@@ -71,3 +71,10 @@ Do not claim these commands work on a given Python build without running them in
 
 ## Immediate development workflow for Claude Code
 First read `README.md`, `BACKLOG.md`, `app.py`, `framescout_engine.py`, `profiles.json`, `requirements.txt` and both `.bat` files. Summarize the current code state and risks before changing architecture. Ask which next improvement to implement if the user's request is unspecified. For each change, report modified files, migration/backward-compatibility consequences, test commands and which tests were actually executed. Keep README and this CLAUDE.md current when behavior changes. Avoid claiming the app is production-ready without an actual end-to-end test.
+
+## Git and commits
+- Repository: private GitHub repo `enqii/frame-scout`, branch `main`.
+- Commit messages **must** follow the [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) specification: `<type>[optional scope][!]: <description>`, optional body, optional footers.
+- Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `style`, `revert`. Breaking changes (e.g. incompatible `profiles.json` schema or CLI options) are marked with `!` and a `BREAKING CHANGE:` footer.
+- Suggested scopes: `engine`, `app`, `install`, `profiles`, `deps`.
+- Description and body in German, imperative, lowercase start, no trailing period; reference backlog IDs where applicable (e.g. `fix(app): referenzbilder nicht mehr überschreiben (A1)`).
