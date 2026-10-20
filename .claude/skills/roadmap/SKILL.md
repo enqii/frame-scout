@@ -1,6 +1,9 @@
 ---
 name: roadmap
-description: Orchestrate the FrameScout roadmap in BACKLOG.md as one pull request per item - reconstruct the current state from git and GitHub, then spawn the implementer or reviewer subagent, relay hold-point questions, and merge only after explicit user approval. Use when the user runs /roadmap or asks to continue, resume or check the status of the roadmap/PR workflow.
+description: Orchestrate the FrameScout roadmap in BACKLOG.md as one pull request per item - reconstruct the current state from git and GitHub, then spawn the implementer or reviewer subagent, relay hold-point questions, and merge only after explicit user approval. Started only by the user typing /roadmap.
+# Deliberately user-invoked only: subagents share this .claude/skills folder in their
+# worktrees, and the orchestrator spawns agents and merges, so the model must never
+# start it on its own (no nested orchestrators).
 disable-model-invocation: true
 ---
 
