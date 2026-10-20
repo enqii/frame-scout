@@ -24,7 +24,7 @@ change below.
    fallback in `SKILL.md`.
 2. Swap the state label:
    `gh pr edit {PR} --remove-label fs:needs-review --add-label fs:review-done`
-   (if `gh` is not on `PATH`: `"/c/Program Files/GitHub CLI/gh.exe"` in Git Bash).
+   (if `gh` is not on `PATH`, use the path given in `CLAUDE.md` → "Git and commits").
 3. Return a short summary to the orchestrator: number of findings by severity, one line
    per finding (file:line – issue), and whether any finding looks like a blocker. Do not
    paste the full review.

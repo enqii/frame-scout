@@ -19,11 +19,10 @@ Briefs (fill in the `{PLACEHOLDERS}` and pass the result as the subagent prompt)
 
 ## Tooling notes
 
-- GitHub CLI: use plain `gh …` (matches the permission rules in `.claude/settings.json`).
-  If `gh` is not on `PATH` in the current shell, use `"/c/Program Files/GitHub CLI/gh.exe"`
-  in Git Bash or `& "C:\Program Files\GitHub CLI\gh.exe"` in PowerShell (these prompt).
+- GitHub CLI: use plain `gh …` (matches the permission rules in `.claude/settings.json`);
+  the fallback path is in `CLAUDE.md` → "Git and commits" (it prompts).
 - Repository: `enqii/frame-scout`, base branch `main`.
-- Never push to `main`, never force-push, never discard local work.
+- Branch, push and user-data rules: `CLAUDE.md` → "PR workflow".
 
 ## 1. Reconstruct state (every start – you are stateless)
 
