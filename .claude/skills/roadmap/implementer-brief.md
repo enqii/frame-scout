@@ -34,7 +34,9 @@ comments (`gh pr view {PR} --comments`, review comments via
   work identity.
 - Mode `new`: `git fetch origin`, then `git switch --no-track -c {BRANCH} origin/main`.
   (`--no-track` matters: a branch that tracks `origin/main` would make a plain
-  `git push` target `main`.) First push with `git push -u origin {BRANCH}`.
+  `git push` target `main`.) First push with `git push -u origin {BRANCH}`, every later
+  push with `git push origin {BRANCH}`. Always name the branch: a bare `git push` asks
+  for approval by design, and only `<type>/…` branch names are pre-approved.
 - Other modes: `git fetch origin`, then `git switch -c {BRANCH} --track origin/{BRANCH}`
   (or `git switch {BRANCH}` if it exists locally) and verify `git status` shows it in
   sync with `origin/{BRANCH}`.
@@ -61,7 +63,10 @@ comments (`gh pr view {PR} --comments`, review comments via
   `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`
   (or the attribution line your session prescribes).
 - **Atomic commits, pushed immediately:** one logical change per commit (tests + code of
-  one behavior belong together), `git push` after every commit.
+  one behavior belong together), `git push origin {BRANCH}` after every commit.
+- Stage files by name (`git add <file> …`). Bulk staging (`git add -A`, `git add .`,
+  `git commit -a`) asks for approval, because it could pick up the user's working
+  `profiles.json` (tracked until I7).
 - **TDD** for behavior changes: write the failing test first, see it fail, implement,
   see it pass. Tests must not download models or need torch unless the item says so;
   use pytest's `tmp_path` for every file they write.
@@ -120,15 +125,20 @@ recommendation when the item needs:
 
 Never modify, delete or commit the user's `profiles.json`, `photos/`, `references/`,
 `results/` or `run.log` (in particular not those in the main checkout). Tests use
-`tmp_path`; smoke runs write their output under `.tmp/` of your worktree, e.g.
-
-```bash
-../../../.venv/Scripts/python.exe framescout_engine.py .tmp/smoke-photos --profiles .tmp/smoke-profiles.json --output .tmp/smoke-results --device cpu --no-person-detection
-```
+`tmp_path`; smoke runs read and write only under `.tmp/` of your worktree (no `..` in
+`--output`).
 
 A real model run downloads weights into user-level caches unless `TORCH_HOME`, `HF_HOME`,
 `XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` point to the main checkout's `.cache/` (as the
-`.bat` files do) – treat an unplanned download as a hold point.
+`.bat` files do), so a smoke run is not pre-approved and always asks. Set the cache
+variables to the existing caches first, e.g. in PowerShell:
+
+```powershell
+$env:TORCH_HOME = "..\..\..\.cache\torch"; $env:HF_HOME = "..\..\..\.cache\huggingface"; $env:XDG_CACHE_HOME = "..\..\..\.cache"; $env:YOLO_CONFIG_DIR = "..\..\..\.cache\ultralytics"
+..\..\..\.venv\Scripts\python.exe framescout_engine.py .tmp\smoke-photos --profiles .tmp\smoke-profiles.json --output .tmp\smoke-results --device cpu --no-person-detection
+```
+
+Treat any download that would still be needed as a hold point.
 
 ## Return to the orchestrator
 
