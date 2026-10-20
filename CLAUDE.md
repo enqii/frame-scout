@@ -12,7 +12,7 @@ Current baseline: **v1.1, prototype**, with a Streamlit frontend and a separate 
 - `requirements.txt`: Streamlit, numpy, Pillow, torch, open_clip_torch, ultralytics, psutil; versions currently loosely constrained.
 - `Install-FrameScout.bat`: checks installed Python 3.14/3.13/3.12 (in that order), creates project-local `.venv`, installs requirements, performs imports.
 - `Start-FrameScout.bat`: launches app via that venv on `127.0.0.1:8501`.
-- `README.txt`: current German user guide.
+- `README.md`: current German user guide (Markdown; GitHub start page).
 - Runtime data (generated, not shipped): `photos/` (default input), `references/`, `results/`, `results/cache.sqlite3`, `results/vorschaubilder/`, `run.log`, `.cache/`, `.tmp/`, `.venv/`.
 
 ## How to run (Windows)
@@ -70,4 +70,4 @@ Do not claim these commands work on a given Python build without running them in
 7. Never conflate a similarity score with certainty. Explain that large group photos, subtle subjects and artwork-to-photo reference comparisons can yield false positives/negatives.
 
 ## Immediate development workflow for Claude Code
-First read `README.txt`, `app.py`, `framescout_engine.py`, `profiles.json`, `requirements.txt` and both `.bat` files. Summarize the current code state and risks before changing architecture. Ask which next improvement to implement if the user's request is unspecified. For each change, report modified files, migration/backward-compatibility consequences, test commands and which tests were actually executed. Keep README and this CLAUDE.md current when behavior changes. Avoid claiming the app is production-ready without an actual end-to-end test.
+First read `README.md`, `BACKLOG.md`, `app.py`, `framescout_engine.py`, `profiles.json`, `requirements.txt` and both `.bat` files. Summarize the current code state and risks before changing architecture. Ask which next improvement to implement if the user's request is unspecified. For each change, report modified files, migration/backward-compatibility consequences, test commands and which tests were actually executed. Keep README and this CLAUDE.md current when behavior changes. Avoid claiming the app is production-ready without an actual end-to-end test.
