@@ -81,7 +81,7 @@ Do not claim these commands work on a given Python build without running them in
 7. Never conflate a similarity score with certainty. Explain that large group photos, subtle subjects and artwork-to-photo reference comparisons can yield false positives/negatives.
 
 ## Development workflow for Claude Code
-- Roadmap work (`BACKLOG.md` → "Roadmap") goes through the PR workflow below; start it with `/roadmap`.
+- Roadmap work (`BACKLOG.md` → "Roadmap") goes through the PR workflow below; start it with `/roadmap`. The skill is user-invoked only (so subagents can never start a second orchestrator): if the user asks in words to continue, resume or check the roadmap, ask them to type `/roadmap` instead of improvising the workflow.
 - For ad-hoc requests: first read `README.md`, `BACKLOG.md`, `app.py`, `framescout_engine.py`, `profiles.json`, `requirements.txt` and both `.bat` files. Summarize the current code state and risks before changing architecture. If the request is unspecified, ask which improvement to implement next.
 - For each change, report modified files, migration/backward-compatibility consequences, test commands and which tests were actually executed (vs. not executed).
 - Keep `README.md`, `BACKLOG.md` (check off items, add new findings with IDs) and this `CLAUDE.md` current when behavior changes.
