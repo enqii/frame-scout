@@ -88,10 +88,10 @@ Do not claim these commands work on a given Python build without running them in
 - Avoid claiming the app is production-ready without an actual end-to-end test.
 
 ## PR workflow
-The roadmap is implemented semi-autonomously, **one pull request per roadmap item**. The `/roadmap` skill (`.claude/skills/roadmap/SKILL.md`) is the orchestrator: it is stateless, reconstructs the current state from git and GitHub on every start and spawns subagents (implementer, reviewer) with the briefs in the same folder.
+The roadmap is implemented semi-autonomously, **one pull request per roadmap item**. The `/roadmap` skill (`.claude/skills/roadmap/SKILL.md`) is the orchestrator: it is stateless, reconstructs the current state from git and GitHub on every start and spawns subagents (implementer, reviewer) with the briefs in the same folder. **This section is the single source of the workflow rules**; the skill and the briefs contain procedures and commands and refer back here instead of repeating the rules.
 
 - **Strictly sequential:** the next roadmap item is started only after the previous PR has been merged.
-- **Branch naming:** `<type>/<id>-<short>`, e.g. `fix/a1-unique-reference-names`, `chore/p0-workflow-english`. Branch from an up-to-date `origin/main`; never push to `main` directly, never force-push.
+- **Branch naming:** `<type>/<id>-<short>`, e.g. `fix/a1-unique-reference-names`, `chore/p0-workflow-english`. Branch from an up-to-date `origin/main` without tracking it (`git switch --no-track -c <branch> origin/main`) and always push with the branch named (`git push [-u] origin <branch>`); never push to `main` directly, never force-push, never discard work you did not create.
 - **Commits:** atomic Conventional Commits (see below), each pushed immediately after it is created, so that no work exists only locally.
 - **Draft PR early:** right after the first commit, open a draft PR (template: `.github/pull_request_template.md`) and label it `fs:in-progress`.
 - **State labels** (exactly one per roadmap PR):
@@ -102,15 +102,15 @@ The roadmap is implemented semi-autonomously, **one pull request per roadmap ite
   | `fs:review-done` | reviewer posted `/code-review` findings as PR comments |
   | `fs:ready` | findings addressed or declined with reasons; waiting for the user's merge approval |
 - **Review:** a fresh reviewer agent runs `/code-review medium <PR> --comment` and must not change code. The implementer then verifies every finding technically, fixes it or declines it with a reasoned reply on the comment thread, and summarizes "addressed / declined" in the PR.
-- **Merge:** only after the user's explicit approval in chat: `gh pr merge <PR> --rebase --delete-branch`, then remove the worktree and update local `main`.
+- **Merge:** only after the user's explicit approval in chat, as a rebase merge (`gh pr merge <PR> --rebase --delete-branch`), followed by worktree and branch cleanup and updating local `main` – the exact procedure is in `/roadmap` → "Merge".
 - **Definition of done:** all checklist items of the PR template are true – summary and backlog IDs, modified files, migration/compatibility consequences, tests executed (with output) vs. not executed, `BACKLOG.md`/`README.md`/`CLAUDE.md` updated where needed, user data untouched, review findings addressed or declined.
 - **Hold points** – the implementer stops and returns a question instead of guessing; the orchestrator asks the user (and posts the question as a PR comment once a PR exists):
   - product/design decisions (e.g. P3 multilingual search or stronger models, P4 gallery/UX, P5 distribution);
   - breaking changes: `profiles.json` schema, CLI options, cache invalidation, folder renames;
-  - new dependencies or downloads;
+  - new dependencies or downloads, unless the roadmap item explicitly names them (e.g. `pytest` in step (1));
   - anything that cannot be verified locally (e.g. CUDA without an NVIDIA GPU) → the PR is marked "not runtime-tested";
   - changes to search quality → first a small local evaluation set (kept outside the repo).
-- **User data protection:** never modify, delete or commit the user's working files: the local `profiles.json`, `photos/`, `references/`, `results/`, `run.log`. The tracked example `profiles.json` changes only in a PR whose roadmap item covers it (I5/I7). Tests use pytest's `tmp_path`; smoke runs write under `.tmp/`.
+- **User data protection:** never modify, delete or commit the user's working files: the local `profiles.json`, `photos/`, `references/`, `results/`, `run.log`. The tracked example `profiles.json` changes only in a PR whose roadmap item covers it (I5/I7); stage files by name, never in bulk. Tests use pytest's `tmp_path`; smoke runs read and write only under `.tmp/` (no `..` in `--output`) and set `TORCH_HOME`, `HF_HOME`, `XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` to the main checkout's `.cache/` first, as the `.bat` files do; a download that would still be needed is a hold point.
 - **Pausing and resuming:**
   - Same PC: `claude --continue` or `claude --resume` restores the orchestrator session. Background subagents do **not** survive exiting Claude Code, but their pushed commits and PR comments do; `/roadmap` picks up from the PR labels.
   - Other PC: clone the repo, run `Install-FrameScout.bat`, start Claude Code in the folder and run `/roadmap`; it reconstructs the state from GitHub.
