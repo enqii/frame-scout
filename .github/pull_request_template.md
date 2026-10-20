@@ -34,7 +34,9 @@
 - [ ] Commits follow Conventional Commits (English, imperative, lowercase, backlog IDs)
 - [ ] Tests executed and their output included above; not-executed tests listed
 - [ ] CI checks green (once CI exists)
-- [ ] `BACKLOG.md` updated (item/IDs checked off with date, new findings added)
+- [ ] `BACKLOG.md` updated (item/IDs checked off with date)
+- [ ] Out-of-scope findings added to `BACKLOG.md` as new items (IDs: …), or none found;
+      declined review findings that defer work name their backlog ID (no GitHub issues)
 - [ ] `README.md` updated, or not affected
 - [ ] `CLAUDE.md` updated, or not affected
 - [ ] User data untouched (`profiles.json` of the user, `photos/`, `references/`, `results/`, `run.log`)
