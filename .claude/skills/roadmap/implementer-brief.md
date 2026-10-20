@@ -73,7 +73,8 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   The PR body ends with the line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - Keep the PR description current while you work (`gh pr edit {PR} --body-file <file>`).
 - Update `BACKLOG.md`, `README.md` and `CLAUDE.md` in the same PR as `CLAUDE.md` →
-  "PR workflow" requires.
+  "PR workflow" requires – including out-of-scope findings as new backlog items
+  ("Out-of-scope findings go into the backlog"; no GitHub issues).
 - When the definition of done (`CLAUDE.md` and the PR template) is met: `gh pr ready {PR}`,
   then `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:needs-review`.
   Check CI with `gh pr checks {PR}` once CI exists.
@@ -86,7 +87,8 @@ For **every** unanswered review comment:
    agree performatively and do not fix blindly.
 2. Either fix it (own commit, pushed, e.g. `fix(engine): … (review)`) and reply on the
    comment thread with the commit SHA, or decline it with a reasoned reply on the
-   thread. Reply to inline review comments with
+   thread. If you decline because the work is valid but out of scope, add it to
+   `BACKLOG.md` as a new item (see `CLAUDE.md`) and name the new ID in the reply. Reply to inline review comments with
    `gh api repos/enqii/frame-scout/pulls/{PR}/comments/<comment_id>/replies -f body=...`
    (or `-F body=@<file>`); reply to general PR comments with `gh pr comment {PR}`.
 3. Add a section "Review: addressed / declined" to the PR description listing each
