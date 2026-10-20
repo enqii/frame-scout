@@ -1,0 +1,7 @@
+streamlit>=1.40
+numpy
+pillow
+torch
+open_clip_torch
+ultralytics
+psutil

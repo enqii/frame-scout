@@ -1,0 +1,18 @@
+# Python-Umgebung und Caches
+.venv/
+__pycache__/
+*.pyc
+.cache/
+.tmp/
+.pytest_cache/
+
+# Modellgewichte (werden beim ersten Lauf heruntergeladen)
+*.pt
+
+# Nutzerdaten und Laufzeit-Ausgaben – nie ins Repo
+photos/
+references/
+results/
+run.log
+profiles.tmp
+profiles.json.bak
