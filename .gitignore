@@ -1,4 +1,4 @@
-# Python-Umgebung und Caches
+# Python environment and caches
 .venv/
 __pycache__/
 *.pyc
@@ -6,13 +6,17 @@ __pycache__/
 .tmp/
 .pytest_cache/
 
-# Modellgewichte (werden beim ersten Lauf heruntergeladen)
+# Model weights (downloaded on the first run)
 *.pt
 
-# Nutzerdaten und Laufzeit-Ausgaben – nie ins Repo
+# User data and runtime output – never in the repo
 photos/
 references/
 results/
 run.log
 profiles.tmp
 profiles.json.bak
+
+# Claude Code: agent worktrees and personal settings
+.claude/worktrees/
+.claude/settings.local.json
