@@ -1,105 +1,118 @@
-# FrameScout – Lokale KI-Bildsuche
+# FrameScout – Local AI Image Search
 
-FrameScout durchsucht große lokale Fotosammlungen nach Motiven. Du beschreibst, was du
-suchst (z. B. „rotes Auto“, „Golden Retriever“, „Berglandschaft“), und gibst optional
-Beispielbilder dazu. FrameScout erstellt daraus pro Suchprofil eine Rangliste der
-passendsten Fotos als HTML-Galerie.
+FrameScout searches large local photo collections for motifs. You describe what you are
+looking for (e.g. "red car", "golden retriever", "mountain landscape") and optionally add
+example images. For each search profile, FrameScout creates a ranked list of the best
+matching photos as an HTML gallery.
 
-- **Lokal:** Eigene Bilder verlassen den Rechner nicht. Nur Modellgewichte und
-  Python-Pakete werden bei der Installation bzw. beim ersten Lauf heruntergeladen.
-- **Allgemein:** Personen, Objekte, Fahrzeuge, Tiere, Landschaften, Szenen.
-- **Ohne Sprachmodell:** Die Suche basiert auf CLIP (ViT-B/32), optional ergänzt um
-  YOLO11n-Personenerkennung für Gruppenfotos.
+- **Local:** Your images never leave your computer. Only model weights and Python
+  packages are downloaded during installation or the first run.
+- **General-purpose:** People, objects, vehicles, animals, landscapes, scenes.
+- **No language model:** Search is based on CLIP (ViT-B/32), optionally combined with
+  YOLO11n person detection for group photos.
 
-> **Status:** Prototyp (v1.1). Offene Punkte und Roadmap stehen in [BACKLOG.md](BACKLOG.md).
+> **Status:** Prototype (v1.1). Open issues and the roadmap are listed in
+> [BACKLOG.md](BACKLOG.md).
+>
+> **Note:** The user interface is currently still in German. Translating it to English is
+> planned (backlog item I7). UI labels below are quoted as they currently appear, with an
+> English gloss.
 
-## Voraussetzungen
+## Requirements
 
 - Windows 10/11
-- Python **3.14, 3.13 oder 3.12** mit `py`-Launcher (Installation über python.org)
-- Internetverbindung für die Installation und den ersten Suchlauf
-- Eine dedizierte GPU ist nicht nötig; die Suche läuft auch auf der CPU.
+- Python **3.14, 3.13 or 3.12** with the `py` launcher (install from python.org)
+- Internet connection for installation and the first search run
+- A dedicated GPU is not required; search also runs on the CPU.
 
 ## Installation
 
-1. Projekt in einen eigenen Ordner holen, z. B. `C:\FrameScout`:
+1. Get the project into a folder of its own, e.g. `C:\FrameScout`:
    ```powershell
    git clone https://github.com/enqii/frame-scout.git C:\FrameScout
    ```
-   (alternativ ZIP herunterladen und entpacken)
-2. `Install-FrameScout.bat` doppelklicken. Der Installer sucht Python 3.14, 3.13 oder
-   3.12 (in dieser Reihenfolge), legt eine isolierte `.venv` im Projektordner an und
-   installiert die Abhängigkeiten.
+   (alternatively download the ZIP and extract it)
+2. Double-click `Install-FrameScout.bat`. The installer looks for Python 3.14, 3.13 or
+   3.12 (in that order), creates an isolated `.venv` in the project folder and installs
+   the dependencies.
 
-Falls die Paketinstallation mit einer Python-Version scheitert: `.venv` löschen, eine
-andere unterstützte Python-Version installieren und den Installer erneut starten.
+If package installation fails with one Python version: delete `.venv`, install another
+supported Python version and run the installer again.
 
-## Start und Bedienung
+## Starting and using FrameScout
 
-1. `Start-FrameScout.bat` doppelklicken. Der Browser öffnet
+1. Double-click `Start-FrameScout.bat`. Your browser opens
    <http://127.0.0.1:8501>.
-2. **Suchprofile:** Motiv benennen, optional Kontext, Merkmale (am besten auf Englisch),
-   eigene Suchtexte und Referenzbilder angeben.
-3. **Fotoquelle:** Lokalen Bildordner wählen (Standard: `photos` im Projektordner).
-   Unterordner werden mit durchsucht. Archive und Online-Alben vorher selbst
-   herunterladen und entpacken – FrameScout lädt keine Bilder aus dem Netz.
-4. **KI-Einstellungen:** Mit „auto“ wird CUDA genutzt, falls PyTorch eine kompatible
-   NVIDIA-GPU erkennt, sonst die CPU. Batchgröße 8 ist ein konservativer Startwert.
-5. **Suche & Ergebnisse:** Analyse starten. Den Browser während des Suchlaufs möglichst
-   offen lassen – Start/Stopp hängt an der laufenden Streamlit-Sitzung.
+2. **Suchprofile** (search profiles): name the motif and optionally add context,
+   features (preferably in English), custom search texts and reference images.
+3. **Fotoquelle** (photo source): choose a local image folder (default: `photos` in the
+   project folder). Subfolders are searched as well. Download and extract archives and
+   online albums yourself beforehand – FrameScout does not download images from the
+   internet.
+4. **KI-Einstellungen** (AI settings): with "auto", CUDA is used if PyTorch detects a
+   compatible NVIDIA GPU, otherwise the CPU. A batch size of 8 is a conservative
+   starting value.
+5. **Suche & Ergebnisse** (search & results): start the analysis. Keep the browser open
+   during the search run if possible – start/stop is tied to the running Streamlit
+   session.
 
-Unterstützte Formate: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
+Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 
-## Ergebnisse
+## Results
 
-- Pro Suchprofil entsteht eine HTML-Galerie in `results/`, die Vorschaubilder liegen in
-  `results/vorschaubilder/`. Ein Klick auf ein Foto öffnet das Original.
-- Den Ordner `results` zusammenhalten: Eine einzeln exportierte HTML-Datei enthält keine
-  Vorschaubilder, und die Links auf die Originale funktionieren nur auf diesem Rechner.
-- Bereits analysierte Fotos werden in `results/cache.sqlite3` gespeichert. Ein
-  abgebrochener Lauf setzt beim nächsten Start dort fort, und neue Suchprofile nutzen
-  vorhandene Analysen wieder.
+- One HTML gallery per search profile is written to `results/`; the thumbnails are
+  stored in `results/vorschaubilder/`. Clicking a photo opens the original.
+- Keep the `results` folder together: an HTML file exported on its own contains no
+  thumbnails, and the links to the originals only work on this computer.
+- Photos that have already been analyzed are stored in `results/cache.sqlite3`. An
+  interrupted run resumes from there on the next start, and new search profiles reuse
+  existing analyses.
 
-### Wie verlässlich sind die Treffer?
+### How reliable are the matches?
 
-Die angezeigte „Ähnlichkeit“ ist ein relativer Ranking-Wert, **keine Wahrscheinlichkeit
-und keine sichere Identifikation**. FrameScout kann Treffer übersehen oder falsche
-Treffer liefern – besonders bei großen Gruppenfotos, kleinen oder unauffälligen Motiven
-und beim Vergleich von Zeichnungen/Artwork mit echten Fotos. Die Personenerkennung hilft
-bei Menschen in Gruppenbildern; für andere Motive kann sie abgeschaltet werden.
+The displayed "Ähnlichkeit" (similarity) is a relative ranking value, **not a probability
+and not a reliable identification**. FrameScout can miss matches or return false matches
+– especially with large group photos, small or inconspicuous motifs, and when comparing
+drawings/artwork with real photos. Person detection helps with people in group photos;
+it can be turned off for other motifs.
 
-## Deinstallation
+## Uninstalling
 
-1. Ergebnisse und gewünschte Fotos an anderer Stelle sichern.
-2. FrameScout schließen und den Projektordner löschen. Damit sind `.venv`, Caches
-   (`.cache`, `.tmp`), Modellgewichte (inkl. `yolo11n.pt`) und Ergebnisse entfernt.
+1. Back up results and any photos you want to keep elsewhere.
+2. Close FrameScout and delete the project folder. This removes `.venv`, caches
+   (`.cache`, `.tmp`), model weights (including `yolo11n.pt`) and results.
 
-Eine systemweit installierte Python-Version bleibt bestehen. Einzelne Abhängigkeiten
-können zusätzlich eigene Caches im Benutzerprofil anlegen.
+A system-wide Python installation remains in place. Individual dependencies may also
+create their own caches in your user profile.
 
-## Entwicklung
+## Development
 
-Manueller Start nach der Installation:
+Manual start after installation:
 
 ```powershell
-# Oberfläche
+# User interface
 .\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 
-# Engine direkt (CLI)
+# Engine directly (CLI)
 .\.venv\Scripts\python.exe framescout_engine.py .\photos --profiles .\profiles.json --output .\results --device cpu --batch-size 8 --top 150
 ```
 
-Alle Optionen der Engine: `.\.venv\Scripts\python.exe framescout_engine.py --help`
+All engine options: `.\.venv\Scripts\python.exe framescout_engine.py --help`
 
-### Projektstruktur
+Contributions follow the PR workflow described in [CLAUDE.md](CLAUDE.md) (Conventional
+Commits, one pull request per roadmap item).
 
-| Datei / Ordner | Zweck |
+### Project structure
+
+| File / folder | Purpose |
 |---|---|
-| `app.py` | Streamlit-Oberfläche (Profile, Fotoquelle, Einstellungen, Suchlauf) |
-| `framescout_engine.py` | Such-Engine als eigenständige CLI |
-| `profiles.json` | Gespeicherte Suchprofile |
-| `requirements.txt` | Python-Abhängigkeiten |
-| `Install-FrameScout.bat` / `Start-FrameScout.bat` | Installation und Start unter Windows |
-| `BACKLOG.md` | Bekannte Schwachstellen und Roadmap |
-| `photos/`, `references/`, `results/`, `run.log` | Nutzerdaten und Laufzeit-Ausgaben (nicht im Repo) |
-| `.venv/`, `.cache/`, `.tmp/`, `yolo11n.pt` | Umgebung, Caches und Modellgewichte (nicht im Repo) |
+| `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
+| `framescout_engine.py` | Search engine as a standalone CLI |
+| `profiles.json` | Saved search profiles |
+| `requirements.txt` | Python dependencies |
+| `Install-FrameScout.bat` / `Start-FrameScout.bat` | Installation and start on Windows |
+| `BACKLOG.md` | Known weaknesses and roadmap |
+| `CLAUDE.md` | Project onboarding and development workflow |
+| `.claude/` | Claude Code project settings and the `/roadmap` workflow skill |
+| `photos/`, `references/`, `results/`, `run.log` | User data and runtime output (not in the repo) |
+| `.venv/`, `.cache/`, `.tmp/`, `yolo11n.pt` | Environment, caches and model weights (not in the repo) |
