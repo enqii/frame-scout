@@ -82,6 +82,12 @@ referenced in commits, pull requests and discussions.
         names.
       - The legacy `franchise` field and the `--character` CLI option stay for
         compatibility.
+- [ ] **I8 – No branch protection for `main`:** GitHub returns HTTP 403 "Upgrade to GitHub
+      Pro or make this repository public to enable this feature" for the private repo, so
+      `main` is protected only by the workflow rule (merge only on explicit user approval)
+      and the deny rules in `.claude/settings.json`, which are not a security boundary.
+      Options: GitHub Pro, making the repository public, or accepting the workflow rule.
+      User decision → hold point.
 
 ## Roadmap (priority)
 
