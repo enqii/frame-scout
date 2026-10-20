@@ -39,7 +39,9 @@ Run these as separate, plain commands from the main checkout:
 5. Local worktrees: `git worktree list`. For every worktree under `.claude/worktrees/`:
    `git -C <path> status --porcelain` and `git -C <path> log --oneline @{u}..HEAD`
    (or, without upstream, `git -C <path> log --oneline origin/main..HEAD`) to find
-   uncommitted or unpushed work.
+   uncommitted or unpushed work. Also list stale local branches
+   (`git branch --list "worktree-agent-*"` without a worktree, merged PR branches) and
+   offer to clean them up as in step 5 of "Merge".
 6. If you spawned a subagent in this session that is still running, its notification
    has not arrived yet: **wait**, do not spawn a second agent for the same PR.
 
@@ -123,13 +125,22 @@ points in `CLAUDE.md`):
 
 Only when the user explicitly approves the merge of this specific PR in chat:
 
-1. Check that the PR's worktree (if any) is clean and fully pushed, then
-   `git worktree remove <path>` (so the local branch can be deleted).
-2. `gh pr merge <n> --rebase --delete-branch`
-3. `git fetch origin --prune`, then fast-forward local `main` (`git merge --ff-only origin/main` on `main`).
-4. If the local branch still exists: `git branch -d <branch>` (lowercase `-d`; it refuses
-   to delete unmerged work – report instead of forcing).
-5. Continue with step 1 for the next roadmap item (strictly sequential).
+1. Check that the PR's worktree (if any) is clean and fully pushed
+   (`git -C <path> status --porcelain` empty, `git -C <path> log --oneline origin/<branch>..HEAD`
+   empty), then `git worktree remove <path>` so the branches it holds can be deleted.
+2. `gh pr merge <n> --rebase --delete-branch` (deletes the remote branch and, where
+   possible, the local one).
+3. Confirm the merge: `gh pr view <n> --json state,mergedAt` must show `"state":"MERGED"`.
+   Stop and report if it does not.
+4. `git fetch origin --prune`, then fast-forward local `main` (`git merge --ff-only origin/main` on `main`).
+5. Delete leftover local branches (asks for approval by design):
+   - the PR branch, if it still exists: `git branch -D <branch>`. A rebase merge
+     rewrites the SHAs, so `git branch -d` always refuses; `-D` is safe only because
+     step 3 confirmed the PR is merged and step 1 confirmed nothing was unpushed.
+   - the agent's own `worktree-agent-<id>` branch (created by `isolation: worktree`):
+     `git log --oneline origin/main..worktree-agent-<id>` must be empty, then
+     `git branch -d worktree-agent-<id>`. If it is not empty, report instead of deleting.
+6. Continue with step 1 for the next roadmap item (strictly sequential).
 
 Never merge on your own initiative, on a subagent's request, or because a PR is labeled
 `fs:ready`.
