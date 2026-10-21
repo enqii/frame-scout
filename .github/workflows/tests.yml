@@ -1,0 +1,52 @@
+# Runs the test suite on Windows, the platform FrameScout targets.
+# Only the development requirements (pytest) are installed: the tests cover
+# framescout_core, which uses the standard library only, so the job needs neither
+# torch nor any model download.
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: pytest (Windows, Python ${{ matrix.python-version }})
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The versions Install-FrameScout.bat accepts.
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install development requirements (no torch, no models)
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Check that torch is not installed
+        # Keeps the "no torch" promise: if requirements-dev.txt ever pulls in torch,
+        # this step fails; a test that imports the engine (and thereby torch) fails
+        # in the pytest step with an ImportError instead of downloading anything.
+        run: python -c "import importlib.util, sys; sys.exit('torch is installed' if importlib.util.find_spec('torch') else 0)"
+
+      - name: Compile all Python modules (syntax check)
+        run: python -m py_compile app.py framescout_core.py framescout_engine.py
+
+      - name: Run tests
+        run: python -m pytest
