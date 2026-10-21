@@ -66,8 +66,11 @@ starts with the new example profiles.
    …) that you can edit or delete. Uploaded reference images are copied to
    `references/<profile name>/` (e.g. `references/red-car/`); a profile whose name
    leads to a folder another profile already uses gets its own (`red-car-2`, …).
-   Removing reference images from a profile or deleting a profile does not delete the
-   files.
+   When you rename a profile, its reference images move to the folder of the new name
+   and the profile is updated accordingly; other files in the old folder (e.g. images
+   you removed from the profile) stay there, and the old folder is deleted only if it is
+   empty. Removing reference images from a profile or deleting a profile does not delete
+   the files.
 3. **Photo source:** choose a local image folder (default: `photos` in the
    project folder). Subfolders are searched as well. Download and extract archives and
    online albums yourself beforehand – FrameScout does not download images from the

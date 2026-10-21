@@ -62,8 +62,13 @@ referenced in commits, pull requests and discussions.
       overwrite a file – needed because transliteration made more names share a folder,
       e.g. "Bär"/"Baer" → `references/baer/`. Still open: one folder per profile.)
       (done 2026-10-21: `framescout_core.reference_folder` uses `references/<slug>/`, or
-      `<slug>-2`, `-3`, … if that folder holds references of another profile; folders
-      shared before and existing reference paths are not moved. Leftover files: A14.)
+      `<slug>-2`, `-3`, … if that folder holds references of another profile. On a
+      rename, the profile's own files under `references/` move to the folder of the new
+      name (user decision in the review: the folder follows the name): hard link or
+      copy first, save `profiles.json`, then remove the old names, so a crash never leaves
+      paths to missing files. Files of other profiles, leftovers and paths outside
+      `references/` stay; a folder shared before A1 is split only when one of its
+      profiles is renamed. Leftover files: A14.)
 - [x] **A2 – `profiles.json` data loss:** `read_profiles` does not know the v3 format
       (returns `[]`, the next save overwrites the file). A JSON list → `AttributeError`
       (not caught). No backup before saving.
