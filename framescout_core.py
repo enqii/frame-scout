@@ -15,10 +15,15 @@ from pathlib import Path
 EXT = frozenset({'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'})
 
 
-# Letters that Unicode decomposition does not reduce to ASCII (or, for the German umlauts,
-# where the conventional transliteration differs from just dropping the diacritic).
-_TRANSLITERATION = str.maketrans({'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss', 'æ': 'ae',
-                                  'œ': 'oe', 'ø': 'o', 'ł': 'l', 'đ': 'd', 'ð': 'd', 'þ': 'th'})
+# Lowercase Latin letters that Unicode decomposition does not reduce to ASCII (all of
+# Latin-1 Supplement and Latin Extended-A, plus common stroke letters of Extended-B), and
+# the German umlauts, whose conventional transliteration differs from dropping the
+# diacritic. Letters missing here are dropped; a name left empty gets the hash fallback.
+_TRANSLITERATION = str.maketrans({
+    'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss', 'æ': 'ae', 'œ': 'oe', 'ø': 'o', 'ł': 'l',
+    'đ': 'd', 'ð': 'd', 'þ': 'th', 'ı': 'i', 'ħ': 'h', 'ŧ': 't', 'ŋ': 'ng', 'ĸ': 'k',
+    'ƀ': 'b', 'ƈ': 'c', 'ƒ': 'f', 'ǥ': 'g', 'ƙ': 'k', 'ƚ': 'l', 'ƥ': 'p', 'ƭ': 't',
+    'ƴ': 'y', 'ƶ': 'z', 'ȼ': 'c', 'ɇ': 'e', 'ɉ': 'j', 'ɍ': 'r', 'ɏ': 'y', 'ȷ': 'j'})
 # Device names that Windows does not accept as file names, even with an extension.
 _WINDOWS_DEVICE_NAMES = frozenset({'con', 'prn', 'aux', 'nul',
                                    *(f'com{i}' for i in range(1, 10)),
@@ -38,7 +43,8 @@ def slugify(s):
     # and the hash fallback does not depend on the normal form either
     s = unicodedata.normalize('NFC', s)
     text = unicodedata.normalize('NFKD', s.lower().translate(_TRANSLITERATION))
-    text = text.encode('ascii', 'ignore').decode('ascii')
+    # second pass for letters that only appear after decomposition ("ǽ" -> "æ" + acute)
+    text = text.translate(_TRANSLITERATION).encode('ascii', 'ignore').decode('ascii')
     slug = re.sub('[^a-z0-9]+', '-', text).strip('-')[:SLUG_MAX_LENGTH].rstrip('-')
     if not slug:
         return hashlib.sha256(s.encode()).hexdigest()[:10]

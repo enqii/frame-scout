@@ -25,6 +25,10 @@ def test_ascii_names(name, slug):
     ('Ñandú', 'nandu'),
     ('Ærø Œuvre', 'aero-oeuvre'),
     ('Łódź', 'lodz'),
+    ('Kırmızı araba', 'kirmizi-araba'),
+    ('Ħamrun Ŧ Ŋ ĸ', 'hamrun-t-ng-k'),
+    ('Ǽ ǿ', 'ae-o'),               # precomposed letters whose base is in the table
+    ('ƀ ƒ ǥ ɇ ƶ', 'b-f-g-e-z'),
 ])
 def test_latin_letters_with_diacritics_are_transliterated(name, slug):
     assert slugify(name) == slug
