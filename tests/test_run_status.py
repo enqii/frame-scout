@@ -302,6 +302,23 @@ def test_write_status_round_trips(tmp_path):
     assert read_status(path) == {'pid': 3, 'phase': 'loading'}
 
 
+def test_write_status_retries_a_failed_replace(tmp_path, monkeypatch):
+    # the app reads the file every two seconds; on Windows a replace fails for that moment
+    real_replace = framescout_core.os.replace
+    calls = []
+
+    def flaky(src, dst):
+        calls.append(dst)
+        if len(calls) == 1:
+            raise PermissionError('in use')
+        real_replace(src, dst)
+
+    monkeypatch.setattr(framescout_core.os, 'replace', flaky)
+    path = tmp_path / RUN_STATUS
+    assert write_status(path, {'pid': 3}, attempts=2, retry_delay=0)
+    assert len(calls) == 2 and read_status(path) == {'pid': 3}
+
+
 def test_write_status_gives_up_after_its_attempts(tmp_path):
     path = tmp_path / RUN_STATUS
     path.mkdir()
