@@ -1,17 +1,23 @@
 """CLIP model choice and the feature cache signature (E1)."""
-import hashlib
-import json
+import pytest
 
 from framescout_core import CLIP_MODEL, CLIP_PRETRAINED, ENGINE, feature_signature
 
 DEFAULTS = dict(person_detection=True, max_persons=12, person_confidence=.3, yolo_model='yolo11n.pt')
+# Signature of the default settings in v1.1 (ENGINE v4, GELU embeddings)
+V1_1_DEFAULT_SIGNATURE = '552c0464be05f62156f4acb048eb1555db8e3bc80f63416f9909695dc59c20b4'
 
 
-def test_openai_weights_use_the_quickgelu_architecture():
-    # the OpenAI CLIP weights were trained with QuickGELU; the plain "ViT-B-32" config
-    # uses GELU, which loads the weights without error but degrades the embeddings
-    assert CLIP_PRETRAINED == 'openai'
-    assert CLIP_MODEL == 'ViT-B-32-quickgelu'
+def test_model_config_matches_the_activation_of_the_weights():
+    # Runs only where open_clip is installed (the project venv); CI has no torch and skips
+    # it. Reads open_clip's config tables only, no model download. open_clip warns about a
+    # "QuickGELU mismatch" exactly when these two values differ: the OpenAI weights were
+    # trained with QuickGELU, the plain "ViT-B-32" config uses GELU (E1).
+    open_clip = pytest.importorskip('open_clip')
+    from open_clip.pretrained import get_pretrained_cfg
+    weights = get_pretrained_cfg(CLIP_MODEL, CLIP_PRETRAINED)
+    assert weights, f'open_clip has no {CLIP_PRETRAINED!r} weights for {CLIP_MODEL!r}'
+    assert open_clip.get_model_config(CLIP_MODEL).get('quick_gelu', False) == weights.get('quick_gelu', False)
 
 
 def test_engine_names_the_clip_model():
@@ -19,17 +25,14 @@ def test_engine_names_the_clip_model():
     assert CLIP_MODEL in ENGINE and CLIP_PRETRAINED in ENGINE
 
 
-def test_signature_differs_from_the_gelu_cache_of_v1_1():
-    # signature of the default settings before E1: these rows hold GELU embeddings and
-    # must not be reused, so every photo is analyzed once more after the update
-    old = ['v4-clip-vit-b-32-openai-yolo11n-crop-features-1', True, 12, .3, 'yolo11n.pt']
-    old_signature = hashlib.sha256(json.dumps(old, sort_keys=True).encode()).hexdigest()
-    assert feature_signature(**DEFAULTS) != old_signature
-
-
-def test_signature_is_stable():
-    assert feature_signature(**DEFAULTS) == feature_signature(**DEFAULTS)
-    assert len(feature_signature(**DEFAULTS)) == 64
+def test_signature_values_are_pinned():
+    # Golden values: any change to ENGINE, the config list or its serialization makes every
+    # user's cache invalid, so it must be deliberate and update these values.
+    assert feature_signature(**DEFAULTS) == 'ff0961b445ea26b7f0a4c5ea39a078d1297927da627246d962cef5c1e698fa47'
+    assert feature_signature(**{**DEFAULTS, 'person_detection': False}) == (
+        '943924600aec2d9c711312c59c8db2ae7e33864857967169edc8f87ea2bdcb76')
+    # the GELU rows of v1.1 are never reused, so every photo is analyzed once more
+    assert feature_signature(**DEFAULTS) != V1_1_DEFAULT_SIGNATURE
 
 
 def test_every_detector_setting_changes_the_signature():
