@@ -203,6 +203,50 @@ def undo_reference_move(staged):
             pass
 
 
+def update_backup_references(filename, staged, base):
+    """After a move was saved, point the moved reference paths in <filename>.bak to the new names.
+
+    Call it between save_profiles (which wrote the backup with the old paths) and
+    finish_reference_move (which removes the old names), so restoring the backup keeps
+    working after a rename (review). Only the paths of the moved files (staged, from
+    stage_reference_move; relative to base) change; everything else, including other
+    top-level keys and their order, stays. The backup is replaced via a flushed temporary
+    file, so a crash leaves the old or the new backup, and while the old names still
+    exist both point to existing files.
+
+    Returns True if the backup now fits the moved files (also if nothing had to change,
+    it is missing or in the v3 format without reference paths) and False if it cannot be
+    read, so it is left alone. Raises OSError if rewriting fails: the caller should then
+    keep the old names (not call finish_reference_move), so the backup still works.
+    """
+    if not staged:
+        return True
+    backup = _backup_path(filename)
+    try:
+        data = backup.read_bytes()
+    except FileNotFoundError:
+        return True
+    try:
+        document = json.loads(data.decode('utf-8-sig'))
+    except ValueError:
+        return False
+    if not isinstance(document, dict):
+        return False
+    profiles = document.get('profiles') if 'profiles' in document else []  # v3: no paths
+    new_paths = {_path_key(old): Path(os.path.relpath(new, base)).as_posix() for old, new in staged}
+    changed = False
+    for profile in profiles if isinstance(profiles, list) else []:
+        refs = profile.get('reference_images') if isinstance(profile, dict) else None
+        for i, ref in enumerate(refs if isinstance(refs, list) else []):
+            if isinstance(ref, str) and ref.strip():
+                new = new_paths.get(_path_key(base / ref))
+                if new is not None and new != ref:
+                    refs[i], changed = new, True
+    if changed:
+        _replace_atomically(backup, (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
+    return True
+
+
 def write_new_file(folder, stem, suffix, data):
     """Write data to folder/<stem>-<n><suffix> with the smallest free n >= 1; return the path.
 
@@ -474,7 +518,7 @@ def save_profiles(filename, profiles):
         previous = None
     document = {'profiles': profiles}
     if previous is not None:
-        _replace_atomically(filename.with_name(filename.name + '.bak'), previous)
+        _replace_atomically(_backup_path(filename), previous)
         try:
             old = json.loads(previous.decode('utf-8-sig'))
         except ValueError:  # unreadable: nothing to keep (the .bak has it)
@@ -485,6 +529,11 @@ def save_profiles(filename, profiles):
             document = {**old, 'profiles': profiles}
     text = json.dumps(document, ensure_ascii=False, indent=2) + '\n'
     _replace_atomically(filename, text.encode('utf-8'))
+
+
+def _backup_path(filename):
+    """Return the backup file of a profiles file: <filename>.bak."""
+    return filename.with_name(filename.name + '.bak')
 
 
 def _replace_atomically(target, data):
