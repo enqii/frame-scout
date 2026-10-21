@@ -49,7 +49,7 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
                     written.append(write_new_file(folder, 'reference', suffix, f.getvalue()))
         # keeps the previous file as profiles.json.bak (A2)
         save_profiles(PROFILES, build(refs + [x.relative_to(BASE).as_posix() for x in written]))
-    except OSError as exc:
+    except (OSError, ValueError) as exc:  # ValueError: e.g. a path that cannot be made relative
         undo_reference_move(staged)
         for x in written:
             try:
