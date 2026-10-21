@@ -48,7 +48,9 @@ detection then run on the GPU. You can also choose directly:
 .\Install-FrameScout.bat cpu    # PyTorch for the CPU only
 ```
 
-Running the installer again with the other option switches between the two. For CUDA
+Running the installer again without an option (e.g. after an update) keeps an installed
+CUDA build and asks nothing; `cpu` or `cuda` switches between the two. If the GPU cannot
+be checked at that moment, an installed CUDA build is kept as well. For CUDA
 the installer picks the PyTorch build from the GPU and driver that `nvidia-smi` reports:
 CUDA 13.0 for GeForce RTX 20 series or newer (compute capability 7.5+) with driver 580 or
 newer, otherwise CUDA 12.6 (GeForce GTX 900 series or newer, compute capability 5.0 up
