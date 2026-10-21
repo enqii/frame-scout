@@ -75,11 +75,31 @@ def profile_slugs(names):
     return slugs
 
 
+def reference_folder(refs_root, name, others, base):
+    """Return the folder for new reference images of the profile name.
+
+    That is refs_root/<slug>, or <slug>-2, <slug>-3, ... if the folder holds a reference
+    image of one of the other profiles (dicts with "reference_images", paths relative to
+    base), so two profiles never share a folder (A1). Leftover files that no other
+    profile references do not block a folder: write_new_file never overwrites them.
+    """
+    def key(path):
+        return os.path.normcase(path.resolve())
+
+    used = {key((base / ref).parent) for profile in others for ref in profile.get('reference_images', [])}
+    slug = slugify(name)
+    folder, n = refs_root / slug, 2
+    while key(folder) in used:
+        folder, n = refs_root / f'{slug}-{n}', n + 1
+    return folder
+
+
 def write_new_file(folder, stem, suffix, data):
     """Write data to folder/<stem>-<n><suffix> with the smallest free n >= 1; return the path.
 
-    Never overwrites an existing file (exclusive create), so reference images of profiles
-    that share a folder cannot replace each other. Creates the folder if needed.
+    Never overwrites an existing file (exclusive create), so leftover reference images
+    (e.g. of a deleted profile, or in a folder shared by profiles before A1) are kept.
+    Creates the folder if needed.
     """
     folder.mkdir(parents=True, exist_ok=True)
     n = 1
