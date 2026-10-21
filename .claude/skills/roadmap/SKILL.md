@@ -140,7 +140,15 @@ Only when the user explicitly approves the merge of this specific PR in chat:
    possible, the local one).
 4. Confirm the merge: `gh pr view <n> --json state,mergedAt` must show `"state":"MERGED"`.
    Stop and report if it does not.
-5. `git fetch origin --prune`, then fast-forward local `main` (`git merge --ff-only origin/main` on `main`).
+5. `git fetch origin --prune`, then fast-forward local `main` (`git merge --ff-only origin/main` on `main`)
+   with a guard for the user's `profiles.json`: it was tracked until I7, so a fast-forward
+   across that change deletes an unchanged copy (and refuses for an edited one).
+   - Before the fast-forward, if `profiles.json` exists in the main checkout, copy it to
+     `profiles.json.<YYYYMMDD-HHMMSS>.bak` (gitignored) and keep that backup.
+   - If the fast-forward refuses because of `profiles.json`, stop and report; never
+     discard, stash or check out over it.
+   - Afterwards, if `profiles.json` existed before and is missing now, copy the backup
+     back to `profiles.json` and mention it in your report.
 6. Delete leftover local branches (asks for approval by design):
    - the PR branch, if it still exists: `git branch -D <branch>`. A rebase merge
      rewrites the SHAs, so `git branch -d` always refuses; `-D` is safe only because
