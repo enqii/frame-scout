@@ -5,12 +5,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+import psutil
 import streamlit as st
 
-from framescout_core import (EXT, create_from_example, cuda_status, device_choices, finish_reference_move,
-                             parse_progress, profile_slugs,
-                             read_profiles, reference_folder, save_profiles, stage_reference_move,
-                             undo_reference_move, update_backup_references, write_new_file)
+from framescout_core import (EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter,
+                             create_from_example, cuda_status, device_choices, finish_reference_move, lock_held,
+                             profile_slugs, read_profiles, read_status, reference_folder, run_active, same_run,
+                             save_profiles, stage_reference_move, status_fraction, status_text, stopped_status,
+                             undo_reference_move, update_backup_references, write_new_file, write_status)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -18,6 +20,9 @@ EXAMPLE_PROFILES = BASE / 'profiles.example.json'
 REFS = BASE / 'references'
 RESULTS = BASE / 'results'
 LOG = BASE / 'run.log'
+# held by the engine while it runs, and its phase and progress (A4, A5)
+LOCK = RESULTS / RUN_LOCK
+STATUS = RESULTS / RUN_STATUS
 UPLOAD_TYPES = sorted(x.lstrip('.') for x in EXT)
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
@@ -83,9 +88,85 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
     st.session_state.saves = st.session_state.get('saves', 0) + 1
     return True
 
-def running():
+def engine_alive(pid):
+    """Return True if pid is a running FrameScout engine (not another process that got its id)."""
+    try:
+        return any(part.endswith('framescout_engine.py') for part in psutil.Process(pid).cmdline())
+    except psutil.Error:
+        return False
+
+def run_state():
+    """Return (active, status) of the search in the results folder, whichever tab or session started it (A4)."""
+    status = read_status(STATUS)
+    return run_active(status, lock_held(LOCK), engine_alive), status
+
+def start_run(cmd):
+    """Start the engine with cmd unless a search is running; return None, or why it was not started.
+
+    The app holds the engine's run lock while it starts it, so two tabs or sessions cannot
+    start at the same time; the status "starting" shows the run until the engine takes the
+    lock over (A4).
+    """
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    lock = RunLock(LOCK)
+    if not lock.acquire():
+        return 'A search is already running.'
+    try:
+        if run_active(read_status(STATUS), False, engine_alive):
+            return 'Another search is being started.'
+        with LOG.open('w', encoding='utf-8', buffering=1) as log_handle:
+            proc = subprocess.Popen(cmd, cwd=str(BASE), env=cache_env(), stdout=log_handle, stderr=subprocess.STDOUT)
+        StatusReporter(STATUS, proc.pid).update('starting')
+        st.session_state.process = proc
+        return None
+    finally:
+        lock.release()
+
+def stop_run(status):
+    """End the running engine, also one started in another tab or before a reload (A4).
+
+    Returns True if a process was found to stop.
+    """
+    pids = []
     proc = st.session_state.get('process')
-    return proc is not None and proc.poll() is None
+    if proc is not None and proc.poll() is None:
+        pids.append(proc.pid)
+    if status and isinstance(status.get('pid'), int) and engine_alive(status['pid']):
+        pids.append(status['pid'])
+    targets = {}
+    for pid in pids:
+        try:
+            # with child processes: on Windows the venv's python.exe starts the interpreter as one
+            process = psutil.Process(pid)
+            for x in [process, *process.children(recursive=True)]:
+                targets[x.pid] = x
+        except psutil.Error:
+            pass
+    for x in targets.values():
+        try:
+            x.terminate()
+        except psutil.Error:
+            pass
+    _, remaining = psutil.wait_procs(list(targets.values()), timeout=5)
+    for x in remaining:
+        try:
+            x.kill()
+        except psutil.Error:
+            pass
+    psutil.wait_procs(remaining, timeout=5)
+    if proc is not None:
+        proc.poll()
+    # the stopped engine cannot write its final status; mark it under the lock, unless
+    # another start has replaced the status in the meantime
+    lock = RunLock(LOCK)
+    if status and lock.acquire(timeout=2):
+        try:
+            current = read_status(STATUS)
+            if same_run(current, status) and current.get('phase') not in FINAL_PHASES:
+                write_status(STATUS, stopped_status(current), attempts=20)
+        finally:
+            lock.release()
+    return bool(targets)
 
 def cache_env():
     env = os.environ.copy()
@@ -114,6 +195,9 @@ except (OSError, ValueError) as exc:
              f'editor, or restore the backup profiles.json.bak if there is one.\n\nDetails: {exc}')
     st.stop()
 
+# whether a search runs, also after a reload or in another tab (A4)
+active, run_status = run_state()
+
 if 'settings' not in st.session_state:
     st.session_state.settings = {'folder': str(BASE/'photos'), 'device': 'auto', 'batch': 8,
         'top': 150, 'detect': True, 'max_persons': 12, 'conf': 0.30, 'weight': 0.35}
@@ -138,8 +222,8 @@ with p_tab:
                 refs_new = st.file_uploader('Add reference images', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}_{saves}')
                 clear_refs = st.checkbox('Remove the existing reference images from this profile')
                 c1,c2 = st.columns(2)
-                update = c1.form_submit_button('Save changes', disabled=running())
-                delete = c2.form_submit_button('Delete profile', disabled=running())
+                update = c1.form_submit_button('Save changes', disabled=active)
+                delete = c2.form_submit_button('Delete profile', disabled=active)
             if update:
                 edit_name = edit_name.strip()
                 if not edit_name or any(j != index and q['name'].strip().lower() == edit_name.lower() for j,q in enumerate(profiles)):
@@ -170,7 +254,7 @@ with p_tab:
         features = st.text_area('Distinctive features (optional; English works best)', placeholder='red bodywork, black roof, parked on a street', key=f'new_features_{form_id}')
         prompts = st.text_area('Custom search texts (optional; one per line)', key=f'new_prompts_{form_id}')
         uploads = st.file_uploader('Reference images (optional)', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'new_refs_{form_id}')
-        create = st.form_submit_button('Add profile', disabled=running())
+        create = st.form_submit_button('Add profile', disabled=active)
     if create:
         name = name.strip()
         if not name or any(x['name'].strip().lower() == name.lower() for x in profiles):
@@ -186,7 +270,7 @@ with p_tab:
 
 with f_tab:
     st.subheader('Photo collection')
-    settings['folder'] = st.text_input('Local photo folder (including subfolders)', value=settings['folder'], disabled=running())
+    settings['folder'] = st.text_input('Local photo folder (including subfolders)', value=settings['folder'], disabled=active)
     folder = Path(settings['folder']).expanduser()
     if folder.is_dir():
         count = sum(1 for x in folder.rglob('*') if x.is_file() and x.suffix.lower() in EXT and RESULTS not in x.parents)
@@ -218,13 +302,13 @@ with settings_tab:
     devices = device_choices(info['cuda']) if info else ['auto', 'cpu', 'cuda']
     if settings['device'] not in devices:
         settings['device'] = 'auto'
-    settings['device'] = st.selectbox('Compute device', devices, index=devices.index(settings['device']), disabled=running(), help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
-    settings['batch'] = st.number_input('Batch size', min_value=1, max_value=64, value=int(settings['batch']), step=1, disabled=running())
-    settings['top'] = st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, value=int(settings['top']), step=25, disabled=running())
-    settings['detect'] = st.checkbox('Also detect individual persons in group photos (YOLO)', value=settings['detect'], disabled=running())
-    settings['max_persons'] = st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, value=int(settings['max_persons']), disabled=running())
-    settings['conf'] = st.slider('Minimum confidence of the person detection', .1, .9, float(settings['conf']), .05, disabled=running())
-    settings['weight'] = st.slider('Weight of reference images (if any)', 0., 1., float(settings['weight']), .05, disabled=running(), help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
+    settings['device'] = st.selectbox('Compute device', devices, index=devices.index(settings['device']), disabled=active, help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
+    settings['batch'] = st.number_input('Batch size', min_value=1, max_value=64, value=int(settings['batch']), step=1, disabled=active)
+    settings['top'] = st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, value=int(settings['top']), step=25, disabled=active)
+    settings['detect'] = st.checkbox('Also detect individual persons in group photos (YOLO)', value=settings['detect'], disabled=active)
+    settings['max_persons'] = st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, value=int(settings['max_persons']), disabled=active)
+    settings['conf'] = st.slider('Minimum confidence of the person detection', .1, .9, float(settings['conf']), .05, disabled=active)
+    settings['weight'] = st.slider('Weight of reference images (if any)', 0., 1., float(settings['weight']), .05, disabled=active, help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
     if info:
         st.caption(f"Detected: {info['cpu']} · {info['threads']} logical CPU cores · " +
                    (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unknown · ') +
@@ -235,12 +319,11 @@ with settings_tab:
 
 with run_tab:
     st.subheader('Start search')
-    is_running = running()
     c1,c2 = st.columns([1,1])
     with c1:
-        start = st.button('▶ Start search', type='primary', disabled=is_running or not profiles or not Path(settings['folder']).is_dir(), use_container_width=True)
+        start = st.button('▶ Start search', type='primary', disabled=active or not profiles or not Path(settings['folder']).is_dir(), use_container_width=True)
     with c2:
-        stop = st.button('■ Stop search', disabled=not is_running, use_container_width=True)
+        stop = st.button('■ Stop search', disabled=not active, use_container_width=True)
     if start:
         cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), str(Path(settings['folder']).resolve()),
             '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',settings['device'],
@@ -250,46 +333,58 @@ with run_tab:
         if not settings['detect']:
             cmd.append('--no-person-detection')
         try:
-            log_handle = LOG.open('w', encoding='utf-8', buffering=1)
-            proc = subprocess.Popen(cmd, cwd=str(BASE), env=cache_env(), stdout=log_handle, stderr=subprocess.STDOUT)
-            log_handle.close()
-            st.session_state.process = proc
-            st.session_state.last_exit = None
-            st.rerun()
+            problem = start_run(cmd)
         except Exception as exc:
             st.error(f'Start failed: {exc}')
-    if stop:
-        proc = st.session_state.get('process')
-        if proc and proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-        st.session_state.last_exit = 'stopped'
-        st.rerun()
-    @st.fragment(run_every='2s')
-    def status():
-        proc = st.session_state.get('process')
-        if proc and proc.poll() is None:
-            st.info('Analysis running. Photos that are already processed are kept in the cache.')
-        elif proc:
-            code = proc.poll()
-            if code == 0:
-                st.success('The last search run finished successfully.')
+        else:
+            if problem:
+                st.warning(problem)
             else:
-                st.warning(f'The last search run ended (exit code {code}). See the log for details.')
+                st.rerun()
+    if stop:
+        try:
+            if not stop_run(run_status):
+                st.warning('No running search process was found; it may have just ended.')
+        except Exception as exc:
+            st.error(f'Stop failed: {exc}')
+        else:
+            st.rerun()
+    @st.fragment(run_every='2s')
+    def show_status():
+        now_active, status = run_state()
+        if now_active != active:
+            st.rerun()  # a search started or ended, also in another tab: update the whole page
+        if now_active:
+            st.info('Search running. You can reload this page or close the tab: the search continues and '
+                    'is shown again when you come back. Photos that are already analyzed are kept in the cache.')
+        elif status:
+            phase = status.get('phase')
+            message = status.get('message')
+            if phase == 'finished':
+                finished_at = str(status.get('updated', '')).replace('T', ' ')[:19]
+                st.success(f'The last search run finished successfully ({finished_at}).')
+            elif phase == 'interrupted':
+                st.warning(f"The last search run was interrupted{': ' + message if message else '.'} "
+                           'Photos analyzed so far are in the cache; start again to resume.')
+            elif phase in FINAL_PHASES:
+                st.warning(f"The last search run failed (exit code {status.get('exit_code')})"
+                           f"{': ' + message if message else ''}. See the log for details.")
+            else:
+                st.warning(f"The last search run ended during the phase \"{PHASE_LABELS.get(phase, phase)}\" "
+                           'without finishing (stopped or crashed). Photos analyzed so far are in the cache; '
+                           'see the log for details.')
+        if status and status.get('phase') != 'finished':
+            # the phase and its progress: analysis, scoring and gallery export (A5)
+            fraction = status_fraction(status)
+            if fraction is None:
+                st.caption(status_text(status) + (' …' if now_active else ''))
+            else:
+                st.progress(fraction, text=status_text(status))
         if LOG.exists():
-            contents = LOG.read_text(encoding='utf-8', errors='replace')
-            lines = contents.splitlines()
-            progress = parse_progress(contents)
-            if progress:
-                done,total,new,cached,errors = progress
-                st.progress(min(done/max(total,1),1.), text=f'{done}/{total} photos · {new} new · {cached} from cache · {errors} errors')
-            with st.expander('Live log', expanded=bool(proc and proc.poll() is None)):
+            lines = LOG.read_text(encoding='utf-8', errors='replace').splitlines()
+            with st.expander('Live log', expanded=now_active):
                 st.code('\n'.join(lines[-35:]) or 'No output yet', language='text')
-    status()
+    show_status()
     st.divider()
     st.subheader('Result galleries')
     if RESULTS.exists():
