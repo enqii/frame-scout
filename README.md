@@ -62,6 +62,9 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 
 - One HTML gallery per search profile is written to `results/`; the thumbnails are
   stored in `results/vorschaubilder/`. Clicking a photo opens the original.
+- The gallery file is named after the profile in plain ASCII, e.g. "Red car" →
+  `red-car.html`, "Bär" → `baer.html`; names that would collide get `-2`, `-3`, … in
+  profile order, and names without Latin letters or digits (e.g. "猫") get a short hash.
 - Keep the `results` folder together: an HTML file exported on its own contains no
   thumbnails, and the links to the originals only work on this computer.
 - Photos that have already been analyzed are stored in `results/cache.sqlite3`. An
@@ -99,6 +102,13 @@ Manual start after installation:
 
 All engine options: `.\.venv\Scripts\python.exe framescout_engine.py --help`
 
+Tests (they need neither torch nor a model download):
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest
+```
+
 Contributions follow the PR workflow described in [CLAUDE.md](CLAUDE.md) (Conventional
 Commits, one pull request per roadmap item).
 
@@ -108,8 +118,10 @@ Commits, one pull request per roadmap item).
 |---|---|
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
+| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, profile loading); standard library only |
 | `profiles.json` | Saved search profiles |
 | `requirements.txt` | Python dependencies |
+| `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
 | `Install-FrameScout.bat` / `Start-FrameScout.bat` | Installation and start on Windows |
 | `BACKLOG.md` | Known weaknesses and roadmap |
 | `CLAUDE.md` | Project onboarding and development workflow |

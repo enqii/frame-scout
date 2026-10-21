@@ -15,7 +15,9 @@ One full end-to-end search run on Windows has been confirmed (I6): `run.log` fro
 
 ## Files and responsibilities
 - `app.py`: Streamlit frontend. Tabs (current German UI): Suchprofile (search profiles), Fotoquelle (photo source), KI-Einstellungen (AI settings), Suche & Ergebnisse (search & results). Handles profile CRUD, reference uploads, in-session settings, hardware display, analysis process, progress/log UI and HTML downloads.
-- `framescout_engine.py`: standalone CLI. Parses profiles/arguments, loads models, embeds images, optionally detects persons, caches embeddings, ranks and exports HTML galleries.
+- `framescout_engine.py`: standalone CLI. Parses arguments, loads models, embeds images, optionally detects persons, caches embeddings, ranks and exports HTML galleries.
+- `framescout_core.py`: shared by app and engine, **standard library only** (importable without torch/Streamlit): `EXT`, `slugify`, `profile_slugs` (unique result file names, used by both), `generic_prompts` and `load_profiles` (profile loading/validation, used by the engine). Put logic here when both sides need it or it should be unit-tested without models.
+- `tests/`, `pytest.ini`, `requirements-dev.txt`: pytest suite for `framescout_core` (no torch, no model download); dev dependency `pytest`.
 - `profiles.json`: persisted profile list (currently both the shipped example and the user's working file; see I7). Back it up before overwriting user changes.
 - `requirements.txt`: Streamlit, numpy, Pillow, torch, open_clip_torch, ultralytics, psutil; versions currently loosely constrained.
 - `Install-FrameScout.bat`: checks installed Python 3.14/3.13/3.12 (in that order), creates project-local `.venv`, installs requirements, performs imports.
@@ -37,6 +39,8 @@ Manual commands for development (after installation):
 ```powershell
 .\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 .\.venv\Scripts\python.exe framescout_engine.py .\photos --profiles .\profiles.json --output .\results --device cpu --batch-size 8 --top 150
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt   # once
+.\.venv\Scripts\python.exe -m pytest
 ```
 Do not claim these commands work on a given Python build without running them in that environment. For smoke runs during development, write output under `.tmp/` (e.g. `--output .\.tmp\smoke-results`), never into the user's `results/`.
 
@@ -45,7 +49,7 @@ Do not claim these commands work on a given Python build without running them in
 - Optional Ultralytics `yolo11n.pt` person detection (`classes=[0]`) extracts individual person crops **in addition to the full original image**. Detection is deliberately optional for non-person motifs; the detector currently runs on CPU.
 - Text similarity = maximum cosine similarity across prompt vectors for a whole image/crop. If reference images exist, visual similarity = max over reference vectors; final score is `(1-reference_weight)*text_score + reference_weight*visual_score` (default reference weight .35). The best full-image/crop score represents a source photo. Scores are relative search heuristics, not probabilities or guaranteed identification.
 - Feature rows are stored in `results/cache.sqlite3` per resolved file path + engine/config signature, checked against modification nanoseconds and size. Image embeddings are serialized in float16; profile queries can reuse existing image features. Changes to detector settings can invalidate the cached feature signature.
-- Outputs one ranked `.html` file per profile, with separate JPEG thumbnails in `results/vorschaubilder/` and `file://` links to originals. Keep the output folder intact; exporting an HTML file on its own does **not** embed thumbnails. Local paths may not work on another computer.
+- Outputs one ranked `.html` file per profile (`<slug>.html` from `framescout_core.profile_slugs`: ASCII transliteration, `-2`, `-3`, … on collisions in profile order, hash fallback), with separate JPEG thumbnails in `results/vorschaubilder/` and `file://` links to originals. Keep the output folder intact; exporting an HTML file on its own does **not** embed thumbnails. Local paths may not work on another computer.
 - Supported inputs: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF, recursively. The engine excludes the output folder if nested in the input root.
 
 ## Profiles schema
@@ -62,7 +66,7 @@ Do not claim these commands work on a given Python build without running them in
   ]
 }
 ```
-`franchise` is a legacy internal field name; in the UI it means optional **Kontext / Herkunft** (context / origin), not necessarily a media franchise. Reference paths are interpreted relative to the profile JSON file directory. For new profiles, `app.py` uploads references into `references/<slug>/`. Never silently delete or overwrite user profiles/references. There is also a legacy CLI option `--character`; consider backward compatibility before renaming it.
+`franchise` is a legacy internal field name; in the UI it means optional **Kontext / Herkunft** (context / origin), not necessarily a media franchise. Reference paths are interpreted relative to the profile JSON file directory. For new profiles, `app.py` uploads references into `references/<slug>/` (`framescout_core.slugify`; not de-duplicated, see A1). Never silently delete or overwrite user profiles/references. There is also a legacy CLI option `--character`; consider backward compatibility before renaming it.
 
 ## Current UI / runtime details
 - Settings in `st.session_state` (not persisted across sessions): input folder default `BASE/photos`, device `auto|cpu|cuda`, batch 8, top 150, person detection on, maximum 12 persons, confidence .30, reference weight .35.
@@ -76,8 +80,8 @@ Do not claim these commands work on a given Python build without running them in
 2. Keep all user image data local; do not add cloud uploads, tracking, or network services without explicit consent. First use downloads model weights and pip packages.
 3. Separate frontend and engine; maintain a working CLI and a usable CPU-only path (32 GB RAM and a dedicated GPU must **not** be prerequisites).
 4. Save user state safely, validate paths and profiles, protect data during migrations; avoid overwriting `profiles.json` and user-selected photos/results.
-5. Add focused tests for profile loading, prompt generation, cache signature/reuse, scoring, unique filename/slug handling, and progress interpretation without requiring full model downloads. Add a small integration smoke test for real models when feasible.
-6. Potential current quirks to investigate rather than assume solved (most are tracked in `BACKLOG.md`): `app.py` has a duplicate `import os`; UI `unique_slug` and engine `slugify` should stay aligned, especially for non-ASCII names; uploaded reference filenames (`reference-1...`) may overwrite existing files on subsequent uploads; Streamlit settings are session-only; result file downloads do not contain thumbnails; exceptions during model load may leave only `run.log`; Python 3.14 has been verified for one CPU run only; asynchronous stop/progress robustness; multiple simultaneous sessions; absolute paths/HTML link portability. The UI's dynamic system information is informational, not a hardware benchmark.
+5. Add focused tests without requiring full model downloads. Profile loading, prompt generation and slug handling are covered by `tests/` (via `framescout_core`); still missing: cache signature/reuse, scoring and progress interpretation (A11). Add a small integration smoke test for real models when feasible.
+6. Potential current quirks to investigate rather than assume solved (most are tracked in `BACKLOG.md`): result file names must stay derived from `framescout_core.profile_slugs` on both sides (app downloads and engine export); uploaded reference filenames (`reference-1...`) may overwrite existing files on subsequent uploads; Streamlit settings are session-only; result file downloads do not contain thumbnails; exceptions during model load may leave only `run.log`; Python 3.14 has been verified for one CPU run only; asynchronous stop/progress robustness; multiple simultaneous sessions; absolute paths/HTML link portability. The UI's dynamic system information is informational, not a hardware benchmark.
 7. Never conflate a similarity score with certainty. Explain that large group photos, subtle subjects and artwork-to-photo reference comparisons can yield false positives/negatives.
 
 ## Development workflow for Claude Code
