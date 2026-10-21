@@ -475,6 +475,32 @@ def group_batches(items, batch_size, size):
         yield group
 
 
+def store_group(group, store, failed):
+    """Store a group of items with store(group); return the number of items stored.
+
+    store must store all items or none (one transaction). If it raises and the group has
+    several items, each item is stored on its own, so a single broken photo or a failure
+    that hits only one of them (review) does not fail the whole group, and failed(item,
+    exc) reports every item that still fails with its own error. KeyboardInterrupt and
+    other BaseExceptions are not caught.
+    """
+    try:
+        store(group)
+        return len(group)
+    except Exception as exc:
+        if len(group) == 1:
+            failed(group[0], exc)
+            return 0
+    stored = 0
+    for item in group:
+        try:
+            store([item])
+            stored += 1
+        except Exception as exc:
+            failed(item, exc)
+    return stored
+
+
 def prefetch(submit, items, depth):
     """Yield (item, future) in input order, with up to depth items submitted ahead.
 
