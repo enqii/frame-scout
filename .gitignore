@@ -20,6 +20,9 @@ profiles.tmp
 profiles.json.*.tmp
 profiles.json.bak
 profiles.json.*.bak
+# the user's app settings (A8); anchored, so .claude/settings.json is not affected
+/settings.json
+/settings.json.*.tmp
 
 # Claude Code: agent worktrees and personal settings
 .claude/worktrees/

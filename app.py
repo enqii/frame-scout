@@ -8,14 +8,16 @@ from pathlib import Path
 import psutil
 import streamlit as st
 
-from framescout_core import (EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter,
-                             create_from_example, cuda_status, device_choices, finish_reference_move, lock_held,
-                             profile_slugs, read_profiles, read_status, reference_folder, run_active, started_in_time,
-                             save_profiles, stage_reference_move, status_fraction, status_text, stopped_status,
+from framescout_core import (EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, SETTINGS_FILE, RunLock,
+                             StatusReporter, create_from_example, cuda_status, default_settings, device_choices,
+                             finish_reference_move, lock_held, profile_slugs, read_profiles, read_settings,
+                             read_status, reference_folder, run_active, save_profiles, save_settings,
+                             stage_reference_move, started_in_time, status_fraction, status_text, stopped_status,
                              undo_reference_move, update_backup_references, write_new_file, write_status)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
+SETTINGS = BASE / SETTINGS_FILE  # the user's settings (A8), not in the repository
 EXAMPLE_PROFILES = BASE / 'profiles.example.json'
 REFS = BASE / 'references'
 RESULTS = BASE / 'results'
@@ -232,10 +234,20 @@ except (OSError, ValueError) as exc:
 active, run_status = run_state()
 st.session_state.page_run_state = (active, run_status)
 
-if 'settings' not in st.session_state:
-    st.session_state.settings = {'folder': str(BASE/'photos'), 'device': 'auto', 'batch': 8,
-        'top': 150, 'detect': True, 'max_persons': 12, 'conf': 0.30, 'weight': 0.35}
-settings = st.session_state.settings
+# read on every rerun: a reload, a restart, another tab or session shows the saved settings (A8)
+DEFAULT_SETTINGS = default_settings(BASE)
+settings_writable = True
+try:
+    saved_settings, settings_problems = read_settings(SETTINGS, DEFAULT_SETTINGS)
+except (OSError, ValueError) as exc:
+    # never save over a file the app cannot read, like profiles.json (A2)
+    saved_settings, settings_problems, settings_writable = dict(DEFAULT_SETTINGS), [], False
+    st.warning(f'{SETTINGS.name} cannot be read, so FrameScout uses the default settings and does not change '
+               f'the file. Fix it in a text editor or delete it to save settings again.\n\nDetails: {exc}')
+if settings_problems:
+    st.warning(f'Some values in {SETTINGS.name} are not allowed and were replaced by their defaults: '
+               + '; '.join(settings_problems) + '. Changing such a setting in the app saves a valid value.')
+settings = dict(saved_settings)  # the widgets below update it with this page run's values
 p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source', 'AI settings', 'Search & results'])
 
 with p_tab:
@@ -304,8 +316,8 @@ with p_tab:
 
 with f_tab:
     st.subheader('Photo collection')
-    settings['folder'] = st.text_input('Local photo folder (including subfolders)', value=settings['folder'], disabled=active)
-    folder = Path(settings['folder']).expanduser()
+    settings['photo_folder'] = st.text_input('Local photo folder (including subfolders)', value=settings['photo_folder'], disabled=active)
+    folder = Path(settings['photo_folder']).expanduser()
     if folder.is_dir():
         count = sum(1 for x in folder.rglob('*') if x.is_file() and x.suffix.lower() in EXT and RESULTS not in x.parents)
         st.success(f'{count:,} supported image files found.')
@@ -334,15 +346,21 @@ with settings_tab:
         info, info_error = None, exc
     # "cuda" only if PyTorch can use it (A7); if detection failed, the engine still checks
     devices = device_choices(info['cuda']) if info else ['auto', 'cpu', 'cuda']
-    if settings['device'] not in devices:
-        settings['device'] = 'auto'
-    settings['device'] = st.selectbox('Compute device', devices, index=devices.index(settings['device']), disabled=active, help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
-    settings['batch'] = st.number_input('Batch size', min_value=1, max_value=64, value=int(settings['batch']), step=1, disabled=active)
+    # a saved device this PyTorch cannot use (e.g. "cuda" after switching to the CPU build)
+    # is shown and used as "auto", but stays saved until another device is chosen
+    unavailable_device = settings['device'] not in devices
+    device = st.selectbox('Compute device', devices, index=0 if unavailable_device else devices.index(settings['device']), disabled=active, help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
+    if unavailable_device:
+        st.caption(f"The saved device \"{settings['device']}\" is not available, so auto is used.")
+    if not (unavailable_device and device == 'auto'):
+        settings['device'] = device
+    run_device = device
+    settings['batch_size'] = st.number_input('Batch size', min_value=1, max_value=64, value=int(settings['batch_size']), step=1, disabled=active)
     settings['top'] = st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, value=int(settings['top']), step=25, disabled=active)
-    settings['detect'] = st.checkbox('Also detect individual persons in group photos (YOLO)', value=settings['detect'], disabled=active)
+    settings['person_detection'] = st.checkbox('Also detect individual persons in group photos (YOLO)', value=settings['person_detection'], disabled=active)
     settings['max_persons'] = st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, value=int(settings['max_persons']), disabled=active)
-    settings['conf'] = st.slider('Minimum confidence of the person detection', .1, .9, float(settings['conf']), .05, disabled=active)
-    settings['weight'] = st.slider('Weight of reference images (if any)', 0., 1., float(settings['weight']), .05, disabled=active, help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
+    settings['person_confidence'] = st.slider('Minimum confidence of the person detection', .1, .9, float(settings['person_confidence']), .05, disabled=active)
+    settings['reference_weight'] = st.slider('Weight of reference images (if any)', 0., 1., float(settings['reference_weight']), .05, disabled=active, help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
     if info:
         st.caption(f"Detected: {info['cpu']} · {info['threads']} logical CPU cores · " +
                    (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unknown · ') +
@@ -351,20 +369,30 @@ with settings_tab:
     else:
         st.caption(f'System details could not be determined ({info_error}). Automatic device selection remains available.')
 
+# save what was changed in this page run, before a button below can rerun the page; a
+# failed save is tried again on the next rerun, since the widgets keep the changed value
+changed_settings = {k: v for k, v in settings.items() if v != saved_settings[k]}
+if changed_settings and settings_writable:
+    try:
+        save_settings(SETTINGS, changed_settings, DEFAULT_SETTINGS)
+    except (OSError, ValueError) as exc:
+        st.warning(f'The settings could not be saved to {SETTINGS.name}: {exc}. They apply for now, '
+                   'but a reload shows the saved ones again.')
+
 with run_tab:
     st.subheader('Start search')
     c1,c2 = st.columns([1,1])
     with c1:
-        start = st.button('▶ Start search', type='primary', disabled=active or not profiles or not Path(settings['folder']).is_dir(), use_container_width=True)
+        start = st.button('▶ Start search', type='primary', disabled=active or not profiles or not Path(settings['photo_folder']).is_dir(), use_container_width=True)
     with c2:
         stop = st.button('■ Stop search', disabled=not active, use_container_width=True)
     if start:
-        cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), str(Path(settings['folder']).resolve()),
-            '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',settings['device'],
-            '--batch-size',str(settings['batch']),'--top',str(settings['top']),
-            '--max-persons',str(settings['max_persons']),'--person-confidence',str(settings['conf']),
-            '--reference-weight',str(settings['weight'])]
-        if not settings['detect']:
+        cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), str(Path(settings['photo_folder']).resolve()),
+            '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',run_device,
+            '--batch-size',str(settings['batch_size']),'--top',str(settings['top']),
+            '--max-persons',str(settings['max_persons']),'--person-confidence',str(settings['person_confidence']),
+            '--reference-weight',str(settings['reference_weight'])]
+        if not settings['person_detection']:
             cmd.append('--no-person-detection')
         try:
             problem = start_run(cmd)
