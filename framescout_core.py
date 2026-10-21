@@ -336,10 +336,15 @@ def feature_signature(person_detection, max_persons, person_confidence, yolo_mod
     Cached rows are reused only under the same signature, so any setting that changes
     the stored embeddings or crops belongs here, and nothing else: without person
     detection only the full image is embedded, so the detector settings are left out.
+    Without person detection JPEGs are decoded at reduced scale (draft_size, E2), so that
+    signature also names the decoding; with detection photos keep full resolution and the
+    signature is the same as before E2, so those cached rows stay valid.
     """
     config = [ENGINE, bool(person_detection)]
     if person_detection:
         config += [max_persons, person_confidence, yolo_model]
+    else:
+        config.append(DRAFT_DECODING)
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
 
 
@@ -425,6 +430,10 @@ def progress_due(before, after, total, every=25):
 # requested size (reducing_gap=2) and resizes the rest of the way with its filter; the
 # engine keeps the same quality margin for CLIP's input.
 DRAFT_REDUCING_GAP = 2
+# Names the drafted decoding in the cache signature of runs without person detection;
+# change it if the decoding of those runs changes (the user decided in the PR #7 review
+# that drafted and full-resolution embeddings are not mixed in the cache).
+DRAFT_DECODING = f'jpeg-draft-{DRAFT_REDUCING_GAP}x-clip-size'
 
 
 def draft_size(clip_size, person_detection):

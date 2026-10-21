@@ -109,7 +109,10 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
   analyzed at the moment of the stop are analyzed again), and new search profiles reuse
   existing analyses. Updates that change the image analysis (e.g. the CLIP fix in
   2026-10) analyze every photo once more; the older entries stay in the file, which therefore
-  grows (roughly doubles) until a cleanup function exists.
+  grows (roughly doubles) until a cleanup function exists. The faster decoding without
+  person detection (2026-10) is such a change for searches **without** person detection:
+  the first such search after the update analyzes every photo once more; searches with
+  person detection keep using their existing analyses.
 
 ### How reliable are the matches?
 
