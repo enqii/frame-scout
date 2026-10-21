@@ -4,7 +4,7 @@ import unicodedata
 
 import pytest
 
-from framescout_core import EXT, profile_slugs, slugify
+from framescout_core import EXT, SLUG_MAX_LENGTH, profile_slugs, slugify
 
 
 @pytest.mark.parametrize('name, slug', [
@@ -74,6 +74,15 @@ def test_profile_slugs_are_unique_in_list_order():
 
 def test_profile_slugs_never_reuse_a_generated_suffix():
     assert profile_slugs(['a', 'a!', 'a-2']) == ['a', 'a-2', 'a-2-2']
+
+
+def test_profile_slugs_keep_the_length_limit_including_the_suffix():
+    names = ['a' * 70 + suffix for suffix in ('', '!', '?', '.') * 3]
+    slugs = profile_slugs(names)
+    assert len(set(slugs)) == len(slugs)
+    assert max(len(s) for s in slugs) == SLUG_MAX_LENGTH
+    assert slugs[1] == 'a' * (SLUG_MAX_LENGTH - 2) + '-2'
+    assert slugs[-1] == 'a' * (SLUG_MAX_LENGTH - 3) + '-12'
 
 
 def test_profile_slugs_match_slugify_without_collisions():
