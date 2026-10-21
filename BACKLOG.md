@@ -29,8 +29,9 @@ referenced in commits, pull requests and discussions.
 - [ ] **E8 – Cache key = absolute path:** moving the photo folder forces a complete
       recomputation.
 - [ ] **E9 – `yolo11n.pt` ends up in the project root** instead of `.cache/`; not documented.
-- [ ] **E10 – Duplicate check before `strip()`:** "Joker" and " Joker" are not recognized as
-      equal.
+- [x] **E10 – Duplicate check before `strip()`:** "Joker" and " Joker" are not recognized as
+      equal. (done 2026-10-21 in `framescout_core.load_profiles`; such a hand-edited
+      `profiles.json` is now rejected instead of merging both profiles into one gallery.)
 
 ### App (`app.py`)
 
