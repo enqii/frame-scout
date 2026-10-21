@@ -8,7 +8,7 @@ matching photos as an HTML gallery.
 - **Local:** Your images never leave your computer. Only model weights and Python
   packages are downloaded during installation or the first run.
 - **General-purpose:** People, objects, vehicles, animals, landscapes, scenes.
-- **No language model:** Search is based on CLIP (ViT-B/32), optionally combined with
+- **No language model:** Search is based on OpenAI CLIP (ViT-B/32), optionally combined with
   YOLO11n person detection for group photos.
 
 > **Status:** Prototype (v1.1). Open issues and the roadmap are listed in
@@ -84,7 +84,8 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
   thumbnails, and the links to the originals only work on this computer.
 - Photos that have already been analyzed are stored in `results/cache.sqlite3`. An
   interrupted run resumes from there on the next start, and new search profiles reuse
-  existing analyses.
+  existing analyses. Updates that change the image analysis (e.g. the CLIP fix in
+  2026-10) analyze every photo once more; the older entries stay in the file.
 
 ### How reliable are the matches?
 
