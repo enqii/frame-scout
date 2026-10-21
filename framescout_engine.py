@@ -21,7 +21,7 @@ import open_clip
 from PIL import Image, ImageOps, ImageFile
 
 from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RUN_LOCK, RUN_STATUS,
-                             RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size,
+                             RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
                              ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch, profile_slugs,
                              progress_due, progress_line, store_group)
 
@@ -117,6 +117,11 @@ def main():
     output = args.output.resolve()
     if output == root:
         parser.error('The output folder must not be the photo folder.')
+    if not root.is_dir() and not output.is_dir():
+        # nothing to report to: do not create an output folder (and its lock and status
+        # files) for a mistyped call; an existing output folder, like the app's results
+        # folder, gets the error in its status file (review)
+        parser.error(f'Photo folder does not exist: {root}')
     output.mkdir(parents=True, exist_ok=True)
     # one search per output folder: two would share cache.sqlite3 ("database is locked")
     # and the app's run.log (A4)
@@ -140,8 +145,9 @@ def main():
         status.finish('failed', 1, f'{type(exc).__name__}: {exc}')
         raise
     else:
-        status.finish('finished' if code == 0 else 'interrupted', code,
-                      None if code == 0 else 'Interrupted (Ctrl+C).')
+        # 0 finished, 130 interrupted, any other code failed (review)
+        phase, message = final_status(code)
+        status.finish(phase, code, message)
         return code
     finally:
         lock.release()
