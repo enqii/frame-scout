@@ -3,6 +3,7 @@
 This module uses only the Python standard library, so it can be imported and tested
 without torch, Streamlit or any model download.
 """
+import collections
 import hashlib
 import json
 import os
@@ -409,6 +410,78 @@ def parse_progress(log_text):
     """
     matches = _PROGRESS.findall(log_text)
     return tuple(map(int, matches[-1])) if matches else None
+
+
+def progress_due(before, after, total, every=25):
+    """Return True if the engine should print a progress line after going from before to after done photos.
+
+    That is every `every` photos and once at the end. Photos can finish several at a time
+    (one embedded batch, E2), so a multiple of `every` that was jumped over counts too.
+    """
+    return after > before and (after == total or after // every > before // every)
+
+
+# Pillow's Image.thumbnail decodes JPEGs at a reduced scale only down to twice the
+# requested size (reducing_gap=2) and resizes the rest of the way with its filter; the
+# engine keeps the same quality margin for CLIP's input.
+DRAFT_REDUCING_GAP = 2
+
+
+def draft_size(clip_size, person_detection):
+    """Return the smallest edge length a photo may be decoded at for the analysis, or None.
+
+    JPEG decoding can scale by 1/2, 1/4 or 1/8 on the fly (Image.draft), which makes it
+    several times faster (E2). Without person detection CLIP sees only the whole photo,
+    resized to clip_size, so twice that is enough. With person detection the photo is
+    decoded at full resolution: a person crop (e.g. in a group photo) covers only part of
+    it and would lose detail.
+    """
+    return None if person_detection else DRAFT_REDUCING_GAP * clip_size
+
+
+def group_batches(items, batch_size, size):
+    """Yield lists of consecutive items until each holds at least batch_size crops.
+
+    size(item) is the number of crops of an item (a photo). Each list but the last has a
+    total size of at least batch_size, so CLIP embeds the crops of several photos in one
+    forward pass instead of one photo at a time (E2). Items are read lazily: a list is
+    yielded as soon as it is full, before the next item is requested.
+    """
+    if batch_size < 1:
+        raise ValueError('batch_size must be at least 1')
+    group, count = [], 0
+    for item in items:
+        group.append(item)
+        count += size(item)
+        if count >= batch_size:
+            yield group
+            group, count = [], 0
+    if group:
+        yield group
+
+
+def prefetch(submit, items, depth):
+    """Yield (item, future) in input order, with up to depth items submitted ahead.
+
+    submit(item) starts the work (e.g. ThreadPoolExecutor.submit) and returns a Future.
+    The work for later items runs while the consumer handles the current one (decoding
+    photos in parallel, E2), but never more than depth items ahead, which bounds memory.
+    Errors stay in the futures: future.result() raises them for that item only. Closing
+    the generator (e.g. on KeyboardInterrupt) cancels the work that has not started yet.
+    """
+    if depth < 1:
+        raise ValueError('depth must be at least 1')
+    queue = collections.deque()
+    try:
+        for item in items:
+            queue.append((item, submit(item)))
+            if len(queue) >= depth:
+                yield queue.popleft()
+        while queue:
+            yield queue.popleft()
+    finally:
+        for _, future in queue:
+            future.cancel()
 
 
 def generic_prompts(name, context='', features=''):
