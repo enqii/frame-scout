@@ -2,8 +2,6 @@
 
 This module uses only the Python standard library, so it can be imported and tested
 without torch, Streamlit or any model download.
-
-The user-facing error messages are still German (see backlog item I7).
 """
 import hashlib
 import json
@@ -155,33 +153,33 @@ def load_profiles(filename, inline):
         elif isinstance(data, dict):  # v3 migration: {name: [prompts, ...]}
             raw = [{'name': n, 'prompts': ps} for n, ps in data.items()]
         else:
-            raise ValueError('JSON muss ein Objekt mit "profiles" sein (oder das bisherige v3-Format).')
+            raise ValueError('The JSON file must be an object with "profiles" (or the previous v3 format).')
         if not isinstance(raw, list):
-            raise ValueError('"profiles" muss eine Liste sein.')
+            raise ValueError('"profiles" must be a list.')
     for item in inline:
         fields = [s.strip() for s in item.split('|', 2)]
         raw.append({'name': fields[0], 'franchise': fields[1] if len(fields) > 1 else '',
                     'features': fields[2] if len(fields) > 2 else ''})
     if not raw:
-        raise ValueError('Bitte --profiles oder mindestens ein --character angeben.')
+        raise ValueError('Please specify --profiles or at least one --character.')
     profiles = []
     names = set()
     for item in raw:
         if not isinstance(item, dict):
-            raise ValueError('Jedes Profil muss ein JSON-Objekt sein.')
+            raise ValueError('Every profile must be a JSON object.')
         name = item.get('name', '')
         # compare the stripped name: it is the one stored and used as key (E10)
         if not isinstance(name, str) or not name.strip() or name.strip().lower() in names:
-            raise ValueError(f'Profilname fehlt oder ist doppelt: {name!r}')
+            raise ValueError(f'Profile name missing or duplicate: {name!r}')
         names.add(name.strip().lower())
         franchise = item.get('franchise', '')
         features = item.get('features', '')
         prompts = item.get('prompts', [])
         refs = item.get('reference_images', [])
         if not isinstance(franchise, str) or not isinstance(features, str) or not isinstance(prompts, list) or not isinstance(refs, list):
-            raise ValueError(f'Ungueltiges Profil: {name}')
+            raise ValueError(f'Invalid profile: {name}')
         if any(not isinstance(x, str) or not x.strip() for x in prompts + refs):
-            raise ValueError(f'Prompts und Referenzbilder muessen nichtleere Zeichenketten sein: {name}')
+            raise ValueError(f'Prompts and reference images must be non-empty strings: {name}')
         profiles.append({'name': name.strip(), 'prompts': generic_prompts(name, franchise, features) + prompts,
                          'refs': [((filename.parent if filename else Path.cwd()) / x).resolve() for x in refs]})
     return profiles
