@@ -44,6 +44,23 @@ def slugify(s):
     return slug
 
 
+def profile_slugs(names):
+    """Return one unique slug per profile name, in list order.
+
+    Colliding slugs get "-2", "-3", ... in the order of the list, so the app and the
+    engine derive the same result file names (<slug>.html) from the same profile list.
+    """
+    slugs, used = [], set()
+    for name in names:
+        base = slugify(name)
+        slug, n = base, 2
+        while slug in used:
+            slug, n = f'{base}-{n}', n + 1
+        used.add(slug)
+        slugs.append(slug)
+    return slugs
+
+
 def generic_prompts(name, context='', features=''):
     """English CLIP prompts derived from a profile's name, context and features."""
     subject = name.strip()

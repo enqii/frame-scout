@@ -3,7 +3,7 @@ import hashlib
 
 import pytest
 
-from framescout_core import EXT, slugify
+from framescout_core import EXT, profile_slugs, slugify
 
 
 @pytest.mark.parametrize('name, slug', [
@@ -50,6 +50,21 @@ def test_long_names_are_shortened_without_a_trailing_dash():
     slug = slugify('word ' * 40)
     assert len(slug) <= 60
     assert slug.startswith('word-word') and not slug.endswith('-')
+
+
+def test_profile_slugs_are_unique_in_list_order():
+    names = ['Rotes Auto', 'rotes-auto', 'ROTES AUTO!', 'Golden Retriever']
+    assert profile_slugs(names) == ['rotes-auto', 'rotes-auto-2', 'rotes-auto-3', 'golden-retriever']
+
+
+def test_profile_slugs_never_reuse_a_generated_suffix():
+    assert profile_slugs(['a', 'a!', 'a-2']) == ['a', 'a-2', 'a-2-2']
+
+
+def test_profile_slugs_match_slugify_without_collisions():
+    names = ['Bär', 'Café', '猫']
+    assert profile_slugs(names) == [slugify(n) for n in names]
+    assert profile_slugs([]) == []
 
 
 def test_supported_extensions():

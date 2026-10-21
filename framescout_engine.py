@@ -17,7 +17,7 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import EXT, load_profiles, slugify
+from framescout_core import EXT, load_profiles, profile_slugs
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -191,12 +191,8 @@ def main():
     con.close()
 
     thumbs = output / 'vorschaubilder'; thumbs.mkdir(exist_ok=True)
-    slugs = {}; used = set()
-    for p in profiles:
-        base = slugify(p['name']); slug = base; n = 2
-        while slug in used:
-            slug = f'{base}-{n}'; n += 1
-        used.add(slug); slugs[p['name']] = slug
+    names = [p['name'] for p in profiles]
+    slugs = dict(zip(names, profile_slugs(names)))
     nav = '<nav>' + ' · '.join(f'<a href="{quote(slugs[p["name"]] + ".html")}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
     style = '''body{font:16px system-ui;background:#181818;color:#eee;margin:24px}a{color:#a9d2ff}
     main{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:16px}
