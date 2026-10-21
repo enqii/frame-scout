@@ -8,6 +8,7 @@ import hashlib
 import html
 import io
 import json
+import shutil
 import sqlite3
 from pathlib import Path
 from urllib.parse import quote
@@ -190,8 +191,10 @@ def main():
             print(f'CACHE ERROR {path}: {exc}', flush=True)
     con.close()
 
-    # results/vorschaubilder/ of older versions is left alone; cleanup is E7
     thumbs = output / 'thumbnails'; thumbs.mkdir(exist_ok=True)
+    # thumbnail folder of older versions: thumbnails are copied from it instead of being
+    # rendered again, but it is never changed (old galleries link it; cleanup is E7)
+    legacy_thumbs = output / 'vorschaubilder'
     names = [p['name'] for p in profiles]
     slugs = dict(zip(names, profile_slugs(names)))
     nav = '<nav>' + ' · '.join(f'<a href="{quote(slugs[p["name"]] + ".html")}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
@@ -208,7 +211,11 @@ def main():
             thumb = thumbs / thumb_name
             try:
                 if not thumb.exists():
-                    im = open_image(path); im.thumbnail((380, 380)); im.save(thumb, quality=82)
+                    old = legacy_thumbs / thumb_name  # same name = same photo and mtime
+                    if old.is_file():
+                        shutil.copyfile(old, thumb)
+                    else:
+                        im = open_image(path); im.thumbnail((380, 380)); im.save(thumb, quality=82)
             except Exception as exc:
                 print(f'Thumbnail not possible ({path}): {exc}', flush=True)
                 continue
