@@ -122,8 +122,12 @@ starts with the new example profiles.
    folder as soon as you change them, so they are kept after a reload or a restart and
    apply in every tab. Only values that differ from the defaults are stored; delete the
    file to return to the defaults. If it cannot be read (e.g. after editing it by hand),
-   the app uses the defaults and leaves the file unchanged; a value that is not allowed
-   is replaced by its default with a warning.
+   the app keeps the settings it shows (the defaults when the page is new) and leaves
+   the file unchanged; a value that is not allowed is replaced by its default with a
+   warning and removed from the file with the next saved change. A saved compute device
+   that PyTorch cannot use (e.g. "cuda" after installing the CPU build) is shown and used
+   as "auto" but stays saved, so it applies again once PyTorch can use it; choose another
+   device or "Use auto from now on" to replace it.
 5. **Search & results:** start the analysis. The page shows the current step (looking
    for photos, loading the AI models, analyzing, scoring, writing the galleries) and its
    progress. The search keeps running when you reload the page or close the browser tab
