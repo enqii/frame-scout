@@ -90,6 +90,31 @@ def write_new_file(folder, stem, suffix, data):
             n += 1
 
 
+def create_from_example(target, example):
+    """Create target as a copy of example if target does not exist; return True if created.
+
+    Used for profiles.json, the user's working file, which is not in the repository:
+    the app creates it from the shipped profiles.example.json on the first start. An
+    existing file (even an empty one) is never replaced (exclusive create), and nothing
+    is created if the example is missing.
+    """
+    try:
+        data = example.read_bytes()
+    except FileNotFoundError:
+        return False
+    try:
+        handle = open(target, 'xb')
+    except FileExistsError:
+        return False
+    try:
+        with handle:
+            handle.write(data)
+    except OSError:
+        target.unlink()  # we created it; do not leave a truncated copy behind
+        raise
+    return True
+
+
 # Label of the uncropped photo among the crops; person crops are labelled "Person <n>".
 FULL_IMAGE_LABEL = 'Full image'
 # Labels are stored in the feature cache; rows written before the English translation

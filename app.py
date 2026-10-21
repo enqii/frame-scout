@@ -9,10 +9,11 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import EXT, parse_progress, profile_slugs, slugify, write_new_file
+from framescout_core import EXT, create_from_example, parse_progress, profile_slugs, slugify, write_new_file
 
 BASE = Path(__file__).resolve().parent
-PROFILES = BASE / 'profiles.json'
+PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
+EXAMPLE_PROFILES = BASE / 'profiles.example.json'
 REFS = BASE / 'references'
 RESULTS = BASE / 'results'
 LOG = BASE / 'run.log'
@@ -63,6 +64,7 @@ st.title('🔎 FrameScout')
 st.caption('Local AI search in large photo collections · your images stay on your computer')
 
 try:
+    create_from_example(PROFILES, EXAMPLE_PROFILES)  # first start only; never overwrites
     profiles = read_profiles()
 except (OSError, ValueError) as exc:
     st.error(f'profiles.json is invalid: {exc}')
