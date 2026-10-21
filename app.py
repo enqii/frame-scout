@@ -67,6 +67,10 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
     if problems:
         st.session_state.notice = ('Saved. Some reference images could not be removed from their old '
                                    'folder and now exist twice; the profile uses the new copy: ' + '; '.join(problems))
+    # new widget keys for the edit forms: their uploaders would otherwise keep the saved
+    # files and add them again on the next save, or pass them to the profile that moves
+    # into a deleted profile's place (review)
+    st.session_state.saves = st.session_state.get('saves', 0) + 1
     return True
 
 def running():
@@ -112,15 +116,16 @@ with p_tab:
         st.warning(st.session_state.pop('notice'))
     if not profiles:
         st.info('Create a search profile first.')
+    saves = st.session_state.get('saves', 0)
     for index, p in enumerate(profiles):
         with st.expander(f"{p['name']}  ·  {p.get('franchise','')}"):
-            with st.form(f'edit_{index}'):
+            with st.form(f'edit_{index}_{saves}'):
                 edit_name = st.text_input('Search motif', value=p['name'])
                 franchise = st.text_input('Context / origin (optional)', value=p.get('franchise', ''))
                 features = st.text_area('Distinctive features (optional; English works best)', value=p.get('features', ''))
                 prompts = st.text_area('Custom search texts (optional; one per line)', value='\n'.join(p.get('prompts', [])))
                 st.caption('Existing reference images: ' + (', '.join(p.get('reference_images', [])) or 'none'))
-                refs_new = st.file_uploader('Add reference images', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}')
+                refs_new = st.file_uploader('Add reference images', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}_{saves}')
                 clear_refs = st.checkbox('Remove the existing reference images from this profile')
                 c1,c2 = st.columns(2)
                 update = c1.form_submit_button('Save changes', disabled=running())
