@@ -17,6 +17,7 @@ run.log
 # the user's search profiles; the app creates it from profiles.example.json on the first start
 profiles.json
 profiles.tmp
+profiles.json.*.tmp
 profiles.json.bak
 
 # Claude Code: agent worktrees and personal settings
