@@ -388,25 +388,44 @@ def parse_gpu_query(text):
     return gpus
 
 
-def cuda_build(gpus):
-    """Return the newest CUDA build of PyTorch ("cu130", "cu126") that suits all gpus.
+def _supports(build, gpu):
+    cc, version, _ = gpu
+    for name, oldest, unsupported, driver in CUDA_BUILDS:
+        if name == build:
+            return oldest <= cc and (unsupported is None or cc < unsupported) and version >= driver
+    raise ValueError(f'unknown PyTorch build: {build}')
 
-    gpus as returned by parse_gpu_query. A build must support every GPU, since CUDA can
-    number the GPUs differently from nvidia-smi. Raises ValueError with the reason if no
-    build fits (GPU too old or too new for the driver, driver too old).
+
+def unsupported_gpus(build, gpus):
+    """Return the names of the gpus (as from parse_gpu_query) that build cannot use."""
+    return [gpu[2] for gpu in gpus if not _supports(build, gpu)]
+
+
+def cuda_build(gpus):
+    """Return the CUDA build of PyTorch ("cu130", "cu126") to install for gpus.
+
+    gpus as returned by parse_gpu_query. The newest build that supports every GPU is
+    preferred, since CUDA can number the GPUs differently from nvidia-smi. Otherwise the
+    newest build for the most capable GPU (highest compute capability) is used, so an old
+    second card does not drop the PC to the CPU build (review); unsupported_gpus names the
+    GPUs that build cannot use. Raises ValueError with the reason if no build supports the
+    most capable GPU (GPU too old, or driver too old for it).
     """
     if not gpus:
         raise ValueError('no NVIDIA GPU found')
-    for build, oldest, unsupported, driver in CUDA_BUILDS:
-        if all(oldest <= cc and (unsupported is None or cc < unsupported) and version >= driver
-               for cc, version, _ in gpus):
+    for build, *_ in CUDA_BUILDS:
+        if all(_supports(build, gpu) for gpu in gpus):
             return build
-    details = '; '.join(f'{name}: compute capability {".".join(map(str, cc))}, driver {".".join(map(str, version))}'
-                        for cc, version, name in gpus)
+    best = max(gpus, key=lambda gpu: gpu[0])
+    for build, *_ in CUDA_BUILDS:
+        if _supports(build, best):
+            return build
+    cc, version, name = best
     oldest = min(supported for _, supported, *_ in CUDA_BUILDS)
-    hint = ('The GPU is too old for current PyTorch builds.' if any(cc < oldest for cc, *_ in gpus)
+    hint = ('The GPU is too old for current PyTorch builds.' if cc < oldest
             else 'A current NVIDIA driver may help.')
-    raise ValueError(f'no CUDA build of PyTorch {TORCH_VERSION} suits this GPU and driver ({details}). {hint}')
+    raise ValueError(f'no CUDA build of PyTorch {TORCH_VERSION} suits {name} (compute capability '
+                     f'{".".join(map(str, cc))}) with driver {".".join(map(str, version))}. {hint}')
 
 
 def torch_requirements(build):

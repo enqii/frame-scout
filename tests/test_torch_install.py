@@ -5,7 +5,8 @@ import pytest
 
 import install_torch
 from framescout_core import (TORCH_VERSION, TORCHVISION_VERSION, cuda_build, installed_build_matches,
-                             installed_cuda_build, parse_gpu_query, torch_index_url, torch_requirements)
+                             installed_cuda_build, parse_gpu_query, torch_index_url, torch_requirements,
+                             unsupported_gpus)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -59,11 +60,30 @@ def test_the_reason_names_the_cause():
         cuda_build([gpu((8, 9), (512, 95))])
 
 
-def test_every_gpu_must_be_supported():
-    # CUDA numbers the GPUs differently from nvidia-smi, so the build must suit all of them
+def test_a_build_for_every_gpu_is_preferred():
+    # CUDA can number the GPUs differently from nvidia-smi, so a build that suits all of
+    # them is the safe choice when there is one
     assert cuda_build([gpu((8, 9), (581, 57)), gpu((6, 1), (581, 57))]) == 'cu126'
-    with pytest.raises(ValueError):
+
+
+def test_an_unsupported_second_gpu_does_not_block_the_best_one():
+    # review: an old display card next to a modern GPU must not drop the PC to the CPU build;
+    # the build for the most capable GPU is used, the other GPU is named (unsupported_gpus)
+    rtx5090, gtx1060, kepler = (((12, 0), (590, 1), 'RTX 5090'), ((6, 1), (590, 1), 'GTX 1060'),
+                                ((3, 7), (590, 1), 'Tesla K80'))
+    assert cuda_build([rtx5090, gtx1060]) == 'cu130'
+    assert unsupported_gpus('cu130', [rtx5090, gtx1060]) == ['GTX 1060']
+    assert cuda_build([gpu((8, 9), (590, 1)), kepler]) == 'cu130'
+    assert unsupported_gpus('cu126', [gtx1060, kepler]) == ['Tesla K80']
+    # with a driver too old for CUDA 13, the Blackwell card has no build at all
+    with pytest.raises(ValueError, match='driver may help'):
         cuda_build([gpu((12, 0), (566, 36)), gpu((6, 1), (566, 36))])
+
+
+def test_mixed_generations_with_a_current_driver_get_no_driver_hint():
+    # review: the hint "a current driver may help" was given although the driver is current
+    rtx5090, gtx1060 = ((12, 0), (590, 1), 'RTX 5090'), ((6, 1), (590, 1), 'GTX 1060')
+    assert cuda_build([gtx1060, rtx5090]) == 'cu130'
 
 
 # --- what pip installs ---
@@ -261,6 +281,16 @@ def test_unknown_cuda_build_is_never_replaced_by_the_cpu_build(monkeypatch):
     monkeypatch.setattr(install_torch.subprocess, 'run', ran)
     assert install_torch.main([]) == 1
     assert ran.commands == []
+
+
+def test_gpus_the_build_cannot_use_are_named(monkeypatch, capsys):
+    monkeypatch.setattr(install_torch, 'query_gpus',
+                        lambda: '12.0, 590.01, NVIDIA GeForce RTX 5090\n6.1, 590.01, NVIDIA GeForce GTX 1060\n')
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main(['cuda']) == 0
+    assert index(ran.commands[0]) == torch_index_url('cu130')
+    assert 'NVIDIA GeForce GTX 1060 is not supported by this build' in capsys.readouterr().out
 
 
 def test_question_only_with_an_nvidia_driver(monkeypatch):
