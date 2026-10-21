@@ -129,6 +129,10 @@ class Ran:
         return type('Result', (), {'returncode': self.code})()
 
 
+def index(command):
+    return command[command.index('--index-url') + 1]
+
+
 @pytest.fixture(autouse=True)
 def nothing_installed(monkeypatch):
     # the tests decide what is "installed"; CI has no torch, the project venv has one
@@ -156,7 +160,10 @@ def test_cpu_installs_the_cpu_build(monkeypatch):
     assert install_torch.main(['cpu']) == 0
     (command,) = ran.commands
     assert command[1:4] == ['-m', 'pip', 'install']
-    assert command[-2:] == ['--index-url', 'https://download.pytorch.org/whl/cpu']
+    assert index(command) == 'https://download.pytorch.org/whl/cpu'
+    # torch's and torchvision's dependencies (e.g. numpy) also come from PyPI: the PyTorch
+    # index lags behind, so requirements.txt would replace them right away (review)
+    assert command[command.index('--extra-index-url') + 1] == 'https://pypi.org/simple'
     assert torch_requirements('cpu')[0] in command
 
 
@@ -165,7 +172,7 @@ def test_cuda_installs_the_build_for_the_gpu(monkeypatch, capsys):
     ran = Ran()
     monkeypatch.setattr(install_torch.subprocess, 'run', ran)
     assert install_torch.main(['cuda']) == 0
-    assert ran.commands[0][-1] == 'https://download.pytorch.org/whl/cu130'
+    assert index(ran.commands[0]) == 'https://download.pytorch.org/whl/cu130'
     assert torch_requirements('cu130')[0] in ran.commands[0]
     assert 'NVIDIA GeForce RTX 4070' in capsys.readouterr().out
 
@@ -181,7 +188,7 @@ def test_cuda_without_a_suitable_gpu_installs_the_cpu_build(monkeypatch, capsys)
     assert install_torch.main(['cuda']) == 0
     monkeypatch.setattr(install_torch, 'query_gpus', lambda: '6.1, 512.95, NVIDIA GeForce GTX 1060\n')
     assert install_torch.main(['cuda']) == 0
-    assert [command[-1] for command in ran.commands] == [torch_index_url('cpu')] * 2
+    assert [index(command) for command in ran.commands] == [torch_index_url('cpu')] * 2
     assert 'for the CPU instead' in capsys.readouterr().out
 
 
@@ -267,7 +274,7 @@ def test_question_only_with_an_nvidia_driver(monkeypatch):
     for answer, build in ((False, 'cpu'), (True, 'cu130')):
         monkeypatch.setattr(install_torch, 'ask_gpu_support', lambda answer=answer: answer)
         assert install_torch.main([]) == 0
-    assert [command[-1] for command in ran.commands] == [torch_index_url(b) for b in ('cpu', 'cpu', 'cu130')]
+    assert [index(command) for command in ran.commands] == [torch_index_url(b) for b in ('cpu', 'cpu', 'cu130')]
 
 
 def test_the_question_takes_yes_and_no(monkeypatch):

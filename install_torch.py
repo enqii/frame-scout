@@ -25,6 +25,7 @@ from framescout_core import (CUDA_BUILDS, cuda_build, installed_build_matches, i
                              parse_gpu_query, torch_index_url, torch_requirements)
 
 KNOWN_CUDA_BUILDS = {build for build, *_ in CUDA_BUILDS}
+PYPI_INDEX = 'https://pypi.org/simple'
 
 
 def installed_version(name):
@@ -120,8 +121,11 @@ def main(argv=None):
         print('Installing PyTorch for the CPU.', flush=True)
     else:
         print(f'Installing PyTorch with CUDA support ({build}). This is a large download.', flush=True)
+    # torch and torchvision with their local label (+cpu, +cu130) exist only on the PyTorch
+    # index; their dependencies (numpy, pillow, ...) are taken from PyPI too, where they are
+    # newer, so requirements.txt does not replace them right away (review)
     command = [sys.executable, '-m', 'pip', 'install', '--no-cache-dir', *torch_requirements(build),
-               '--index-url', torch_index_url(build)]
+               '--index-url', torch_index_url(build), '--extra-index-url', PYPI_INDEX]
     if args.dry_run:
         print(' '.join(command))
         return 0
