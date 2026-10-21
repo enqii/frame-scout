@@ -122,7 +122,9 @@ referenced in commits, pull requests and discussions.
       rerun and saves its whole list, so an edit made in another tab/session (or by hand)
       between that read and a save is overwritten; `profiles.json.bak` holds only the
       state before the last save. Fix idea: save only if the file is unchanged since it
-      was read (mtime/hash), otherwise reload and ask; possibly keep several backups.
+      was read (mtime/hash), otherwise reload and ask. More than one backup generation
+      (rotating `.bak` files, a one-time copy before the v3 conversion) also belongs
+      here; for now the user chose a single `profiles.json.bak` (PR #6 review).
 - [ ] **A14 – Unreferenced reference files accumulate:** removing reference images from a
       profile, deleting a profile or a failed save of `profiles.json` after the upload
       leaves the files in `references/` (deliberately – nothing is deleted silently).
