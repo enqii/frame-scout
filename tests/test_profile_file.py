@@ -71,6 +71,23 @@ def test_saved_profiles_are_read_back_and_loadable_by_the_engine(tmp_path):
     assert [p['name'] for p in load_profiles(path, [])] == ['Bär']
 
 
+def test_other_top_level_keys_of_the_file_are_kept(tmp_path):
+    # review: {"version": 2, "profiles": [...]} lost "version" on the first save
+    path = write(tmp_path / 'profiles.json', {'version': 2, 'profiles': [{'name': 'Dog'}], 'note': 'mine'})
+    save_profiles(path, [{'name': 'Cat'}])
+    data = json.loads(path.read_text(encoding='utf-8'))
+    assert data == {'version': 2, 'profiles': [{'name': 'Cat'}], 'note': 'mine'}
+    assert list(data) == ['version', 'profiles', 'note']
+
+
+def test_the_v3_format_is_saved_without_its_old_keys(tmp_path):
+    # in v3 the top-level keys are profile names; they must not survive next to "profiles"
+    path = write(tmp_path / 'profiles.json', {'Dog': ['a dog on a meadow']})
+    save_profiles(path, read_profiles(path))
+    assert json.loads(path.read_text(encoding='utf-8')) == {
+        'profiles': [{'name': 'Dog', 'prompts': ['a dog on a meadow']}]}
+
+
 def test_the_previous_file_is_kept_as_backup(tmp_path):
     path = tmp_path / 'profiles.json'
     path.write_bytes(b'{"Dog": ["a dog on a meadow"]}\r\n')  # e.g. the v3 original
