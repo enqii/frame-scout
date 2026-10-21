@@ -13,10 +13,6 @@ matching photos as an HTML gallery.
 
 > **Status:** Prototype (v1.1). Open issues and the roadmap are listed in
 > [BACKLOG.md](BACKLOG.md).
->
-> **Note:** The user interface is currently still in German. Translating it to English is
-> planned (backlog item I7). UI labels below are quoted as they currently appear, with an
-> English gloss.
 
 ## Requirements
 
@@ -43,16 +39,17 @@ supported Python version and run the installer again.
 
 1. Double-click `Start-FrameScout.bat`. Your browser opens
    <http://127.0.0.1:8501>.
-2. **Suchprofile** (search profiles): name the motif and optionally add context,
-   features (preferably in English), custom search texts and reference images.
-3. **Fotoquelle** (photo source): choose a local image folder (default: `photos` in the
+2. **Search profiles:** name the motif and optionally add context, distinctive
+   features, custom search texts and reference images. CLIP understands English best,
+   so enter motif names and features in English where possible.
+3. **Photo source:** choose a local image folder (default: `photos` in the
    project folder). Subfolders are searched as well. Download and extract archives and
    online albums yourself beforehand – FrameScout does not download images from the
    internet.
-4. **KI-Einstellungen** (AI settings): with "auto", CUDA is used if PyTorch detects a
+4. **AI settings:** with "auto", CUDA is used if PyTorch detects a
    compatible NVIDIA GPU, otherwise the CPU. A batch size of 8 is a conservative
    starting value.
-5. **Suche & Ergebnisse** (search & results): start the analysis. Keep the browser open
+5. **Search & results:** start the analysis. Keep the browser open
    during the search run if possible – start/stop is tied to the running Streamlit
    session.
 
@@ -73,7 +70,7 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 
 ### How reliable are the matches?
 
-The displayed "Ähnlichkeit" (similarity) is a relative ranking value, **not a probability
+The displayed "Similarity" is a relative ranking value, **not a probability
 and not a reliable identification**. FrameScout can miss matches or return false matches
 – especially with large group photos, small or inconspicuous motifs, and when comparing
 drawings/artwork with real photos. Person detection helps with people in group photos;

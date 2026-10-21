@@ -5,7 +5,7 @@ FrameScout is a **local, general-purpose AI image search** tool for large folder
 
 ## Language
 - **Project language is English** for everything in the repository and on GitHub: code, identifiers, code comments, UI, generated outputs, docs, commit messages, PR titles/descriptions, review comments and skills. CLIP prompts are English anyway.
-- Exception until backlog item **I7** is done: the UI strings in `app.py`, the HTML gallery and log messages of `framescout_engine.py` and the `.bat` messages are still German. Do not translate them outside of I7; quote them verbatim (with an English gloss) in docs.
+- UI strings, the HTML gallery, engine log/error messages and the `.bat` messages are English since I7. Remaining German names: the thumbnail folder `results/vorschaubilder/` and the legacy crop label `Gesamtbild` in old cache rows (shown as "Full image" via `framescout_core.crop_label`).
 - Chat with the user may be in German.
 
 ## Status
@@ -14,9 +14,9 @@ Current baseline: **v1.1, prototype**, with a Streamlit frontend and a separate 
 One full end-to-end search run on Windows has been confirmed (I6): `run.log` from the original checkout shows 4,997 photos, 6 search profiles, CLIP on CPU, YOLO person detection enabled, 0 errors (2,609 new analyses + 2,388 from cache, i.e. a resumed run) and 6 HTML galleries written. The project `.venv` used for that run is Python 3.14.8 with torch 2.14.1+cpu (per `.venv/pyvenv.cfg` and the installed torch package; `run.log` itself does not record versions). The log also shows the QuickGELU warning (E1). This is a single CPU-only run, not a test suite: CUDA, other Python versions, a fresh install on another machine and the edge cases in the backlog are **not** verified. Treat syntax checks, unit tests and a real model run as distinct kinds of evidence, and do not call the app production-ready.
 
 ## Files and responsibilities
-- `app.py`: Streamlit frontend. Tabs (current German UI): Suchprofile (search profiles), Fotoquelle (photo source), KI-Einstellungen (AI settings), Suche & Ergebnisse (search & results). Handles profile CRUD, reference uploads, in-session settings, hardware display, analysis process, progress/log UI and HTML downloads.
+- `app.py`: Streamlit frontend. Tabs: Search profiles, Photo source, AI settings, Search & results. Handles profile CRUD, reference uploads, in-session settings, hardware display, analysis process, progress/log UI and HTML downloads.
 - `framescout_engine.py`: standalone CLI. Parses arguments, loads models, embeds images, optionally detects persons, caches embeddings, ranks and exports HTML galleries.
-- `framescout_core.py`: shared by app and engine, **standard library only** (importable without torch/Streamlit): `EXT`, `slugify`, `profile_slugs` (unique result file names, used by both), `write_new_file` (reference uploads without overwriting), `generic_prompts` and `load_profiles` (profile loading/validation, used by the engine). Put logic here when both sides need it or it should be unit-tested without models.
+- `framescout_core.py`: shared by app and engine, **standard library only** (importable without torch/Streamlit): `EXT`, `slugify`, `profile_slugs` (unique result file names, used by both), `write_new_file` (reference uploads without overwriting), `generic_prompts` and `load_profiles` (profile loading/validation, used by the engine), `progress_line`/`parse_progress` (the progress line the engine logs and the app parses, A11) and `crop_label`/`FULL_IMAGE_LABEL` (gallery crop labels). Put logic here when both sides need it or it should be unit-tested without models.
 - `tests/`, `pytest.ini`, `requirements-dev.txt`: pytest suite for `framescout_core` (no torch, no model download); dev dependency `pytest`.
 - `profiles.json`: persisted profile list (currently both the shipped example and the user's working file; see I7). Back it up before overwriting user changes.
 - `requirements.txt`: Streamlit, numpy, Pillow, torch, open_clip_torch, ultralytics, psutil; versions currently loosely constrained.
