@@ -9,6 +9,7 @@ import io
 import json
 import os
 import sqlite3
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -19,9 +20,10 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, crop_label,
-                             cuda_hint, detection_options, draft_size, ensure_thumbnail, feature_signature, group_batches, load_profiles,
-                             prefetch, profile_slugs, progress_due, progress_line, store_group)
+from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RUN_LOCK, RUN_STATUS,
+                             RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size,
+                             ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch, profile_slugs,
+                             progress_due, progress_line, store_group)
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -34,6 +36,21 @@ DECODE_THREADS = min(4, os.cpu_count() or 1)
 # memory; more threads were not faster, they only wait there with a photo each (review).
 DETECTION_DECODE_THREADS = 2
 THUMBNAIL_SIZE = 380
+# How long the engine waits for the run lock of the output folder. The app holds it for a
+# moment while it starts the engine or checks whether a search runs; a search that really
+# runs holds it for its whole duration.
+LOCK_TIMEOUT = 5
+# exit code when another search already uses the output folder (A4)
+EXIT_BUSY = 3
+
+
+class Parser(argparse.ArgumentParser):
+    """ArgumentParser that remembers its error message for the status file."""
+    error_message = None
+
+    def error(self, message):
+        self.error_message = message
+        super().error(message)
 
 
 def open_image(path, min_size=None):
@@ -78,7 +95,7 @@ def unpack(blob):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='FrameScout: local image search by name, reference images and optional features.')
+    parser = Parser(description='FrameScout: local image search by name, reference images and optional features.')
     parser.add_argument('folder', type=Path, help='photo folder (subfolders are searched recursively)')
     parser.add_argument('--profiles', type=Path, help='JSON file with search profiles (see profiles.example.json)')
     parser.add_argument('--character', action='append', default=[], metavar='NAME|CONTEXT|FEATURES',
@@ -102,6 +119,38 @@ def main():
         parser.error(f'Photo folder does not exist: {root}')
     if output == root:
         parser.error('The output folder must not be the photo folder.')
+    output.mkdir(parents=True, exist_ok=True)
+    # one search per output folder: two would share cache.sqlite3 ("database is locked")
+    # and the app's run.log (A4)
+    lock = RunLock(output / RUN_LOCK)
+    if not lock.acquire(timeout=LOCK_TIMEOUT):
+        print(f'Another FrameScout search is already running with the output folder {output}. '
+              'Wait until it has finished or stop it, then start again.', file=sys.stderr, flush=True)
+        return EXIT_BUSY
+    status = StatusReporter(output / RUN_STATUS, os.getpid())
+    try:
+        status.update('scanning')
+        code = search(args, parser, root, output, status)
+    except SystemExit as exc:  # parser.error
+        status.finish('failed', exc.code if isinstance(exc.code, int) else 1, parser.error_message)
+        raise
+    except KeyboardInterrupt:
+        status.finish('interrupted', 130, 'Interrupted (Ctrl+C).')
+        raise
+    except BaseException as exc:
+        # e.g. a model that cannot be loaded: the traceback goes to the log, the status names the error
+        status.finish('failed', 1, f'{type(exc).__name__}: {exc}')
+        raise
+    else:
+        status.finish('finished' if code == 0 else 'interrupted', code,
+                      None if code == 0 else 'Interrupted (Ctrl+C).')
+        return code
+    finally:
+        lock.release()
+
+
+def search(args, parser, root, output, status):
+    """Run the search with the run lock of output held; report the phases to status (A5)."""
     try:
         profiles = load_profiles(args.profiles.resolve() if args.profiles else None, args.character)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -117,7 +166,7 @@ def main():
     if device == 'cuda' and not torch.cuda.is_available():
         parser.error(f'CUDA is not available; use --device cpu. {cuda_hint(torch.version.cuda)}')
     torch.set_num_threads(min(12, max(1, torch.get_num_threads())))
-    output.mkdir(parents=True, exist_ok=True)
+    status.update('loading')
     print(f'{len(paths)} photos; {len(profiles)} search profiles; CLIP: {device}; '
           f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
     print('Model weights are downloaded on the first start.', flush=True)
@@ -189,6 +238,8 @@ def main():
         done = fresh + reused + errors
         if progress_due(before, done, len(paths)):
             print(progress_line(done, len(paths), fresh, reused, errors), flush=True)
+        # the status file is written at most once a second, the last photo always (A5)
+        status.update(done=done, new=fresh, cached=reused, errors=errors, force=done == len(paths))
 
     def prepared(todo, pool, ahead):
         """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped."""
@@ -219,6 +270,7 @@ def main():
         print(f'ERROR {item[0]}: {exc}', flush=True)
         finished(failed=1)
 
+    status.update('analyzing', total=len(paths))
     try:
         todo = []
         for path in paths:
@@ -252,8 +304,11 @@ def main():
         con.close()
         return 130
 
+    print('Scoring the photos for each search profile ...', flush=True)
+    status.update('scoring', total=len(paths))
     scores = {p['name']: [] for p in profiles}
-    for path in paths:
+    for number, path in enumerate(paths, 1):
+        status.update(done=number, force=number == len(paths))
         try:
             stat = path.stat()
             record = con.execute('SELECT mtime_ns,size,labels,vectors FROM features WHERE path=? AND signature=?',
@@ -297,10 +352,17 @@ def main():
     article{background:#292929;padding:12px;border-radius:10px;overflow-wrap:anywhere}
     img{width:100%;height:250px;object-fit:contain;background:#111;border-radius:5px}
     small{color:#bbb}nav{margin-bottom:22px}'''
+    rankings = {name: sorted(found, key=lambda x: x[0], reverse=True)[:args.top] for name, found in scores.items()}
+    total_cards = sum(len(ranked) for ranked in rankings.values())
+    print('Writing the galleries ...', flush=True)
+    status.update('exporting', total=total_cards)
+    cards_done = 0
     for p in profiles:
-        name = p['name']; ranked = sorted(scores[name], key=lambda x: x[0], reverse=True)[:args.top]
+        name = p['name']; ranked = rankings[name]
         cards = []
         for rank, (score, path, label) in enumerate(ranked, 1):
+            cards_done += 1
+            status.update(done=cards_done, force=cards_done == total_cards)
             # skips (and logs) photos deleted or unreadable since scoring instead of aborting (E6)
             thumb_name = ensure_thumbnail(path, thumbs, legacy_thumbs, render_thumbnail, log)
             if thumb_name is None:
