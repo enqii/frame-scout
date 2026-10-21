@@ -19,6 +19,7 @@ profiles.json
 profiles.tmp
 profiles.json.*.tmp
 profiles.json.bak
+profiles.json.*.bak
 
 # Claude Code: agent worktrees and personal settings
 .claude/worktrees/
