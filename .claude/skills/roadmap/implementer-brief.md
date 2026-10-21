@@ -75,10 +75,10 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
 - Update `BACKLOG.md`, `README.md` and `CLAUDE.md` in the same PR as `CLAUDE.md` →
   "PR workflow" requires – including out-of-scope findings as new backlog items
   ("Out-of-scope findings go into the backlog"; no GitHub issues).
-- When the definition of done (`CLAUDE.md` and the PR template) is met: `gh pr ready {PR}`,
-  then `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:needs-review`.
-  Before that, check CI with `gh pr checks {PR}` (the `tests` workflow must be green;
-  `gh pr checks {PR} --watch` waits for running checks).
+- When the definition of done (`CLAUDE.md` and the PR template) is met: first wait for
+  CI with `gh pr checks {PR} --watch` – every check of the latest push must pass
+  (fix failures first) – then `gh pr ready {PR}` and
+  `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:needs-review`.
 
 ## Addressing a review (mode `address-review`)
 
@@ -94,7 +94,10 @@ For **every** unanswered review comment:
    (or `-F body=@<file>`); reply to general PR comments with `gh pr comment {PR}`.
 3. Add a section "Review: addressed / declined" to the PR description listing each
    finding with its outcome, and post the same summary as a PR comment.
-4. Re-run the tests, then `gh pr edit {PR} --remove-label fs:review-done --add-label fs:ready`.
+4. Re-run the tests locally, wait for CI on the latest push with
+   `gh pr checks {PR} --watch` (every check must pass; review fixes trigger a new run
+   that may fail on another Python version), then
+   `gh pr edit {PR} --remove-label fs:review-done --add-label fs:ready`.
 
 ## Hold points
 
