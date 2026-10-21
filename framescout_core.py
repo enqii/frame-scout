@@ -348,6 +348,98 @@ def feature_signature(person_detection, max_persons, person_confidence, yolo_mod
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
 
 
+# PyTorch version the installer installs (I3), the version of the verified end-to-end run.
+# requirements.txt pins the same versions; a test keeps them in sync.
+TORCH_VERSION = '2.14.1'
+TORCHVISION_VERSION = '0.29.1'
+TORCH_INDEX = 'https://download.pytorch.org/whl/'
+# CUDA builds of PyTorch the installer chooses from, newest first (A7):
+# (build, oldest compute capability, first unsupported compute capability, oldest Windows
+# driver). From the CUDA 12.6/13.0 release notes and PyTorch's build targets as known when
+# this was written; not verified on a GPU (the development PC has none). CUDA 13 dropped
+# Maxwell, Pascal and Volta (< 7.5); the CUDA 12.6 build ends before Blackwell (10.0).
+CUDA_BUILDS = (('cu130', (7, 5), None, (580,)),
+               ('cu126', (5, 0), (10, 0), (528, 33)))
+
+
+def _version(text):
+    return tuple(int(x) for x in text.strip().split('.'))
+
+
+def parse_gpu_query(text):
+    """Return [(compute capability, driver version, name)] from nvidia-smi's GPU query.
+
+    text is the output of nvidia-smi --query-gpu=compute_cap,driver_version,name
+    --format=csv,noheader, one GPU per line, e.g. "8.9, 581.57, NVIDIA GeForce RTX 4070".
+    Raises ValueError if it lists no GPU or a line cannot be read (e.g. "[N/A]" from an
+    old driver).
+    """
+    gpus = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            cc, driver, name = (x.strip() for x in line.split(',', 2))
+            gpus.append((_version(cc), _version(driver), name))
+        except ValueError:
+            raise ValueError(f'cannot read the GPU details from nvidia-smi: {line.strip()!r}') from None
+    if not gpus:
+        raise ValueError('nvidia-smi lists no GPU')
+    return gpus
+
+
+def cuda_build(gpus):
+    """Return the newest CUDA build of PyTorch ("cu130", "cu126") that suits all gpus.
+
+    gpus as returned by parse_gpu_query. A build must support every GPU, since CUDA can
+    number the GPUs differently from nvidia-smi. Raises ValueError with the reason if no
+    build fits (GPU too old or too new for the driver, driver too old).
+    """
+    if not gpus:
+        raise ValueError('no NVIDIA GPU found')
+    for build, oldest, unsupported, driver in CUDA_BUILDS:
+        if all(oldest <= cc and (unsupported is None or cc < unsupported) and version >= driver
+               for cc, version, _ in gpus):
+            return build
+    details = '; '.join(f'{name}: compute capability {".".join(map(str, cc))}, driver {".".join(map(str, version))}'
+                        for cc, version, name in gpus)
+    oldest = min(supported for _, supported, *_ in CUDA_BUILDS)
+    hint = ('The GPU is too old for current PyTorch builds.' if any(cc < oldest for cc, *_ in gpus)
+            else 'A current NVIDIA driver may help.')
+    raise ValueError(f'no CUDA build of PyTorch {TORCH_VERSION} suits this GPU and driver ({details}). {hint}')
+
+
+def torch_requirements(build):
+    """Return the pip requirements of PyTorch for build ("cpu", "cu126", "cu130").
+
+    The local version label (+cpu, +cu130) makes pip replace an installed build of the same
+    version, so running the installer again switches between the CPU and the CUDA build.
+    """
+    return [f'torch=={TORCH_VERSION}+{build}', f'torchvision=={TORCHVISION_VERSION}+{build}']
+
+
+def installed_build_matches(torch_version, torchvision_version, build):
+    """Return True if the installed torch and torchvision are the pinned versions of build.
+
+    The versions are those of the installed packages (None = not installed), e.g.
+    "2.14.1+cu130". PyPI's Windows wheels are the CPU build without a local label, so a
+    plain "2.14.1" counts as "cpu": an existing CPU install is not downloaded again.
+    """
+    def matches(installed, version):
+        if installed is None:
+            return False
+        base, _, label = installed.partition('+')
+        return base == version and (label == build or (build == 'cpu' and label == ''))
+    return matches(torch_version, TORCH_VERSION) and matches(torchvision_version, TORCHVISION_VERSION)
+
+
+def torch_index_url(build):
+    """Return the PyTorch package index of build ("cpu" or one of CUDA_BUILDS)."""
+    if build != 'cpu' and build not in {b for b, *_ in CUDA_BUILDS}:
+        raise ValueError(f'unknown PyTorch build: {build}')
+    return TORCH_INDEX + build
+
+
 def device_choices(cuda_available):
     """Return the compute devices the app offers: "cuda" only if PyTorch can use a CUDA GPU (A7)."""
     return ['auto', 'cpu'] + (['cuda'] if cuda_available else [])

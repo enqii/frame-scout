@@ -1,7 +1,14 @@
+# PyTorch is pinned (I3): Install-FrameScout.bat installs this version first from the
+# PyTorch index, as the CPU build or a CUDA build (install_torch.py), and the same pins here
+# keep pip from replacing it. Change it together with TORCH_VERSION and TORCHVISION_VERSION
+# in framescout_core.py (a test checks that they match).
+torch==2.14.1
+torchvision==0.29.1
+# Minimum versions: those of the project venv of the verified runs (Python 3.14, CPU).
+# Streamlit keeps its older floor until A10. Full locking is part of P5.
 streamlit>=1.40
-numpy
-pillow
-torch
-open_clip_torch
-ultralytics
-psutil
+numpy>=2.5.4
+pillow>=12.3.0
+open_clip_torch>=3.3.0
+ultralytics>=8.4.183
+psutil>=7.2.2
