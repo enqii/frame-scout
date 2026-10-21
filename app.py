@@ -8,10 +8,11 @@ from pathlib import Path
 import psutil
 import streamlit as st
 
-from framescout_core import (EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, SETTINGS_FILE, RunLock,
-                             StatusReporter, create_from_example, cuda_status, default_settings, device_choices,
-                             finish_reference_move, lock_held, profile_slugs, read_profiles, read_settings,
-                             read_status, reference_folder, run_active, save_profiles, save_settings,
+from framescout_core import (DEVICES, EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, SETTING_RANGES,
+                             SETTINGS_FILE, RunLock, StatusReporter, create_from_example, cuda_status,
+                             default_settings, device_choices, finish_reference_move, lock_held, profile_slugs,
+                             read_profiles, read_settings, read_status, reconcile_settings, reference_folder,
+                             run_active, save_profiles, save_settings,
                              stage_reference_move, started_in_time, status_fraction, status_text, stopped_status,
                              undo_reference_move, update_backup_references, write_new_file, write_status)
 
@@ -247,35 +248,33 @@ def system_info():
         data['ram_gb'] = None
     return data
 
-try:
-    info, info_error = system_info(), None
-except Exception as exc:
-    info, info_error = None, exc
-# "cuda" only if PyTorch can use it (A7); if detection failed, the engine still checks
-devices = device_choices(info['cuda']) if info else ['auto', 'cpu', 'cuda']
-
 DEFAULT_SETTINGS = default_settings(BASE)
 
 def setting_key(name):
     """Return the session-state key of the widget of setting name (A8)."""
     return 'setting_' + name
 
-def shown_setting(name, value):
-    """Return what the widget of setting name shows for a saved value: an unavailable device as auto (A7)."""
-    return 'auto' if name == 'device' and value not in devices else value
+def number_range(name):
+    """Return the min_value/max_value arguments of the widget of setting name (review: one table)."""
+    low, high = SETTING_RANGES[name]
+    return {'min_value': low, 'max_value': high}
 
 # Settings (A8): settings.json is read on every rerun, so a reload, a restart, another tab
 # or session shows the saved settings. The widgets have keys and get the saved values
 # through their session state; passing them as value= would give a widget a new identity
-# after every save and drop the next change (review). settings_seen holds, per setting,
-# the saved value this session shows: a widget that differs from it was changed here and
-# is saved (the latest action wins); a saved value that differs from it was saved by
-# another tab or session and is shown here, unless this session changed it.
+# after every save and drop the next change (review). framescout_core.reconcile_settings
+# tells a change made in this session (saved; the latest action wins) from a value another
+# session saved (shown here).
 try:
     saved_settings, settings_problems = read_settings(SETTINGS, DEFAULT_SETTINGS)
-except (OSError, ValueError) as exc:
+except OSError as exc:
+    # e.g. a virus scanner or another program holding the file for longer (review)
+    saved_settings, settings_problems = None, []
+    st.warning(f'{SETTINGS.name} is in use by another program right now, so the settings shown are kept and '
+               f'saving a change is tried again the next time this page updates.\n\nDetails: {exc}')
+except ValueError as exc:
     # never save over a file the app cannot read, like profiles.json (A2); the widgets keep
-    # what they show (the defaults in a new session)
+    # what they show (the defaults in a new page)
     saved_settings, settings_problems = None, []
     st.warning(f'{SETTINGS.name} cannot be read, so FrameScout does not change it and keeps the settings shown '
                f'(the defaults in a new page). Fix it in a text editor or delete it to save settings again.'
@@ -284,30 +283,29 @@ if settings_problems:
     st.warning(f'Some values in {SETTINGS.name} are not allowed and were replaced by their defaults: '
                + '; '.join(settings_problems) + '. The next saved change removes them from the file.')
 seen = st.session_state.setdefault('settings_seen', {})
-changed_settings = {}
-for name, default in DEFAULT_SETTINGS.items():
-    key = setting_key(name)
-    saved = saved_settings[name] if saved_settings else default
-    if key not in st.session_state:  # a new page, or the widget was not drawn in the last page run
-        st.session_state[key], seen[name] = shown_setting(name, saved), saved
-    elif st.session_state[key] != shown_setting(name, seen.get(name, default)):
-        changed_settings[name] = st.session_state[key]
-    elif saved_settings and saved != seen.get(name, default):
-        st.session_state[key], seen[name] = shown_setting(name, saved), saved
-if st.session_state[setting_key('device')] not in devices:
-    st.session_state[setting_key('device')] = 'auto'
+shown = st.session_state.setdefault('settings_shown', {})
+widget_values = {name: st.session_state[setting_key(name)] for name in DEFAULT_SETTINGS
+                 if setting_key(name) in st.session_state}
+setting_updates, changed_settings, settings_taken_over = reconcile_settings(
+    widget_values, seen, shown, saved_settings, DEFAULT_SETTINGS)
+for name, value in setting_updates.items():
+    st.session_state[setting_key(name)] = value
 if changed_settings:
-    # a failed save is tried again on the next rerun: the widget still differs from settings_seen
     if saved_settings is None:
-        st.warning(f'The changed settings are used, but not saved, since {SETTINGS.name} cannot be read.')
+        st.warning(f'The changed settings are used, but not saved yet, since {SETTINGS.name} cannot be read.')
     else:
         try:
-            save_settings(SETTINGS, changed_settings, DEFAULT_SETTINGS)
-            seen.update(changed_settings)
+            written = save_settings(SETTINGS, changed_settings, DEFAULT_SETTINGS)
         except (OSError, ValueError) as exc:
+            # tried again on the next rerun: the widget still differs from settings_shown
             st.warning(f'The settings could not be saved to {SETTINGS.name}: {exc}. They are used for now, and '
                        'saving is tried again the next time this page updates.')
+        else:
+            shown.update(changed_settings)
+            seen.update(written)  # as stored, e.g. rounded (review)
 settings = {name: st.session_state[setting_key(name)] for name in DEFAULT_SETTINGS}
+# the folder as the image count, the Start check and the engine use it (review: ~ expanded)
+photo_folder = Path(settings['photo_folder']).expanduser()
 p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source', 'AI settings', 'Search & results'])
 
 with p_tab:
@@ -377,9 +375,8 @@ with p_tab:
 with f_tab:
     st.subheader('Photo collection')
     st.text_input('Local photo folder (including subfolders)', key=setting_key('photo_folder'), disabled=active)
-    folder = Path(settings['photo_folder']).expanduser()
-    if folder.is_dir():
-        count = sum(1 for x in folder.rglob('*') if x.is_file() and x.suffix.lower() in EXT and RESULTS not in x.parents)
+    if photo_folder.is_dir():
+        count = sum(1 for x in photo_folder.rglob('*') if x.is_file() and x.suffix.lower() in EXT and RESULTS not in x.parents)
         st.success(f'{count:,} supported image files found.')
     else:
         st.warning('The folder does not exist yet. Create it or choose an existing image folder.')
@@ -387,6 +384,17 @@ with f_tab:
 
 with settings_tab:
     st.subheader('AI processing')
+    # imports torch: here rather than at the top, so the profile tab is drawn first (review)
+    try:
+        info, info_error = system_info(), None
+    except Exception as exc:
+        info, info_error = None, exc
+    # "cuda" only if PyTorch can use it (A7); if detection failed, the engine still checks
+    devices = device_choices(info['cuda']) if info else list(DEVICES)
+    if st.session_state[setting_key('device')] not in devices:
+        # the only substitute (review): a saved device this PyTorch cannot use (e.g. "cuda"
+        # after switching to the CPU build) is shown and used as "auto" but stays saved
+        st.session_state[setting_key('device')] = shown['device'] = 'auto'
     st.selectbox('Compute device', devices, key=setting_key('device'), disabled=active, help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
     if seen.get('device', 'auto') not in devices:
         # a saved device this PyTorch cannot use (e.g. "cuda" after switching to the CPU
@@ -402,12 +410,12 @@ with settings_tab:
             else:
                 seen['device'] = 'auto'
                 st.rerun()
-    st.number_input('Batch size', min_value=1, max_value=64, step=1, key=setting_key('batch_size'), disabled=active)
-    st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, step=25, key=setting_key('top'), disabled=active)
+    st.number_input('Batch size', **number_range('batch_size'), step=1, key=setting_key('batch_size'), disabled=active)
+    st.number_input('Maximum matches per search profile', **number_range('top'), step=25, key=setting_key('top'), disabled=active)
     st.checkbox('Also detect individual persons in group photos (YOLO)', key=setting_key('person_detection'), disabled=active)
-    st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, key=setting_key('max_persons'), disabled=active)
-    st.slider('Minimum confidence of the person detection', min_value=.1, max_value=.9, step=.05, key=setting_key('person_confidence'), disabled=active)
-    st.slider('Weight of reference images (if any)', min_value=0., max_value=1., step=.05, key=setting_key('reference_weight'), disabled=active, help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
+    st.number_input('Maximum detected persons per photo', **number_range('max_persons'), key=setting_key('max_persons'), disabled=active)
+    st.slider('Minimum confidence of the person detection', **number_range('person_confidence'), step=.05, key=setting_key('person_confidence'), disabled=active)
+    st.slider('Weight of reference images (if any)', **number_range('reference_weight'), step=.05, key=setting_key('reference_weight'), disabled=active, help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
     if info:
         st.caption(f"Detected: {info['cpu']} · {info['threads']} logical CPU cores · " +
                    (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unknown · ') +
@@ -420,12 +428,19 @@ with run_tab:
     st.subheader('Start search')
     c1,c2 = st.columns([1,1])
     with c1:
-        start = st.button('▶ Start search', type='primary', disabled=active or not profiles or not Path(settings['photo_folder']).is_dir(), use_container_width=True)
+        start = st.button('▶ Start search', type='primary', disabled=active or not profiles or not photo_folder.is_dir(), use_container_width=True)
     with c2:
         stop = st.button('■ Stop search', disabled=not active, use_container_width=True)
+    if start and settings_taken_over:
+        # the page showed other values until this click: never start with settings the
+        # user has not seen (review)
+        st.session_state.run_notice = ('The search was not started: another tab or window changed these settings '
+                                       'meanwhile: ' + ', '.join(settings_taken_over) + '. Check the settings '
+                                       'shown now and start again.')
+        st.rerun()
     if start:
-        cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), str(Path(settings['photo_folder']).resolve()),
-            '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',settings['device'],
+        cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), str(photo_folder.resolve()),
+            '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',st.session_state[setting_key('device')],
             '--batch-size',str(settings['batch_size']),'--top',str(settings['top']),
             '--max-persons',str(settings['max_persons']),'--person-confidence',str(settings['person_confidence']),
             '--reference-weight',str(settings['reference_weight'])]
