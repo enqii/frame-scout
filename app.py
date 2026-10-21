@@ -7,8 +7,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (EXT, create_from_example, parse_progress, profile_slugs, read_profiles, reference_folder,
-                             save_profiles, write_new_file)
+from framescout_core import (EXT, create_from_example, finish_reference_move, parse_progress, profile_slugs,
+                             read_profiles, reference_folder, save_profiles, stage_reference_move,
+                             undo_reference_move, write_new_file)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -22,34 +23,51 @@ st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
 .stButton button{border-radius:8px}</style>''', unsafe_allow_html=True)
 
-def store(build, uploads=(), name='', others=()):
-    """Copy uploaded reference images, then save the profile list build(new_reference_paths).
+def store(build, uploads=(), name='', others=(), keep=(), move=False):
+    """Save the profile list build(reference_paths) with the profile's reference images.
 
-    Returns True on success. On an error nothing changes: the message is shown, the
-    copies made for this save are removed again (no profile references them) and the
-    caller keeps its unchanged profile list, which still matches the file on disk.
+    reference_paths are the paths in keep (moved into the folder of name if move is set,
+    i.e. after a rename) plus copies of the uploads. Returns True on success. On an error
+    nothing changes: the message is shown, the new files and names made for this save are
+    removed again and the caller keeps its unchanged profile list, which still matches
+    the file on disk.
     """
-    written = []
+    written, staged, refs, new_folder = [], [], list(keep), None
     try:
-        if uploads:
-            # one folder per profile, never one holding references of another profile (A1);
-            # write_new_file never overwrites leftover files in it
+        if uploads or move:
+            # one folder per profile, never one holding references of another profile (A1),
+            # named after the profile: a rename moves the profile's files along
             folder = reference_folder(REFS, name, others, BASE)
+            new_folder = None if folder.exists() else folder
+            if move:
+                # old and new names both exist until the save succeeded (crash safety)
+                refs, staged = stage_reference_move(refs, folder, REFS, BASE, others)
+            # write_new_file never overwrites leftover files in the folder
             for f in uploads:
                 suffix = Path(f.name).suffix.lower()
                 if suffix in EXT:
                     written.append(write_new_file(folder, 'reference', suffix, f.getvalue()))
         # keeps the previous file as profiles.json.bak (A2)
-        save_profiles(PROFILES, build([x.relative_to(BASE).as_posix() for x in written]))
-        return True
+        save_profiles(PROFILES, build(refs + [x.relative_to(BASE).as_posix() for x in written]))
     except OSError as exc:
+        undo_reference_move(staged)
         for x in written:
             try:
                 x.unlink()
             except OSError:
                 pass
+        if new_folder:
+            try:
+                new_folder.rmdir()  # the folder made for this save; only removed if empty
+            except OSError:
+                pass
         st.error(f'Could not save the search profiles: {exc}. Your changes were not saved.')
         return False
+    problems = finish_reference_move(staged, REFS)
+    if problems:
+        st.session_state.notice = ('Saved. Some reference images could not be removed from their old '
+                                   'folder and now exist twice; the profile uses the new copy: ' + '; '.join(problems))
+    return True
 
 def running():
     proc = st.session_state.get('process')
@@ -90,6 +108,8 @@ p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source'
 
 with p_tab:
     st.subheader('Saved search profiles')
+    if 'notice' in st.session_state:
+        st.warning(st.session_state.pop('notice'))
     if not profiles:
         st.info('Create a search profile first.')
     for index, p in enumerate(profiles):
@@ -110,14 +130,15 @@ with p_tab:
                 if not edit_name or any(j != index and q['name'].strip().lower() == edit_name.lower() for j,q in enumerate(profiles)):
                     st.error('The profile name must be unique and must not be empty.')
                 else:
-                    def edited(new_refs, index=index, p=p):
-                        refs = ([] if clear_refs else list(p.get('reference_images', []))) + new_refs
+                    def edited(refs, index=index, p=p):
                         # {**p, ...} keeps keys the form does not edit (A2)
                         return profiles[:index] + [{**p, 'name': edit_name, 'franchise': franchise.strip(),
                                 'features': features.strip(), 'reference_images': refs,
                                 'prompts': [x.strip() for x in prompts.splitlines() if x.strip()]}] + profiles[index+1:]
                     others = profiles[:index] + profiles[index+1:]
-                    if store(edited, refs_new or [], edit_name, others):
+                    keep = [] if clear_refs else p.get('reference_images', [])
+                    # a renamed profile's reference folder follows the new name (A1)
+                    if store(edited, refs_new or [], edit_name, others, keep, move=edit_name != p['name']):
                         st.rerun()
             # new lists instead of changing profiles in place: after a failed save the page
             # keeps showing (and the search uses) exactly what is in profiles.json
