@@ -1,5 +1,4 @@
 """FrameScout: local Streamlit user interface for framescout_engine.py."""
-import json
 import os
 import platform
 import subprocess
@@ -8,7 +7,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import EXT, create_from_example, parse_progress, profile_slugs, slugify, write_new_file
+from framescout_core import (EXT, create_from_example, parse_progress, profile_slugs, read_profiles, save_profiles,
+                             slugify, write_new_file)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -22,16 +22,14 @@ st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
 .stButton button{border-radius:8px}</style>''', unsafe_allow_html=True)
 
-def read_profiles():
-    if not PROFILES.exists():
-        return []
-    data = json.loads(PROFILES.read_text(encoding='utf-8-sig'))
-    return data.get('profiles', [])
-
-def save_profiles(data):
-    tmp = PROFILES.with_suffix('.tmp')
-    tmp.write_text(json.dumps({'profiles': data}, ensure_ascii=False, indent=2), encoding='utf-8')
-    tmp.replace(PROFILES)
+def persist(profiles):
+    # keeps the previous file as profiles.json.bak (A2); returns False if saving failed
+    try:
+        save_profiles(PROFILES, profiles)
+        return True
+    except OSError as exc:
+        st.error(f'Could not save profiles.json: {exc}. Your changes were not saved.')
+        return False
 
 def running():
     proc = st.session_state.get('process')
@@ -69,9 +67,11 @@ except OSError as exc:  # e.g. a read-only project folder
              'Check that the project folder is writable.')
     st.stop()
 try:
-    profiles = read_profiles()
+    profiles = read_profiles(PROFILES)
 except (OSError, ValueError) as exc:
-    st.error(f'profiles.json is invalid: {exc}')
+    # never save over a file the app cannot read (A2)
+    st.error(f'profiles.json cannot be read: {exc}. FrameScout does not change the file. '
+             'Fix it in a text editor, or restore the backup profiles.json.bak if there is one.')
     st.stop()
 
 if 'settings' not in st.session_state:
@@ -99,20 +99,21 @@ with p_tab:
                 delete = c2.form_submit_button('Delete profile', disabled=running())
             if update:
                 edit_name = edit_name.strip()
-                if not edit_name or any(j != index and q['name'].lower() == edit_name.lower() for j,q in enumerate(profiles)):
+                if not edit_name or any(j != index and q['name'].strip().lower() == edit_name.lower() for j,q in enumerate(profiles)):
                     st.error('The profile name must be unique and must not be empty.')
                 else:
                     refs = [] if clear_refs else list(p.get('reference_images', []))
                     if refs_new:
                         refs.extend(add_ref_files(refs_new, edit_name))
-                    profiles[index] = {'name': edit_name, 'franchise': franchise.strip(), 'features': features.strip(),
+                    # {**p, ...} keeps keys the form does not edit (A2)
+                    profiles[index] = {**p, 'name': edit_name, 'franchise': franchise.strip(), 'features': features.strip(),
                                        'prompts': [x.strip() for x in prompts.splitlines() if x.strip()], 'reference_images': refs}
-                    save_profiles(profiles)
-                    st.rerun()
+                    if persist(profiles):
+                        st.rerun()
             if delete:
                 profiles.pop(index)
-                save_profiles(profiles)
-                st.rerun()
+                if persist(profiles):
+                    st.rerun()
     st.divider()
     st.subheader('New search profile')
     with st.form('new_profile', clear_on_submit=True):
@@ -124,14 +125,14 @@ with p_tab:
         create = st.form_submit_button('Add profile', disabled=running())
     if create:
         name = name.strip()
-        if not name or any(x['name'].lower() == name.lower() for x in profiles):
+        if not name or any(x['name'].strip().lower() == name.lower() for x in profiles):
             st.error('Please enter a unique name.')
         else:
             refs = add_ref_files(uploads or [], name)
             profiles.append({'name':name, 'franchise':franchise.strip(), 'features':features.strip(),
                              'prompts':[x.strip() for x in prompts.splitlines() if x.strip()], 'reference_images':refs})
-            save_profiles(profiles)
-            st.rerun()
+            if persist(profiles):
+                st.rerun()
     st.caption('FrameScout automatically creates several CLIP search texts from the name. No language model is required.')
 
 with f_tab:
