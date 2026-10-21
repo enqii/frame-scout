@@ -21,7 +21,7 @@ import subprocess
 import sys
 from importlib import metadata
 
-from framescout_core import (CUDA_BUILDS, cuda_build, installed_build_matches, installed_cuda_build,
+from framescout_core import (CUDA_BUILDS, cuda_build, driver_text, installed_build_matches, installed_cuda_build,
                              parse_gpu_query, torch_index_url, torch_requirements, unsupported_gpus)
 
 KNOWN_CUDA_BUILDS = {build for build, *_ in CUDA_BUILDS}
@@ -73,7 +73,7 @@ def chosen_cuda_build():
     """Return the CUDA build for this PC's GPUs; raises ValueError with the reason if there is none."""
     gpus = parse_gpu_query(query_gpus())
     for cc, driver, name in gpus:
-        print(f'GPU: {name} (compute capability {".".join(map(str, cc))}, driver {".".join(map(str, driver))})')
+        print(f'GPU: {name} (compute capability {".".join(map(str, cc))}, driver {driver_text(driver)})')
     build = cuda_build(gpus)
     for name in unsupported_gpus(build, gpus):
         print(f'Note: {name} is not supported by this build ({build}) and is not used.', flush=True)
