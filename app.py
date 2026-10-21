@@ -2,7 +2,6 @@
 import json
 import os
 import platform
-import os
 import re
 import subprocess
 import sys
@@ -11,12 +10,14 @@ from pathlib import Path
 
 import streamlit as st
 
+from framescout_core import EXT, profile_slugs, slugify
+
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'
 REFS = BASE / 'references'
 RESULTS = BASE / 'results'
 LOG = BASE / 'run.log'
-EXT = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'}
+UPLOAD_TYPES = sorted(x.lstrip('.') for x in EXT)
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
@@ -33,10 +34,6 @@ def save_profiles(data):
     tmp.write_text(json.dumps({'profiles': data}, ensure_ascii=False, indent=2), encoding='utf-8')
     tmp.replace(PROFILES)
 
-def unique_slug(name):
-    slug = re.sub('[^a-z0-9]+', '-', name.lower()).strip('-')
-    return slug or 'profile'
-
 def running():
     proc = st.session_state.get('process')
     return proc is not None and proc.poll() is None
@@ -52,7 +49,7 @@ def cache_env():
     return env
 
 def add_ref_files(files, name):
-    target_dir = REFS / unique_slug(name)
+    target_dir = REFS / slugify(name)
     target_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     for i, f in enumerate(files):
@@ -91,7 +88,7 @@ with p_tab:
                 features = st.text_area('Zusätzliche Merkmale (am besten Englisch)', value=p.get('features', ''))
                 prompts = st.text_area('Zusätzliche Suchtexte: eine Zeile pro Text (optional)', value='\n'.join(p.get('prompts', [])))
                 st.caption('Vorhandene Referenzen: ' + (', '.join(p.get('reference_images', [])) or 'keine'))
-                refs_new = st.file_uploader('Referenzbilder hinzufügen', type=[x.lstrip('.') for x in EXT], accept_multiple_files=True, key=f'edit_refs_{index}')
+                refs_new = st.file_uploader('Referenzbilder hinzufügen', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}')
                 clear_refs = st.checkbox('Vorhandene Referenzbilder aus Profil entfernen')
                 c1,c2 = st.columns(2)
                 update = c1.form_submit_button('Änderungen speichern', disabled=running())
@@ -119,7 +116,7 @@ with p_tab:
         franchise = st.text_input('Kontext / Herkunft (optional)', placeholder='z. B. Batman / DC Comics')
         features = st.text_area('Erkennungsmerkmale (optional)', placeholder='red bodywork, black roof, parked on a street')
         prompts = st.text_area('Eigene Suchformulierungen (optional; eine pro Zeile)')
-        uploads = st.file_uploader('Referenzbilder (optional)', type=['jpg','jpeg','png','webp','bmp','tif','tiff'], accept_multiple_files=True)
+        uploads = st.file_uploader('Referenzbilder (optional)', type=UPLOAD_TYPES, accept_multiple_files=True)
         create = st.form_submit_button('Profil hinzufügen', disabled=running())
     if create:
         name = name.strip()
@@ -234,8 +231,9 @@ with run_tab:
     st.divider()
     st.subheader('Ergebnisgalerien')
     if RESULTS.exists():
-        for p in profiles:
-            page = RESULTS/(unique_slug(p['name'])+'.html')
+        # same file names as the engine: unique slugs in profile order
+        for p, slug in zip(profiles, profile_slugs([q['name'].strip() for q in profiles])):
+            page = RESULTS/(slug+'.html')
             if page.exists():
                 st.download_button(f"HTML exportieren: {p['name']}", page.read_bytes(), file_name=page.name, mime='text/html', key=f'dl_{p["name"]}')
                 st.caption(f'Lokale Galerie öffnen: {page}')
