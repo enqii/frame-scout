@@ -454,7 +454,8 @@ def cuda_status(cuda_available, cuda_build, gpu_name):
     if cuda_available:
         return f'CUDA: {gpu_name}'
     if cuda_build is None:
-        return 'PyTorch without CUDA support (CPU build), so the analysis runs on the CPU'
+        return ('PyTorch without CUDA support (CPU build), so the analysis runs on the CPU. '
+                'For an NVIDIA GPU, run Install-FrameScout.bat cuda')
     return f'No CUDA GPU detected (PyTorch for CUDA {cuda_build}), so the analysis runs on the CPU'
 
 

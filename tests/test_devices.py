@@ -14,7 +14,10 @@ def test_cuda_status_names_the_gpu():
 
 def test_cuda_status_tells_a_cpu_build_from_a_missing_gpu():
     # torch.version.cuda is None for the CPU build: a GPU would not be used even if present
-    assert 'CPU build' in cuda_status(False, None, None)
+    cpu_build = cuda_status(False, None, None)
+    assert 'CPU build' in cpu_build
+    # the way to GPU support (A7): the installer option for the CUDA build
+    assert 'Install-FrameScout.bat cuda' in cpu_build
     missing = cuda_status(False, '12.6', None)
     assert 'No CUDA GPU' in missing and 'CPU build' not in missing
 

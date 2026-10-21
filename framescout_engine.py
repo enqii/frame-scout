@@ -115,7 +115,8 @@ def main():
         parser.error('No supported images found. Please check the local photo folder.')
     device = ('cuda' if torch.cuda.is_available() else 'cpu') if args.device == 'auto' else args.device
     if device == 'cuda' and not torch.cuda.is_available():
-        parser.error('CUDA is not available; use --device cpu.')
+        parser.error('CUDA is not available; use --device cpu. For an NVIDIA GPU, install PyTorch with CUDA support: '
+                     'Install-FrameScout.bat cuda.')
     torch.set_num_threads(min(12, max(1, torch.get_num_threads())))
     output.mkdir(parents=True, exist_ok=True)
     print(f'{len(paths)} photos; {len(profiles)} search profiles; CLIP: {device}; '
