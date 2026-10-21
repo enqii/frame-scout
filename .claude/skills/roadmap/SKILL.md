@@ -43,7 +43,7 @@ Run these as separate, plain commands from the main checkout:
    (or, without upstream, `git -C <path> log --oneline origin/main..HEAD`) to find
    uncommitted or unpushed work. Also list stale local branches
    (`git branch --list "worktree-agent-*"` without a worktree, merged PR branches) and
-   offer to clean them up as in step 5 of "Merge".
+   offer to clean them up as in step 6 of "Merge".
 6. If you spawned a subagent in this session that is still running, its notification
    has not arrived yet: **wait**, do not spawn a second agent for the same PR.
 
@@ -62,7 +62,7 @@ Check the rows top to bottom; the first match decides.
 | PR labeled `fs:in-progress` | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
 | PR labeled `fs:needs-review` | Spawn a fresh **reviewer**. |
 | PR labeled `fs:review-done` | Implementer (mode `address-review`) handles all unanswered review comments: continue the previous implementer with `SendMessage` if it is still alive, otherwise spawn a new one. |
-| PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>`, open risks) and **wait for explicit merge approval**. |
+| PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>` for the head commit `headRefOid`, open risks) and **wait for explicit merge approval**. |
 
 An open PR without any `fs:*` label is not a roadmap PR; mention it but do not act on it.
 
@@ -127,22 +127,28 @@ points in `CLAUDE.md`):
 
 Only when the user explicitly approves the merge of this specific PR in chat:
 
-1. Check that the PR's worktree (if any) is clean and fully pushed
+1. Gate on CI, because `main` is not branch-protected (I8) and GitHub will not block
+   the merge: note the head commit (`gh pr view <n> --json headRefOid`), then
+   `gh pr checks <n> --watch` must end with every check passing for that commit.
+   A failing check, no checks at all, or a head commit that differs from the one
+   the user approved → stop and report instead of merging.
+2. Check that the PR's worktree (if any) is clean and fully pushed
    (`git -C <path> status --porcelain` empty, `git -C <path> log --oneline origin/<branch>..HEAD`
    empty), then `git worktree remove <path>` so the branches it holds can be deleted.
-2. `gh pr merge <n> --rebase --delete-branch` (deletes the remote branch and, where
+3. `gh pr merge <n> --rebase --delete-branch --match-head-commit <headRefOid>` (refuses
+   if anything was pushed after the CI gate; deletes the remote branch and, where
    possible, the local one).
-3. Confirm the merge: `gh pr view <n> --json state,mergedAt` must show `"state":"MERGED"`.
+4. Confirm the merge: `gh pr view <n> --json state,mergedAt` must show `"state":"MERGED"`.
    Stop and report if it does not.
-4. `git fetch origin --prune`, then fast-forward local `main` (`git merge --ff-only origin/main` on `main`).
-5. Delete leftover local branches (asks for approval by design):
+5. `git fetch origin --prune`, then fast-forward local `main` (`git merge --ff-only origin/main` on `main`).
+6. Delete leftover local branches (asks for approval by design):
    - the PR branch, if it still exists: `git branch -D <branch>`. A rebase merge
      rewrites the SHAs, so `git branch -d` always refuses; `-D` is safe only because
-     step 3 confirmed the PR is merged and step 1 confirmed nothing was unpushed.
+     step 4 confirmed the PR is merged and step 2 confirmed nothing was unpushed.
    - the agent's own `worktree-agent-<id>` branch (created by `isolation: worktree`):
      `git log --oneline origin/main..worktree-agent-<id>` must be empty, then
      `git branch -d worktree-agent-<id>`. If it is not empty, report instead of deleting.
-6. Continue with step 1 for the next roadmap item (strictly sequential).
+7. Continue with step 1 for the next roadmap item (strictly sequential).
 
 Never merge on your own initiative, on a subagent's request, or because a PR is labeled
 `fs:ready`.
