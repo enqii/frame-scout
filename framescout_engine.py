@@ -18,11 +18,11 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import EXT, FULL_IMAGE_LABEL, crop_label, load_profiles, profile_slugs, progress_line
+from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, EXT, FULL_IMAGE_LABEL, crop_label, feature_signature,
+                             load_profiles, profile_slugs, progress_line)
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-ENGINE = 'v4-clip-vit-b-32-openai-yolo11n-crop-features-1'
 
 
 def open_image(path):
@@ -100,9 +100,9 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     print(f'{len(paths)} photos; {len(profiles)} search profiles; CLIP: {device}; YOLO: {not args.no_person_detection}', flush=True)
     print('Model weights are downloaded on the first start.', flush=True)
-    model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai', device=device)
+    model, _, preprocess = open_clip.create_model_and_transforms(CLIP_MODEL, pretrained=CLIP_PRETRAINED, device=device)
     model.eval()
-    tokenizer = open_clip.get_tokenizer('ViT-B-32')
+    tokenizer = open_clip.get_tokenizer(CLIP_MODEL)
 
     def embed_images(images):
         vectors = []
@@ -131,9 +131,8 @@ def main():
     if not args.no_person_detection:
         from ultralytics import YOLO
         detector = YOLO(args.yolo_model)
-    config = [ENGINE, not args.no_person_detection, args.max_persons, args.person_confidence,
-              args.yolo_model]
-    signature = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
+    signature = feature_signature(not args.no_person_detection, args.max_persons, args.person_confidence,
+                                  args.yolo_model)
     con = sqlite3.connect(output / 'cache.sqlite3')
     con.execute('''CREATE TABLE IF NOT EXISTS features (
         path TEXT NOT NULL, signature TEXT NOT NULL, mtime_ns INTEGER NOT NULL,

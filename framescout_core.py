@@ -129,6 +129,26 @@ def _publish_new(tmp, target):
         os.link(tmp, target)  # POSIX rename would replace target; a hard link does not
 
 
+# OpenCLIP model and weights. The OpenAI CLIP weights were trained with QuickGELU;
+# the plain "ViT-B-32" config uses GELU, loads them with only a warning and yields
+# degraded embeddings (E1). Same weights file, so switching needs no new download.
+CLIP_MODEL = 'ViT-B-32-quickgelu'
+CLIP_PRETRAINED = 'openai'
+# Part of the feature cache signature: change it whenever cached embeddings become
+# incompatible (other model, weights, preprocessing or crops). v4 was ViT-B-32 with GELU.
+ENGINE = f'v5-clip-{CLIP_MODEL}-{CLIP_PRETRAINED}-crop-features-1'
+
+
+def feature_signature(person_detection, max_persons, person_confidence, yolo_model):
+    """Return the cache signature of the image features for these engine settings.
+
+    Cached rows are reused only under the same signature, so any setting that changes
+    the stored embeddings or crops belongs here.
+    """
+    config = [ENGINE, person_detection, max_persons, person_confidence, yolo_model]
+    return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
+
+
 # Label of the uncropped photo among the crops; person crops are labelled "Person <n>".
 FULL_IMAGE_LABEL = 'Full image'
 # Labels are stored in the feature cache; rows written before the English translation
