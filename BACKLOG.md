@@ -75,6 +75,9 @@ referenced in commits, pull requests and discussions.
       with a regex on `Neu:`/`Cache:`/`Fehler:`. Translating the engine log (I7) breaks
       the progress bar unless both change together; a machine-readable progress line or
       status file (see P2) plus a test for the progress interpretation would decouple it.
+      (partly done 2026-10-21: the line format lives in `framescout_core.progress_line`,
+      the app parses it with `parse_progress`, both tested; the line is English now.
+      Still open: a machine-readable status file (P2).)
 - [ ] **A12 – Gallery downloads are re-derived from the current profile list:** the app
       maps profiles to `<slug>.html` with `profile_slugs` on the *current*
       `profiles.json`. After deleting, renaming or reordering profiles with colliding
@@ -95,7 +98,7 @@ referenced in commits, pull requests and discussions.
       test with real models.)
 - [ ] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
 - [ ] **I4 – Installer requires the `py` launcher;** without it, the misleading message
-      "Python nicht gefunden" (Python not found) is shown.
+      "Python 3.12 to 3.14 not found." is shown.
 - [ ] **I5 – Example profiles/placeholders lean towards cosplay** (Joker, Harley Quinn, 2B,
       "Batman / DC Comics") – contradicts the general-purpose product goal.
 - [x] **I6 – Update `CLAUDE.md`:** record the successful end-to-end run (`run.log`: 4,997
@@ -114,6 +117,11 @@ referenced in commits, pull requests and discussions.
         names.
       - The legacy `franchise` field and the `--character` CLI option stay for
         compatibility.
+      (partly done 2026-10-21: UI, HTML gallery, engine log/error messages and `--help`,
+      profile validation messages, `.bat` messages and the `.gitattributes` comment are
+      English. The crop label is "Full image"; old cache rows with "Gesamtbild" are
+      shown as "Full image", so the cache stays valid. The UI placeholders are English
+      now, which nudges users towards English motif names (E3), but does not enforce it.)
 - [ ] **I8 – No branch protection for `main`:** GitHub returns HTTP 403 "Upgrade to GitHub
       Pro or make this repository public to enable this feature" for the private repo, so
       `main` is protected only by the workflow rule (merge only on explicit user approval)
