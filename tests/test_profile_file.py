@@ -1,5 +1,6 @@
 """Reading and saving the app's profiles.json without losing data (framescout_core, A2)."""
 import json
+from pathlib import Path
 
 import pytest
 
@@ -91,6 +92,27 @@ def test_no_temporary_file_is_left_behind(tmp_path):
     save_profiles(path, [{'name': 'Dog'}])
     save_profiles(path, [{'name': 'Cat'}])
     assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json', 'profiles.json.bak']
+
+
+def test_both_files_are_flushed_to_disk_before_they_get_their_final_names(tmp_path, monkeypatch):
+    # review: without fsync, a power loss can persist the rename before the data and
+    # leave an empty profiles.json and profiles.json.bak
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    events = []
+    real_fsync, real_replace = framescout_core.os.fsync, framescout_core.os.replace
+
+    def fsync(fd):
+        events.append('fsync')
+        real_fsync(fd)
+
+    def replace(src, dst):
+        events.append(('replace', Path(dst).name))
+        real_replace(src, dst)
+
+    monkeypatch.setattr(framescout_core.os, 'fsync', fsync)
+    monkeypatch.setattr(framescout_core.os, 'replace', replace)
+    save_profiles(path, [{'name': 'Cat'}])
+    assert events == ['fsync', ('replace', 'profiles.json.bak'), 'fsync', ('replace', 'profiles.json')]
 
 
 def test_if_the_backup_fails_the_profiles_file_is_not_changed(tmp_path, monkeypatch):

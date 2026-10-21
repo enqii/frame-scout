@@ -129,17 +129,33 @@ def create_from_example(target, example):
         data = example.read_bytes()
     except FileNotFoundError:
         return False
-    fd, name = tempfile.mkstemp(dir=target.parent, prefix=target.name + '.', suffix='.tmp')
-    tmp = Path(name)
     try:
-        with os.fdopen(fd, 'wb') as handle:
-            handle.write(data)
-        _publish_new(tmp, target)
+        _publish_via_temp(target, lambda tmp: tmp.write_bytes(data), _publish_new)
     except FileExistsError:
         return False
+    return True
+
+
+def _publish_via_temp(target, write, publish, suffix='.tmp', durable=True):
+    """Create target from a complete temporary file; never leave a partial target behind.
+
+    write(tmp) fills a new temporary file in target's folder (named <target name>.<random>
+    <suffix>); with durable, its data is flushed to disk (fsync) so that after a power
+    loss the final name cannot point to an empty or partial file. Then publish(tmp, target)
+    gives it the final name (os.replace, or _publish_new to never replace a file). The
+    temporary file is removed whatever happens.
+    """
+    fd, name = tempfile.mkstemp(dir=target.parent, prefix=target.name + '.', suffix=suffix)
+    os.close(fd)
+    tmp = Path(name)
+    try:
+        write(tmp)
+        if durable:
+            with open(tmp, 'r+b') as handle:
+                os.fsync(handle.fileno())
+        publish(tmp, target)
     finally:
         tmp.unlink(missing_ok=True)
-    return True
 
 
 def _publish_new(tmp, target):
@@ -197,7 +213,8 @@ def ensure_thumbnail(path, thumbs, legacy_thumbs, render, log):
     same photo and modification time) is copied and left in place; otherwise
     render(path, target) writes a new one. Any failure, including a photo that was
     deleted or moved after scoring (E6), is reported with log(message) and the photo
-    is skipped, so one missing file cannot abort the whole HTML export.
+    is skipped, so one missing file cannot abort the whole HTML export. render must
+    write to the target it is given (a temporary .jpg name, not the final one).
     """
     try:
         name = thumbnail_name(path, path.stat().st_mtime_ns)
@@ -205,9 +222,14 @@ def ensure_thumbnail(path, thumbs, legacy_thumbs, render, log):
         if not target.exists():
             old = legacy_thumbs / name
             if old.is_file():
-                shutil.copyfile(old, target)
+                def write(tmp):
+                    shutil.copyfile(old, tmp)
             else:
-                render(path, target)
+                def write(tmp):
+                    render(path, tmp)
+            # via a temporary .jpg file (Pillow picks the format from the extension), so an
+            # interrupted copy or render never leaves a broken thumbnail that later runs reuse
+            _publish_via_temp(target, write, os.replace, suffix='.jpg', durable=False)
         return name
     except Exception as exc:
         log(f'Thumbnail not possible ({path}): {exc}')
@@ -332,8 +354,9 @@ def save_profiles(filename, profiles):
     """Write profiles to filename as {"profiles": [...]}, keeping the previous file as .bak.
 
     The previous content is copied byte for byte to <filename>.bak first (replacing an
-    older backup); if that fails, filename is left unchanged. Both files are written to a
-    temporary file in the same folder and then renamed, so a crash leaves a complete
+    older backup, so only the state before the latest save is kept); if that fails,
+    filename is left unchanged. Both files are written to a temporary file in the same
+    folder, flushed to disk and then renamed, so a crash or power loss leaves a complete
     old or new file, never a half-written one.
     """
     try:
@@ -347,12 +370,5 @@ def save_profiles(filename, profiles):
 
 
 def _replace_atomically(target, data):
-    """Write data to a temporary file next to target, then rename it to target."""
-    fd, name = tempfile.mkstemp(dir=target.parent, prefix=target.name + '.', suffix='.tmp')
-    tmp = Path(name)
-    try:
-        with os.fdopen(fd, 'wb') as handle:
-            handle.write(data)
-        os.replace(tmp, target)
-    finally:
-        tmp.unlink(missing_ok=True)
+    """Replace target with data via a temporary file that is flushed to disk first."""
+    _publish_via_temp(target, lambda tmp: tmp.write_bytes(data), os.replace)

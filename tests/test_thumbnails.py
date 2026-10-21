@@ -1,6 +1,8 @@
 """Gallery thumbnails of the HTML export (framescout_core.ensure_thumbnail, E6)."""
 import os
+from pathlib import Path
 
+import framescout_core
 from framescout_core import ensure_thumbnail, thumbnail_name
 
 
@@ -30,7 +32,10 @@ def test_a_missing_thumbnail_is_rendered(tmp_path):
     calls, log = [], []
     name = ensure_thumbnail(photo, thumbs, tmp_path / 'vorschaubilder', renderer(calls), log.append)
     assert name == thumbnail_name(photo, photo.stat().st_mtime_ns)
-    assert calls == [(photo, thumbs / name)]
+    # rendered to a temporary .jpg in the same folder, then renamed (review)
+    [(rendered, target)] = calls
+    assert rendered == photo and target.parent == thumbs and target.suffix == '.jpg'
+    assert [p.name for p in thumbs.iterdir()] == [name]
     assert (thumbs / name).read_bytes() == b'thumbnail'
     assert log == []
 
@@ -70,6 +75,45 @@ def test_a_photo_deleted_after_scoring_is_skipped_instead_of_aborting_the_export
     assert ensure_thumbnail(photo, thumbs, tmp_path / 'vorschaubilder', renderer(calls), log.append) is None
     assert calls == []
     assert len(log) == 1 and log[0].startswith(f'Thumbnail not possible ({photo}): ')
+
+
+def test_an_interrupted_render_leaves_no_thumbnail_that_later_runs_would_reuse(tmp_path):
+    # review: a half-written thumbnail under the final name passed the exists() check of
+    # every later export, so the gallery kept showing a broken image
+    photo = make_photo(tmp_path)
+    thumbs = tmp_path / 'thumbnails'
+    thumbs.mkdir()
+
+    def render(path, target):
+        assert target.suffix == '.jpg'  # Pillow picks the format from the extension
+        target.write_bytes(b'half')
+        raise OSError('No space left on device')
+
+    log = []
+    assert ensure_thumbnail(photo, thumbs, tmp_path / 'vorschaubilder', render, log.append) is None
+    assert list(thumbs.iterdir()) == []
+    calls = []
+    name = ensure_thumbnail(photo, thumbs, tmp_path / 'vorschaubilder', renderer(calls), log.append)
+    assert calls and (thumbs / name).read_bytes() == b'thumbnail'
+
+
+def test_an_interrupted_copy_of_an_old_thumbnail_leaves_nothing_behind(tmp_path, monkeypatch):
+    photo = make_photo(tmp_path)
+    thumbs, legacy = tmp_path / 'thumbnails', tmp_path / 'vorschaubilder'
+    thumbs.mkdir()
+    legacy.mkdir()
+    name = thumbnail_name(photo, photo.stat().st_mtime_ns)
+    (legacy / name).write_bytes(b'old thumbnail')
+
+    def copyfile(src, dst):
+        Path(dst).write_bytes(b'old')
+        raise OSError('I/O error')
+
+    monkeypatch.setattr(framescout_core.shutil, 'copyfile', copyfile)
+    log = []
+    assert ensure_thumbnail(photo, thumbs, legacy, renderer([]), log.append) is None
+    assert list(thumbs.iterdir()) == []
+    assert (legacy / name).read_bytes() == b'old thumbnail'
 
 
 def test_a_photo_that_cannot_be_rendered_is_skipped(tmp_path):
