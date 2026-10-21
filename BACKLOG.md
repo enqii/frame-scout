@@ -120,6 +120,15 @@ referenced in commits, pull requests and discussions.
       and the person crops change → needs an evaluation of search quality first, and the
       gain can only be measured on a GPU (I11). Deferred from the roadmap item "YOLO on
       GPU" (PR #8, user decision).
+- [ ] **E19 – The detection settings in the cache signature are listed by hand:**
+      `feature_signature` hashes `max_persons`, `person_confidence` and `yolo_model`, but
+      not the YOLO input size (`DETECTION_IMAGE_SIZE`, 640) or the other fixed
+      `detection_options`; changing them needs a manual `ENGINE` bump (a comment and the
+      golden test of `detection_options` ask for it). Deriving the signature from
+      `detection_options` (without device and verbose) removes that step, but changes the
+      signature value and so re-analyzes every photo once → do it with the next `ENGINE`
+      bump. The device stays out on purpose: CPU and CUDA give slightly different numbers
+      for CLIP as well, and the cache has always been shared between devices (PR #8 review).
 
 ### App (`app.py`)
 
@@ -163,9 +172,11 @@ referenced in commits, pull requests and discussions.
 - [x] **A7 – CUDA never available:** pip installs torch `+cpu`; "cuda" can still be selected.
       (done 2026-10-21: `Install-FrameScout.bat` offers the CUDA build of PyTorch (I3); the
       app offers "cuda" only if `torch.cuda.is_available()`, falls back to "auto" for a
-      stale setting and tells a CPU build of PyTorch (with the hint
-      `Install-FrameScout.bat cuda`) from a missing GPU; the engine's error for
-      `--device cuda` names the installer option too. Not run on a GPU: I11.)
+      stale setting and tells a CPU build of PyTorch from a CUDA build that finds no usable
+      GPU (no GPU, or a driver too old for the build); the hint (`cuda_hint`, also in the
+      engine's error for `--device cuda`) says to close FrameScout, run
+      `Install-FrameScout.bat cuda` (or update the driver) and start FrameScout again. Not
+      run on a GPU: I11.)
 - [ ] **A8 – UX gaps:** deleting a profile without confirmation; settings only per session;
       results without timestamp/reference to the profile state.
 - [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
@@ -236,15 +247,18 @@ referenced in commits, pull requests and discussions.
       (done 2026-10-21: `torch==2.14.1` and `torchvision==0.29.1` are pinned
       (`framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, a test keeps both in sync);
       the other packages have the versions of the verified runs as minimum, Streamlit keeps
-      `>=1.40` (A10). `Install-FrameScout.bat [cpu|cuda]` installs PyTorch first with
-      `install_torch.py` from the PyTorch index: without an argument it asks only if
-      `nvidia-smi` finds an NVIDIA driver; for CUDA `framescout_core.cuda_build` picks
-      `cu130` (compute capability ≥ 7.5, driver ≥ 580) or `cu126` (5.0 to 9.x, driver
-      ≥ 528.33) for every GPU, otherwise the CPU build is installed. Running it again with
-      the other option switches the build; a matching build is not downloaded again
-      (PyPI's CPU wheels without `+cpu` count as the CPU build). The support limits are
-      from the CUDA/PyTorch documentation as known, not verified on a GPU (I11). Full
-      locking incl. transitive dependencies: P5.)
+      `>=1.40` (A10); no upper bounds (user decision, I12). `Install-FrameScout.bat
+      [cpu|cuda]` installs PyTorch first with `install_torch.py` from the PyTorch index
+      (dependencies also from PyPI). Without an argument an installed CUDA build is kept,
+      otherwise it asks only if `nvidia-smi` finds an NVIDIA driver; for CUDA
+      `framescout_core.cuda_build` picks `cu130` (compute capability ≥ 7.5, driver ≥ 580)
+      or `cu126` (5.0 to 9.x, driver ≥ 528.33), preferring a build for every GPU, else the
+      one for the most capable GPU; if none fits, an installed CUDA build is kept,
+      otherwise the CPU build is installed. Only an explicit `cpu` replaces a CUDA build
+      (PR #8 review); a matching build is not downloaded again (PyPI's CPU wheels without
+      `+cpu` count as the CPU build). The support limits are from the CUDA/PyTorch
+      documentation as known, not verified on a GPU (I11). Full locking incl. transitive
+      dependencies: P5.)
 - [ ] **I4 – Installer requires the `py` launcher;** without it, the misleading message
       "Python 3.12 to 3.14 not found." is shown.
 - [x] **I5 – Example profiles/placeholders lean towards cosplay** (Joker, Harley Quinn, 2B,
@@ -305,7 +319,14 @@ referenced in commits, pull requests and discussions.
       untested; the support limits in `framescout_core.CUDA_BUILDS` are not verified either.
       To do on an NVIDIA machine: `Install-FrameScout.bat cuda`, a search run with
       `--device cuda` with and without person detection, compare scores with a CPU run,
-      and measure the time (also for E18).
+      and measure the time (also for E18); re-run the installer without an argument and
+      check that the CUDA build is kept. With several GPUs, check which one `cuda`
+      (device 0 in CUDA's order) uses when the build cannot use all of them.
+- [ ] **I12 – Fresh installs can get untested major versions:** `requirements.txt` sets only
+      minimum versions apart from torch/torchvision (user decision in PR #8), so a fresh
+      install takes the newest release, e.g. Pillow 13.0.0 is on PyPI while the verified
+      venv has 12.3.0 (PR #8 review). Upper bounds on the major version (`<13`) or a lock
+      file would keep installs on tested versions; part of the pinned dependencies of P5.
 
 ## Roadmap (priority)
 
@@ -349,4 +370,4 @@ Each unchecked item is implemented in its own pull request, strictly one after a
       optional HEIC/RAW support
 
 ### P5 – Distribution
-- [ ] Pinned dependencies, portable Python variant, uninstall script
+- [ ] Pinned dependencies (I12), portable Python variant, uninstall script
