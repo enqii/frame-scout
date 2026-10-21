@@ -23,9 +23,12 @@ referenced in commits, pull requests and discussions.
       photos go through CLIP together until a group holds `--batch-size` crops
       (`group_batches`), one SQLite transaction per group. Without person detection JPEGs
       and all gallery thumbnails are decoded with `Image.draft` at twice the target size
-      (`draft_size`); with person detection photos keep full resolution (E15). Cache
-      signature unchanged: on a 202-photo sample (CPU) the features with detection are
-      identical, without detection cosine ≥ 0.999, gallery scores differ by ≤ 0.004; whole
+      (`draft_size`); with person detection photos keep full resolution (E15). On a
+      202-photo sample (CPU) the features with detection are identical, without detection
+      cosine ≥ 0.999, gallery scores differ by ≤ 0.004. Cache signature: unchanged with
+      detection; without detection it names the drafted decoding (user decision in the
+      review), so the first such run analyzes every photo once more and the old rows stay
+      in `cache.sqlite3` like after E1 (E11). Whole
       runs incl. model load and export took 44 s → 23 s (detection) and 30 s → 15 s
       (without). YOLO device: E14.)
 - [ ] **E3 – German motif names in English prompts:** e.g. "A photograph of Rotes Auto
