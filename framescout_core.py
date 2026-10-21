@@ -425,7 +425,13 @@ def cuda_build(gpus):
     hint = ('The GPU is too old for current PyTorch builds.' if cc < oldest
             else 'A current NVIDIA driver may help.')
     raise ValueError(f'no CUDA build of PyTorch {TORCH_VERSION} suits {name} (compute capability '
-                     f'{".".join(map(str, cc))}) with driver {".".join(map(str, version))}. {hint}')
+                     f'{".".join(map(str, cc))}) with driver {driver_text(version)}. {hint}')
+
+
+def driver_text(version):
+    """Return an NVIDIA driver version tuple as nvidia-smi prints it, e.g. (590, 1) -> "590.01"."""
+    major, *rest = version
+    return '.'.join([str(major)] + [f'{x:02d}' for x in rest])
 
 
 def torch_requirements(build):

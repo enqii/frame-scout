@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 import install_torch
-from framescout_core import (TORCH_VERSION, TORCHVISION_VERSION, cuda_build, installed_build_matches,
+from framescout_core import (TORCH_VERSION, TORCHVISION_VERSION, cuda_build, driver_text, installed_build_matches,
                              installed_cuda_build, parse_gpu_query, torch_index_url, torch_requirements,
                              unsupported_gpus)
 
@@ -281,6 +281,14 @@ def test_unknown_cuda_build_is_never_replaced_by_the_cpu_build(monkeypatch):
     monkeypatch.setattr(install_torch.subprocess, 'run', ran)
     assert install_torch.main([]) == 1
     assert ran.commands == []
+
+
+def test_driver_versions_are_shown_as_nvidia_smi_prints_them():
+    # parsed as numbers for the comparison; "590.01" must not be shown as "590.1"
+    assert driver_text((590, 1)) == '590.01'
+    assert driver_text((528, 33)) == '528.33'
+    with pytest.raises(ValueError, match='driver 512.05'):
+        cuda_build([gpu((8, 9), (512, 5))])
 
 
 def test_gpus_the_build_cannot_use_are_named(monkeypatch, capsys):
