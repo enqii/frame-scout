@@ -75,6 +75,11 @@ def profile_slugs(names):
     return slugs
 
 
+def _path_key(path):
+    """Comparable form of a path: resolved, and case-insensitive where the OS is (Windows)."""
+    return os.path.normcase(path.resolve())
+
+
 def reference_folder(refs_root, name, others, base):
     """Return the folder for new reference images of the profile name.
 
@@ -83,13 +88,10 @@ def reference_folder(refs_root, name, others, base):
     base), so two profiles never share a folder (A1). Leftover files that no other
     profile references do not block a folder: write_new_file never overwrites them.
     """
-    def key(path):
-        return os.path.normcase(path.resolve())
-
-    used = {key((base / ref).parent) for profile in others for ref in profile.get('reference_images', [])}
+    used = {_path_key((base / ref).parent) for profile in others for ref in profile.get('reference_images', [])}
     slug = slugify(name)
     folder, n = refs_root / slug, 2
-    while key(folder) in used:
+    while _path_key(folder) in used:
         folder, n = refs_root / f'{slug}-{n}', n + 1
     return folder
 
@@ -110,24 +112,23 @@ def stage_reference_move(refs, folder, refs_root, base, others):
     outside refs_root, missing files and files of other profiles keep their paths. If
     staging fails, the names created so far are removed and the error is raised.
     """
-    def key(path):
-        return os.path.normcase(path.resolve())
-
-    root = Path(key(refs_root))
-    taken = {key(base / ref) for profile in others for ref in profile.get('reference_images', [])}
+    root = Path(_path_key(refs_root))
+    taken = {_path_key(base / ref) for profile in others for ref in profile.get('reference_images', [])}
     moved, staged, new_refs = {}, [], []
     try:
         for ref in refs:
             old = base / ref
-            k = key(old)
+            k = _path_key(old)
             if k not in moved:
                 inside = Path(k).is_relative_to(root) and Path(k) != root
-                if not inside or k in taken or key(old.parent) == key(folder) or not old.is_file():
+                if not inside or k in taken or _path_key(old.parent) == _path_key(folder) or not old.is_file():
                     moved[k] = None  # keeps its path, exactly as written
                 else:
                     new = _link_new(old.resolve(), folder)
                     staged.append((old.resolve(), new))
-                    moved[k] = new.resolve().relative_to(base.resolve()).as_posix()
+                    # lexically, like the paths the app writes: resolving would leave base
+                    # if references/ is a junction or symlink to another place (review)
+                    moved[k] = Path(os.path.relpath(new, base)).as_posix()
             new_refs.append(moved[k] or ref)
     except BaseException:
         undo_reference_move(staged)
@@ -183,9 +184,9 @@ def finish_reference_move(staged, refs_root):
             folders.add(old.parent)
         except OSError as exc:
             problems.append(f'{old}: {exc}')
-    root = os.path.normcase(refs_root.resolve())
+    root = _path_key(refs_root)
     for folder in folders:
-        if os.path.normcase(folder.resolve()) != root:
+        if _path_key(folder) != root:
             try:
                 folder.rmdir()  # only succeeds if the folder is empty
             except OSError:

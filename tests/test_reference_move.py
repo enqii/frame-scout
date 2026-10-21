@@ -117,6 +117,23 @@ def test_a_failure_while_staging_undoes_the_files_staged_before(project, monkeyp
     assert list((project / 'references' / 'blue-car').iterdir()) == []
 
 
+@pytest.mark.skipif(os.name != 'nt', reason='directory junctions are a Windows feature')
+def test_a_references_folder_that_is_a_junction_elsewhere_works(tmp_path):
+    # review: resolving the new path left the project folder and relative_to raised ValueError
+    _winapi = pytest.importorskip('_winapi')
+    target = tmp_path / 'elsewhere' / 'refs'
+    (target / 'red-car').mkdir(parents=True)
+    (target / 'red-car' / 'reference-1.jpg').write_bytes(b'one')
+    project = tmp_path / 'project'
+    project.mkdir()
+    _winapi.CreateJunction(str(target), str(project / 'references'))
+    new_refs, staged = stage(project, ['references/red-car/reference-1.jpg'])
+    assert new_refs == ['references/blue-car/reference-1.jpg']
+    assert finish_reference_move(staged, project / 'references') == []
+    assert (target / 'blue-car' / 'reference-1.jpg').read_bytes() == b'one'
+    assert not (target / 'red-car').exists()
+
+
 def test_an_old_name_that_cannot_be_removed_is_reported(project, monkeypatch):
     new_refs, staged = stage(project, ['references/red-car/reference-1.jpg'])
     real_unlink = framescout_core.Path.unlink
