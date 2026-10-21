@@ -3,7 +3,7 @@ from framescout_core import parse_progress, progress_line
 
 
 def test_progress_line_format():
-    assert progress_line(25, 4997, 20, 4, 1) == '25/4997 | New: 20 | Cached: 4 | Errors: 1'
+    assert progress_line(25, 4997, 20, 4, 1) == 'Progress: 25/4997 | New: 20 | Cached: 4 | Errors: 1'
 
 
 def test_progress_line_round_trips():
@@ -31,7 +31,10 @@ def test_no_progress_line_returns_none():
     assert parse_progress('Model weights are downloaded on the first start.\n') is None
 
 
-def test_progress_text_inside_another_line_is_not_a_progress_line():
-    # e.g. an error message about a file whose name looks like a progress line
-    log = 'ERROR C:\\x\\' + progress_line(9, 9, 9, 0, 0) + '.jpg: broken\n'
-    assert parse_progress(log) is None
+def test_progress_after_other_output_on_the_same_line_is_found():
+    # stderr shares run.log; a warning or a progress bar written without a final newline
+    # (digits included) must not hide the progress line that follows (review)
+    log = 'model.safetensors: 100%|#####| 605M/605M\r' + progress_line(25, 50, 25, 0, 0) + '\n'
+    assert parse_progress(log) == (25, 50, 25, 0, 0)
+    log = 'UserWarning: foo 12' + progress_line(30, 50, 30, 0, 0) + '\n'
+    assert parse_progress(log) == (30, 50, 30, 0, 0)
