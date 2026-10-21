@@ -1,10 +1,12 @@
 """Moving a renamed profile's reference images to the folder of its new name (A1, review)."""
+import json
 import os
 
 import pytest
 
 import framescout_core
-from framescout_core import finish_reference_move, stage_reference_move, undo_reference_move
+from framescout_core import (finish_reference_move, save_profiles, stage_reference_move, undo_reference_move,
+                             update_backup_references)
 
 
 @pytest.fixture
@@ -147,3 +149,99 @@ def test_an_old_name_that_cannot_be_removed_is_reported(project, monkeypatch):
     problems = finish_reference_move(staged, project / 'references')
     assert len(problems) == 1 and 'reference-1.jpg' in problems[0]
     assert (project / new_refs[0]).read_bytes() == b'one'
+
+
+def rename_red_car(project, previous):
+    """Rename "Red car" to "Blue car" like the app: stage, save (writes the .bak), return staged."""
+    path = project / 'profiles.json'
+    path.write_text(json.dumps(previous, ensure_ascii=False), encoding='utf-8')
+    refs = previous['profiles'][0]['reference_images']
+    others = previous['profiles'][1:]
+    new_refs, staged = stage(project, refs, others=others)
+    save_profiles(path, [{'name': 'Blue car', 'reference_images': new_refs}] + others)
+    return path, staged
+
+
+def test_the_backup_points_to_the_moved_files_after_a_rename(project):
+    # review: restoring profiles.json.bak after a rename pointed at removed file names
+    (project / 'photos').mkdir()
+    (project / 'photos' / 'bike.jpg').write_bytes(b'bike')
+    previous = {'version': 2, 'profiles': [
+        {'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg',
+                                                 'references/red-car/reference-2.png']},
+        {'name': 'Bike', 'reference_images': ['photos/bike.jpg']}], 'note': 'mine'}
+    path, staged = rename_red_car(project, previous)
+    assert update_backup_references(path, staged, project) is True
+    backup = json.loads((project / 'profiles.json.bak').read_text(encoding='utf-8'))
+    assert list(backup) == ['version', 'profiles', 'note']
+    assert backup['version'] == 2 and backup['note'] == 'mine'
+    assert backup['profiles'] == [
+        {'name': 'Red car', 'reference_images': ['references/blue-car/reference-1.jpg',
+                                                 'references/blue-car/reference-2.png']},
+        {'name': 'Bike', 'reference_images': ['photos/bike.jpg']}]
+    assert finish_reference_move(staged, project / 'references') == []
+    for ref in backup['profiles'][0]['reference_images'] + backup['profiles'][1]['reference_images']:
+        assert (project / ref).is_file()
+
+
+def test_the_backup_is_flushed_to_disk_before_it_replaces_the_old_one(project, monkeypatch):
+    previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}]}
+    path, staged = rename_red_car(project, previous)
+    events = []
+    real_fsync, real_replace = framescout_core.os.fsync, framescout_core.os.replace
+
+    def fsync(fd):
+        events.append('fsync')
+        real_fsync(fd)
+
+    def replace(src, dst):
+        events.append(('replace', os.path.basename(dst)))
+        real_replace(src, dst)
+
+    monkeypatch.setattr(framescout_core.os, 'fsync', fsync)
+    monkeypatch.setattr(framescout_core.os, 'replace', replace)
+    assert update_backup_references(path, staged, project) is True
+    assert events == ['fsync', ('replace', 'profiles.json.bak')]
+
+
+def test_nothing_is_rewritten_without_moved_files(project):
+    previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}]}
+    path = project / 'profiles.json'
+    path.write_text(json.dumps(previous), encoding='utf-8')
+    save_profiles(path, previous['profiles'])
+    before = (project / 'profiles.json.bak').read_bytes()
+    assert update_backup_references(path, [], project) is True
+    assert (project / 'profiles.json.bak').read_bytes() == before
+
+
+@pytest.mark.parametrize('content, usable', [
+    (b'{"Red car": ["a red car"]}', True),  # v3: no reference paths, restoring works as is
+    (b'{"profiles": [', False),             # unreadable: cannot be updated
+    (b'', False),
+])
+def test_a_backup_in_the_v3_format_or_unreadable_is_left_alone(project, content, usable):
+    path = project / 'profiles.json'
+    (project / 'profiles.json.bak').write_bytes(content)
+    _, staged = stage(project, ['references/red-car/reference-1.jpg'])
+    assert update_backup_references(path, staged, project) is usable
+    assert (project / 'profiles.json.bak').read_bytes() == content
+
+
+def test_a_missing_backup_needs_no_update(project):
+    _, staged = stage(project, ['references/red-car/reference-1.jpg'])
+    assert update_backup_references(project / 'profiles.json', staged, project) is True
+    assert not (project / 'profiles.json.bak').exists()
+
+
+def test_a_failed_backup_rewrite_raises_and_keeps_the_old_backup(project, monkeypatch):
+    previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}]}
+    path, staged = rename_red_car(project, previous)
+    before = (project / 'profiles.json.bak').read_bytes()
+
+    def replace(src, dst):
+        raise PermissionError('backup not writable')
+
+    monkeypatch.setattr(framescout_core.os, 'replace', replace)
+    with pytest.raises(PermissionError):
+        update_backup_references(path, staged, project)
+    assert (project / 'profiles.json.bak').read_bytes() == before

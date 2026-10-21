@@ -9,7 +9,7 @@ import streamlit as st
 
 from framescout_core import (EXT, create_from_example, finish_reference_move, parse_progress, profile_slugs,
                              read_profiles, reference_folder, save_profiles, stage_reference_move,
-                             undo_reference_move, write_new_file)
+                             undo_reference_move, update_backup_references, write_new_file)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -63,10 +63,19 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
                 pass
         st.error(f'Could not save the search profiles: {exc}. Your changes were not saved.')
         return False
-    problems = finish_reference_move(staged, REFS)
-    if problems:
-        st.session_state.notice = ('Saved. Some reference images could not be removed from their old '
-                                   'folder and now exist twice; the profile uses the new copy: ' + '; '.join(problems))
+    try:
+        # profiles.json.bak still lists the old paths: point it to the new names before the
+        # old ones are removed, so restoring the backup keeps working (review)
+        update_backup_references(PROFILES, staged, BASE)
+    except OSError as exc:
+        # keep the old names too, so the backup still points to existing files
+        st.session_state.notice = (f'Saved. profiles.json.bak could not be updated ({exc}), so the moved '
+                                   'reference images also keep their old names for now.')
+    else:
+        problems = finish_reference_move(staged, REFS)
+        if problems:
+            st.session_state.notice = ('Saved. Some reference images could not be removed from their old folder '
+                                       'and now exist twice; the profile uses the new copy: ' + '; '.join(problems))
     # new widget keys for the edit forms: their uploaders would otherwise keep the saved
     # files and add them again on the next save, or pass them to the profile that moves
     # into a deleted profile's place (review)
