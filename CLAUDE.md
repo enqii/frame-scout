@@ -5,7 +5,7 @@ FrameScout is a **local, general-purpose AI image search** tool for large folder
 
 ## Language
 - **Project language is English** for everything in the repository and on GitHub: code, identifiers, code comments, UI, generated outputs, docs, commit messages, PR titles/descriptions, review comments and skills. CLIP prompts are English anyway.
-- UI strings, the HTML gallery, engine log/error messages and the `.bat` messages are English since I7. Remaining German names: the thumbnail folder `results/vorschaubilder/` and the legacy crop label `Gesamtbild` in old cache rows (shown as "Full image" via `framescout_core.crop_label`).
+- UI strings, the HTML gallery, engine log/error messages and the `.bat` messages are English since I7. Remaining German names, kept for compatibility: the legacy crop label `Gesamtbild` in old cache rows (shown as "Full image" via `framescout_core.crop_label`) and the thumbnail folder `results/vorschaubilder/` of older runs (no longer written; new runs use `results/thumbnails/`).
 - Chat with the user may be in German.
 
 ## Status
@@ -16,9 +16,9 @@ One full end-to-end search run on Windows has been confirmed (I6): `run.log` fro
 ## Files and responsibilities
 - `app.py`: Streamlit frontend. Tabs: Search profiles, Photo source, AI settings, Search & results. Handles profile CRUD, reference uploads, in-session settings, hardware display, analysis process, progress/log UI and HTML downloads.
 - `framescout_engine.py`: standalone CLI. Parses arguments, loads models, embeds images, optionally detects persons, caches embeddings, ranks and exports HTML galleries.
-- `framescout_core.py`: shared by app and engine, **standard library only** (importable without torch/Streamlit): `EXT`, `slugify`, `profile_slugs` (unique result file names, used by both), `write_new_file` (reference uploads without overwriting), `generic_prompts` and `load_profiles` (profile loading/validation, used by the engine), `progress_line`/`parse_progress` (the progress line the engine logs and the app parses, A11) and `crop_label`/`FULL_IMAGE_LABEL` (gallery crop labels). Put logic here when both sides need it or it should be unit-tested without models.
+- `framescout_core.py`: shared by app and engine, **standard library only** (importable without torch/Streamlit): `EXT`, `create_from_example` (first-start `profiles.json`), `slugify`, `profile_slugs` (unique result file names, used by both), `write_new_file` (reference uploads without overwriting), `generic_prompts` and `load_profiles` (profile loading/validation, used by the engine), `progress_line`/`parse_progress` (the progress line the engine logs and the app parses, A11) and `crop_label`/`FULL_IMAGE_LABEL` (gallery crop labels). Put logic here when both sides need it or it should be unit-tested without models.
 - `tests/`, `pytest.ini`, `requirements-dev.txt`: pytest suite for `framescout_core` (no torch, no model download); dev dependency `pytest`.
-- `profiles.json`: persisted profile list (currently both the shipped example and the user's working file; see I7). Back it up before overwriting user changes.
+- `profiles.example.json`: shipped, general-purpose English example profiles (I5). `profiles.json`: the user's working profile list, **gitignored**; `app.py` creates it from the example on the first start with `framescout_core.create_from_example`, which never replaces an existing file. Back it up before overwriting user changes.
 - `requirements.txt`: Streamlit, numpy, Pillow, torch, open_clip_torch, ultralytics, psutil; versions currently loosely constrained.
 - `Install-FrameScout.bat`: checks installed Python 3.14/3.13/3.12 (in that order), creates project-local `.venv`, installs requirements, performs imports.
 - `Start-FrameScout.bat`: launches app via that venv on `127.0.0.1:8501`.
@@ -27,7 +27,7 @@ One full end-to-end search run on Windows has been confirmed (I6): `run.log` fro
 - `.claude/skills/roadmap/`: the `/roadmap` orchestrator skill plus implementer/reviewer briefs. `.claude/settings.json`: shared permission rules for the workflow.
 - `.github/pull_request_template.md`: definition-of-done checklist for every PR.
 - `.github/workflows/tests.yml`: CI – runs `pytest` (plus a `compileall` syntax check of all Python files outside dot-directories) on `windows-latest` for Python 3.12/3.13/3.14 on every pull request and push to `main`. It installs only `requirements-dev.txt` and fails if torch is installed, so tests must not need torch or model downloads. Green CI is unit-test and syntax evidence only, not a model run.
-- Runtime data (generated, not in the repo): `photos/` (default input), `references/`, `results/`, `results/cache.sqlite3`, `results/vorschaubilder/`, `run.log`, `.cache/`, `.tmp/`, `.venv/`, `yolo11n.pt`.
+- Runtime data (generated, not in the repo): `photos/` (default input), `references/`, `results/`, `results/cache.sqlite3`, `results/thumbnails/` (older runs: `results/vorschaubilder/`), `profiles.json`, `run.log`, `.cache/`, `.tmp/`, `.venv/`, `yolo11n.pt`.
 
 ## How to run (Windows)
 1. Clone the repository (or download and extract the ZIP) into a directory you control. Install a compatible Python if needed.
@@ -43,14 +43,14 @@ Manual commands for development (after installation):
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt   # once
 .\.venv\Scripts\python.exe -m pytest
 ```
-Do not claim these commands work on a given Python build without running them in that environment. For smoke runs during development, write output under `.tmp/` (e.g. `--output .\.tmp\smoke-results`), never into the user's `results/`.
+On a fresh clone, `profiles.json` exists only after the first app start; use `--profiles .\profiles.example.json` until then. Do not claim these commands work on a given Python build without running them in that environment. For smoke runs during development, write output under `.tmp/` (e.g. `--output .\.tmp\smoke-results`), never into the user's `results/`.
 
 ## Current search pipeline
 - Uses OpenCLIP `ViT-B-32`, `pretrained='openai'`, for normalized text and image embeddings. No LLM is required. Four generic English prompt templates are derived from each profile's name and optional context, plus extra templates if `features` is provided; user-defined `prompts` are appended.
 - Optional Ultralytics `yolo11n.pt` person detection (`classes=[0]`) extracts individual person crops **in addition to the full original image**. Detection is deliberately optional for non-person motifs; the detector currently runs on CPU.
 - Text similarity = maximum cosine similarity across prompt vectors for a whole image/crop. If reference images exist, visual similarity = max over reference vectors; final score is `(1-reference_weight)*text_score + reference_weight*visual_score` (default reference weight .35). The best full-image/crop score represents a source photo. Scores are relative search heuristics, not probabilities or guaranteed identification.
 - Feature rows are stored in `results/cache.sqlite3` per resolved file path + engine/config signature, checked against modification nanoseconds and size. Image embeddings are serialized in float16; profile queries can reuse existing image features. Changes to detector settings can invalidate the cached feature signature.
-- Outputs one ranked `.html` file per profile (`<slug>.html` from `framescout_core.profile_slugs`: ASCII transliteration, `-2`, `-3`, … on collisions in profile order, hash fallback), with separate JPEG thumbnails in `results/vorschaubilder/` and `file://` links to originals. Keep the output folder intact; exporting an HTML file on its own does **not** embed thumbnails. Local paths may not work on another computer.
+- Outputs one ranked `.html` file per profile (`<slug>.html` from `framescout_core.profile_slugs`: ASCII transliteration, `-2`, `-3`, … on collisions in profile order, hash fallback), with separate JPEG thumbnails in `results/thumbnails/` and `file://` links to originals. Keep the output folder intact; exporting an HTML file on its own does **not** embed thumbnails. Local paths may not work on another computer.
 - Supported inputs: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF, recursively. The engine excludes the output folder if nested in the input root.
 
 ## Profiles schema
@@ -87,7 +87,7 @@ Do not claim these commands work on a given Python build without running them in
 
 ## Development workflow for Claude Code
 - Roadmap work (`BACKLOG.md` → "Roadmap") goes through the PR workflow below; start it with `/roadmap`. The skill is user-invoked only (so subagents can never start a second orchestrator): if the user asks in words to continue, resume or check the roadmap, ask them to type `/roadmap` instead of improvising the workflow.
-- For ad-hoc requests: first read `README.md`, `BACKLOG.md`, `app.py`, `framescout_engine.py`, `profiles.json`, `requirements.txt` and both `.bat` files. Summarize the current code state and risks before changing architecture. If the request is unspecified, ask which improvement to implement next.
+- For ad-hoc requests: first read `README.md`, `BACKLOG.md`, `app.py`, `framescout_engine.py`, `profiles.example.json`, `requirements.txt` and both `.bat` files. Summarize the current code state and risks before changing architecture. If the request is unspecified, ask which improvement to implement next.
 - For each change, report modified files, migration/backward-compatibility consequences, test commands and which tests were actually executed (vs. not executed).
 - Keep `README.md`, `BACKLOG.md` (check off items, add new findings with IDs) and this `CLAUDE.md` current when behavior changes.
 - Avoid claiming the app is production-ready without an actual end-to-end test.
@@ -116,7 +116,7 @@ The roadmap is implemented semi-autonomously, **one pull request per roadmap ite
   - new dependencies or downloads, unless the roadmap item explicitly names them (e.g. `pytest` in step (1));
   - anything that cannot be verified locally (e.g. CUDA without an NVIDIA GPU) → the PR is marked "not runtime-tested";
   - changes to search quality → first a small local evaluation set (kept outside the repo).
-- **User data protection:** never modify, delete or commit the user's working files: the local `profiles.json`, `photos/`, `references/`, `results/`, `run.log`. The tracked example `profiles.json` changes only in a PR whose roadmap item covers it (I5/I7); stage files by name, never in bulk. Tests use pytest's `tmp_path`; smoke runs read and write only under `.tmp/` (no `..` in `--output`) and set `TORCH_HOME`, `HF_HOME`, `XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` to the main checkout's `.cache/` first, as the `.bat` files do; a download that would still be needed is a hold point.
+- **User data protection:** never modify, delete or commit the user's working files: the local `profiles.json`, `photos/`, `references/`, `results/`, `run.log`. `profiles.json` is gitignored since I7; never add it back to the repository (the shipped examples live in `profiles.example.json`). Stage files by name, never in bulk. Tests use pytest's `tmp_path`; smoke runs read and write only under `.tmp/` (no `..` in `--output`) and set `TORCH_HOME`, `HF_HOME`, `XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` to the main checkout's `.cache/` first, as the `.bat` files do; a download that would still be needed is a hold point.
 - **Pausing and resuming:**
   - Same PC: `claude --continue` or `claude --resume` restores the orchestrator session. Background subagents do **not** survive exiting Claude Code, but their pushed commits and PR comments do; `/roadmap` picks up from the PR labels.
   - Other PC: clone the repo, run `Install-FrameScout.bat`, start Claude Code in the folder and run `/roadmap`; it reconstructs the state from GitHub.

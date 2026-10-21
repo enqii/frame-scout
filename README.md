@@ -35,13 +35,28 @@ matching photos as an HTML gallery.
 If package installation fails with one Python version: delete `.venv`, install another
 supported Python version and run the installer again.
 
+### Updating an existing installation
+
+Your search profiles are stored in `profiles.json`, which is not part of the
+repository: on the first start the app creates it from the shipped
+`profiles.example.json` and never overwrites it afterwards.
+
+Checkouts from before the English user interface still have a `profiles.json` that git
+tracks.
+**Copy it to a safe place before `git pull`** – the update removes it from the
+repository, so git deletes an unchanged copy (or refuses to update if you edited it;
+then move the file away first). Put your copy back afterwards; without it, the app
+starts with the new example profiles.
+
 ## Starting and using FrameScout
 
 1. Double-click `Start-FrameScout.bat`. Your browser opens
    <http://127.0.0.1:8501>.
 2. **Search profiles:** name the motif and optionally add context, distinctive
    features, custom search texts and reference images. CLIP understands English best,
-   so enter motif names and features in English where possible.
+   so enter motif names and features in English where possible. On the first start the
+   list contains a few example profiles (red car, golden retriever, mountain landscape,
+   …) that you can edit or delete.
 3. **Photo source:** choose a local image folder (default: `photos` in the
    project folder). Subfolders are searched as well. Download and extract archives and
    online albums yourself beforehand – FrameScout does not download images from the
@@ -58,7 +73,10 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 ## Results
 
 - One HTML gallery per search profile is written to `results/`; the thumbnails are
-  stored in `results/vorschaubilder/`. Clicking a photo opens the original.
+  stored in `results/thumbnails/`. Clicking a photo opens the original. (Versions
+  before the English UI used `results/vorschaubilder/`; that folder is no longer
+  written; galleries created before still link it, so delete it only when you no longer
+  need those older galleries.)
 - The gallery file is named after the profile in plain ASCII, e.g. "Red car" →
   `red-car.html`, "Bär" → `baer.html`; names that would collide get `-2`, `-3`, … in
   profile order, and names without Latin letters or digits (e.g. "猫") get a short hash.
@@ -78,7 +96,8 @@ it can be turned off for other motifs.
 
 ## Uninstalling
 
-1. Back up results and any photos you want to keep elsewhere.
+1. Back up results, your search profiles (`profiles.json`, `references/`) and any
+   photos you want to keep elsewhere.
 2. Close FrameScout and delete the project folder. This removes `.venv`, caches
    (`.cache`, `.tmp`), model weights (including `yolo11n.pt`) and results.
 
@@ -96,6 +115,9 @@ Manual start after installation:
 # Engine directly (CLI)
 .\.venv\Scripts\python.exe framescout_engine.py .\photos --profiles .\profiles.json --output .\results --device cpu --batch-size 8 --top 150
 ```
+
+`profiles.json` exists once the app has been started; on a fresh clone use
+`--profiles .\profiles.example.json` instead.
 
 All engine options: `.\.venv\Scripts\python.exe framescout_engine.py --help`
 
@@ -119,7 +141,7 @@ Commits, one pull request per roadmap item).
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
 | `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, profile loading); standard library only |
-| `profiles.json` | Saved search profiles |
+| `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies |
 | `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
 | `.github/` | CI workflow (`workflows/tests.yml`) and pull request template |
@@ -127,5 +149,5 @@ Commits, one pull request per roadmap item).
 | `BACKLOG.md` | Known weaknesses and roadmap |
 | `CLAUDE.md` | Project onboarding and development workflow |
 | `.claude/` | Claude Code project settings and the `/roadmap` workflow skill |
-| `photos/`, `references/`, `results/`, `run.log` | User data and runtime output (not in the repo) |
+| `profiles.json`, `photos/`, `references/`, `results/`, `run.log` | User data and runtime output (not in the repo) |
 | `.venv/`, `.cache/`, `.tmp/`, `yolo11n.pt` | Environment, caches and model weights (not in the repo) |

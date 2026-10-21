@@ -24,8 +24,11 @@ referenced in commits, pull requests and discussions.
       reference weight therefore has a much stronger effect than its nominal value.
 - [ ] **E6 – `path.stat()` outside `try`** in the export (line ~264): a file deleted in the
       meantime aborts the entire HTML export.
-- [ ] **E7 – No cleanup:** `vorschaubilder/`, `cache.sqlite3` (deleted files, old
-      signatures) and HTML files of renamed/deleted profiles grow without bound.
+- [ ] **E7 – No cleanup:** `thumbnails/`, `cache.sqlite3` (deleted files, old
+      signatures) and HTML files of renamed/deleted profiles grow without bound. Since
+      I7 the thumbnail folder of older versions, `vorschaubilder/`, is no longer written
+      but stays in `results/` (galleries of profiles that were not regenerated still
+      link it).
 - [ ] **E8 – Cache key = absolute path:** moving the photo folder forces a complete
       recomputation.
 - [ ] **E9 – `yolo11n.pt` ends up in the project root** instead of `.cache/`; not documented.
@@ -62,6 +65,8 @@ referenced in commits, pull requests and discussions.
 - [ ] **A7 – CUDA never available:** pip installs torch `+cpu`; "cuda" can still be selected.
 - [ ] **A8 – UX gaps:** deleting a profile without confirmation; settings only per session;
       results without timestamp/reference to the profile state.
+- [ ] **A13 – Unused `import time` in `app.py`:** left over; harmless, remove it with the
+      next change to the imports.
 - [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
       `use_container_width` possibly deprecated (Streamlit 1.66).
       (done 2026-10-21: duplicate import removed, `EXT` lives in `framescout_core`;
@@ -99,12 +104,15 @@ referenced in commits, pull requests and discussions.
 - [ ] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
 - [ ] **I4 – Installer requires the `py` launcher;** without it, the misleading message
       "Python 3.12 to 3.14 not found." is shown.
-- [ ] **I5 – Example profiles/placeholders lean towards cosplay** (Joker, Harley Quinn, 2B,
+- [x] **I5 – Example profiles/placeholders lean towards cosplay** (Joker, Harley Quinn, 2B,
       "Batman / DC Comics") – contradicts the general-purpose product goal.
+      (done 2026-10-21: `profiles.example.json` ships Red car, Golden retriever, Mountain
+      landscape, Bicycle, Birthday cake and Person with umbrella; the context
+      placeholder is "e.g. vehicles, pets, nature".)
 - [x] **I6 – Update `CLAUDE.md`:** record the successful end-to-end run (`run.log`: 4,997
       photos, 6 profiles, 0 errors; `.venv`: Python 3.14.8, torch 2.14.1+cpu).
       (done 2026-10-20)
-- [ ] **I7 – Project language English:** translate the UI strings in `app.py`, the HTML
+- [x] **I7 – Project language English:** translate the UI strings in `app.py`, the HTML
       gallery and log/error messages in `framescout_engine.py`, the `.bat` messages, code
       comments (including `.gitattributes`). Open decisions to resolve in that PR:
       - Rename `results/vorschaubilder/` → `results/thumbnails/`? Existing HTML results
@@ -117,11 +125,16 @@ referenced in commits, pull requests and discussions.
         names.
       - The legacy `franchise` field and the `--character` CLI option stay for
         compatibility.
-      (partly done 2026-10-21: UI, HTML gallery, engine log/error messages and `--help`,
+      (done 2026-10-21: UI, HTML gallery, engine log/error messages and `--help`,
       profile validation messages, `.bat` messages and the `.gitattributes` comment are
       English. The crop label is "Full image"; old cache rows with "Gesamtbild" are
-      shown as "Full image", so the cache stays valid. The UI placeholders are English
-      now, which nudges users towards English motif names (E3), but does not enforce it.)
+      shown as "Full image", so the cache stays valid. Decisions: new runs write
+      thumbnails to `results/thumbnails/`, the old `vorschaubilder/` is left alone (E7);
+      `profiles.example.json` is shipped, `profiles.json` is gitignored and created by
+      the app on the first start without ever replacing an existing file (breaking for
+      existing checkouts: back up `profiles.json` before pulling). The UI placeholders
+      are English now, which nudges users towards English motif names (E3), but does
+      not enforce it.)
 - [ ] **I8 – No branch protection for `main`:** GitHub returns HTTP 403 "Upgrade to GitHub
       Pro or make this repository public to enable this feature" for the private repo, so
       `main` is protected only by the workflow rule (merge only on explicit user approval)
@@ -150,7 +163,7 @@ Each unchecked item is implemented in its own pull request, strictly one after a
       (done 2026-10-21)
 - [x] (2) CI: GitHub Action running `pytest` on a Windows runner without torch/model
       download (part of I2) (done 2026-10-21)
-- [ ] (3) English UI and outputs, neutral example profiles (I7, I5)
+- [x] (3) English UI and outputs, neutral example profiles (I7, I5) (done 2026-10-21)
 - [ ] (4) QuickGELU fix + `ENGINE` bump, cache rebuilt once (E1)
 - [ ] (5) Data-loss fixes: unique reference names (A1), robust `read_profiles` + `.bak`
       (A2), E6
