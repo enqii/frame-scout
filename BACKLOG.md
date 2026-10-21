@@ -49,8 +49,8 @@ referenced in commits, pull requests and discussions.
       mismatched. Umlauts are dropped ("Bär" → `b-r`).
       (done 2026-10-21: app and engine use `framescout_core.slugify`/`profile_slugs`;
       "Bär" → `baer`, "Café" → `cafe`, hash fallback for names such as "猫", Windows
-      device names get `-profile`, at most 60 characters. Galleries of renamed slugs
-      are left behind until the next run → cleanup is E7.)
+      device names get `-profile`, at most 60 characters. Galleries under the old slugs
+      (e.g. `b-r.html`) stay in `results/` until cleanup exists (E7).)
 - [ ] **A4 – Process handle only in the session:** browser reload → the run is orphaned,
       stopping is impossible, a second start is possible → two processes write to the
       same `run.log` (which gets truncated) and the same SQLite file ("database is
@@ -75,6 +75,14 @@ referenced in commits, pull requests and discussions.
       with a regex on `Neu:`/`Cache:`/`Fehler:`. Translating the engine log (I7) breaks
       the progress bar unless both change together; a machine-readable progress line or
       status file (see P2) plus a test for the progress interpretation would decouple it.
+- [ ] **A12 – Gallery downloads are re-derived from the current profile list:** the app
+      maps profiles to `<slug>.html` with `profile_slugs` on the *current*
+      `profiles.json`. After deleting, renaming or reordering profiles with colliding
+      slugs, a button can serve another (deleted) profile's stale gallery, e.g. delete
+      "Rotes Auto" → "rotes auto!" now maps to the old `rotes-auto.html`. Fix: the engine
+      writes a manifest (profile name → file, run timestamp) that the app reads – a new
+      output format, so a design decision; fits the status file of P2 and A8 ("results
+      without reference to the profile state").
 
 ### Installation / project
 
