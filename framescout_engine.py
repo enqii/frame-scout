@@ -4,11 +4,9 @@ Search profiles are kept in profiles.json. Reference images are optional.
 The first model start needs internet access; your own images are never uploaded.
 """
 import argparse
-import hashlib
 import html
 import io
 import json
-import shutil
 import sqlite3
 from pathlib import Path
 from urllib.parse import quote
@@ -18,8 +16,8 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, EXT, FULL_IMAGE_LABEL, crop_label, feature_signature,
-                             load_profiles, profile_slugs, progress_line)
+from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, EXT, FULL_IMAGE_LABEL, crop_label, ensure_thumbnail,
+                             feature_signature, load_profiles, profile_slugs, progress_line)
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -194,6 +192,13 @@ def main():
     # thumbnail folder of older versions: thumbnails are copied from it instead of being
     # rendered again, but it is never changed (old galleries link it; cleanup is E7)
     legacy_thumbs = output / 'vorschaubilder'
+
+    def render_thumbnail(path, target):
+        im = open_image(path); im.thumbnail((380, 380)); im.save(target, quality=82)
+
+    def log(message):
+        print(message, flush=True)
+
     names = [p['name'] for p in profiles]
     slugs = dict(zip(names, profile_slugs(names)))
     nav = '<nav>' + ' · '.join(f'<a href="{quote(slugs[p["name"]] + ".html")}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
@@ -206,17 +211,9 @@ def main():
         name = p['name']; ranked = sorted(scores[name], key=lambda x: x[0], reverse=True)[:args.top]
         cards = []
         for rank, (score, path, label) in enumerate(ranked, 1):
-            thumb_name = hashlib.sha256((str(path)+str(path.stat().st_mtime_ns)).encode()).hexdigest()[:24]+'.jpg'
-            thumb = thumbs / thumb_name
-            try:
-                if not thumb.exists():
-                    old = legacy_thumbs / thumb_name  # same name = same photo and mtime
-                    if old.is_file():
-                        shutil.copyfile(old, thumb)
-                    else:
-                        im = open_image(path); im.thumbnail((380, 380)); im.save(thumb, quality=82)
-            except Exception as exc:
-                print(f'Thumbnail not possible ({path}): {exc}', flush=True)
+            # skips (and logs) photos deleted or unreadable since scoring instead of aborting (E6)
+            thumb_name = ensure_thumbnail(path, thumbs, legacy_thumbs, render_thumbnail, log)
+            if thumb_name is None:
                 continue
             uri = html.escape(path.as_uri(), quote=True)
             rel = html.escape(str(path.relative_to(root)))

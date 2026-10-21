@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import tempfile
 import unicodedata
 from pathlib import Path
@@ -162,6 +163,35 @@ _LEGACY_LABELS = {'Gesamtbild': FULL_IMAGE_LABEL}
 def crop_label(stored):
     """Return the gallery label for a crop label stored in the feature cache."""
     return _LEGACY_LABELS.get(stored, stored)
+
+
+def thumbnail_name(path, mtime_ns):
+    """Return the file name of the gallery thumbnail of path at modification time mtime_ns."""
+    return hashlib.sha256((str(path) + str(mtime_ns)).encode()).hexdigest()[:24] + '.jpg'
+
+
+def ensure_thumbnail(path, thumbs, legacy_thumbs, render, log):
+    """Return the file name of path's thumbnail in the folder thumbs, or None on failure.
+
+    An existing thumbnail is reused; one of an older version in legacy_thumbs (same name =
+    same photo and modification time) is copied and left in place; otherwise
+    render(path, target) writes a new one. Any failure, including a photo that was
+    deleted or moved after scoring (E6), is reported with log(message) and the photo
+    is skipped, so one missing file cannot abort the whole HTML export.
+    """
+    try:
+        name = thumbnail_name(path, path.stat().st_mtime_ns)
+        target = thumbs / name
+        if not target.exists():
+            old = legacy_thumbs / name
+            if old.is_file():
+                shutil.copyfile(old, target)
+            else:
+                render(path, target)
+        return name
+    except Exception as exc:
+        log(f'Thumbnail not possible ({path}): {exc}')
+        return None
 
 
 # Not anchored to the start of a line: stderr shares run.log, and a warning or a progress
