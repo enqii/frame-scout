@@ -1083,3 +1083,101 @@ def _backup_path(filename):
 def _replace_atomically(target, data):
     """Replace target with data via a temporary file that is flushed to disk first."""
     _publish_via_temp(target, lambda tmp: tmp.write_bytes(data), os.replace)
+
+
+# The app's settings (A8): kept in settings.json in the project folder, so they survive a
+# browser reload and a restart. Only values that differ from the defaults are written, so
+# the default photo folder follows the project folder when it is moved.
+SETTINGS_FILE = 'settings.json'
+DEVICES = ('auto', 'cpu', 'cuda')
+# the allowed values of each setting, the same as the app's widgets (which raise for others)
+_INT_SETTINGS = {'batch_size': (1, 64), 'top': (1, 5000), 'max_persons': (1, 50)}
+_FLOAT_SETTINGS = {'person_confidence': (0.1, 0.9), 'reference_weight': (0.0, 1.0)}
+
+
+def default_settings(base):
+    """Return the app's default settings; base is the project folder (photos/ is the default input)."""
+    return {'photo_folder': str(Path(base) / 'photos'), 'device': 'auto', 'batch_size': 8, 'top': 150,
+            'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.35}
+
+
+def _setting_value(key, value):
+    """Return value as the setting key uses it, or None if it is not allowed."""
+    if key == 'photo_folder':
+        return value if isinstance(value, str) else None
+    if key == 'device':
+        return value if isinstance(value, str) and value in DEVICES else None
+    if key == 'person_detection':
+        return value if isinstance(value, bool) else None
+    number = isinstance(value, (int, float)) and not isinstance(value, bool)
+    if key in _INT_SETTINGS:
+        low, high = _INT_SETTINGS[key]
+        return value if number and isinstance(value, int) and low <= value <= high else None
+    if key in _FLOAT_SETTINGS:
+        low, high = _FLOAT_SETTINGS[key]
+        return float(value) if number and low <= value <= high else None  # NaN is never in range
+    return None
+
+
+def _read_settings_file(filename):
+    """Return the JSON object of a settings file ({} if it is missing); ValueError if unreadable."""
+    try:
+        data = json.loads(Path(filename).read_text(encoding='utf-8-sig'))
+    except FileNotFoundError:
+        return {}
+    if not isinstance(data, dict):
+        raise ValueError('The settings file must be a JSON object.')
+    return data
+
+
+def read_settings(filename, defaults):
+    """Return (settings, problems) of the app's settings file.
+
+    settings has the keys of defaults: a saved value replaces its default if it is allowed
+    (the same range as the app's widget); a missing file gives the defaults. problems lists
+    the saved values that are not allowed and were replaced by their defaults. Unknown keys
+    are ignored (save_settings keeps them). Raises ValueError (including JSON and Unicode
+    decoding errors) for a file that is not a JSON object, and OSError if it cannot be read.
+    """
+    data = _read_settings_file(filename)
+    settings, problems = dict(defaults), []
+    for key in defaults:
+        if key not in data:
+            continue
+        value = _setting_value(key, data[key])
+        if value is None:
+            problems.append(f'{key}: {data[key]!r} is not allowed, the default {defaults[key]!r} is used')
+        else:
+            settings[key] = value
+    return settings, problems
+
+
+def _same_setting(value, default):
+    # True == 1 in Python: a bool and a number are never the same setting
+    return isinstance(value, bool) == isinstance(default, bool) and value == default
+
+
+def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05):
+    """Write the changed settings into the app's settings file.
+
+    changes are merged into the file as it is now (another tab or session may have saved
+    other settings in between); values equal to their default are removed and unknown keys
+    are kept. No file is created if there is nothing to write. The file is replaced
+    atomically; on Windows that fails while another session reads it at that moment, so it
+    is tried up to attempts times. Raises ValueError for an unreadable file, which is never
+    replaced, and OSError if writing keeps failing.
+    """
+    filename = Path(filename)
+    document = {**_read_settings_file(filename), **changes}
+    document = {k: v for k, v in document.items() if not (k in defaults and _same_setting(v, defaults[k]))}
+    if not document and not filename.exists():
+        return
+    data = (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+    for attempt in range(attempts):
+        try:
+            _replace_atomically(filename, data)
+            return
+        except OSError:
+            if attempt + 1 == attempts:
+                raise
+            time.sleep(retry_delay)
