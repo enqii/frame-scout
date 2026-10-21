@@ -69,8 +69,10 @@ starts with the new example profiles.
    When you rename a profile, its reference images move to the folder of the new name
    and the profile is updated accordingly; other files in the old folder (e.g. images
    you removed from the profile) stay there, and the old folder is deleted only if it is
-   empty. Removing reference images from a profile or deleting a profile does not delete
-   the files.
+   empty. The paths in `profiles.json.bak` are updated to the new folder as well, so
+   restoring the backup after a rename still finds the images (if that update fails, the
+   images also keep their old names and the app shows a note). Removing reference
+   images from a profile or deleting a profile does not delete the files.
 3. **Photo source:** choose a local image folder (default: `photos` in the
    project folder). Subfolders are searched as well. Download and extract archives and
    online albums yourself beforehand – FrameScout does not download images from the

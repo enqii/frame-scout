@@ -75,9 +75,10 @@ referenced in commits, pull requests and discussions.
       rename, the profile's own files under `references/` move to the folder of the new
       name (user decision in the review: the folder follows the name): hard link or
       copy first, save `profiles.json`, then remove the old names, so a crash never leaves
-      paths to missing files. Files of other profiles, leftovers and paths outside
-      `references/` stay; a folder shared before A1 is split only when one of its
-      profiles is renamed. Leftover files: A14.)
+      paths to missing files; `profiles.json.bak` is updated to the new paths before the
+      old names go (user decision, review round 2). Files of other profiles, leftovers
+      and paths outside `references/` stay; a folder shared before A1 is split only when
+      one of its profiles is renamed. Leftover files: A14.)
 - [x] **A2 – `profiles.json` data loss:** `read_profiles` does not know the v3 format
       (returns `[]`, the next save overwrites the file). A JSON list → `AttributeError`
       (not caught). No backup before saving.
