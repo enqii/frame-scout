@@ -239,24 +239,40 @@ def load_profiles(filename, inline):
     "prompts" (generated + custom prompts) and "refs" (reference image paths, resolved
     relative to the JSON file's folder). Raises ValueError for invalid input.
     """
-    raw = []
-    if filename:
-        data = json.loads(filename.read_text(encoding='utf-8-sig'))
-        if isinstance(data, dict) and 'profiles' in data:
-            raw = data['profiles']
-        elif isinstance(data, dict):  # v3 migration: {name: [prompts, ...]}
-            raw = [{'name': n, 'prompts': ps} for n, ps in data.items()]
-        else:
-            raise ValueError('The JSON file must be an object with "profiles" (or the previous v3 format).')
-        if not isinstance(raw, list):
-            raise ValueError('"profiles" must be a list.')
+    raw = list(_read_entries(filename)) if filename else []
     for item in inline:
         fields = [s.strip() for s in item.split('|', 2)]
         raw.append({'name': fields[0], 'franchise': fields[1] if len(fields) > 1 else '',
                     'features': fields[2] if len(fields) > 2 else ''})
     if not raw:
         raise ValueError('Please specify --profiles or at least one --character.')
+    _check_entries(raw)
     profiles = []
+    for item in raw:
+        name = item['name']
+        franchise, features = item.get('franchise', ''), item.get('features', '')
+        prompts, refs = item.get('prompts', []), item.get('reference_images', [])
+        profiles.append({'name': name.strip(), 'prompts': generic_prompts(name, franchise, features) + prompts,
+                         'refs': [((filename.parent if filename else Path.cwd()) / x).resolve() for x in refs]})
+    return profiles
+
+
+def _read_entries(filename):
+    """Return the raw profile list of a profiles JSON file; the v3 format is converted."""
+    data = json.loads(filename.read_text(encoding='utf-8-sig'))
+    if isinstance(data, dict) and 'profiles' in data:
+        raw = data['profiles']
+    elif isinstance(data, dict):  # v3 migration: {name: [prompts, ...]}
+        raw = [{'name': n, 'prompts': ps} for n, ps in data.items()]
+    else:
+        raise ValueError('The JSON file must be an object with "profiles" (or the previous v3 format).')
+    if not isinstance(raw, list):
+        raise ValueError('"profiles" must be a list.')
+    return raw
+
+
+def _check_entries(raw):
+    """Raise ValueError unless raw is a list of valid profile dicts with unique names."""
     names = set()
     for item in raw:
         if not isinstance(item, dict):
@@ -274,6 +290,49 @@ def load_profiles(filename, inline):
             raise ValueError(f'Invalid profile: {name}')
         if any(not isinstance(x, str) or not x.strip() for x in prompts + refs):
             raise ValueError(f'Prompts and reference images must be non-empty strings: {name}')
-        profiles.append({'name': name.strip(), 'prompts': generic_prompts(name, franchise, features) + prompts,
-                         'refs': [((filename.parent if filename else Path.cwd()) / x).resolve() for x in refs]})
-    return profiles
+
+
+def read_profiles(filename):
+    """Return the profile dicts of the app's profiles JSON file as stored ([] if it is missing).
+
+    Validated like load_profiles(), but an empty list is allowed and unknown keys are
+    kept. The previous v3 format {name: [prompts, ...]} is converted, so saving it does
+    not lose the profiles (A2). Raises ValueError (including json.JSONDecodeError) for a
+    file the app cannot represent, so that the app never saves over it.
+    """
+    try:
+        raw = _read_entries(filename)
+    except FileNotFoundError:
+        return []
+    _check_entries(raw)
+    return raw
+
+
+def save_profiles(filename, profiles):
+    """Write profiles to filename as {"profiles": [...]}, keeping the previous file as .bak.
+
+    The previous content is copied byte for byte to <filename>.bak first (replacing an
+    older backup); if that fails, filename is left unchanged. Both files are written to a
+    temporary file in the same folder and then renamed, so a crash leaves a complete
+    old or new file, never a half-written one.
+    """
+    try:
+        previous = filename.read_bytes()
+    except FileNotFoundError:
+        previous = None
+    if previous is not None:
+        _replace_atomically(filename.with_name(filename.name + '.bak'), previous)
+    text = json.dumps({'profiles': profiles}, ensure_ascii=False, indent=2) + '\n'
+    _replace_atomically(filename, text.encode('utf-8'))
+
+
+def _replace_atomically(target, data):
+    """Write data to a temporary file next to target, then rename it to target."""
+    fd, name = tempfile.mkstemp(dir=target.parent, prefix=target.name + '.', suffix='.tmp')
+    tmp = Path(name)
+    try:
+        with os.fdopen(fd, 'wb') as handle:
+            handle.write(data)
+        os.replace(tmp, target)
+    finally:
+        tmp.unlink(missing_ok=True)
