@@ -26,10 +26,13 @@ from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EX
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 # Photos are decoded in threads ahead of CLIP (E2). Pillow releases the GIL while it
-# decodes; more threads would mostly compete with PyTorch for the same CPU cores. At most
-# DECODE_AHEAD photos are queued, which bounds the memory for decoded images.
+# decodes; more threads would mostly compete with PyTorch for the same CPU cores.
 DECODE_THREADS = min(4, os.cpu_count() or 1)
-DECODE_AHEAD = 2 * DECODE_THREADS
+# With person detection a thread holds a full-resolution photo until the detector, which
+# runs one photo at a time (E14), is done with it. Two threads let one photo be decoded
+# while the other is in the detector, so at most two full-resolution photos are in
+# memory; more threads were not faster, they only wait there with a photo each (review).
+DETECTION_DECODE_THREADS = 2
 THUMBNAIL_SIZE = 380
 
 
@@ -178,9 +181,9 @@ def main():
         if progress_due(before, done, len(paths)):
             print(progress_line(done, len(paths), fresh, reused, errors), flush=True)
 
-    def prepared(todo, pool):
+    def prepared(todo, pool, ahead):
         """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped."""
-        for (path, stat), future in prefetch(lambda item: pool.submit(prepare, item[0]), todo, DECODE_AHEAD):
+        for (path, stat), future in prefetch(lambda item: pool.submit(prepare, item[0]), todo, ahead):
             try:
                 labels, pixels = future.result()
             except Exception as exc:
@@ -223,9 +226,14 @@ def main():
                 todo.append((path, stat))
         # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
         # crops of several photos are embedded together, batch_size at a time (E2).
-        pool = ThreadPoolExecutor(DECODE_THREADS)
+        threads = DECODE_THREADS if detector is None else DETECTION_DECODE_THREADS
+        # enough photos ahead for the next group while CLIP embeds the current one (a group
+        # holds at most batch_size photos); finished photos wait as small preprocessed
+        # tensors, so memory grows with the batch size, not with the photo size (review)
+        ahead = max(2 * threads, args.batch_size + threads)
+        pool = ThreadPoolExecutor(threads)
         try:
-            for group in group_batches(prepared(todo, pool), args.batch_size, size=lambda item: len(item[2])):
+            for group in group_batches(prepared(todo, pool, ahead), args.batch_size, size=lambda item: len(item[2])):
                 # after a failure the photos are stored one by one, so only a broken one fails
                 finished(new=store_group(group, store, store_failed))
         finally:
