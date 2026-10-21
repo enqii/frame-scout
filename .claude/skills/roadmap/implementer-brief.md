@@ -77,7 +77,8 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   ("Out-of-scope findings go into the backlog"; no GitHub issues).
 - When the definition of done (`CLAUDE.md` and the PR template) is met: `gh pr ready {PR}`,
   then `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:needs-review`.
-  Check CI with `gh pr checks {PR}` once CI exists.
+  Before that, check CI with `gh pr checks {PR}` (the `tests` workflow must be green;
+  `gh pr checks {PR} --watch` waits for running checks).
 
 ## Addressing a review (mode `address-review`)
 

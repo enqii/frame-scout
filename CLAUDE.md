@@ -26,6 +26,7 @@ One full end-to-end search run on Windows has been confirmed (I6): `run.log` fro
 - `BACKLOG.md`: known weaknesses (IDs E/A/I) and the prioritized roadmap that drives the PR workflow.
 - `.claude/skills/roadmap/`: the `/roadmap` orchestrator skill plus implementer/reviewer briefs. `.claude/settings.json`: shared permission rules for the workflow.
 - `.github/pull_request_template.md`: definition-of-done checklist for every PR.
+- `.github/workflows/tests.yml`: CI – runs `pytest` (plus a byte-compile syntax check of `app.py` and both `framescout_*` modules) on `windows-latest` for Python 3.12/3.13/3.14 on every pull request and push to `main`. It installs only `requirements-dev.txt` and fails if torch is installed, so tests must not need torch or model downloads. Green CI is unit-test and syntax evidence only, not a model run.
 - Runtime data (generated, not in the repo): `photos/` (default input), `references/`, `results/`, `results/cache.sqlite3`, `results/vorschaubilder/`, `run.log`, `.cache/`, `.tmp/`, `.venv/`, `yolo11n.pt`.
 
 ## How to run (Windows)
@@ -108,7 +109,7 @@ The roadmap is implemented semi-autonomously, **one pull request per roadmap ite
 - **Review:** a fresh reviewer agent runs `/code-review medium <PR> --comment` and must not change code. The implementer then verifies every finding technically, fixes it or declines it with a reasoned reply on the comment thread, and summarizes "addressed / declined" in the PR.
 - **Out-of-scope findings go into the backlog:** anything found while working on a PR that is outside its scope – valid review findings that are deferred, discovered limitations, new bugs – is added to `BACKLOG.md` **in the same PR** as a new item with the next free ID of its group (E/A/I). A declined review reply that defers work names that backlog ID. `BACKLOG.md` is the single source of truth for open work; do not create GitHub issues.
 - **Merge:** only after the user's explicit approval in chat, as a rebase merge (`gh pr merge <PR> --rebase --delete-branch`), followed by worktree and branch cleanup and updating local `main` – the exact procedure is in `/roadmap` → "Merge".
-- **Definition of done:** all checklist items of the PR template are true – summary and backlog IDs, modified files, migration/compatibility consequences, tests executed (with output) vs. not executed, `BACKLOG.md`/`README.md`/`CLAUDE.md` updated where needed, user data untouched, review findings addressed or declined.
+- **Definition of done:** all checklist items of the PR template are true – summary and backlog IDs, modified files, migration/compatibility consequences, tests executed (with output) vs. not executed, CI checks green, `BACKLOG.md`/`README.md`/`CLAUDE.md` updated where needed, user data untouched, review findings addressed or declined.
 - **Hold points** – the implementer stops and returns a question instead of guessing; the orchestrator asks the user (and posts the question as a PR comment once a PR exists):
   - product/design decisions (e.g. P3 multilingual search or stronger models, P4 gallery/UX, P5 distribution);
   - breaking changes: `profiles.json` schema, CLI options, cache invalidation, folder renames;

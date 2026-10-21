@@ -89,8 +89,10 @@ referenced in commits, pull requests and discussions.
 - [x] **I1 – No git repository.** (done 2026-10-20)
 - [ ] **I2 – No tests.** (partly done 2026-10-21: `pytest` scaffold and tests for
       `framescout_core` – slugs, `EXT`, profile loading/validation, prompt generation.
-      Open: CI (roadmap step (2)); tests for cache signature/reuse, scoring and progress
-      interpretation; a smoke test with real models.)
+      CI done 2026-10-21: `.github/workflows/tests.yml` runs `pytest` on Windows,
+      Python 3.12–3.14, without torch.
+      Open: tests for cache signature/reuse, scoring and progress interpretation; a smoke
+      test with real models.)
 - [ ] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
 - [ ] **I4 – Installer requires the `py` launcher;** without it, the misleading message
       "Python nicht gefunden" (Python not found) is shown.
@@ -131,8 +133,8 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 - [x] (1) `pytest` scaffold + shared module `framescout_core.py` (slug, `EXT`, profile
       loading/validation) with tests, no model download (A3, A9, part of I2)
       (done 2026-10-21)
-- [ ] (2) CI: GitHub Action running `pytest` on a Windows runner without torch/model
-      download (part of I2)
+- [x] (2) CI: GitHub Action running `pytest` on a Windows runner without torch/model
+      download (part of I2) (done 2026-10-21)
 - [ ] (3) English UI and outputs, neutral example profiles (I7, I5)
 - [ ] (4) QuickGELU fix + `ENGINE` bump, cache rebuilt once (E1)
 - [ ] (5) Data-loss fixes: unique reference names (A1), robust `read_profiles` + `.bak`
