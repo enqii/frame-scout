@@ -1,5 +1,6 @@
 """File-name slugs for result pages and reference folders (framescout_core)."""
 import hashlib
+import unicodedata
 
 import pytest
 
@@ -27,6 +28,13 @@ def test_ascii_names(name, slug):
 ])
 def test_latin_letters_with_diacritics_are_transliterated(name, slug):
     assert slugify(name) == slug
+
+
+@pytest.mark.parametrize('form', ['NFC', 'NFD'])
+def test_transliteration_does_not_depend_on_the_unicode_normal_form(form):
+    assert slugify(unicodedata.normalize(form, 'Bär Größe')) == 'baer-groesse'
+    # the hash fallback, too (Hangul decomposes into Jamo under NFD)
+    assert slugify(unicodedata.normalize(form, '고양이')) == hashlib.sha256('고양이'.encode()).hexdigest()[:10]
 
 
 def test_name_without_usable_characters_falls_back_to_a_stable_hash():

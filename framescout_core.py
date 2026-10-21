@@ -34,6 +34,9 @@ def slugify(s):
     The result contains only [a-z0-9-], is at most SLUG_MAX_LENGTH characters long and is
     never a Windows device name. It is not unique: use profile_slugs() for a profile list.
     """
+    # NFC first, so that decomposed input ("a" + combining diaeresis) still matches "ä"
+    # and the hash fallback does not depend on the normal form either
+    s = unicodedata.normalize('NFC', s)
     text = unicodedata.normalize('NFKD', s.lower().translate(_TRANSLITERATION))
     text = text.encode('ascii', 'ignore').decode('ascii')
     slug = re.sub('[^a-z0-9]+', '-', text).strip('-')[:SLUG_MAX_LENGTH].rstrip('-')
