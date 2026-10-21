@@ -10,7 +10,7 @@ import streamlit as st
 
 from framescout_core import (EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter,
                              create_from_example, cuda_status, device_choices, finish_reference_move, lock_held,
-                             profile_slugs, read_profiles, read_status, reference_folder, run_active, same_run,
+                             profile_slugs, read_profiles, read_status, reference_folder, run_active, started_in_time,
                              save_profiles, stage_reference_move, status_fraction, status_text, stopped_status,
                              undo_reference_move, update_backup_references, write_new_file, write_status)
 
@@ -88,17 +88,24 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
     st.session_state.saves = st.session_state.get('saves', 0) + 1
     return True
 
-def engine_alive(pid):
-    """Return True if pid is a running FrameScout engine (not another process that got its id)."""
+def engine_alive(pid, status):
+    """Return True if pid is the running FrameScout engine of status.
+
+    Checks the command line and that the process existed when status was written, so a
+    process (also another engine, e.g. with another --output) that got the pid of an ended
+    run later does not count (review).
+    """
     try:
-        return any(part.endswith('framescout_engine.py') for part in psutil.Process(pid).cmdline())
+        process = psutil.Process(pid)
+        return (any(part.endswith('framescout_engine.py') for part in process.cmdline())
+                and started_in_time(status, process.create_time()))
     except psutil.Error:
         return False
 
 def run_state():
     """Return (active, status) of the search in the results folder, whichever tab or session started it (A4)."""
     status = read_status(STATUS)
-    return run_active(status, lock_held(LOCK), engine_alive), status
+    return run_active(status, lock_held(LOCK), lambda pid: engine_alive(pid, status)), status
 
 def start_run(cmd):
     """Start the engine with cmd unless a search is running; return None, or why it was not started.
@@ -109,30 +116,68 @@ def start_run(cmd):
     """
     RESULTS.mkdir(parents=True, exist_ok=True)
     lock = RunLock(LOCK)
-    if not lock.acquire():
+    # with a timeout: every open tab checks the lock for a moment every two seconds (review)
+    if not lock.acquire(timeout=1):
         return 'A search is already running.'
     try:
-        if run_active(read_status(STATUS), False, engine_alive):
+        current = read_status(STATUS)
+        if run_active(current, False, lambda pid: engine_alive(pid, current)):
             return 'Another search is being started.'
         with LOG.open('w', encoding='utf-8', buffering=1) as log_handle:
             proc = subprocess.Popen(cmd, cwd=str(BASE), env=cache_env(), stdout=log_handle, stderr=subprocess.STDOUT)
-        StatusReporter(STATUS, proc.pid).update('starting')
         st.session_state.process = proc
+        if not StatusReporter(STATUS, proc.pid).update('starting'):
+            # without "starting", other tabs would see no run until the engine takes the
+            # lock and could start a second one (review)
+            end_processes([proc.pid])
+            proc.poll()
+            return (f'The search was not started: {STATUS} cannot be written (it may be open in another '
+                    'program). Try again in a moment.')
         return None
     finally:
         lock.release()
 
-def stop_run(status):
+def stop_run():
     """End the running engine, also one started in another tab or before a reload (A4).
 
-    Returns True if a process was found to stop.
+    Returns None, or a note for the user.
     """
+    # read again: the page may have been drawn before the engine replaced the app's
+    # "starting" status with its own (review)
+    status = read_status(STATUS)
     pids = []
     proc = st.session_state.get('process')
     if proc is not None and proc.poll() is None:
         pids.append(proc.pid)
-    if status and isinstance(status.get('pid'), int) and engine_alive(status['pid']):
+    if status and isinstance(status.get('pid'), int) and engine_alive(status['pid'], status):
         pids.append(status['pid'])
+    ended = end_processes(pids)
+    if proc is not None:
+        proc.poll()
+    if not ended:
+        return 'No running search process was found; it may have just ended.'
+    # the stopped engine cannot write its final status; mark it under the lock, which
+    # Windows may release a moment after the process has ended (review)
+    lock = RunLock(LOCK)
+    if not lock.acquire(timeout=10):
+        return ('The search was stopped, but its lock was not released yet, so it is not marked as stopped; '
+                'the page may show it as ended without finishing.')
+    try:
+        current = read_status(STATUS)
+        # only the status of a stopped process: another start may have replaced it meanwhile
+        if current and current.get('pid') in ended and current.get('phase') not in FINAL_PHASES:
+            if not write_status(STATUS, stopped_status(current), attempts=20):
+                return ('The search was stopped, but the status file could not be updated, so the page may show '
+                        'it as ended without finishing.')
+    finally:
+        lock.release()
+    return None
+
+def end_processes(pids):
+    """Terminate the processes pids with their child processes, kill what is left after 5 s.
+
+    Returns the set of process ids that were found (and ended).
+    """
     targets = {}
     for pid in pids:
         try:
@@ -154,19 +199,7 @@ def stop_run(status):
         except psutil.Error:
             pass
     psutil.wait_procs(remaining, timeout=5)
-    if proc is not None:
-        proc.poll()
-    # the stopped engine cannot write its final status; mark it under the lock, unless
-    # another start has replaced the status in the meantime
-    lock = RunLock(LOCK)
-    if status and lock.acquire(timeout=2):
-        try:
-            current = read_status(STATUS)
-            if same_run(current, status) and current.get('phase') not in FINAL_PHASES:
-                write_status(STATUS, stopped_status(current), attempts=20)
-        finally:
-            lock.release()
-    return bool(targets)
+    return set(targets)
 
 def cache_env():
     env = os.environ.copy()
@@ -197,6 +230,7 @@ except (OSError, ValueError) as exc:
 
 # whether a search runs, also after a reload or in another tab (A4)
 active, run_status = run_state()
+st.session_state.page_run_state = (active, run_status)
 
 if 'settings' not in st.session_state:
     st.session_state.settings = {'folder': str(BASE/'photos'), 'device': 'auto', 'batch': 8,
@@ -335,23 +369,23 @@ with run_tab:
         try:
             problem = start_run(cmd)
         except Exception as exc:
-            st.error(f'Start failed: {exc}')
-        else:
-            if problem:
-                st.warning(problem)
-            else:
-                st.rerun()
+            problem = f'Start failed: {exc}'
+        # kept for the next page run: the state may have changed, which reruns the page
+        st.session_state.run_notice = problem
+        st.rerun()
     if stop:
         try:
-            if not stop_run(run_status):
-                st.warning('No running search process was found; it may have just ended.')
+            st.session_state.run_notice = stop_run()
         except Exception as exc:
-            st.error(f'Stop failed: {exc}')
-        else:
-            st.rerun()
+            st.session_state.run_notice = f'Stop failed: {exc}'
+        st.rerun()
+    if st.session_state.get('run_notice'):
+        st.warning(st.session_state.pop('run_notice'))
     @st.fragment(run_every='2s')
     def show_status():
-        now_active, status = run_state()
+        # the state of this page run, read once at its top; fragment-only reruns read it again (review)
+        fresh = st.session_state.pop('page_run_state', None)
+        now_active, status = fresh if fresh else run_state()
         if now_active != active:
             st.rerun()  # a search started or ended, also in another tab: update the whole page
         if now_active:

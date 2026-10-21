@@ -778,11 +778,6 @@ def stopped_status(status):
             'updated': _timestamp()}
 
 
-def same_run(a, b):
-    """Return True if the status dicts a and b belong to the same run (process id and start time)."""
-    return bool(a and b) and a.get('pid') == b.get('pid') and a.get('started') == b.get('started')
-
-
 def started_in_time(status, create_time, tolerance=2.0):
     """Return True if a process created at create_time (seconds since the epoch) can be the run of status.
 
