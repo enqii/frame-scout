@@ -20,7 +20,7 @@ import open_clip
 from PIL import Image, ImageOps, ImageFile
 
 from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, crop_label,
-                             draft_size, ensure_thumbnail, feature_signature, group_batches, load_profiles,
+                             detection_options, draft_size, ensure_thumbnail, feature_signature, group_batches, load_profiles,
                              prefetch, profile_slugs, progress_due, progress_line, store_group)
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
@@ -48,13 +48,14 @@ def open_image(path, min_size=None):
         return ImageOps.exif_transpose(image).convert('RGB')
 
 
-def crops_for(image, detector, limit, conf, lock):
+def crops_for(image, detector, options, lock):
+    """Return [(label, image)]: the whole photo, then each person found with detector.predict(**options)."""
     crops = [(FULL_IMAGE_LABEL, image)]
     if detector is None:
         return crops
+    limit = options['max_det']
     with lock:  # one detector instance is shared by the decoding threads
-        result = detector.predict(source=image, classes=[0], conf=conf, imgsz=640,
-                                  max_det=limit, verbose=False, device='cpu')[0]
+        result = detector.predict(source=image, **options)[0]
     boxes = result.boxes.xyxy.cpu().tolist() if result.boxes is not None else []
     w, h = image.size
     for i, (x1, y1, x2, y2) in enumerate(boxes[:limit], 1):
@@ -117,7 +118,8 @@ def main():
         parser.error('CUDA is not available; use --device cpu.')
     torch.set_num_threads(min(12, max(1, torch.get_num_threads())))
     output.mkdir(parents=True, exist_ok=True)
-    print(f'{len(paths)} photos; {len(profiles)} search profiles; CLIP: {device}; YOLO: {not args.no_person_detection}', flush=True)
+    print(f'{len(paths)} photos; {len(profiles)} search profiles; CLIP: {device}; '
+          f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
     print('Model weights are downloaded on the first start.', flush=True)
     model, _, preprocess = open_clip.create_model_and_transforms(CLIP_MODEL, pretrained=CLIP_PRETRAINED, device=device)
     model.eval()
@@ -165,6 +167,8 @@ def main():
     min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
                           detector is not None)
     detect_lock = threading.Lock()
+    # the detector runs on the CLIP device (E14)
+    detect_options = detection_options(device, args.max_persons, args.person_confidence)
 
     def prepare(path):
         """Decode, detect and preprocess one photo; runs in a decoding thread (E2).
@@ -173,7 +177,7 @@ def main():
         long before), so the stored modification time and size belong to the analyzed content.
         """
         stat = path.stat()
-        crops = crops_for(open_image(path, min_size), detector, args.max_persons, args.person_confidence, detect_lock)
+        crops = crops_for(open_image(path, min_size), detector, detect_options, detect_lock)
         return stat, [label for label, _ in crops], torch.stack([preprocess(im) for _, im in crops])
 
     fresh = reused = errors = done = 0

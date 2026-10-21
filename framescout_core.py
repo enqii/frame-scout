@@ -348,6 +348,21 @@ def feature_signature(person_detection, max_persons, person_confidence, yolo_mod
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
 
 
+# Input size of the person detection: it decides which persons are found, i.e. which
+# crops are cached, so changing it needs an ENGINE bump.
+DETECTION_IMAGE_SIZE = 640
+
+
+def detection_options(device, max_persons, person_confidence):
+    """Return the keyword arguments of the person detection (YOLO predict) of one photo.
+
+    The detector runs on the same device as CLIP (E14): on a CUDA GPU it was the slowest
+    step when it stayed on the CPU. Only class 0 (person) is detected.
+    """
+    return dict(classes=[0], conf=person_confidence, imgsz=DETECTION_IMAGE_SIZE, max_det=max_persons,
+                verbose=False, device=device)
+
+
 # Label of the uncropped photo among the crops; person crops are labelled "Person <n>".
 FULL_IMAGE_LABEL = 'Full image'
 # Labels are stored in the feature cache; rows written before the English translation
