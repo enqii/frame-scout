@@ -1,0 +1,46 @@
+{
+  "profiles": [
+    {
+      "name": "Red car",
+      "franchise": "Vehicles",
+      "features": "red bodywork, four wheels",
+      "reference_images": [],
+      "prompts": []
+    },
+    {
+      "name": "Golden retriever",
+      "franchise": "Dogs",
+      "features": "golden fur, floppy ears",
+      "reference_images": [],
+      "prompts": []
+    },
+    {
+      "name": "Mountain landscape",
+      "franchise": "Nature",
+      "features": "mountains, valley, natural scenery",
+      "reference_images": [],
+      "prompts": []
+    },
+    {
+      "name": "Bicycle",
+      "franchise": "Vehicles",
+      "features": "two wheels, handlebars, frame",
+      "reference_images": [],
+      "prompts": []
+    },
+    {
+      "name": "Birthday cake",
+      "franchise": "Food",
+      "features": "candles, frosting",
+      "reference_images": [],
+      "prompts": []
+    },
+    {
+      "name": "Person with umbrella",
+      "franchise": "People",
+      "features": "open umbrella, rain",
+      "reference_images": [],
+      "prompts": []
+    }
+  ]
+}
