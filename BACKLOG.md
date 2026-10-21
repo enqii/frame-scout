@@ -205,6 +205,18 @@ referenced in commits, pull requests and discussions.
       results without timestamp/reference to the profile state. Since A4 a reload shows a
       running search again, but the settings and the photo folder it was started with are
       back at their defaults (the status file does not record them).
+      (partly done 2026-10-21: the settings – photo folder, device, batch size, top,
+      person detection with its maximum and confidence, reference weight – are kept in
+      `settings.json` in the project folder (gitignored), so a reload, a restart, another
+      tab or session shows them, also for a running search. The app reads the file on
+      every rerun and saves the values changed in a page run merged into the current file
+      (`framescout_core.read_settings`/`save_settings`); only values that differ from the
+      defaults are written, so the default photo folder follows a moved project folder.
+      Invalid values fall back to their defaults with a warning, an unreadable file is
+      never replaced, and a saved device PyTorch cannot use is used as "auto" but stays
+      saved. Two sessions changing the same setting at once: the last save wins.
+      Still open: deleting a profile without confirmation; results without timestamp or
+      reference to the profile state, see A12.)
 - [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
       `use_container_width` possibly deprecated (Streamlit 1.66).
       (done 2026-10-21: duplicate import removed, `EXT` lives in `framescout_core`;
@@ -254,6 +266,13 @@ referenced in commits, pull requests and discussions.
       `profile_slugs` with a fallback for occupied folders – note that the order-based
       slugs change when profiles are deleted or reordered, which would then move folders
       (design decision, PR #6 review).
+- [ ] **A16 – An empty photo folder searches the app's working directory:** `Path('')`
+      is `.`, so with the folder field emptied, "Start search" is enabled and the engine
+      gets the folder the app was started in – with `Start-FrameScout.bat` the project
+      folder, including `.venv/` (whose packages ship PNG files) and `references/`.
+      Older than A8, but since A8 an empty field is also saved in `settings.json` and comes
+      back after a restart. Fix: treat an empty or whitespace-only folder as missing in the
+      app (and possibly reject it in the engine). Found in PR #10.
 
 ### Installation / project
 
@@ -272,6 +291,8 @@ referenced in commits, pull requests and discussions.
       itself is not tested in CI.
       2026-10-21 (A4/A5): tests for the run lock (also released when its process is
       killed), the status file and the app's run state.
+      2026-10-21 (A8): tests for reading and saving `settings.json`; the app's use of it
+      was checked with Streamlit's `AppTest` (not in CI).
       Open: tests for cache signature/reuse and scoring; tests of `app.py` itself (e.g.
       Streamlit's `AppTest`, which needs Streamlit in CI); a smoke test with real models.)
 - [x] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
@@ -386,7 +407,7 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 ### P2 – Robust runs
 - [x] Engine writes a status/lock file (PID, phase, progress); the app reconnects after a
       reload and prevents parallel starts (A4, A5) (done 2026-10-21)
-- [ ] Persist settings in `settings.json` (A8)
+- [x] Persist settings in `settings.json` (A8) (done 2026-10-21; A8 itself is partly open)
 
 ### P3 – Search quality
 - [ ] Average the prompt ensemble, normalize scores per profile (E4, E5)
