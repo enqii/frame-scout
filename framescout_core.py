@@ -10,8 +10,15 @@ import os
 import re
 import shutil
 import tempfile
+import time
 import unicodedata
+from datetime import datetime
 from pathlib import Path
+
+if os.name == 'nt':
+    import msvcrt
+else:
+    import fcntl
 
 # Supported image file extensions (lowercase, with leading dot).
 EXT = frozenset({'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'})
@@ -595,6 +602,248 @@ def progress_due(before, after, total, every=25):
     (one embedded batch, E2), so a multiple of `every` that was jumped over counts too.
     """
     return after > before and (after == total or after // every > before // every)
+
+
+# One search at a time per output folder (A4): the engine holds RUN_LOCK in the output
+# folder while it runs and reports its phase and progress in RUN_STATUS (A5), which the
+# app reads to show a run again after a browser reload, in another tab or session.
+RUN_LOCK = 'run.lock'
+RUN_STATUS = 'run-status.json'
+STATUS_FORMAT = 1
+# phases in run order; the app writes "starting", the engine the others
+PHASE_LABELS = {
+    'starting': 'Starting the search',
+    'scanning': 'Looking for photos',
+    'loading': 'Loading the AI models',
+    'analyzing': 'Analyzing photos',
+    'scoring': 'Scoring photos',
+    'exporting': 'Writing galleries',
+    'finished': 'Finished',
+    'failed': 'Failed',
+    'interrupted': 'Interrupted',
+}
+FINAL_PHASES = frozenset({'finished', 'failed', 'interrupted'})
+
+
+def _try_lock(fd):
+    """Lock fd exclusively without waiting; raise OSError if another handle holds the lock."""
+    if os.name == 'nt':
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)  # one byte, beyond the end of the empty file
+    else:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _unlock(fd):
+    if os.name == 'nt':
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+class RunLock:
+    """An exclusive lock on a file, held while a search runs in an output folder (A4).
+
+    It is a lock of the operating system (Windows byte-range lock, flock elsewhere) on an
+    open file, not the existence of the file: when the process ends in any way, including
+    terminate()/kill() or a crash, the operating system releases it, so a stopped run never
+    leaves a stale lock behind. The file stays in place (empty) after the run. Two RunLock
+    objects conflict even within one process.
+    """
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self._fd = None
+
+    @property
+    def held(self):
+        return self._fd is not None
+
+    def acquire(self, timeout=0.0, poll=0.1, clock=time.monotonic, sleep=time.sleep):
+        """Take the lock, trying for up to timeout seconds; return True if it is held now."""
+        if self._fd is not None:
+            return True
+        fd = os.open(self.path, os.O_RDWR | os.O_CREAT)  # not inherited by child processes (PEP 446)
+        deadline = clock() + timeout
+        while True:
+            try:
+                _try_lock(fd)
+            except OSError:
+                if clock() >= deadline:
+                    os.close(fd)
+                    return False
+                sleep(poll)
+            else:
+                self._fd = fd
+                return True
+
+    def release(self):
+        """Give the lock back (nothing happens if it is not held)."""
+        fd, self._fd = self._fd, None
+        if fd is None:
+            return
+        try:
+            _unlock(fd)
+        except OSError:
+            pass  # closing the file releases the lock as well
+        finally:
+            os.close(fd)
+
+
+def lock_held(path):
+    """Return True if a process holds the RunLock on path; never creates the file.
+
+    Checks by taking the lock for a moment, so a RunLock.acquire at that very moment fails
+    once: the engine therefore acquires with a timeout.
+    """
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except FileNotFoundError:
+        return False
+    try:
+        try:
+            _try_lock(fd)
+        except OSError:
+            return True
+        _unlock(fd)
+        return False
+    finally:
+        os.close(fd)
+
+
+def _timestamp():
+    return datetime.now().astimezone().isoformat(timespec='seconds')
+
+
+class StatusReporter:
+    """Writes the status file of a search run: process id, phase and progress (A4, A5).
+
+    update() merges the given fields; it writes the file when the phase changes, when force
+    is set, and otherwise at most every interval seconds, so a progress update per photo
+    costs nothing. The file is replaced atomically (never half-written). Writing is best
+    effort: on Windows replacing a file fails while another process has it open (the app
+    reads it every two seconds); a failed update is retried with the next one and never
+    stops the search. finish() writes the final phase, trying harder.
+    """
+
+    def __init__(self, path, pid, interval=1.0, clock=time.monotonic, retries=20, retry_delay=0.05):
+        self.path = Path(path)
+        self.interval, self.clock, self.retries, self.retry_delay = interval, clock, retries, retry_delay
+        started = _timestamp()
+        self.state = {'format': STATUS_FORMAT, 'pid': pid, 'phase': None, 'started': started, 'updated': started,
+                      'done': 0, 'total': 0, 'new': 0, 'cached': 0, 'errors': 0,
+                      'exit_code': None, 'message': None}
+        self._written = None  # clock() of the last successful write
+
+    def update(self, phase=None, force=False, **fields):
+        """Merge phase and fields into the status; write it if due. Returns True if written now."""
+        if phase is not None and phase != self.state['phase']:
+            # a new phase starts its own progress count; the analysis counts are kept
+            self.state.update(phase=phase, done=0, total=0)
+            force = True
+        self.state.update(fields)
+        if not force and self._written is not None and self.clock() - self._written < self.interval:
+            return False
+        # a phase change is worth a few retries, a single progress update is not
+        return self._write(attempts=1 + self.retries if force else 1)
+
+    def finish(self, phase, exit_code, message=None):
+        """Write the final phase (one of FINAL_PHASES) with the exit code; returns True if written."""
+        self.state.update(phase=phase, exit_code=exit_code, message=message)
+        return self._write(attempts=1 + self.retries)
+
+    def _write(self, attempts):
+        self.state['updated'] = _timestamp()
+        if not write_status(self.path, self.state, attempts, self.retry_delay):
+            return False
+        self._written = self.clock()
+        return True
+
+
+def write_status(path, status, attempts=1, retry_delay=0.05):
+    """Replace the status file path with the dict status atomically; return True if written.
+
+    Tries up to attempts times, retry_delay seconds apart; never raises OSError.
+    """
+    text = json.dumps(status, ensure_ascii=False, indent=1) + '\n'
+    for attempt in range(attempts):
+        try:
+            _publish_via_temp(Path(path), lambda tmp: tmp.write_text(text, encoding='utf-8'), os.replace,
+                              durable=False)
+            return True
+        except OSError:
+            if attempt + 1 < attempts:
+                time.sleep(retry_delay)
+    return False
+
+
+def stopped_status(status):
+    """Return status marked as stopped from the app: phase "interrupted", progress kept.
+
+    terminate()/kill() skips the engine's own final write, so the app writes this instead.
+    """
+    return {**status, 'phase': 'interrupted', 'exit_code': None, 'message': 'Stopped in the app.',
+            'updated': _timestamp()}
+
+
+def same_run(a, b):
+    """Return True if the status dicts a and b belong to the same run (process id and start time)."""
+    return bool(a and b) and a.get('pid') == b.get('pid') and a.get('started') == b.get('started')
+
+
+def read_status(path):
+    """Return the status dict of a run (see StatusReporter), or None if missing or unreadable."""
+    try:
+        data = json.loads(Path(path).read_text(encoding='utf-8'))
+    except (OSError, ValueError):  # ValueError includes JSON and Unicode decoding errors
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def run_active(status, held, alive):
+    """Return True if a search is running in the output folder of status.
+
+    held: whether the RunLock of that folder is held (lock_held). Without the lock, a run
+    counts only while it is being started: the app writes the status "starting" with the
+    engine's process id before the engine takes the lock, and alive(pid) tells whether
+    that process still runs. A status that is not final (e.g. after kill(), which skips
+    the final write) does not count once its process is gone.
+    """
+    if held:
+        return True
+    if not status or status.get('phase') in FINAL_PHASES:
+        return False
+    pid = status.get('pid')
+    return isinstance(pid, int) and not isinstance(pid, bool) and bool(alive(pid))
+
+
+def _count(status, key):
+    value = status.get(key)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def status_fraction(status):
+    """Return the progress of the current phase between 0 and 1, or None if it has no count."""
+    done, total = _count(status, 'done'), _count(status, 'total')
+    if done is None or not total or total < 0:
+        return None
+    return min(max(done / total, 0.0), 1.0)
+
+
+def status_text(status):
+    """Return the line the app shows for a status: the phase and, if it counts, its progress."""
+    phase = status.get('phase')
+    label = PHASE_LABELS.get(phase, str(phase))
+    done, total = _count(status, 'done'), _count(status, 'total')
+    if not total or done is None:
+        return label
+    if phase == 'analyzing':
+        new, cached, errors = (_count(status, k) or 0 for k in ('new', 'cached', 'errors'))
+        return f'{label}: {done:,}/{total:,} · {new:,} new · {cached:,} from cache · {errors:,} errors'
+    if phase == 'exporting':
+        return f'{label}: {done:,}/{total:,} matches'
+    return f'{label}: {done:,}/{total:,}'
 
 
 # Pillow's Image.thumbnail decodes JPEGs at a reduced scale only down to twice the
