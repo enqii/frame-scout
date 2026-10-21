@@ -1,4 +1,4 @@
-"""FrameScout: lokale Streamlit-Oberflaeche fuer framescout_engine.py."""
+"""FrameScout: local Streamlit user interface for framescout_engine.py."""
 import json
 import os
 import platform
@@ -60,41 +60,41 @@ def add_ref_files(files, name):
     return paths
 
 st.title('🔎 FrameScout')
-st.caption('Lokale KI-Suche in großen Fotosammlungen · Bilder bleiben auf deinem Rechner')
+st.caption('Local AI search in large photo collections · your images stay on your computer')
 
 try:
     profiles = read_profiles()
 except (OSError, ValueError) as exc:
-    st.error(f'profiles.json ist ungültig: {exc}')
+    st.error(f'profiles.json is invalid: {exc}')
     st.stop()
 
 if 'settings' not in st.session_state:
     st.session_state.settings = {'folder': str(BASE/'photos'), 'device': 'auto', 'batch': 8,
         'top': 150, 'detect': True, 'max_persons': 12, 'conf': 0.30, 'weight': 0.35}
 settings = st.session_state.settings
-p_tab, f_tab, settings_tab, run_tab = st.tabs(['Suchprofile', 'Fotoquelle', 'KI-Einstellungen', 'Suche & Ergebnisse'])
+p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source', 'AI settings', 'Search & results'])
 
 with p_tab:
-    st.subheader('Gespeicherte Suchprofile')
+    st.subheader('Saved search profiles')
     if not profiles:
-        st.info('Lege zunächst ein Suchprofil an.')
+        st.info('Create a search profile first.')
     for index, p in enumerate(profiles):
         with st.expander(f"{p['name']}  ·  {p.get('franchise','')}"):
             with st.form(f'edit_{index}'):
-                edit_name = st.text_input('Suchmotiv', value=p['name'])
-                franchise = st.text_input('Kontext / Herkunft (optional)', value=p.get('franchise', ''))
-                features = st.text_area('Zusätzliche Merkmale (am besten Englisch)', value=p.get('features', ''))
-                prompts = st.text_area('Zusätzliche Suchtexte: eine Zeile pro Text (optional)', value='\n'.join(p.get('prompts', [])))
-                st.caption('Vorhandene Referenzen: ' + (', '.join(p.get('reference_images', [])) or 'keine'))
-                refs_new = st.file_uploader('Referenzbilder hinzufügen', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}')
-                clear_refs = st.checkbox('Vorhandene Referenzbilder aus Profil entfernen')
+                edit_name = st.text_input('Search motif', value=p['name'])
+                franchise = st.text_input('Context / origin (optional)', value=p.get('franchise', ''))
+                features = st.text_area('Distinctive features (optional; English works best)', value=p.get('features', ''))
+                prompts = st.text_area('Custom search texts (optional; one per line)', value='\n'.join(p.get('prompts', [])))
+                st.caption('Existing reference images: ' + (', '.join(p.get('reference_images', [])) or 'none'))
+                refs_new = st.file_uploader('Add reference images', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}')
+                clear_refs = st.checkbox('Remove the existing reference images from this profile')
                 c1,c2 = st.columns(2)
-                update = c1.form_submit_button('Änderungen speichern', disabled=running())
-                delete = c2.form_submit_button('Profil entfernen', disabled=running())
+                update = c1.form_submit_button('Save changes', disabled=running())
+                delete = c2.form_submit_button('Delete profile', disabled=running())
             if update:
                 edit_name = edit_name.strip()
                 if not edit_name or any(j != index and q['name'].lower() == edit_name.lower() for j,q in enumerate(profiles)):
-                    st.error('Der Profilname muss eindeutig und nicht leer sein.')
+                    st.error('The profile name must be unique and must not be empty.')
                 else:
                     refs = [] if clear_refs else list(p.get('reference_images', []))
                     if refs_new:
@@ -108,50 +108,50 @@ with p_tab:
                 save_profiles(profiles)
                 st.rerun()
     st.divider()
-    st.subheader('Neues Suchprofil')
+    st.subheader('New search profile')
     with st.form('new_profile', clear_on_submit=True):
-        name = st.text_input('Suchmotiv *', placeholder='z. B. rotes Auto, Golden Retriever, Berglandschaft')
-        franchise = st.text_input('Kontext / Herkunft (optional)', placeholder='z. B. Batman / DC Comics')
-        features = st.text_area('Erkennungsmerkmale (optional)', placeholder='red bodywork, black roof, parked on a street')
-        prompts = st.text_area('Eigene Suchformulierungen (optional; eine pro Zeile)')
-        uploads = st.file_uploader('Referenzbilder (optional)', type=UPLOAD_TYPES, accept_multiple_files=True)
-        create = st.form_submit_button('Profil hinzufügen', disabled=running())
+        name = st.text_input('Search motif *', placeholder='e.g. red car, golden retriever, mountain landscape')
+        franchise = st.text_input('Context / origin (optional)', placeholder='e.g. vehicles, pets, nature')
+        features = st.text_area('Distinctive features (optional; English works best)', placeholder='red bodywork, black roof, parked on a street')
+        prompts = st.text_area('Custom search texts (optional; one per line)')
+        uploads = st.file_uploader('Reference images (optional)', type=UPLOAD_TYPES, accept_multiple_files=True)
+        create = st.form_submit_button('Add profile', disabled=running())
     if create:
         name = name.strip()
         if not name or any(x['name'].lower() == name.lower() for x in profiles):
-            st.error('Bitte einen eindeutigen Namen eingeben.')
+            st.error('Please enter a unique name.')
         else:
             refs = add_ref_files(uploads or [], name)
             profiles.append({'name':name, 'franchise':franchise.strip(), 'features':features.strip(),
                              'prompts':[x.strip() for x in prompts.splitlines() if x.strip()], 'reference_images':refs})
             save_profiles(profiles)
             st.rerun()
-    st.caption('FrameScout erzeugt aus dem Namen automatisch mehrere CLIP-Suchtexte. Ein LLM ist nicht erforderlich.')
+    st.caption('FrameScout automatically creates several CLIP search texts from the name. No language model is required.')
 
 with f_tab:
-    st.subheader('Fotosammlung')
-    settings['folder'] = st.text_input('Lokaler Fotoordner (inklusive Unterordner)', value=settings['folder'], disabled=running())
+    st.subheader('Photo collection')
+    settings['folder'] = st.text_input('Local photo folder (including subfolders)', value=settings['folder'], disabled=running())
     folder = Path(settings['folder']).expanduser()
     if folder.is_dir():
         count = sum(1 for x in folder.rglob('*') if x.is_file() and x.suffix.lower() in EXT and RESULTS not in x.parents)
-        st.success(f'{count:,} unterstützte Bilddateien gefunden.'.replace(',', '.'))
+        st.success(f'{count:,} supported image files found.')
     else:
-        st.warning('Ordner noch nicht vorhanden. Lege ihn an oder wähle einen existierenden Bildordner.')
-    st.caption('Unterstützt JPG, PNG, WebP, BMP und TIFF. FrameScout durchsucht lokale Dateien und lädt keine Bilder von Online-Diensten herunter.')
+        st.warning('The folder does not exist yet. Create it or choose an existing image folder.')
+    st.caption('Supports JPG, PNG, WebP, BMP and TIFF. FrameScout searches local files and does not download images from online services.')
 
 with settings_tab:
-    st.subheader('KI-Verarbeitung')
-    settings['device'] = st.selectbox('Rechengerät', ['auto','cpu','cuda'], index=['auto','cpu','cuda'].index(settings['device']), disabled=running(), help='Automatisch verwendet CUDA, wenn eine kompatible NVIDIA-GPU verfügbar ist; sonst CPU.')
-    settings['batch'] = st.number_input('Batchgröße', min_value=1, max_value=64, value=int(settings['batch']), step=1, disabled=running())
-    settings['top'] = st.number_input('Maximale Treffer je Suchprofil', min_value=1, max_value=5000, value=int(settings['top']), step=25, disabled=running())
-    settings['detect'] = st.checkbox('Personen in Gruppenfotos zusätzlich erkennen (YOLO)', value=settings['detect'], disabled=running())
-    settings['max_persons'] = st.number_input('Maximal erkannte Personen je Foto', min_value=1, max_value=50, value=int(settings['max_persons']), disabled=running())
-    settings['conf'] = st.slider('Mindest-Konfidenz der Personenerkennung', .1, .9, float(settings['conf']), .05, disabled=running())
-    settings['weight'] = st.slider('Gewichtung Referenzbilder (falls vorhanden)', 0., 1., float(settings['weight']), .05, disabled=running(), help='0 = nur Text; 0,35 = 35 % Referenzbild und 65 % Text.')
+    st.subheader('AI processing')
+    settings['device'] = st.selectbox('Compute device', ['auto','cpu','cuda'], index=['auto','cpu','cuda'].index(settings['device']), disabled=running(), help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
+    settings['batch'] = st.number_input('Batch size', min_value=1, max_value=64, value=int(settings['batch']), step=1, disabled=running())
+    settings['top'] = st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, value=int(settings['top']), step=25, disabled=running())
+    settings['detect'] = st.checkbox('Also detect individual persons in group photos (YOLO)', value=settings['detect'], disabled=running())
+    settings['max_persons'] = st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, value=int(settings['max_persons']), disabled=running())
+    settings['conf'] = st.slider('Minimum confidence of the person detection', .1, .9, float(settings['conf']), .05, disabled=running())
+    settings['weight'] = st.slider('Weight of reference images (if any)', 0., 1., float(settings['weight']), .05, disabled=running(), help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
     @st.cache_data(show_spinner=False)
     def system_info():
         import torch
-        data = {'cpu': platform.processor() or platform.machine() or 'Nicht erkannt',
+        data = {'cpu': platform.processor() or platform.machine() or 'Not detected',
                 'threads': os.cpu_count() or 1, 'cuda': torch.cuda.is_available(),
                 'gpu': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
         try:
@@ -162,21 +162,21 @@ with settings_tab:
         return data
     try:
         info = system_info()
-        st.caption(f"Erkannt: {info['cpu']} · {info['threads']} logische CPU-Kerne · " +
-                   (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unbekannt · ') +
-                   (f"CUDA: {info['gpu']}" if info['cuda'] else 'Keine CUDA-GPU erkannt'))
-        st.info('Empfehlung: Automatisch wählen. Batchgröße 8 ist ein konservativer Ausgangspunkt; bei Speicherproblemen reduzieren. Beim ersten Lauf werden Modellgewichte heruntergeladen.')
+        st.caption(f"Detected: {info['cpu']} · {info['threads']} logical CPU cores · " +
+                   (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unknown · ') +
+                   (f"CUDA: {info['gpu']}" if info['cuda'] else 'No CUDA GPU detected'))
+        st.info('Recommendation: choose auto. A batch size of 8 is a conservative starting point; reduce it if memory runs short. Model weights are downloaded on the first run.')
     except Exception as exc:
-        st.caption(f'Systemdetails konnten nicht ermittelt werden ({exc}). Automatische Gerätewahl bleibt verfügbar.')
+        st.caption(f'System details could not be determined ({exc}). Automatic device selection remains available.')
 
 with run_tab:
-    st.subheader('Suche starten')
+    st.subheader('Start search')
     is_running = running()
     c1,c2 = st.columns([1,1])
     with c1:
-        start = st.button('▶ Suche starten', type='primary', disabled=is_running or not profiles or not Path(settings['folder']).is_dir(), use_container_width=True)
+        start = st.button('▶ Start search', type='primary', disabled=is_running or not profiles or not Path(settings['folder']).is_dir(), use_container_width=True)
     with c2:
-        stop = st.button('■ Suche stoppen', disabled=not is_running, use_container_width=True)
+        stop = st.button('■ Stop search', disabled=not is_running, use_container_width=True)
     if start:
         cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), str(Path(settings['folder']).resolve()),
             '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',settings['device'],
@@ -193,7 +193,7 @@ with run_tab:
             st.session_state.last_exit = None
             st.rerun()
         except Exception as exc:
-            st.error(f'Start fehlgeschlagen: {exc}')
+            st.error(f'Start failed: {exc}')
     if stop:
         proc = st.session_state.get('process')
         if proc and proc.poll() is None:
@@ -203,38 +203,38 @@ with run_tab:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()
-        st.session_state.last_exit = 'angehalten'
+        st.session_state.last_exit = 'stopped'
         st.rerun()
     @st.fragment(run_every='2s')
     def status():
         proc = st.session_state.get('process')
         if proc and proc.poll() is None:
-            st.info('Analyse läuft. Bereits fertig verarbeitete Fotos werden zwischengespeichert.')
+            st.info('Analysis running. Photos that are already processed are kept in the cache.')
         elif proc:
             code = proc.poll()
             if code == 0:
-                st.success('Letzter Suchlauf erfolgreich beendet.')
+                st.success('The last search run finished successfully.')
             else:
-                st.warning(f'Letzter Suchlauf beendet (Exitcode {code}). Einzelheiten stehen im Protokoll.')
+                st.warning(f'The last search run ended (exit code {code}). See the log for details.')
         if LOG.exists():
             contents = LOG.read_text(encoding='utf-8', errors='replace')
             lines = contents.splitlines()
             progress = parse_progress(contents)
             if progress:
                 done,total,new,cached,errors = progress
-                st.progress(min(done/max(total,1),1.), text=f'{done}/{total} Fotos · {new} neu · {cached} aus Cache · {errors} Fehler')
-            with st.expander('Live-Protokoll', expanded=bool(proc and proc.poll() is None)):
-                st.code('\n'.join(lines[-35:]) or 'Noch keine Ausgabe', language='text')
+                st.progress(min(done/max(total,1),1.), text=f'{done}/{total} photos · {new} new · {cached} from cache · {errors} errors')
+            with st.expander('Live log', expanded=bool(proc and proc.poll() is None)):
+                st.code('\n'.join(lines[-35:]) or 'No output yet', language='text')
     status()
     st.divider()
-    st.subheader('Ergebnisgalerien')
+    st.subheader('Result galleries')
     if RESULTS.exists():
         # same file names as the engine: unique slugs in profile order
         for p, slug in zip(profiles, profile_slugs([q['name'].strip() for q in profiles])):
             page = RESULTS/(slug+'.html')
             if page.exists():
-                st.download_button(f"HTML exportieren: {p['name']}", page.read_bytes(), file_name=page.name, mime='text/html', key=f'dl_{p["name"]}')
-                st.caption(f'Lokale Galerie öffnen: {page}')
-        st.caption('Öffne die HTML-Dateien im Dateimanager. Sie verlinken auf die lokalen Vorschaubilder und Originalfotos; für die vollständige Galerie den Ergebnisordner zusammenhalten.')
+                st.download_button(f"Export HTML: {p['name']}", page.read_bytes(), file_name=page.name, mime='text/html', key=f'dl_{p["name"]}')
+                st.caption(f'Open the local gallery: {page}')
+        st.caption('Open the HTML files in your file manager. They link to the local thumbnails and original photos; keep the results folder together for the complete gallery.')
     else:
-        st.caption('Nach dem ersten Suchlauf erscheinen die HTML-Galerien im Ordner results.')
+        st.caption('After the first search run, the HTML galleries appear in the results folder.')
