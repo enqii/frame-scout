@@ -18,19 +18,21 @@ referenced in commits, pull requests and discussions.
 - [x] **E2 – No batching across images:** `embed_images` only receives the crops of a single
       photo, so the batch size has almost no effect. Also: no parallel decoding, full
       resolution (no `Image.draft`), YOLO hard-coded to `device='cpu'`.
-      (done 2026-10-21: photos are decoded, searched for persons and preprocessed in up to
-      four threads, at most eight ahead (`framescout_core.prefetch`); the crops of several
-      photos go through CLIP together until a group holds `--batch-size` crops
-      (`group_batches`), one SQLite transaction per group. Without person detection JPEGs
-      and all gallery thumbnails are decoded with `Image.draft` at twice the target size
+      (done 2026-10-21: photos are stat-ed, decoded, searched for persons and preprocessed
+      in four threads, two with person detection (at most two full-resolution photos in
+      memory), at most `max(2 × threads, --batch-size + threads)` photos ahead
+      (`framescout_core.prefetch`); the crops of several photos go through CLIP in one pass
+      of at most `--batch-size` crops (`group_batches`), one SQLite transaction per group,
+      photo by photo after a failure (`store_group`). Without person detection JPEGs and
+      all gallery thumbnails are decoded with `Image.draft` at twice the target size
       (`draft_size`); with person detection photos keep full resolution (E15). On a
-      202-photo sample (CPU) the features with detection are identical, without detection
+      ~200-photo sample (CPU) the features with detection are identical, without detection
       cosine ≥ 0.999, gallery scores differ by ≤ 0.004. Cache signature: unchanged with
       detection; without detection it names the drafted decoding (user decision in the
       review), so the first such run analyzes every photo once more and the old rows stay
-      in `cache.sqlite3` like after E1 (E11). Whole
-      runs incl. model load and export took 44 s → 23 s (detection) and 30 s → 15 s
-      (without). YOLO device: E14.)
+      in `cache.sqlite3` like after E1 (E11). Whole runs incl. model load and export took
+      44 s → 19 s with and 30 s → 10–15 s without person detection. YOLO device: E14;
+      thread counts on small CPUs: E17.)
 - [ ] **E3 – German motif names in English prompts:** e.g. "A photograph of Rotes Auto
       (Fahrzeuge)." – OpenAI CLIP practically only understands English, while the UI
       placeholders are German.
@@ -95,6 +97,16 @@ referenced in commits, pull requests and discussions.
       surprising for a local tool. Fix idea: set `HF_HUB_OFFLINE=1` once the weights are
       cached (or try offline first and fall back to a download), in the engine or the
       `.bat` files; check the behavior without internet access.
+- [ ] **E17 – Thread counts are not tuned for small CPUs:** PyTorch uses up to 12 threads
+      (`torch.set_num_threads(min(12, …))`, from the logical core count, also when the
+      process may use fewer cores), and since E2 up to four decoding threads (two with
+      person detection) preprocess crops with torch at the same time, YOLO included. On
+      the 24-thread development PC pinned to 4 cores the E2 engine was still faster than
+      before (200 photos: 33.5 s → 20.2 s without, 55.1 s → 45.6–47.7 s with person
+      detection), but the gain with detection shrinks and timings are noisy (PR #7
+      review). Fix idea: measure on a real 4–8 core machine; derive the torch threads from
+      the cores the process may use and the decoding threads, or convert crops to tensors
+      on the main thread.
 
 ### App (`app.py`)
 
