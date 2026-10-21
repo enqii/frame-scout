@@ -19,7 +19,8 @@ matching photos as an HTML gallery.
 - Windows 10/11
 - Python **3.14, 3.13 or 3.12** with the `py` launcher (install from python.org)
 - Internet connection for installation and the first search run
-- A dedicated GPU is not required; search also runs on the CPU.
+- A dedicated GPU is not required; search also runs on the CPU. An NVIDIA GPU with a
+  current driver can be used through CUDA (see below).
 
 ## Installation
 
@@ -34,6 +35,28 @@ matching photos as an HTML gallery.
 
 If package installation fails with one Python version: delete `.venv`, install another
 supported Python version and run the installer again.
+
+### GPU support (NVIDIA, CUDA)
+
+If the installer finds an NVIDIA graphics driver (`nvidia-smi`), it asks whether to
+install GPU support; otherwise it installs the CPU version without asking. GPU support
+means the CUDA build of PyTorch, about 2.5 GB more download. Both CLIP and the person
+detection then run on the GPU. You can also choose directly:
+
+```powershell
+.\Install-FrameScout.bat cuda   # PyTorch with CUDA support
+.\Install-FrameScout.bat cpu    # PyTorch for the CPU only
+```
+
+Running the installer again with the other option switches between the two. For CUDA
+the installer picks the PyTorch build from the GPU and driver that `nvidia-smi` reports:
+CUDA 13.0 for GeForce RTX 20 series or newer (compute capability 7.5+) with driver 580 or
+newer, otherwise CUDA 12.6 (GeForce GTX 900 series or newer, compute capability 5.0 up
+to 9.x, driver 528.33 or newer; RTX 50 series cards need CUDA 13.0 and a current driver).
+If no build suits the GPU and driver, it explains why and installs the CPU version. These
+limits come from the CUDA and PyTorch documentation as known when this was written; they
+have **not been tested on a GPU** yet. Under "AI settings" the app shows whether PyTorch
+can use the GPU; it offers "cuda" only then.
 
 ### Updating an existing installation
 
@@ -78,7 +101,8 @@ starts with the new example profiles.
    online albums yourself beforehand – FrameScout does not download images from the
    internet.
 4. **AI settings:** with "auto", CUDA is used if PyTorch detects a
-   compatible NVIDIA GPU, otherwise the CPU. The batch size is the number of image
+   compatible NVIDIA GPU, otherwise the CPU; "cuda" is offered only if PyTorch was
+   installed with GPU support (see "GPU support" above). The batch size is the number of image
    parts (whole photos and person crops, also from several photos) that CLIP analyzes
    together; 8 is a conservative starting value, reduce it if memory runs short.
    Without person detection, JPEG photos are decoded at a reduced resolution, which
@@ -130,7 +154,9 @@ it can be turned off for other motifs.
    (`.cache`, `.tmp`), model weights (including `yolo11n.pt`) and results.
 
 A system-wide Python installation remains in place. Individual dependencies may also
-create their own caches in your user profile.
+create their own caches in your user profile. For example, Ultralytics (person detection)
+writes `%APPDATA%\Ultralytics\settings.json` when it is used outside the `.bat` files,
+e.g. from a manual command line without `YOLO_CONFIG_DIR`.
 
 ## Development
 
@@ -170,7 +196,8 @@ Commits, one pull request per roadmap item).
 | `framescout_engine.py` | Search engine as a standalone CLI |
 | `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles, thumbnails); standard library only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
-| `requirements.txt` | Python dependencies |
+| `requirements.txt` | Python dependencies (PyTorch pinned) |
+| `install_torch.py` | Installs the CPU or CUDA build of PyTorch; called by `Install-FrameScout.bat` |
 | `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
 | `.github/` | CI workflow (`workflows/tests.yml`) and pull request template |
 | `Install-FrameScout.bat` / `Start-FrameScout.bat` | Installation and start on Windows |
