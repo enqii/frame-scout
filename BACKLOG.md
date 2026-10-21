@@ -8,10 +8,13 @@ referenced in commits, pull requests and discussions.
 
 ### Engine (`framescout_engine.py`)
 
-- [ ] **E1 – QuickGELU mismatch:** `create_model_and_transforms('ViT-B-32', pretrained='openai')`
+- [x] **E1 – QuickGELU mismatch:** `create_model_and_transforms('ViT-B-32', pretrained='openai')`
       emits the warning `QuickGELU mismatch`; the OpenAI weights run with GELU instead of
       QuickGELU → worse embeddings. Fix: `ViT-B-32-quickgelu` or `force_quick_gelu=True`,
       bump the `ENGINE` signature (the cache is rebuilt once).
+      (done 2026-10-21: `ViT-B-32-quickgelu`, same weights file; model name, `ENGINE` (v5)
+      and `feature_signature` live in `framescout_core` with tests. Every photo is
+      analyzed once more after the update; the v4 rows stay in `cache.sqlite3` (E7).)
 - [ ] **E2 – No batching across images:** `embed_images` only receives the crops of a single
       photo, so the batch size has almost no effect. Also: no parallel decoding, full
       resolution (no `Image.draft`), YOLO hard-coded to `device='cpu'`.
@@ -162,7 +165,7 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 - [x] (2) CI: GitHub Action running `pytest` on a Windows runner without torch/model
       download (part of I2) (done 2026-10-21)
 - [x] (3) English UI and outputs, neutral example profiles (I7, I5) (done 2026-10-21)
-- [ ] (4) QuickGELU fix + `ENGINE` bump, cache rebuilt once (E1)
+- [x] (4) QuickGELU fix + `ENGINE` bump, cache rebuilt once (E1) (done 2026-10-21)
 - [ ] (5) Data-loss fixes: unique reference names (A1), robust `read_profiles` + `.bak`
       (A2), E6
 
