@@ -8,15 +8,40 @@ The user-facing error messages are still German (see backlog item I7).
 import hashlib
 import json
 import re
+import unicodedata
 from pathlib import Path
 
 # Supported image file extensions (lowercase, with leading dot).
 EXT = frozenset({'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'})
 
 
+# Letters that Unicode decomposition does not reduce to ASCII (or, for the German umlauts,
+# where the conventional transliteration differs from just dropping the diacritic).
+_TRANSLITERATION = str.maketrans({'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss', 'æ': 'ae',
+                                  'œ': 'oe', 'ø': 'o', 'ł': 'l', 'đ': 'd', 'ð': 'd', 'þ': 'th'})
+# Device names that Windows does not accept as file names, even with an extension.
+_WINDOWS_DEVICE_NAMES = frozenset({'con', 'prn', 'aux', 'nul',
+                                   *(f'com{i}' for i in range(1, 10)),
+                                   *(f'lpt{i}' for i in range(1, 10))})
+SLUG_MAX_LENGTH = 60
+
+
 def slugify(s):
-    """Return a file-name-safe slug for a profile name."""
-    return re.sub('[^a-z0-9]+', '-', s.lower()).strip('-') or hashlib.sha256(s.encode()).hexdigest()[:10]
+    """Return a file-name-safe ASCII slug for a profile name.
+
+    Latin letters with diacritics are transliterated ("Bär" -> "baer", "Café" -> "cafe");
+    a name without any usable character (e.g. "猫") gets a stable 10-digit hash instead.
+    The result contains only [a-z0-9-], is at most SLUG_MAX_LENGTH characters long and is
+    never a Windows device name. It is not unique: use profile_slugs() for a profile list.
+    """
+    text = unicodedata.normalize('NFKD', s.lower().translate(_TRANSLITERATION))
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    slug = re.sub('[^a-z0-9]+', '-', text).strip('-')[:SLUG_MAX_LENGTH].rstrip('-')
+    if not slug:
+        return hashlib.sha256(s.encode()).hexdigest()[:10]
+    if slug in _WINDOWS_DEVICE_NAMES:
+        slug += '-profile'
+    return slug
 
 
 def generic_prompts(name, context='', features=''):
