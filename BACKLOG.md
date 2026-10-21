@@ -25,8 +25,10 @@ referenced in commits, pull requests and discussions.
       dominate. An averaged prompt ensemble is common practice.
 - [ ] **E5 – Mixed score scales:** text cosine ≈ 0.2–0.35, image-to-image ≈ 0.5–0.9; the
       reference weight therefore has a much stronger effect than its nominal value.
-- [ ] **E6 – `path.stat()` outside `try`** in the export (line ~264): a file deleted in the
+- [x] **E6 – `path.stat()` outside `try`** in the export (line ~264): a file deleted in the
       meantime aborts the entire HTML export.
+      (done 2026-10-21: `framescout_core.ensure_thumbnail` logs "Thumbnail not possible"
+      and the photo is skipped; thumbnail names are unchanged. Rank gaps: E12.)
 - [ ] **E7 – No cleanup:** `thumbnails/`, `cache.sqlite3` (deleted files, old
       signatures) and HTML files of renamed/deleted profiles grow without bound. Since
       I7 the thumbnail folder of older versions, `vorschaubilder/`, is no longer written
@@ -46,18 +48,29 @@ referenced in commits, pull requests and discussions.
       store `ENGINE` in its own column, then delete rows of other engine versions and
       `VACUUM` – only with the user's consent (the cache is user data). Part of the
       cleanup in E7.
+- [ ] **E12 – Skipped photos leave gaps in the gallery:** a photo whose thumbnail fails
+      (deleted since scoring, unreadable) is skipped after the top-N cut, so the gallery
+      shows e.g. #2, #3, #4 and fewer than `--top` cards although lower-ranked photos
+      exist. Fix idea: rank only the photos that got a card and fill up to `--top`.
 
 ### App (`app.py`)
 
-- [ ] **A1 – Reference images get overwritten:** uploads are always named `reference-1…n`;
+- [x] **A1 – Reference images get overwritten:** uploads are always named `reference-1…n`;
       a second upload overwrites the first ones. Profiles with the same slug
       (e.g. "Rotes Auto"/"rotes-auto") share the folder.
       (partly done 2026-10-21: uploads take the next free `reference-<n>` name and never
       overwrite a file – needed because transliteration made more names share a folder,
       e.g. "Bär"/"Baer" → `references/baer/`. Still open: one folder per profile.)
-- [ ] **A2 – `profiles.json` data loss:** `read_profiles` does not know the v3 format
+      (done 2026-10-21: `framescout_core.reference_folder` uses `references/<slug>/`, or
+      `<slug>-2`, `-3`, … if that folder holds references of another profile; folders
+      shared before and existing reference paths are not moved. Leftover files: A14.)
+- [x] **A2 – `profiles.json` data loss:** `read_profiles` does not know the v3 format
       (returns `[]`, the next save overwrites the file). A JSON list → `AttributeError`
       (not caught). No backup before saving.
+      (done 2026-10-21: `framescout_core.read_profiles` converts v3 and validates like the
+      engine – an unreadable file stops the app instead of being saved over;
+      `save_profiles` keeps the previous file as `profiles.json.bak` (one generation) and
+      writes atomically; editing keeps keys the form does not show. Concurrent edits: A13.)
 - [x] **A3 – Slugs app ≠ engine:** the engine appends `-2` on collisions and uses a hash
       fallback, the app uses `profile` without deduplication → downloads missing or
       mismatched. Umlauts are dropped ("Bär" → `b-r`).
@@ -100,6 +113,16 @@ referenced in commits, pull requests and discussions.
       writes a manifest (profile name → file, run timestamp) that the app reads – a new
       output format, so a design decision; fits the status file of P2 and A8 ("results
       without reference to the profile state").
+- [ ] **A13 – Concurrent profile edits are lost:** the app reads `profiles.json` on every
+      rerun and saves its whole list, so an edit made in another tab/session (or by hand)
+      between that read and a save is overwritten; `profiles.json.bak` holds only the
+      state before the last save. Fix idea: save only if the file is unchanged since it
+      was read (mtime/hash), otherwise reload and ask; possibly keep several backups.
+- [ ] **A14 – Unreferenced reference files accumulate:** removing reference images from a
+      profile, deleting a profile or a failed save of `profiles.json` after the upload
+      leaves the files in `references/` (deliberately – nothing is deleted silently).
+      Fix idea: list files no profile references and offer to delete them, with the
+      user's consent; part of the cleanup in P4.
 
 ### Installation / project
 
@@ -108,6 +131,8 @@ referenced in commits, pull requests and discussions.
       `framescout_core` – slugs, `EXT`, profile loading/validation, prompt generation.
       CI done 2026-10-21: `.github/workflows/tests.yml` runs `pytest` on Windows,
       Python 3.12–3.14, without torch.
+      2026-10-21 (5): tests for reading/saving `profiles.json`, reference folders and
+      export thumbnails.
       Open: tests for cache signature/reuse, scoring and progress interpretation; a smoke
       test with real models.)
 - [ ] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
@@ -174,8 +199,8 @@ Each unchecked item is implemented in its own pull request, strictly one after a
       download (part of I2) (done 2026-10-21)
 - [x] (3) English UI and outputs, neutral example profiles (I7, I5) (done 2026-10-21)
 - [x] (4) QuickGELU fix + `ENGINE` bump, cache rebuilt once (E1) (done 2026-10-21)
-- [ ] (5) Data-loss fixes: unique reference names (A1), robust `read_profiles` + `.bak`
-      (A2), E6
+- [x] (5) Data-loss fixes: unique reference names (A1), robust `read_profiles` + `.bak`
+      (A2), E6 (done 2026-10-21)
 
 ### P1 – Performance
 - [ ] Batching across images, parallel decoding, `Image.draft` (E2)
@@ -195,7 +220,8 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 ### P4 – UX
 - [ ] Result gallery in the app, mark matches/copy them to a folder, "open folder",
       ZIP export with thumbnails
-- [ ] Cleanup of cache/thumbnails/orphaned HTML files (E7, E11); optional HEIC/RAW support
+- [ ] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
+      optional HEIC/RAW support
 
 ### P5 – Distribution
 - [ ] Pinned dependencies, portable Python variant, uninstall script
