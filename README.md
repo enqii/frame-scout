@@ -117,6 +117,13 @@ starts with the new example profiles.
    Without person detection, JPEG photos are decoded at a reduced resolution, which
    makes the analysis noticeably faster; with person detection they keep their full
    resolution, so that small persons, e.g. in group photos, keep their detail.
+
+   The photo folder and the AI settings are saved in `settings.json` in the project
+   folder as soon as you change them, so they are kept after a reload or a restart and
+   apply in every tab. Only values that differ from the defaults are stored; delete the
+   file to return to the defaults. If it cannot be read (e.g. after editing it by hand),
+   the app uses the defaults and leaves the file unchanged; a value that is not allowed
+   is replaced by its default with a warning.
 5. **Search & results:** start the analysis. The page shows the current step (looking
    for photos, loading the AI models, analyzing, scoring, writing the galleries) and its
    progress. The search keeps running when you reload the page or close the browser tab
@@ -164,8 +171,8 @@ it can be turned off for other motifs.
 
 ## Uninstalling
 
-1. Back up results, your search profiles (`profiles.json`, `references/`) and any
-   photos you want to keep elsewhere.
+1. Back up results, your search profiles (`profiles.json`, `references/`), your
+   settings (`settings.json`) and any photos you want to keep elsewhere.
 2. Close FrameScout and delete the project folder. This removes `.venv`, caches
    (`.cache`, `.tmp`), model weights (including `yolo11n.pt`) and results.
 
@@ -216,7 +223,7 @@ Commits, one pull request per roadmap item).
 |---|---|
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
-| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles, thumbnails, run lock and status file); standard library only |
+| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file); standard library only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies (PyTorch pinned) |
 | `install_torch.py` | Installs the CPU or CUDA build of PyTorch; called by `Install-FrameScout.bat` |
@@ -226,5 +233,5 @@ Commits, one pull request per roadmap item).
 | `BACKLOG.md` | Known weaknesses and roadmap |
 | `CLAUDE.md` | Project onboarding and development workflow |
 | `.claude/` | Claude Code project settings and the `/roadmap` workflow skill |
-| `profiles.json`, `photos/`, `references/`, `results/`, `run.log` | User data and runtime output (not in the repo) |
+| `profiles.json`, `settings.json`, `photos/`, `references/`, `results/`, `run.log` | User data and runtime output (not in the repo) |
 | `.venv/`, `.cache/`, `.tmp/`, `yolo11n.pt` | Environment, caches and model weights (not in the repo) |
