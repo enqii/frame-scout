@@ -52,6 +52,15 @@ referenced in commits, pull requests and discussions.
       (deleted since scoring, unreadable) is skipped after the top-N cut, so the gallery
       shows e.g. #2, #3, #4 and fewer than `--top` cards although lower-ranked photos
       exist. Fix idea: rank only the photos that got a card and fill up to `--top`.
+      Also: `ensure_thumbnail` repeats the `stat()` done during scoring; the mtime could
+      be kept with the score (PR #6 review).
+- [ ] **E13 – Interrupted thumbnail writes leave temporary files:** since PR #6 a
+      thumbnail is written as `thumbnails/<hash>.jpg.<random>.jpg` and renamed when
+      complete. The app's Stop button ends the engine with `terminate()`/`kill()`, which
+      on Windows skips the `finally` that removes the temporary file, so each stop
+      during the export can leave one such file; it is never reused (no broken
+      thumbnail), only clutter. Fix idea: a recognizable `.tmp` name that the next run
+      (or the cleanup of E7) removes, taking parallel runs (A4) into account.
 
 ### App (`app.py`)
 
@@ -130,6 +139,14 @@ referenced in commits, pull requests and discussions.
       leaves the files in `references/` (deliberately – nothing is deleted silently).
       Fix idea: list files no profile references and offer to delete them, with the
       user's consent; part of the cleanup in P4.
+- [ ] **A15 – Reference folder and gallery file can get different suffixes:**
+      `reference_folder` adds `-2`, `-3`, … when another profile's references occupy the
+      folder, `profile_slugs` adds them by profile order. The same profile can therefore
+      have `references/red-car-2/` but `red-car.html` (or the reverse). Nothing breaks,
+      but the names are harder to explain. Fix idea: derive the folder from
+      `profile_slugs` with a fallback for occupied folders – note that the order-based
+      slugs change when profiles are deleted or reordered, which would then move folders
+      (design decision, PR #6 review).
 
 ### Installation / project
 
