@@ -36,6 +36,14 @@ def test_an_empty_existing_profiles_file_is_not_replaced_either(tmp_path):
     assert target.read_bytes() == b''
 
 
+def test_the_example_is_not_read_when_the_profiles_file_exists(tmp_path):
+    # the app calls this on every Streamlit rerun (review); an unreadable "example"
+    # (here a folder) must not even be opened once profiles.json exists
+    target = tmp_path / 'profiles.json'
+    target.write_text('{"profiles": []}', encoding='utf-8')
+    assert create_from_example(target, tmp_path) is False
+
+
 def test_without_an_example_nothing_is_created(tmp_path):
     target = tmp_path / 'profiles.json'
     assert create_from_example(target, tmp_path / 'missing.example.json') is False
