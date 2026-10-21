@@ -8,7 +8,6 @@ import hashlib
 import html
 import io
 import json
-import re
 import sqlite3
 from pathlib import Path
 from urllib.parse import quote
@@ -18,69 +17,16 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
+from framescout_core import EXT, load_profiles, slugify
+
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-EXT = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'}
 ENGINE = 'v4-clip-vit-b-32-openai-yolo11n-crop-features-1'
-
-
-def slugify(s):
-    return re.sub('[^a-z0-9]+', '-', s.lower()).strip('-') or hashlib.sha256(s.encode()).hexdigest()[:10]
 
 
 def open_image(path):
     with Image.open(path) as image:
         return ImageOps.exif_transpose(image).convert('RGB')
-
-
-def load_profiles(filename, inline):
-    raw = []
-    if filename:
-        data = json.loads(filename.read_text(encoding='utf-8-sig'))
-        if isinstance(data, dict) and 'profiles' in data:
-            raw = data['profiles']
-        elif isinstance(data, dict):  # v3 migration: {name: [prompts, ...]}
-            raw = [{'name': n, 'prompts': ps} for n, ps in data.items()]
-        else:
-            raise ValueError('JSON muss ein Objekt mit "profiles" sein (oder das bisherige v3-Format).')
-        if not isinstance(raw, list):
-            raise ValueError('"profiles" muss eine Liste sein.')
-    for item in inline:
-        fields = [s.strip() for s in item.split('|', 2)]
-        raw.append({'name': fields[0], 'franchise': fields[1] if len(fields) > 1 else '',
-                    'features': fields[2] if len(fields) > 2 else ''})
-    if not raw:
-        raise ValueError('Bitte --profiles oder mindestens ein --character angeben.')
-    profiles = []
-    names = set()
-    for item in raw:
-        if not isinstance(item, dict):
-            raise ValueError('Jedes Profil muss ein JSON-Objekt sein.')
-        name = item.get('name', '')
-        if not isinstance(name, str) or not name.strip() or name.lower() in names:
-            raise ValueError(f'Profilname fehlt oder ist doppelt: {name!r}')
-        names.add(name.lower())
-        franchise = item.get('franchise', '')
-        features = item.get('features', '')
-        prompts = item.get('prompts', [])
-        refs = item.get('reference_images', [])
-        if not isinstance(franchise, str) or not isinstance(features, str) or not isinstance(prompts, list) or not isinstance(refs, list):
-            raise ValueError(f'Ungueltiges Profil: {name}')
-        if any(not isinstance(x, str) or not x.strip() for x in prompts + refs):
-            raise ValueError(f'Prompts und Referenzbilder muessen nichtleere Zeichenketten sein: {name}')
-        subject = name.strip()
-        context = f' ({franchise.strip()})' if franchise.strip() else ''
-        target = subject + context
-        generated = [f'A photograph of {target}.',
-                     f'An image showing {target}.',
-                     f'A detailed photo of {target}.',
-                     f'A scene featuring {target}.']
-        if features.strip():
-            generated += [f'A photograph of {target}, with {features.strip()}.',
-                          f'An image showing {features.strip()}, depicting {target}.']
-        profiles.append({'name': name.strip(), 'prompts': generated + prompts,
-                         'refs': [((filename.parent if filename else Path.cwd()) / x).resolve() for x in refs]})
-    return profiles
 
 
 def crops_for(image, detector, limit, conf):
