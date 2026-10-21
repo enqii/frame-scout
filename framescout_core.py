@@ -24,10 +24,12 @@ _TRANSLITERATION = str.maketrans({
     'đ': 'd', 'ð': 'd', 'þ': 'th', 'ı': 'i', 'ħ': 'h', 'ŧ': 't', 'ŋ': 'ng', 'ĸ': 'k',
     'ƀ': 'b', 'ƈ': 'c', 'ƒ': 'f', 'ǥ': 'g', 'ƙ': 'k', 'ƚ': 'l', 'ƥ': 'p', 'ƭ': 't',
     'ƴ': 'y', 'ƶ': 'z', 'ȼ': 'c', 'ɇ': 'e', 'ɉ': 'j', 'ɍ': 'r', 'ɏ': 'y', 'ȷ': 'j'})
-# Device names that Windows does not accept as file names, even with an extension.
+# Reserved Windows device names (Microsoft "Naming Files, Paths, and Namespaces"); some
+# Windows versions and tools reject them as file names even with an extension. The
+# superscript variants (COM¹ ...) become "com1" ... through NFKD and are covered too.
 _WINDOWS_DEVICE_NAMES = frozenset({'con', 'prn', 'aux', 'nul',
-                                   *(f'com{i}' for i in range(1, 10)),
-                                   *(f'lpt{i}' for i in range(1, 10))})
+                                   *(f'com{i}' for i in range(10)),
+                                   *(f'lpt{i}' for i in range(10))})
 SLUG_MAX_LENGTH = 60
 
 
