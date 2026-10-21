@@ -2,7 +2,6 @@
 import json
 import os
 import platform
-import re
 import subprocess
 import sys
 import time
@@ -10,7 +9,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import EXT, profile_slugs, slugify, write_new_file
+from framescout_core import EXT, parse_progress, profile_slugs, slugify, write_new_file
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'
@@ -220,9 +219,9 @@ with run_tab:
         if LOG.exists():
             contents = LOG.read_text(encoding='utf-8', errors='replace')
             lines = contents.splitlines()
-            progress = re.findall(r'(\d+)/(\d+) \| Neu: (\d+) \| Cache: (\d+) \| Fehler: (\d+)',contents)
+            progress = parse_progress(contents)
             if progress:
-                done,total,new,cached,errors = map(int,progress[-1])
+                done,total,new,cached,errors = progress
                 st.progress(min(done/max(total,1),1.), text=f'{done}/{total} Fotos · {new} neu · {cached} aus Cache · {errors} Fehler')
             with st.expander('Live-Protokoll', expanded=bool(proc and proc.poll() is None)):
                 st.code('\n'.join(lines[-35:]) or 'Noch keine Ausgabe', language='text')
