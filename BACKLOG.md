@@ -215,7 +215,8 @@ referenced in commits, pull requests and discussions.
       defaults are written, so the default photo folder follows a moved project folder.
       The widgets have keys and get the saved values through their session state (passed
       as `value=`, every save gave them a new identity and dropped the next change, PR #10
-      review); the app tells a change made in a session from another session's save, so
+      review; the session-only settings before A8 had the same bug: in a browser every
+      second change of a setting jumped back to the first); the app tells a change made in a session from another session's save, so
       the latest action wins. Invalid values fall back to their defaults with a warning
       and are removed with the next save, an unreadable file is never replaced (the page
       keeps the settings it shows), and a saved device PyTorch cannot use is used as
@@ -297,7 +298,10 @@ referenced in commits, pull requests and discussions.
       2026-10-21 (A4/A5): tests for the run lock (also released when its process is
       killed), the status file and the app's run state.
       2026-10-21 (A8): tests for reading and saving `settings.json`; the app's use of it
-      was checked with Streamlit's `AppTest` (not in CI).
+      was checked with Streamlit's `AppTest` (not in CI) and, since `AppTest` does not run
+      the browser frontend and missed the jumping-back controls, with a script that
+      drives the real frontend in headless Microsoft Edge over the DevTools protocol
+      (kept outside the repo; not in CI).
       Open: tests for cache signature/reuse and scoring; tests of `app.py` itself (e.g.
       Streamlit's `AppTest`, which needs Streamlit in CI); a smoke test with real models.)
 - [x] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
