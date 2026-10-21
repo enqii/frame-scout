@@ -348,6 +348,24 @@ def feature_signature(person_detection, max_persons, person_confidence, yolo_mod
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
 
 
+def device_choices(cuda_available):
+    """Return the compute devices the app offers: "cuda" only if PyTorch can use a CUDA GPU (A7)."""
+    return ['auto', 'cpu'] + (['cuda'] if cuda_available else [])
+
+
+def cuda_status(cuda_available, cuda_build, gpu_name):
+    """Describe whether the engine can use a CUDA GPU, for the app's system details.
+
+    cuda_build is torch.version.cuda: None for the CPU build of PyTorch, which never uses
+    a GPU, even an NVIDIA GPU with a current driver (A7).
+    """
+    if cuda_available:
+        return f'CUDA: {gpu_name}'
+    if cuda_build is None:
+        return 'PyTorch without CUDA support (CPU build), so the analysis runs on the CPU'
+    return f'No CUDA GPU detected (PyTorch for CUDA {cuda_build}), so the analysis runs on the CPU'
+
+
 # Input size of the person detection: it decides which persons are found, i.e. which
 # crops are cached, so changing it needs an ENGINE bump.
 DETECTION_IMAGE_SIZE = 640
