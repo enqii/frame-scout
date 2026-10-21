@@ -7,7 +7,10 @@ import argparse
 import html
 import io
 import json
+import os
 import sqlite3
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import quote
 
@@ -16,24 +19,39 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, EXT, FULL_IMAGE_LABEL, crop_label, ensure_thumbnail,
-                             feature_signature, load_profiles, profile_slugs, progress_line)
+from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, crop_label,
+                             draft_size, ensure_thumbnail, feature_signature, group_batches, load_profiles,
+                             prefetch, profile_slugs, progress_due, progress_line)
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+# Photos are decoded in threads ahead of CLIP (E2). Pillow releases the GIL while it
+# decodes; more threads would mostly compete with PyTorch for the same CPU cores. At most
+# DECODE_AHEAD photos are queued, which bounds the memory for decoded images.
+DECODE_THREADS = min(4, os.cpu_count() or 1)
+DECODE_AHEAD = 2 * DECODE_THREADS
+THUMBNAIL_SIZE = 380
 
 
-def open_image(path):
+def open_image(path, min_size=None):
+    """Open path as an upright RGB image.
+
+    With min_size, a JPEG is decoded at 1/2, 1/4 or 1/8 scale (Image.draft) as long as
+    both edges stay at least min_size pixels long; other formats ignore it (E2).
+    """
     with Image.open(path) as image:
+        if min_size:
+            image.draft(None, (min_size, min_size))
         return ImageOps.exif_transpose(image).convert('RGB')
 
 
-def crops_for(image, detector, limit, conf):
+def crops_for(image, detector, limit, conf, lock):
     crops = [(FULL_IMAGE_LABEL, image)]
     if detector is None:
         return crops
-    result = detector.predict(source=image, classes=[0], conf=conf, imgsz=640,
-                              max_det=limit, verbose=False, device='cpu')[0]
+    with lock:  # one detector instance is shared by the decoding threads
+        result = detector.predict(source=image, classes=[0], conf=conf, imgsz=640,
+                                  max_det=limit, verbose=False, device='cpu')[0]
     boxes = result.boxes.xyxy.cpu().tolist() if result.boxes is not None else []
     w, h = image.size
     for i, (x1, y1, x2, y2) in enumerate(boxes[:limit], 1):
@@ -102,15 +120,18 @@ def main():
     model.eval()
     tokenizer = open_clip.get_tokenizer(CLIP_MODEL)
 
-    def embed_images(images):
+    def embed_pixels(pixels):
+        """Embed preprocessed images (one tensor, first dimension = images), batch_size at a time."""
         vectors = []
         with torch.inference_mode():
-            for start in range(0, len(images), args.batch_size):
-                batch = torch.stack([preprocess(im) for im in images[start:start+args.batch_size]]).to(device)
-                emb = model.encode_image(batch).float()
+            for start in range(0, len(pixels), args.batch_size):
+                emb = model.encode_image(pixels[start:start+args.batch_size].to(device)).float()
                 emb /= emb.norm(dim=-1, keepdim=True).clamp_min(1e-8)
                 vectors.append(emb.cpu().numpy())
         return np.concatenate(vectors, axis=0)
+
+    def embed_images(images):
+        return embed_pixels(torch.stack([preprocess(im) for im in images]))
 
     profile_vectors = {}
     with torch.inference_mode():
@@ -137,28 +158,77 @@ def main():
         size INTEGER NOT NULL, labels TEXT NOT NULL, vectors BLOB NOT NULL,
         PRIMARY KEY(path, signature))''')
     con.commit()
-    fresh = reused = errors = 0
+    image_size = getattr(model.visual, 'image_size', 224)
+    min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
+                          detector is not None)
+    detect_lock = threading.Lock()
+
+    def prepare(path):
+        """Decode, detect and preprocess one photo; runs in a decoding thread (E2)."""
+        crops = crops_for(open_image(path, min_size), detector, args.max_persons, args.person_confidence, detect_lock)
+        return [label for label, _ in crops], torch.stack([preprocess(im) for _, im in crops])
+
+    fresh = reused = errors = done = 0
+
+    def finished(new=0, cached=0, failed=0):
+        nonlocal fresh, reused, errors, done
+        before = done
+        fresh, reused, errors = fresh + new, reused + cached, errors + failed
+        done = fresh + reused + errors
+        if progress_due(before, done, len(paths)):
+            print(progress_line(done, len(paths), fresh, reused, errors), flush=True)
+
+    def prepared(todo, pool):
+        """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped."""
+        for (path, stat), future in prefetch(lambda item: pool.submit(prepare, item[0]), todo, DECODE_AHEAD):
+            try:
+                labels, pixels = future.result()
+            except Exception as exc:
+                print(f'ERROR {path}: {exc}', flush=True)
+                finished(failed=1)
+                continue
+            yield path, stat, labels, pixels
+
+    def store(group):
+        """Embed the crops of several photos in one go and cache them, one transaction per group."""
+        try:
+            vectors = embed_pixels(torch.cat([pixels for *_, pixels in group]))
+            offsets = np.cumsum([len(labels) for _, _, labels, _ in group])[:-1]
+            for (path, stat, labels, _), vec in zip(group, np.split(vectors, offsets)):
+                con.execute('INSERT OR REPLACE INTO features VALUES (?,?,?,?,?,?)',
+                            (str(path), signature, stat.st_mtime_ns, stat.st_size,
+                             json.dumps(labels, ensure_ascii=False), pack(vec)))
+            con.commit()
+        except Exception as exc:
+            con.rollback()
+            for path, *_ in group:
+                print(f'ERROR {path}: {exc}', flush=True)
+            finished(failed=len(group))
+        else:
+            finished(new=len(group))
+
     try:
-        for n, path in enumerate(paths, 1):
+        todo = []
+        for path in paths:
             try:
                 stat = path.stat()
                 record = con.execute('SELECT mtime_ns,size FROM features WHERE path=? AND signature=?', (str(path), signature)).fetchone()
-                if record == (stat.st_mtime_ns, stat.st_size):
-                    reused += 1
-                else:
-                    crops = crops_for(open_image(path), detector, args.max_persons, args.person_confidence)
-                    labels = [label for label, _ in crops]
-                    vec = embed_images([im for _, im in crops])
-                    con.execute('INSERT OR REPLACE INTO features VALUES (?,?,?,?,?,?)',
-                                (str(path), signature, stat.st_mtime_ns, stat.st_size,
-                                 json.dumps(labels, ensure_ascii=False), pack(vec)))
-                    con.commit()
-                    fresh += 1
             except Exception as exc:
-                errors += 1
                 print(f'ERROR {path}: {exc}', flush=True)
-            if n % 25 == 0 or n == len(paths):
-                print(progress_line(n, len(paths), fresh, reused, errors), flush=True)
+                finished(failed=1)
+                continue
+            if record == (stat.st_mtime_ns, stat.st_size):
+                finished(cached=1)
+            else:
+                todo.append((path, stat))
+        # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
+        # crops of several photos are embedded together, batch_size at a time (E2).
+        pool = ThreadPoolExecutor(DECODE_THREADS)
+        try:
+            for group in group_batches(prepared(todo, pool), args.batch_size, size=lambda item: len(item[2])):
+                store(group)
+        finally:
+            pool.shutdown(cancel_futures=True)  # on an interruption: no new decoding
     except KeyboardInterrupt:
         print('\nInterrupted: images analyzed so far are in the cache. Start again to resume.')
         con.close()
@@ -194,7 +264,9 @@ def main():
     legacy_thumbs = output / 'vorschaubilder'
 
     def render_thumbnail(path, target):
-        im = open_image(path); im.thumbnail((380, 380)); im.save(target, quality=82)
+        # decoded at reduced scale like an unloaded image in Image.thumbnail (E2)
+        im = open_image(path, DRAFT_REDUCING_GAP * THUMBNAIL_SIZE)
+        im.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE)); im.save(target, quality=82)
 
     def log(message):
         print(message, flush=True)
