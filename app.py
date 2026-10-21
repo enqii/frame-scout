@@ -7,8 +7,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (EXT, create_from_example, parse_progress, profile_slugs, read_profiles, save_profiles,
-                             slugify, write_new_file)
+from framescout_core import (EXT, create_from_example, parse_progress, profile_slugs, read_profiles, reference_folder,
+                             save_profiles, write_new_file)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -45,9 +45,10 @@ def cache_env():
         env[k] = str(p)
     return env
 
-def add_ref_files(files, name):
-    # profiles with the same slug share the folder (A1); write_new_file never overwrites
-    target_dir = REFS / slugify(name)
+def add_ref_files(files, name, others):
+    # one folder per profile: never one holding references of the other profiles (A1);
+    # write_new_file never overwrites leftover files in it
+    target_dir = reference_folder(REFS, name, others, BASE)
     paths = []
     for f in files:
         suffix = Path(f.name).suffix.lower()
@@ -70,8 +71,8 @@ try:
     profiles = read_profiles(PROFILES)
 except (OSError, ValueError) as exc:
     # never save over a file the app cannot read (A2)
-    st.error(f'profiles.json cannot be read: {exc}. FrameScout does not change the file. '
-             'Fix it in a text editor, or restore the backup profiles.json.bak if there is one.')
+    st.error('profiles.json cannot be read, so FrameScout does not change it. Fix it in a text '
+             f'editor, or restore the backup profiles.json.bak if there is one.\n\nDetails: {exc}')
     st.stop()
 
 if 'settings' not in st.session_state:
@@ -104,7 +105,8 @@ with p_tab:
                 else:
                     refs = [] if clear_refs else list(p.get('reference_images', []))
                     if refs_new:
-                        refs.extend(add_ref_files(refs_new, edit_name))
+                        others = [q for j, q in enumerate(profiles) if j != index]
+                        refs.extend(add_ref_files(refs_new, edit_name, others))
                     # {**p, ...} keeps keys the form does not edit (A2)
                     profiles[index] = {**p, 'name': edit_name, 'franchise': franchise.strip(), 'features': features.strip(),
                                        'prompts': [x.strip() for x in prompts.splitlines() if x.strip()], 'reference_images': refs}
@@ -128,7 +130,7 @@ with p_tab:
         if not name or any(x['name'].strip().lower() == name.lower() for x in profiles):
             st.error('Please enter a unique name.')
         else:
-            refs = add_ref_files(uploads or [], name)
+            refs = add_ref_files(uploads or [], name, profiles)
             profiles.append({'name':name, 'franchise':franchise.strip(), 'features':features.strip(),
                              'prompts':[x.strip() for x in prompts.splitlines() if x.strip()], 'reference_images':refs})
             if persist(profiles):
