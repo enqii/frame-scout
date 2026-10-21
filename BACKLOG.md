@@ -76,13 +76,16 @@ referenced in commits, pull requests and discussions.
       during the export can leave one such file; it is never reused (no broken
       thumbnail), only clutter. Fix idea: a recognizable `.tmp` name that the next run
       (or the cleanup of E7) removes, taking parallel runs (A4) into account.
-- [ ] **E14 – YOLO runs on the CPU, one photo at a time:** `crops_for` passes
+- [x] **E14 – YOLO runs on the CPU, one photo at a time:** `crops_for` passes
       `device='cpu'` to the detector, even when CLIP runs on CUDA, and since E2 the decoding
       threads share one detector under a lock, so detection is serialized. With person
       detection on (the default) it is now the slowest step on the CPU: `--batch-size` 1, 8
       and 32 took 26 s, 23 s and 24 s for the same 202 photos. Fix idea: run YOLO on the
       CLIP device and pass it several photos per call; part of the roadmap item "YOLO on
       GPU". CUDA cannot be verified on the development PC (no CUDA torch, A7).
+      (done 2026-10-21: the detector runs on the CLIP device, `framescout_core.detection_options`;
+      on the CPU the cached features are unchanged (same signature, identical vectors on
+      40 photos). Not run on a GPU (I11). Several photos per call: E18.)
 - [ ] **E15 – No `Image.draft` with person detection:** since E2 photos are decoded at
       reduced scale only without person detection; with detection they keep full
       resolution, because a person crop in a group photo can be smaller than CLIP's
@@ -107,6 +110,16 @@ referenced in commits, pull requests and discussions.
       review). Fix idea: measure on a real 4–8 core machine; derive the torch threads from
       the cores the process may use and the decoding threads, or convert crops to tensors
       on the main thread.
+- [ ] **E18 – Person detection is still one photo per call:** since E14 YOLO runs on the
+      CLIP device, but the decoding threads still call it one photo at a time under a lock,
+      and with detection only two decoding threads run (`DETECTION_DECODE_THREADS`, chosen
+      for the CPU and the memory of full-resolution photos). On a GPU, detection is fast
+      and decoding may become the limit. Passing several photos per call is not a pure
+      speed change: Ultralytics pads photos of different shapes in one call to a square
+      (`LetterBox(auto=False)`) instead of the smallest rectangle, so the detected boxes
+      and the person crops change → needs an evaluation of search quality first, and the
+      gain can only be measured on a GPU (I11). Deferred from the roadmap item "YOLO on
+      GPU" (PR #8, user decision).
 
 ### App (`app.py`)
 
@@ -147,7 +160,12 @@ referenced in commits, pull requests and discussions.
       afterwards without any indication while the bar is already full.
 - [ ] **A6 – Folder count on every rerun:** `rglob` over the whole photo folder on every
       interaction; slow for large folders/network drives.
-- [ ] **A7 – CUDA never available:** pip installs torch `+cpu`; "cuda" can still be selected.
+- [x] **A7 – CUDA never available:** pip installs torch `+cpu`; "cuda" can still be selected.
+      (done 2026-10-21: `Install-FrameScout.bat` offers the CUDA build of PyTorch (I3); the
+      app offers "cuda" only if `torch.cuda.is_available()`, falls back to "auto" for a
+      stale setting and tells a CPU build of PyTorch (with the hint
+      `Install-FrameScout.bat cuda`) from a missing GPU; the engine's error for
+      `--device cuda` names the installer option too. Not run on a GPU: I11.)
 - [ ] **A8 – UX gaps:** deleting a profile without confirmation; settings only per session;
       results without timestamp/reference to the profile state.
 - [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
@@ -159,6 +177,8 @@ referenced in commits, pull requests and discussions.
       yet; it still works). `width` for buttons is newer than the current floor
       `streamlit>=1.40` (the release notes name 1.48 – not verified), so switching needs
       a raised minimum version → do it together with I3.
+      (I3 is done, but the user kept the Streamlit floor at `>=1.40` in PR #8: raising
+      it and switching to `width` belong together in this item.)
 - [ ] **A11 – Progress bar parses German log text:** the app reads progress from `run.log`
       with a regex on `Neu:`/`Cache:`/`Fehler:`. Translating the engine log (I7) breaks
       the progress bar unless both change together; a machine-readable progress line or
@@ -207,9 +227,24 @@ referenced in commits, pull requests and discussions.
       2026-10-21 (E2): tests for the analysis pipeline helpers (batching, prefetching,
       draft size, when progress lines are due); the engine's decoding with `Image.draft`
       is not unit-tested, since CI installs no Pillow.
+      2026-10-21 (A7/I3/E14): tests for the choice of the PyTorch build, `install_torch.py`
+      (nvidia-smi and pip replaced) and the device choice of the app; the `.bat` file
+      itself is not tested in CI.
       Open: tests for cache signature/reuse, scoring and progress interpretation; a smoke
       test with real models.)
-- [ ] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
+- [x] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
+      (done 2026-10-21: `torch==2.14.1` and `torchvision==0.29.1` are pinned
+      (`framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, a test keeps both in sync);
+      the other packages have the versions of the verified runs as minimum, Streamlit keeps
+      `>=1.40` (A10). `Install-FrameScout.bat [cpu|cuda]` installs PyTorch first with
+      `install_torch.py` from the PyTorch index: without an argument it asks only if
+      `nvidia-smi` finds an NVIDIA driver; for CUDA `framescout_core.cuda_build` picks
+      `cu130` (compute capability ≥ 7.5, driver ≥ 580) or `cu126` (5.0 to 9.x, driver
+      ≥ 528.33) for every GPU, otherwise the CPU build is installed. Running it again with
+      the other option switches the build; a matching build is not downloaded again
+      (PyPI's CPU wheels without `+cpu` count as the CPU build). The support limits are
+      from the CUDA/PyTorch documentation as known, not verified on a GPU (I11). Full
+      locking incl. transitive dependencies: P5.)
 - [ ] **I4 – Installer requires the `py` launcher;** without it, the misleading message
       "Python 3.12 to 3.14 not found." is shown.
 - [x] **I5 – Example profiles/placeholders lean towards cosplay** (Joker, Harley Quinn, 2B,
@@ -256,6 +291,21 @@ referenced in commits, pull requests and discussions.
       the SHAs. Options: periodic manual bump, or Dependabot for `github-actions`.
       Dependabot opens its own PRs outside the one-PR-per-roadmap-item workflow, so
       this is a workflow decision → hold point.
+- [ ] **I10 – Manual runs leave files in the user profile:** importing Ultralytics without
+      `YOLO_CONFIG_DIR` writes `%APPDATA%\Ultralytics\settings.json` (seen in PR #8 when a
+      development command imported it). The `.bat` files and the app set the variable, but
+      the manual engine command in `README.md` and `CLAUDE.md` does not, and the same
+      applies to `TORCH_HOME`, `HF_HOME` and `XDG_CACHE_HOME` (model downloads land in the
+      user profile). This is a gap for a clean uninstall. Fix idea: the engine sets these
+      variables to the project's `.cache/` when they are unset (`os.environ.setdefault`
+      before importing torch, open_clip and ultralytics), or a documented PowerShell snippet.
+- [ ] **I11 – The CUDA path has never run on a GPU:** the development PC has no NVIDIA GPU,
+      so the CUDA install (`cu130`/`cu126` choice, about 2.5 GB), CLIP and YOLO on CUDA
+      (E14), the app's device choice with a CUDA build (A7) and the speed gain are
+      untested; the support limits in `framescout_core.CUDA_BUILDS` are not verified either.
+      To do on an NVIDIA machine: `Install-FrameScout.bat cuda`, a search run with
+      `--device cuda` with and without person detection, compare scores with a CPU run,
+      and measure the time (also for E18).
 
 ## Roadmap (priority)
 
@@ -278,7 +328,8 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 
 ### P1 – Performance
 - [x] Batching across images, parallel decoding, `Image.draft` (E2) (done 2026-10-21)
-- [ ] Installer option for CUDA torch, YOLO on GPU (A7, I3, E14)
+- [x] Installer option for CUDA torch, YOLO on GPU (A7, I3, E14) (done 2026-10-21; not
+      run on a GPU, I11)
 
 ### P2 – Robust runs
 - [ ] Engine writes a status/lock file (PID, phase, progress); the app reconnects after a
