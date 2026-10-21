@@ -22,13 +22,33 @@ st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
 .stButton button{border-radius:8px}</style>''', unsafe_allow_html=True)
 
-def persist(profiles):
-    # keeps the previous file as profiles.json.bak (A2); returns False if saving failed
+def store(build, uploads=(), name='', others=()):
+    """Copy uploaded reference images, then save the profile list build(new_reference_paths).
+
+    Returns True on success. On an error nothing changes: the message is shown, the
+    copies made for this save are removed again (no profile references them) and the
+    caller keeps its unchanged profile list, which still matches the file on disk.
+    """
+    written = []
     try:
-        save_profiles(PROFILES, profiles)
+        if uploads:
+            # one folder per profile, never one holding references of another profile (A1);
+            # write_new_file never overwrites leftover files in it
+            folder = reference_folder(REFS, name, others, BASE)
+            for f in uploads:
+                suffix = Path(f.name).suffix.lower()
+                if suffix in EXT:
+                    written.append(write_new_file(folder, 'reference', suffix, f.getvalue()))
+        # keeps the previous file as profiles.json.bak (A2)
+        save_profiles(PROFILES, build([x.relative_to(BASE).as_posix() for x in written]))
         return True
     except OSError as exc:
-        st.error(f'Could not save profiles.json: {exc}. Your changes were not saved.')
+        for x in written:
+            try:
+                x.unlink()
+            except OSError:
+                pass
+        st.error(f'Could not save the search profiles: {exc}. Your changes were not saved.')
         return False
 
 def running():
@@ -44,19 +64,6 @@ def cache_env():
         p.mkdir(parents=True, exist_ok=True)
         env[k] = str(p)
     return env
-
-def add_ref_files(files, name, others):
-    # one folder per profile: never one holding references of the other profiles (A1);
-    # write_new_file never overwrites leftover files in it
-    target_dir = reference_folder(REFS, name, others, BASE)
-    paths = []
-    for f in files:
-        suffix = Path(f.name).suffix.lower()
-        if suffix not in EXT:
-            continue
-        target = write_new_file(target_dir, 'reference', suffix, f.getvalue())
-        paths.append(target.relative_to(BASE).as_posix())
-    return paths
 
 st.title('🔎 FrameScout')
 st.caption('Local AI search in large photo collections · your images stay on your computer')
@@ -103,37 +110,41 @@ with p_tab:
                 if not edit_name or any(j != index and q['name'].strip().lower() == edit_name.lower() for j,q in enumerate(profiles)):
                     st.error('The profile name must be unique and must not be empty.')
                 else:
-                    refs = [] if clear_refs else list(p.get('reference_images', []))
-                    if refs_new:
-                        others = [q for j, q in enumerate(profiles) if j != index]
-                        refs.extend(add_ref_files(refs_new, edit_name, others))
-                    # {**p, ...} keeps keys the form does not edit (A2)
-                    profiles[index] = {**p, 'name': edit_name, 'franchise': franchise.strip(), 'features': features.strip(),
-                                       'prompts': [x.strip() for x in prompts.splitlines() if x.strip()], 'reference_images': refs}
-                    if persist(profiles):
+                    def edited(new_refs, index=index, p=p):
+                        refs = ([] if clear_refs else list(p.get('reference_images', []))) + new_refs
+                        # {**p, ...} keeps keys the form does not edit (A2)
+                        return profiles[:index] + [{**p, 'name': edit_name, 'franchise': franchise.strip(),
+                                'features': features.strip(), 'reference_images': refs,
+                                'prompts': [x.strip() for x in prompts.splitlines() if x.strip()]}] + profiles[index+1:]
+                    others = profiles[:index] + profiles[index+1:]
+                    if store(edited, refs_new or [], edit_name, others):
                         st.rerun()
-            if delete:
-                profiles.pop(index)
-                if persist(profiles):
-                    st.rerun()
+            # new lists instead of changing profiles in place: after a failed save the page
+            # keeps showing (and the search uses) exactly what is in profiles.json
+            if delete and store(lambda _, index=index: profiles[:index] + profiles[index+1:]):
+                st.rerun()
     st.divider()
     st.subheader('New search profile')
-    with st.form('new_profile', clear_on_submit=True):
-        name = st.text_input('Search motif *', placeholder='e.g. red car, golden retriever, mountain landscape')
-        franchise = st.text_input('Context / origin (optional)', placeholder='e.g. vehicles, pets, nature')
-        features = st.text_area('Distinctive features (optional; English works best)', placeholder='red bodywork, black roof, parked on a street')
-        prompts = st.text_area('Custom search texts (optional; one per line)')
-        uploads = st.file_uploader('Reference images (optional)', type=UPLOAD_TYPES, accept_multiple_files=True)
+    # the form is emptied only after a successful save, by giving its widgets new keys;
+    # after an error the input stays for another try
+    form_id = st.session_state.setdefault('new_profile_form', 0)
+    with st.form('new_profile'):
+        name = st.text_input('Search motif *', placeholder='e.g. red car, golden retriever, mountain landscape', key=f'new_name_{form_id}')
+        franchise = st.text_input('Context / origin (optional)', placeholder='e.g. vehicles, pets, nature', key=f'new_context_{form_id}')
+        features = st.text_area('Distinctive features (optional; English works best)', placeholder='red bodywork, black roof, parked on a street', key=f'new_features_{form_id}')
+        prompts = st.text_area('Custom search texts (optional; one per line)', key=f'new_prompts_{form_id}')
+        uploads = st.file_uploader('Reference images (optional)', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'new_refs_{form_id}')
         create = st.form_submit_button('Add profile', disabled=running())
     if create:
         name = name.strip()
         if not name or any(x['name'].strip().lower() == name.lower() for x in profiles):
             st.error('Please enter a unique name.')
         else:
-            refs = add_ref_files(uploads or [], name, profiles)
-            profiles.append({'name':name, 'franchise':franchise.strip(), 'features':features.strip(),
-                             'prompts':[x.strip() for x in prompts.splitlines() if x.strip()], 'reference_images':refs})
-            if persist(profiles):
+            def added(refs):
+                return profiles + [{'name':name, 'franchise':franchise.strip(), 'features':features.strip(),
+                                    'prompts':[x.strip() for x in prompts.splitlines() if x.strip()], 'reference_images':refs}]
+            if store(added, uploads or [], name, profiles):
+                st.session_state.new_profile_form = form_id + 1
                 st.rerun()
     st.caption('FrameScout automatically creates several CLIP search texts from the name. No language model is required.')
 
