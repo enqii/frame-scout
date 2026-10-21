@@ -85,7 +85,8 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 - Photos that have already been analyzed are stored in `results/cache.sqlite3`. An
   interrupted run resumes from there on the next start, and new search profiles reuse
   existing analyses. Updates that change the image analysis (e.g. the CLIP fix in
-  2026-10) analyze every photo once more; the older entries stay in the file.
+  2026-10) analyze every photo once more; the older entries stay in the file, which therefore
+  grows (roughly doubles) until a cleanup function exists.
 
 ### How reliable are the matches?
 
