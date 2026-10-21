@@ -1,7 +1,7 @@
-"""FrameScout: lokale Bildsuche mit CLIP und optionaler Personenerkennung.
+"""FrameScout: local image search with CLIP and optional person detection.
 
-Die Profile werden in profiles.json verwaltet. Referenzbilder sind optional.
-Erster Modellstart benötigt Internet; eigene Bilder werden nicht hochgeladen.
+Search profiles are kept in profiles.json. Reference images are optional.
+The first model start needs internet access; your own images are never uploaded.
 """
 import argparse
 import hashlib
@@ -17,7 +17,7 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import EXT, load_profiles, profile_slugs, progress_line
+from framescout_core import EXT, FULL_IMAGE_LABEL, crop_label, load_profiles, profile_slugs, progress_line
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -30,7 +30,7 @@ def open_image(path):
 
 
 def crops_for(image, detector, limit, conf):
-    crops = [('Gesamtbild', image)]
+    crops = [(FULL_IMAGE_LABEL, image)]
     if detector is None:
         return crops
     result = detector.predict(source=image, classes=[0], conf=conf, imgsz=640,
@@ -57,11 +57,11 @@ def unpack(blob):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='FrameScout: Name, Referenzbilder, optionale Merkmale.')
-    parser.add_argument('folder', type=Path, help='Fotoordner (Unterordner werden rekursiv durchsucht)')
-    parser.add_argument('--profiles', type=Path, help='JSON mit Suchprofilen (siehe profiles.json)')
-    parser.add_argument('--character', action='append', default=[], metavar='NAME|FRANCHISE|MERKMALE',
-                        help='Beliebig oft nutzbar; z.B. "Rotes Auto|Fahrzeuge|red paint, black roof"')
+    parser = argparse.ArgumentParser(description='FrameScout: local image search by name, reference images and optional features.')
+    parser.add_argument('folder', type=Path, help='photo folder (subfolders are searched recursively)')
+    parser.add_argument('--profiles', type=Path, help='JSON file with search profiles (see profiles.json)')
+    parser.add_argument('--character', action='append', default=[], metavar='NAME|CONTEXT|FEATURES',
+                        help='inline search profile, can be repeated; e.g. "Red car|Vehicles|red paint, black roof"')
     parser.add_argument('--output', type=Path, default=Path('results'))
     parser.add_argument('--device', choices=('auto', 'cpu', 'cuda'), default='auto')
     parser.add_argument('--batch-size', type=int, default=8)
@@ -71,16 +71,16 @@ def main():
     parser.add_argument('--person-confidence', type=float, default=.3)
     parser.add_argument('--yolo-model', default='yolo11n.pt')
     parser.add_argument('--reference-weight', type=float, default=.35,
-                        help='Gewichtung des Referenzbild-Scores (0..1); ohne Referenzbilder nur Text')
+                        help='weight of the reference image score (0..1); profiles without reference images use text only')
     args = parser.parse_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):
-        parser.error('Ungueltiger Wert fuer batch-size, top, max-persons, person-confidence oder reference-weight.')
+        parser.error('Invalid value for batch-size, top, max-persons, person-confidence or reference-weight.')
     root = args.folder.resolve()
     output = args.output.resolve()
     if not root.is_dir():
-        parser.error(f'Fotoordner existiert nicht: {root}')
+        parser.error(f'Photo folder does not exist: {root}')
     if output == root:
-        parser.error('Ausgabeordner darf nicht identisch mit Fotoordner sein.')
+        parser.error('The output folder must not be the photo folder.')
     try:
         profiles = load_profiles(args.profiles.resolve() if args.profiles else None, args.character)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -88,17 +88,17 @@ def main():
     for p in profiles:
         for ref in p['refs']:
             if not ref.is_file():
-                parser.error(f'Referenzbild fehlt: {ref}')
+                parser.error(f'Reference image not found: {ref}')
     paths = sorted(x for x in root.rglob('*') if x.is_file() and x.suffix.lower() in EXT and output not in x.parents)
     if not paths:
-        parser.error('Keine unterstützten Bilder gefunden. Bitte den lokalen Bildordner prüfen.')
+        parser.error('No supported images found. Please check the local photo folder.')
     device = ('cuda' if torch.cuda.is_available() else 'cpu') if args.device == 'auto' else args.device
     if device == 'cuda' and not torch.cuda.is_available():
-        parser.error('CUDA ist nicht verfuegbar; --device cpu verwenden.')
+        parser.error('CUDA is not available; use --device cpu.')
     torch.set_num_threads(min(12, max(1, torch.get_num_threads())))
     output.mkdir(parents=True, exist_ok=True)
-    print(f'{len(paths)} Fotos; {len(profiles)} Suchprofile; CLIP: {device}; YOLO: {not args.no_person_detection}', flush=True)
-    print('Beim ersten Start werden die Modellgewichte heruntergeladen.', flush=True)
+    print(f'{len(paths)} photos; {len(profiles)} search profiles; CLIP: {device}; YOLO: {not args.no_person_detection}', flush=True)
+    print('Model weights are downloaded on the first start.', flush=True)
     model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai', device=device)
     model.eval()
     tokenizer = open_clip.get_tokenizer('ViT-B-32')
@@ -123,7 +123,7 @@ def main():
                 try:
                     ref_vectors.append(embed_images([open_image(ref)])[0])
                 except Exception as exc:
-                    parser.error(f'Referenzbild unlesbar ({ref}): {exc}')
+                    parser.error(f'Reference image cannot be read ({ref}): {exc}')
             profile_vectors[p['name']] = (t.cpu().numpy(), np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
 
     detector = None
@@ -158,11 +158,11 @@ def main():
                     fresh += 1
             except Exception as exc:
                 errors += 1
-                print(f'FEHLER {path}: {exc}', flush=True)
+                print(f'ERROR {path}: {exc}', flush=True)
             if n % 25 == 0 or n == len(paths):
                 print(progress_line(n, len(paths), fresh, reused, errors), flush=True)
     except KeyboardInterrupt:
-        print('\nUnterbrochen: bereits bearbeitete Bilder sind im Cache. Einfach erneut starten.')
+        print('\nInterrupted: images analyzed so far are in the cache. Start again to resume.')
         con.close()
         return 130
 
@@ -187,7 +187,7 @@ def main():
                 best = int(np.argmax(combined))
                 scores[p['name']].append((float(combined[best]), path, labels[best]))
         except Exception as exc:
-            print(f'CACHE-FEHLER {path}: {exc}', flush=True)
+            print(f'CACHE ERROR {path}: {exc}', flush=True)
     con.close()
 
     thumbs = output / 'vorschaubilder'; thumbs.mkdir(exist_ok=True)
@@ -209,20 +209,20 @@ def main():
                 if not thumb.exists():
                     im = open_image(path); im.thumbnail((380, 380)); im.save(thumb, quality=82)
             except Exception as exc:
-                print(f'Vorschaubild nicht moeglich ({path}): {exc}', flush=True)
+                print(f'Thumbnail not possible ({path}): {exc}', flush=True)
                 continue
             uri = html.escape(path.as_uri(), quote=True)
             rel = html.escape(str(path.relative_to(root)))
             cards.append(f'<article><a href="{uri}" target="_blank"><img loading="lazy" src="vorschaubilder/{quote(thumb_name)}" alt="{rel}"></a>'
-                         f'<p><b>#{rank}</b> · Ähnlichkeit {score:.3f} · {html.escape(label)}<br>'
+                         f'<p><b>#{rank}</b> · Similarity {score:.3f} · {html.escape(crop_label(label))}<br>'
                          f'<a href="{uri}" target="_blank">{html.escape(path.name)}</a></p><small>{rel}</small></article>')
-        page = ('<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        page = ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                 f'<title>FrameScout – {html.escape(name)}</title><style>{style}</style>' + nav +
-                f'<h1>{html.escape(name)} – Top {len(cards)}</h1><p>Automatisch erzeugte Rangliste, keine garantierte Identifikation. '
-                'Gesamtbild oder Person bezeichnet den höchstbewerteten Ausschnitt. Zum Original auf ein Foto klicken.</p><main>' + ''.join(cards) + '</main></html>')
+                f'<h1>{html.escape(name)} – Top {len(cards)}</h1><p>Automatically generated ranking, not a guaranteed identification. '
+                '"Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original.</p><main>' + ''.join(cards) + '</main></html>')
         target = output / (slugs[name] + '.html'); target.write_text(page, encoding='utf-8')
         print(f'{name}: {target}', flush=True)
-    print(f'Fertig. Neue Fotoanalysen: {fresh}, Cache: {reused}. Weitere Suchprofile können den bestehenden Cache wiederverwenden.')
+    print(f'Done. New photo analyses: {fresh}, from cache: {reused}. Further search profiles can reuse the existing cache.')
     return 0
 
 

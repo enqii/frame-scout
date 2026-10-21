@@ -92,6 +92,18 @@ def write_new_file(folder, stem, suffix, data):
             n += 1
 
 
+# Label of the uncropped photo among the crops; person crops are labelled "Person <n>".
+FULL_IMAGE_LABEL = 'Full image'
+# Labels are stored in the feature cache; rows written before the English translation
+# (I7) carry the German label. Mapping them on display keeps those rows valid.
+_LEGACY_LABELS = {'Gesamtbild': FULL_IMAGE_LABEL}
+
+
+def crop_label(stored):
+    """Return the gallery label for a crop label stored in the feature cache."""
+    return _LEGACY_LABELS.get(stored, stored)
+
+
 _PROGRESS = re.compile(
     r'^(\d+)/(\d+) \| New: (\d+) \| Cached: (\d+) \| Errors: (\d+)[ \t\r]*$', re.MULTILINE)
 
