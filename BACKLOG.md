@@ -86,7 +86,7 @@ referenced in commits, pull requests and discussions.
       GPU". CUDA cannot be verified on the development PC (no CUDA torch, A7).
       (done 2026-10-21: the detector runs on the CLIP device, `framescout_core.detection_options`;
       on the CPU the cached features are unchanged (same signature, identical vectors on
-      40 photos). Not run on a GPU (I11). Several photos per call: E18.)
+      40 photos). On a GPU only one smoke run so far (I11). Several photos per call: E18.)
 - [ ] **E15 – No `Image.draft` with person detection:** since E2 photos are decoded at
       reduced scale only without person detection; with detection they keep full
       resolution, because a person crop in a group photo can be smaller than CLIP's
@@ -199,8 +199,8 @@ referenced in commits, pull requests and discussions.
       stale setting and tells a CPU build of PyTorch from a CUDA build that finds no usable
       GPU (no GPU, or a driver too old for the build); the hint (`cuda_hint`, also in the
       engine's error for `--device cuda`) says to close FrameScout, run
-      `Install-FrameScout.bat cuda` (or update the driver) and start FrameScout again. Not
-      run on a GPU: I11.)
+      `Install-FrameScout.bat cuda` (or update the driver) and start FrameScout again. On a
+      GPU: one engine smoke run; the app's device choice there is untested, I11.)
 - [ ] **A8 – UX gaps:** deleting a profile without confirmation; settings only per session;
       results without timestamp/reference to the profile state. Since A4 a reload shows a
       running search again, but the settings and the photo folder it was started with are
@@ -314,8 +314,8 @@ referenced in commits, pull requests and discussions.
       otherwise the CPU build is installed. Only an explicit `cpu` replaces a CUDA build
       (PR #8 review); a matching build is not downloaded again (PyPI's CPU wheels without
       `+cpu` count as the CPU build). The support limits are from the CUDA/PyTorch
-      documentation as known, not verified on a GPU (I11). Full locking incl. transitive
-      dependencies: P5.)
+      documentation as known, not verified (I11: one smoke run with `cu130` on one GPU).
+      Full locking incl. transitive dependencies: P5.)
 - [ ] **I4 – Installer requires the `py` launcher;** without it, the misleading message
       "Python 3.12 to 3.14 not found." is shown.
 - [x] **I5 – Example profiles/placeholders lean towards cosplay** (Joker, Harley Quinn, 2B,
@@ -370,7 +370,7 @@ referenced in commits, pull requests and discussions.
       user profile). This is a gap for a clean uninstall. Fix idea: the engine sets these
       variables to the project's `.cache/` when they are unset (`os.environ.setdefault`
       before importing torch, open_clip and ultralytics), or a documented PowerShell snippet.
-- [ ] **I11 – The CUDA path has never run on a GPU:** the development PC has no NVIDIA GPU,
+- [ ] **I11 – The CUDA path has run on a GPU only once:** the development PC had no NVIDIA GPU,
       so the CUDA install (`cu130`/`cu126` choice, about 2.5 GB), CLIP and YOLO on CUDA
       (E14), the app's device choice with a CUDA build (A7) and the speed gain are
       untested; the support limits in `framescout_core.CUDA_BUILDS` are not verified either.
@@ -379,6 +379,22 @@ referenced in commits, pull requests and discussions.
       and measure the time (also for E18); re-run the installer without an argument and
       check that the CUDA build is kept. With several GPUs, check which one `cuda`
       (device 0 in CUDA's order) uses when the build cannot use all of them.
+      (partly done 2026-10-21, user-approved smoke run from the main checkout: NVIDIA
+      GeForce RTX 4070 with 12 GB, driver 616.56, `.venv` with torch 2.14.1+cu130 and
+      Python 3.14, `torch.cuda.is_available()` True. 300 synthetic 1600×1200 JPEGs
+      (coloured shapes, no real photos), `profiles.example.json` (6 profiles),
+      `--batch-size 16`, person detection on, nothing downloaded. `--device cuda`: the log
+      says "CLIP: cuda; person detection (YOLO): cuda", exit code 0, 300 new analyses,
+      0 errors, 6 galleries, 17 s wall time including model load; `--device cpu` on the
+      same input: exit code 0, 0 errors, 26 s – small-set timings, not a benchmark. Both
+      caches have 300 rows with the same paths and identical signatures; the 301
+      comparable crops have embeddings with cosine similarity ≥ 0.99999 (float16 storage).
+      One synthetic photo got one extra YOLO "person" crop on CUDA (303 vs 302 crops), a
+      borderline false detection near the confidence threshold. Still open: a fresh
+      install with `Install-FrameScout.bat cuda` (the `.venv` already had `cu130`) and the
+      installer re-run, `cu126`, other GPUs and several GPUs, a run without person
+      detection, real photos and scores compared on them, the app's device choice in the
+      browser, and the speed on a large folder (also for E18).)
 - [ ] **I12 – Fresh installs can get untested major versions:** `requirements.txt` sets only
       minimum versions apart from torch/torchvision (user decision in PR #8), so a fresh
       install takes the newest release, e.g. Pillow 13.0.0 is on PyPI while the verified
@@ -406,8 +422,8 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 
 ### P1 – Performance
 - [x] Batching across images, parallel decoding, `Image.draft` (E2) (done 2026-10-21)
-- [x] Installer option for CUDA torch, YOLO on GPU (A7, I3, E14) (done 2026-10-21; not
-      run on a GPU, I11)
+- [x] Installer option for CUDA torch, YOLO on GPU (A7, I3, E14) (done 2026-10-21; one
+      GPU smoke run so far, I11)
 
 ### P2 – Robust runs
 - [x] Engine writes a status/lock file (PID, phase, progress); the app reconnects after a
