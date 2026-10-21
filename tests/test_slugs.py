@@ -51,11 +51,14 @@ def test_non_latin_name_falls_back_to_a_stable_hash():
     assert slugify('猫') != slugify('犬')
 
 
-@pytest.mark.parametrize('name', ['CON', 'prn', 'Aux', 'nul', 'COM1', 'lpt9'])
-def test_windows_device_names_are_not_used_as_slugs(name):
+@pytest.mark.parametrize('name, device', [
+    ('CON', 'con'), ('prn', 'prn'), ('Aux', 'aux'), ('nul', 'nul'), ('COM0', 'com0'),
+    ('COM1', 'com1'), ('lpt0', 'lpt0'), ('lpt9', 'lpt9'), ('COM¹', 'com1'), ('LPT³', 'lpt3'),
+])
+def test_windows_device_names_are_not_used_as_slugs(name, device):
     slug = slugify(name)
-    assert slug.startswith(name.lower())
-    assert slug != name.lower()
+    assert slug.startswith(device)
+    assert slug != device
 
 
 def test_long_names_are_shortened_without_a_trailing_dash():
