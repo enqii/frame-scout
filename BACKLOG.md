@@ -216,8 +216,12 @@ referenced in commits, pull requests and discussions.
       The widgets have keys and get the saved values through their session state (passed
       as `value=`, every save gave them a new identity and dropped the next change, PR #10
       review; the session-only settings before A8 had the same bug: in a browser every
-      second change of a setting jumped back to the first); the app tells a change made in a session from another session's save, so
-      the latest action wins. Invalid values fall back to their defaults with a warning
+      second change of a setting jumped back to the first). `reconcile_settings` tells a
+      change made in a session from another session's save, so the latest action wins;
+      a Start in a page run that took over another session's values is refused once with
+      a note, so a search never runs with settings the user has not seen. Saves hold a
+      lock (`settings.json.lock`) around their read-merge-write, so two sessions saving
+      at the same moment keep both changes (second review). Invalid values fall back to their defaults with a warning
       and are removed with the next save, an unreadable file is never replaced (the page
       keeps the settings it shows), and a saved device PyTorch cannot use is used as
       "auto" but stays saved until another device or "Use auto from now on" is chosen.

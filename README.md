@@ -129,7 +129,9 @@ starts with the new example profiles.
    warning and removed from the file with the next saved change. A saved compute device
    that PyTorch cannot use (e.g. "cuda" after installing the CPU build) is shown and used
    as "auto" but stays saved, so it applies again once PyTorch can use it; choose another
-   device or "Use auto from now on" to replace it.
+   device or "Use auto from now on" to replace it. If another tab or window changed the
+   settings since your page last updated, "Start search" first shows the new settings
+   and asks you to start again, so a search never runs with settings you have not seen.
 5. **Search & results:** start the analysis. The page shows the current step (looking
    for photos, loading the AI models, analyzing, scoring, writing the galleries) and its
    progress. The search keeps running when you reload the page or close the browser tab
