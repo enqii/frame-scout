@@ -1,3 +1,5 @@
 # Development tools (not needed to run FrameScout).
 # The test suite only uses the standard library and pytest: no torch, no model download.
-pytest>=8
+# Capped at the tested major version so that a new pytest major cannot turn CI red
+# on unrelated pull requests; adopt the next major in its own change (see I3).
+pytest>=9,<10
