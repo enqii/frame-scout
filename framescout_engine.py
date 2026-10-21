@@ -167,9 +167,14 @@ def main():
     detect_lock = threading.Lock()
 
     def prepare(path):
-        """Decode, detect and preprocess one photo; runs in a decoding thread (E2)."""
+        """Decode, detect and preprocess one photo; runs in a decoding thread (E2).
+
+        The file is stat-ed right before it is decoded (not in the cache scan, which can be
+        long before), so the stored modification time and size belong to the analyzed content.
+        """
+        stat = path.stat()
         crops = crops_for(open_image(path, min_size), detector, args.max_persons, args.person_confidence, detect_lock)
-        return [label for label, _ in crops], torch.stack([preprocess(im) for _, im in crops])
+        return stat, [label for label, _ in crops], torch.stack([preprocess(im) for _, im in crops])
 
     fresh = reused = errors = done = 0
 
@@ -183,9 +188,9 @@ def main():
 
     def prepared(todo, pool, ahead):
         """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped."""
-        for (path, stat), future in prefetch(lambda item: pool.submit(prepare, item[0]), todo, ahead):
+        for path, future in prefetch(lambda item: pool.submit(prepare, item), todo, ahead):
             try:
-                labels, pixels = future.result()
+                stat, labels, pixels = future.result()
             except Exception as exc:
                 print(f'ERROR {path}: {exc}', flush=True)
                 finished(failed=1)
@@ -223,7 +228,7 @@ def main():
             if record == (stat.st_mtime_ns, stat.st_size):
                 finished(cached=1)
             else:
-                todo.append((path, stat))
+                todo.append(path)
         # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
         # crops of several photos are embedded together, batch_size at a time (E2).
         threads = DECODE_THREADS if detector is None else DETECTION_DECODE_THREADS
