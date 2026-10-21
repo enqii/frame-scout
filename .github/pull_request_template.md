@@ -33,7 +33,7 @@
 
 - [ ] Commits follow Conventional Commits (English, imperative, lowercase, backlog IDs)
 - [ ] Tests executed and their output included above; not-executed tests listed
-- [ ] CI checks green (once CI exists)
+- [ ] CI checks green (`tests` workflow, `gh pr checks <PR>`)
 - [ ] `BACKLOG.md` updated (item/IDs checked off with date)
 - [ ] Out-of-scope findings added to `BACKLOG.md` as new items (IDs: …), or none found;
       declined review findings that defer work name their backlog ID (no GitHub issues)

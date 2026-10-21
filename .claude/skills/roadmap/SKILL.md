@@ -62,7 +62,7 @@ Check the rows top to bottom; the first match decides.
 | PR labeled `fs:in-progress` | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
 | PR labeled `fs:needs-review` | Spawn a fresh **reviewer**. |
 | PR labeled `fs:review-done` | Implementer (mode `address-review`) handles all unanswered review comments: continue the previous implementer with `SendMessage` if it is still alive, otherwise spawn a new one. |
-| PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, open risks) and **wait for explicit merge approval**. |
+| PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>`, open risks) and **wait for explicit merge approval**. |
 
 An open PR without any `fs:*` label is not a roadmap PR; mention it but do not act on it.
 

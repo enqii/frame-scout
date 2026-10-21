@@ -109,6 +109,9 @@ Tests (they need neither torch nor a model download):
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+The same tests run automatically on GitHub (Windows, Python 3.12, 3.13 and 3.14) for
+every pull request and every push to `main` – see `.github/workflows/tests.yml`.
+
 Contributions follow the PR workflow described in [CLAUDE.md](CLAUDE.md) (Conventional
 Commits, one pull request per roadmap item).
 
@@ -122,6 +125,7 @@ Commits, one pull request per roadmap item).
 | `profiles.json` | Saved search profiles |
 | `requirements.txt` | Python dependencies |
 | `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
+| `.github/` | CI workflow (`workflows/tests.yml`) and pull request template |
 | `Install-FrameScout.bat` / `Start-FrameScout.bat` | Installation and start on Windows |
 | `BACKLOG.md` | Known weaknesses and roadmap |
 | `CLAUDE.md` | Project onboarding and development workflow |
