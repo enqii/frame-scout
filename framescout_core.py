@@ -102,6 +102,8 @@ def create_from_example(target, example):
     only then published under the final name, so a crash or a parallel session never
     sees a half-written target.
     """
+    if target.exists():  # the usual case: cheap check, the publish step still guards races
+        return False
     try:
         data = example.read_bytes()
     except FileNotFoundError:
