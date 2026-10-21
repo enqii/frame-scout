@@ -49,8 +49,11 @@ jobs:
         # in the pytest step with an ImportError instead of downloading anything.
         run: python -c "import importlib.util, sys; sys.exit('torch is installed' if importlib.util.find_spec('torch') else 0)"
 
-      - name: Compile all Python modules (syntax check)
-        run: python -m py_compile app.py framescout_core.py framescout_engine.py
+      - name: Compile all Python files (syntax check)
+        # Covers modules the tests never import (app.py, framescout_engine.py) and
+        # picks up new files automatically. Compiling does not import torch or
+        # streamlit. -x skips paths below dot-directories (.git, .github, .venv, ...).
+        run: python -m compileall -x '[\\/]\.' .
 
       - name: Run tests
         run: python -m pytest

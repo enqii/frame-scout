@@ -26,7 +26,7 @@ One full end-to-end search run on Windows has been confirmed (I6): `run.log` fro
 - `BACKLOG.md`: known weaknesses (IDs E/A/I) and the prioritized roadmap that drives the PR workflow.
 - `.claude/skills/roadmap/`: the `/roadmap` orchestrator skill plus implementer/reviewer briefs. `.claude/settings.json`: shared permission rules for the workflow.
 - `.github/pull_request_template.md`: definition-of-done checklist for every PR.
-- `.github/workflows/tests.yml`: CI – runs `pytest` (plus a byte-compile syntax check of `app.py` and both `framescout_*` modules) on `windows-latest` for Python 3.12/3.13/3.14 on every pull request and push to `main`. It installs only `requirements-dev.txt` and fails if torch is installed, so tests must not need torch or model downloads. Green CI is unit-test and syntax evidence only, not a model run.
+- `.github/workflows/tests.yml`: CI – runs `pytest` (plus a `compileall` syntax check of all Python files outside dot-directories) on `windows-latest` for Python 3.12/3.13/3.14 on every pull request and push to `main`. It installs only `requirements-dev.txt` and fails if torch is installed, so tests must not need torch or model downloads. Green CI is unit-test and syntax evidence only, not a model run.
 - Runtime data (generated, not in the repo): `photos/` (default input), `references/`, `results/`, `results/cache.sqlite3`, `results/vorschaubilder/`, `run.log`, `.cache/`, `.tmp/`, `.venv/`, `yolo11n.pt`.
 
 ## How to run (Windows)
