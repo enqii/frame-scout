@@ -21,7 +21,7 @@ from PIL import Image, ImageOps, ImageFile
 
 from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, crop_label,
                              draft_size, ensure_thumbnail, feature_signature, group_batches, load_profiles,
-                             prefetch, profile_slugs, progress_due, progress_line)
+                             prefetch, profile_slugs, progress_due, progress_line, store_group)
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -190,7 +190,7 @@ def main():
             yield path, stat, labels, pixels
 
     def store(group):
-        """Embed the crops of several photos in one go and cache them, one transaction per group."""
+        """Embed the crops of several photos in one go and cache them in one transaction (all or none)."""
         try:
             vectors = embed_pixels(torch.cat([pixels for *_, pixels in group]))
             offsets = np.cumsum([len(labels) for _, _, labels, _ in group])[:-1]
@@ -199,13 +199,13 @@ def main():
                             (str(path), signature, stat.st_mtime_ns, stat.st_size,
                              json.dumps(labels, ensure_ascii=False), pack(vec)))
             con.commit()
-        except Exception as exc:
+        except BaseException:
             con.rollback()
-            for path, *_ in group:
-                print(f'ERROR {path}: {exc}', flush=True)
-            finished(failed=len(group))
-        else:
-            finished(new=len(group))
+            raise
+
+    def store_failed(item, exc):
+        print(f'ERROR {item[0]}: {exc}', flush=True)
+        finished(failed=1)
 
     try:
         todo = []
@@ -226,7 +226,8 @@ def main():
         pool = ThreadPoolExecutor(DECODE_THREADS)
         try:
             for group in group_batches(prepared(todo, pool), args.batch_size, size=lambda item: len(item[2])):
-                store(group)
+                # after a failure the photos are stored one by one, so only a broken one fails
+                finished(new=store_group(group, store, store_failed))
         finally:
             pool.shutdown(cancel_futures=True)  # on an interruption: no new decoding
     except KeyboardInterrupt:

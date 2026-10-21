@@ -3,7 +3,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 
 import pytest
 
-from framescout_core import draft_size, group_batches, prefetch, progress_due
+from framescout_core import draft_size, group_batches, prefetch, progress_due, store_group
 
 
 # --- group_batches: crops of several photos go through CLIP together ---
@@ -64,6 +64,57 @@ def test_group_batches_reads_its_input_lazily():
 def test_group_batches_rejects_an_invalid_batch_size():
     with pytest.raises(ValueError):
         list(group_batches([1], 0, size=lambda item: 1))
+
+
+# --- store_group: one failure must not fail the other photos of a group ---
+
+def recording_store(bad):
+    calls = []
+
+    def store(group):
+        calls.append(list(group))
+        broken = [item for item in group if item in bad]
+        if broken:
+            raise OSError(f'cannot store {broken[0]}')
+    return store, calls
+
+
+def test_a_group_is_stored_in_one_call():
+    store, calls = recording_store(bad=set())
+    failures = []
+    assert store_group(['a', 'b', 'c'], store, lambda item, exc: failures.append(item)) == 3
+    assert calls == [['a', 'b', 'c']] and failures == []
+
+
+def test_after_a_failure_the_photos_are_stored_one_by_one_and_only_the_culprit_fails():
+    store, calls = recording_store(bad={'b'})
+    failures = []
+    stored = store_group(['a', 'b', 'c'], store, lambda item, exc: failures.append((item, str(exc))))
+    assert stored == 2
+    assert calls == [['a', 'b', 'c'], ['a'], ['b'], ['c']]
+    assert failures == [('b', 'cannot store b')]  # the real error of that photo
+
+
+def test_a_failure_that_hits_every_photo_reports_each_with_its_own_error():
+    store, calls = recording_store(bad={'a', 'b'})
+    failures = []
+    assert store_group(['a', 'b'], store, lambda item, exc: failures.append((item, str(exc)))) == 0
+    assert failures == [('a', 'cannot store a'), ('b', 'cannot store b')]
+
+
+def test_a_single_photo_is_not_retried():
+    store, calls = recording_store(bad={'a'})
+    failures = []
+    assert store_group(['a'], store, lambda item, exc: failures.append(item)) == 0
+    assert calls == [['a']] and failures == ['a']
+
+
+def test_store_group_does_not_swallow_keyboard_interrupt():
+    def store(group):
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        store_group(['a', 'b'], store, lambda item, exc: None)
 
 
 # --- prefetch: bounded, ordered decoding ahead of the consumer ---
