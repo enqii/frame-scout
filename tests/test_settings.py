@@ -1,10 +1,12 @@
 """The app's settings.json: defaults, validation and saving without losing data (framescout_core, A8)."""
 import json
+import threading
 from pathlib import Path
 
 import pytest
 
-from framescout_core import SETTINGS_FILE, default_settings, read_settings, save_settings
+from framescout_core import (DEVICES, SETTING_RANGES, SETTINGS_FILE, default_settings, read_settings,
+                             reconcile_settings, save_settings)
 
 
 @pytest.fixture
@@ -127,7 +129,8 @@ def test_saving_leaves_no_temporary_file(tmp_path, defaults):
     path = tmp_path / 'settings.json'
     save_settings(path, {'batch_size': 4}, defaults)
     save_settings(path, {'batch_size': 8}, defaults)
-    assert [x.name for x in tmp_path.iterdir()] == ['settings.json']
+    # the lock file of save_settings stays (empty), like the run lock
+    assert sorted(x.name for x in tmp_path.iterdir()) == ['settings.json', 'settings.json.lock']
     assert stored(path) == {}
 
 
@@ -160,7 +163,8 @@ def test_a_replace_that_keeps_failing_raises_os_error(tmp_path, defaults, monkey
     with pytest.raises(OSError):
         save_settings(path, {'top': 400}, defaults, attempts=3, retry_delay=0)
     assert stored(path) == {'top': 300}
-    assert [x.name for x in tmp_path.iterdir()] == ['settings.json']
+    # the lock file of save_settings stays (empty), like the run lock
+    assert sorted(x.name for x in tmp_path.iterdir()) == ['settings.json', 'settings.json.lock']
 
 
 def test_a_transient_read_error_is_retried(tmp_path, defaults, monkeypatch):
@@ -219,3 +223,106 @@ def test_an_invalid_change_raises_value_error_and_changes_nothing(tmp_path, defa
     with pytest.raises(ValueError):
         save_settings(path, changes, defaults)
     assert stored(path) == {'top': 300}
+
+
+def test_saving_returns_the_values_as_written(tmp_path, defaults):
+    # the app remembers these, not the raw widget values (review: rounded floats)
+    path = tmp_path / 'settings.json'
+    written = save_settings(path, {'person_confidence': 0.1 + 4 * 0.05, 'reference_weight': 0, 'top': 300}, defaults)
+    assert written == {'person_confidence': 0.3, 'reference_weight': 0.0, 'top': 300}
+    assert isinstance(written['reference_weight'], float)
+
+
+def test_concurrent_saves_of_different_settings_keep_every_change(tmp_path, defaults):
+    # app sessions are threads of one process; without a lock around read-merge-write,
+    # two saves at the same moment lose one change (review)
+    path = tmp_path / 'settings.json'
+    names = ['batch_size', 'top', 'max_persons']
+    values = {'batch_size': range(9, 30), 'top': range(200, 221), 'max_persons': range(13, 34)}
+    errors = []
+    start = threading.Barrier(len(names))
+
+    def worker(name):
+        start.wait()
+        try:
+            for value in values[name]:
+                save_settings(path, {name: value}, defaults, retry_delay=0.01)
+        except Exception as exc:  # reported below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(n,)) for n in names]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    assert stored(path) == {name: values[name][-1] for name in names}
+
+
+def test_the_ranges_are_the_ones_of_the_widgets():
+    # the app builds its widgets from SETTING_RANGES, so both always agree (review)
+    assert SETTING_RANGES == {'batch_size': (1, 64), 'top': (1, 5000), 'max_persons': (1, 50),
+                              'person_confidence': (0.1, 0.9), 'reference_weight': (0.0, 1.0)}
+    assert DEVICES == ('auto', 'cpu', 'cuda')
+
+
+# --- reconcile_settings: widget state, the session's view and settings.json (A8 review) ---
+
+def test_a_new_page_shows_the_saved_values(defaults):
+    seen, shown = {}, {}
+    saved = {**defaults, 'top': 300}
+    updates, changed, taken_over = reconcile_settings({}, seen, shown, saved, defaults)
+    assert updates == saved and changed == {} and taken_over == []
+    assert seen == saved and shown == saved
+
+
+def test_a_widget_changed_in_this_session_is_reported_as_changed(defaults):
+    seen, shown = dict(defaults), dict(defaults)
+    widgets = {**defaults, 'batch_size': 16}
+    updates, changed, taken_over = reconcile_settings(widgets, seen, shown, dict(defaults), defaults)
+    assert updates == {} and changed == {'batch_size': 16} and taken_over == []
+    assert seen == defaults and shown == defaults  # updated by the caller after a successful save
+
+
+def test_a_value_saved_by_another_session_is_taken_over(defaults):
+    seen, shown = dict(defaults), dict(defaults)
+    saved = {**defaults, 'top': 300}
+    updates, changed, taken_over = reconcile_settings(dict(defaults), seen, shown, saved, defaults)
+    assert updates == {'top': 300} and changed == {} and taken_over == ['top']
+    assert seen['top'] == 300 and shown['top'] == 300
+
+
+def test_a_change_in_this_session_wins_over_another_sessions_save(defaults):
+    # the latest action wins: the widget change happened after this session last looked
+    seen, shown = dict(defaults), dict(defaults)
+    saved = {**defaults, 'top': 300}
+    updates, changed, taken_over = reconcile_settings({**defaults, 'top': 400}, seen, shown, saved, defaults)
+    assert updates == {} and changed == {'top': 400} and taken_over == []
+
+
+def test_a_widget_showing_a_substitute_is_not_a_change(defaults):
+    # a saved "cuda" that PyTorch cannot use is shown as "auto": shown differs from seen
+    seen, shown = {**defaults, 'device': 'cuda'}, {**defaults, 'device': 'auto'}
+    saved = {**defaults, 'device': 'cuda'}
+    updates, changed, taken_over = reconcile_settings(dict(defaults), seen, shown, saved, defaults)
+    assert updates == {} and changed == {} and taken_over == []
+
+
+def test_slider_noise_after_a_save_does_not_look_like_another_session(defaults):
+    # the caller stores the raw widget value as shown and the written value as seen (review)
+    noisy = 0.1 + 4 * 0.05
+    seen, shown = {**defaults, 'person_confidence': 0.3}, {**defaults, 'person_confidence': noisy}
+    updates, changed, taken_over = reconcile_settings({**defaults, 'person_confidence': noisy}, seen, shown,
+                                                      dict(defaults), defaults)
+    assert updates == {} and changed == {} and taken_over == []
+
+
+def test_an_unreadable_file_keeps_what_the_widgets_show(defaults):
+    seen, shown = dict(defaults), dict(defaults)
+    widgets = {**defaults, 'top': 400}
+    updates, changed, taken_over = reconcile_settings(widgets, seen, shown, None, defaults)
+    assert updates == {} and changed == {'top': 400} and taken_over == []
+    # a new page without a readable file shows the defaults
+    seen, shown = {}, {}
+    updates, changed, taken_over = reconcile_settings({}, seen, shown, None, defaults)
+    assert updates == defaults and changed == {} and taken_over == []

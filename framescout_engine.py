@@ -20,8 +20,8 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RUN_LOCK, RUN_STATUS,
-                             RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
+from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEVICES, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RUN_LOCK,
+                             RUN_STATUS, RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
                              ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch, profile_slugs,
                              progress_due, progress_line, store_group)
 
@@ -101,7 +101,7 @@ def main():
     parser.add_argument('--character', action='append', default=[], metavar='NAME|CONTEXT|FEATURES',
                         help='inline search profile, can be repeated; e.g. "Red car|Vehicles|red paint, black roof"')
     parser.add_argument('--output', type=Path, default=Path('results'))
-    parser.add_argument('--device', choices=('auto', 'cpu', 'cuda'), default='auto')
+    parser.add_argument('--device', choices=DEVICES, default='auto')  # the app offers the same (A8 review)
     parser.add_argument('--batch-size', type=int, default=8)
     parser.add_argument('--top', type=int, default=150)
     parser.add_argument('--no-person-detection', action='store_true')
