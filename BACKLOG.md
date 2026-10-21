@@ -15,9 +15,19 @@ referenced in commits, pull requests and discussions.
       (done 2026-10-21: `ViT-B-32-quickgelu`, same weights file; model name, `ENGINE` (v5)
       and `feature_signature` live in `framescout_core` with tests. Every photo is
       analyzed once more after the update; the v4 rows stay in `cache.sqlite3` (E11).)
-- [ ] **E2 – No batching across images:** `embed_images` only receives the crops of a single
+- [x] **E2 – No batching across images:** `embed_images` only receives the crops of a single
       photo, so the batch size has almost no effect. Also: no parallel decoding, full
       resolution (no `Image.draft`), YOLO hard-coded to `device='cpu'`.
+      (done 2026-10-21: photos are decoded, searched for persons and preprocessed in up to
+      four threads, at most eight ahead (`framescout_core.prefetch`); the crops of several
+      photos go through CLIP together until a group holds `--batch-size` crops
+      (`group_batches`), one SQLite transaction per group. Without person detection JPEGs
+      and all gallery thumbnails are decoded with `Image.draft` at twice the target size
+      (`draft_size`); with person detection photos keep full resolution (E15). Cache
+      signature unchanged: on a 202-photo sample (CPU) the features with detection are
+      identical, without detection cosine ≥ 0.999, gallery scores differ by ≤ 0.004; whole
+      runs incl. model load and export took 44 s → 23 s (detection) and 30 s → 15 s
+      (without). YOLO device: E14.)
 - [ ] **E3 – German motif names in English prompts:** e.g. "A photograph of Rotes Auto
       (Fahrzeuge)." – OpenAI CLIP practically only understands English, while the UI
       placeholders are German.
@@ -61,6 +71,27 @@ referenced in commits, pull requests and discussions.
       during the export can leave one such file; it is never reused (no broken
       thumbnail), only clutter. Fix idea: a recognizable `.tmp` name that the next run
       (or the cleanup of E7) removes, taking parallel runs (A4) into account.
+- [ ] **E14 – YOLO runs on the CPU, one photo at a time:** `crops_for` passes
+      `device='cpu'` to the detector, even when CLIP runs on CUDA, and since E2 the decoding
+      threads share one detector under a lock, so detection is serialized. With person
+      detection on (the default) it is now the slowest step on the CPU: `--batch-size` 1, 8
+      and 32 took 26 s, 23 s and 24 s for the same 202 photos. Fix idea: run YOLO on the
+      CLIP device and pass it several photos per call; part of the roadmap item "YOLO on
+      GPU". CUDA cannot be verified on the development PC (no CUDA torch, A7).
+- [ ] **E15 – No `Image.draft` with person detection:** since E2 photos are decoded at
+      reduced scale only without person detection; with detection they keep full
+      resolution, because a person crop in a group photo can be smaller than CLIP's
+      224 px input after scaling. Drafting to a larger size (e.g. both edges ≥ 1280 px)
+      would speed up the decoding of large photos (≥ ~10 MP), but changes the person crops
+      and needs an evaluation with group photos (search quality) and possibly scaling the
+      minimum crop size of 35×70 px with the draft factor.
+- [ ] **E16 – Every engine start contacts the Hugging Face Hub:** the log shows
+      "You are sending unauthenticated requests to the HF Hub" on each run although the
+      CLIP weights are in `.cache/huggingface`: OpenCLIP checks the hub for a newer file.
+      No image data is sent, but the run needs (or waits for) the network, which is
+      surprising for a local tool. Fix idea: set `HF_HUB_OFFLINE=1` once the weights are
+      cached (or try offline first and fall back to a download), in the engine or the
+      `.bat` files; check the behavior without internet access.
 
 ### App (`app.py`)
 
@@ -158,6 +189,9 @@ referenced in commits, pull requests and discussions.
       Python 3.12–3.14, without torch.
       2026-10-21 (5): tests for reading/saving `profiles.json`, reference folders and
       export thumbnails.
+      2026-10-21 (E2): tests for the analysis pipeline helpers (batching, prefetching,
+      draft size, when progress lines are due); the engine's decoding with `Image.draft`
+      is not unit-tested, since CI installs no Pillow.
       Open: tests for cache signature/reuse, scoring and progress interpretation; a smoke
       test with real models.)
 - [ ] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
@@ -228,8 +262,8 @@ Each unchecked item is implemented in its own pull request, strictly one after a
       (A2), E6 (done 2026-10-21)
 
 ### P1 – Performance
-- [ ] Batching across images, parallel decoding, `Image.draft` (E2)
-- [ ] Installer option for CUDA torch, YOLO on GPU (A7, I3)
+- [x] Batching across images, parallel decoding, `Image.draft` (E2) (done 2026-10-21)
+- [ ] Installer option for CUDA torch, YOLO on GPU (A7, I3, E14)
 
 ### P2 – Robust runs
 - [ ] Engine writes a status/lock file (PID, phase, progress); the app reconnects after a

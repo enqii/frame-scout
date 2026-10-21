@@ -78,8 +78,12 @@ starts with the new example profiles.
    online albums yourself beforehand – FrameScout does not download images from the
    internet.
 4. **AI settings:** with "auto", CUDA is used if PyTorch detects a
-   compatible NVIDIA GPU, otherwise the CPU. A batch size of 8 is a conservative
-   starting value.
+   compatible NVIDIA GPU, otherwise the CPU. The batch size is the number of image
+   parts (whole photos and person crops, also from several photos) that CLIP analyzes
+   together; 8 is a conservative starting value, reduce it if memory runs short.
+   Without person detection, JPEG photos are decoded at a reduced resolution, which
+   makes the analysis noticeably faster; with person detection they keep their full
+   resolution, so that small persons, e.g. in group photos, keep their detail.
 5. **Search & results:** start the analysis. Keep the browser open
    during the search run if possible – start/stop is tied to the running Streamlit
    session.
@@ -101,7 +105,8 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 - Keep the `results` folder together: an HTML file exported on its own contains no
   thumbnails, and the links to the originals only work on this computer.
 - Photos that have already been analyzed are stored in `results/cache.sqlite3`. An
-  interrupted run resumes from there on the next start, and new search profiles reuse
+  interrupted run resumes from there on the next start (the few photos that were being
+  analyzed at the moment of the stop are analyzed again), and new search profiles reuse
   existing analyses. Updates that change the image analysis (e.g. the CLIP fix in
   2026-10) analyze every photo once more; the older entries stay in the file, which therefore
   grows (roughly doubles) until a cleanup function exists.
