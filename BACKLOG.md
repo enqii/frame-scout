@@ -181,6 +181,9 @@ referenced in commits, pull requests and discussions.
       app is marked "Stopped in the app" in the status file. Verified with real runs:
       a parallel CLI start exits with 3, a killed run frees the lock, a new Streamlit
       session (AppTest) shows and stops a run started by another one.)
+      (manual browser check, user report 2026-10-21: start a search, reload the page,
+      open a second tab, press Stop – successful. Closing the `Start-FrameScout.bat`
+      window during a run is still not tested.)
 - [x] **A5 – Progress only for the analysis phase:** scoring, thumbnails and HTML export run
       afterwards without any indication while the bar is already full.
       (done 2026-10-21: the status file has the phase – starting, looking for photos,
