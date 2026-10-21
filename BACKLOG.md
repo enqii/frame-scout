@@ -40,9 +40,13 @@ referenced in commits, pull requests and discussions.
 - [ ] **A2 – `profiles.json` data loss:** `read_profiles` does not know the v3 format
       (returns `[]`, the next save overwrites the file). A JSON list → `AttributeError`
       (not caught). No backup before saving.
-- [ ] **A3 – Slugs app ≠ engine:** the engine appends `-2` on collisions and uses a hash
+- [x] **A3 – Slugs app ≠ engine:** the engine appends `-2` on collisions and uses a hash
       fallback, the app uses `profile` without deduplication → downloads missing or
       mismatched. Umlauts are dropped ("Bär" → `b-r`).
+      (done 2026-10-21: app and engine use `framescout_core.slugify`/`profile_slugs`;
+      "Bär" → `baer`, "Café" → `cafe`, hash fallback for names such as "猫", Windows
+      device names get `-profile`, at most 60 characters. Galleries of renamed slugs
+      are left behind until the next run → cleanup is E7.)
 - [ ] **A4 – Process handle only in the session:** browser reload → the run is orphaned,
       stopping is impossible, a second start is possible → two processes write to the
       same `run.log` (which gets truncated) and the same SQLite file ("database is
@@ -54,13 +58,27 @@ referenced in commits, pull requests and discussions.
 - [ ] **A7 – CUDA never available:** pip installs torch `+cpu`; "cuda" can still be selected.
 - [ ] **A8 – UX gaps:** deleting a profile without confirmation; settings only per session;
       results without timestamp/reference to the profile state.
-- [ ] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
+- [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
       `use_container_width` possibly deprecated (Streamlit 1.66).
+      (done 2026-10-21: duplicate import removed, `EXT` lives in `framescout_core`;
+      `use_container_width` moved to A10.)
+- [ ] **A10 – `use_container_width` is deprecated:** in Streamlit 1.66 the `st.button`
+      docstring marks it as deprecated in favor of `width="stretch"` (no runtime warning
+      yet; it still works). `width` for buttons is newer than the current floor
+      `streamlit>=1.40` (the release notes name 1.48 – not verified), so switching needs
+      a raised minimum version → do it together with I3.
+- [ ] **A11 – Progress bar parses German log text:** the app reads progress from `run.log`
+      with a regex on `Neu:`/`Cache:`/`Fehler:`. Translating the engine log (I7) breaks
+      the progress bar unless both change together; a machine-readable progress line or
+      status file (see P2) plus a test for the progress interpretation would decouple it.
 
 ### Installation / project
 
 - [x] **I1 – No git repository.** (done 2026-10-20)
-- [ ] **I2 – No tests.**
+- [ ] **I2 – No tests.** (partly done 2026-10-21: `pytest` scaffold and tests for
+      `framescout_core` – slugs, `EXT`, profile loading/validation, prompt generation.
+      Open: CI (roadmap step (2)); tests for cache signature/reuse, scoring and progress
+      interpretation; a smoke test with real models.)
 - [ ] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
 - [ ] **I4 – Installer requires the `py` launcher;** without it, the misleading message
       "Python nicht gefunden" (Python not found) is shown.
@@ -98,8 +116,9 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 - [x] Git repository + private GitHub repo (I1)
 - [x] (0) PR workflow (`/roadmap` skill, briefs, permission settings, PR template, labels)
       + English docs incl. `CLAUDE.md` update (I6)
-- [ ] (1) `pytest` scaffold + shared module `framescout_core.py` (slug, `EXT`, profile
+- [x] (1) `pytest` scaffold + shared module `framescout_core.py` (slug, `EXT`, profile
       loading/validation) with tests, no model download (A3, A9, part of I2)
+      (done 2026-10-21)
 - [ ] (2) CI: GitHub Action running `pytest` on a Windows runner without torch/model
       download (part of I2)
 - [ ] (3) English UI and outputs, neutral example profiles (I7, I5)
