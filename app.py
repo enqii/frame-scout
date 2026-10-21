@@ -7,7 +7,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (EXT, create_from_example, finish_reference_move, parse_progress, profile_slugs,
+from framescout_core import (EXT, create_from_example, cuda_status, device_choices, finish_reference_move,
+                             parse_progress, profile_slugs,
                              read_profiles, reference_folder, save_profiles, stage_reference_move,
                              undo_reference_move, update_backup_references, write_new_file)
 
@@ -196,18 +197,12 @@ with f_tab:
 
 with settings_tab:
     st.subheader('AI processing')
-    settings['device'] = st.selectbox('Compute device', ['auto','cpu','cuda'], index=['auto','cpu','cuda'].index(settings['device']), disabled=running(), help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
-    settings['batch'] = st.number_input('Batch size', min_value=1, max_value=64, value=int(settings['batch']), step=1, disabled=running())
-    settings['top'] = st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, value=int(settings['top']), step=25, disabled=running())
-    settings['detect'] = st.checkbox('Also detect individual persons in group photos (YOLO)', value=settings['detect'], disabled=running())
-    settings['max_persons'] = st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, value=int(settings['max_persons']), disabled=running())
-    settings['conf'] = st.slider('Minimum confidence of the person detection', .1, .9, float(settings['conf']), .05, disabled=running())
-    settings['weight'] = st.slider('Weight of reference images (if any)', 0., 1., float(settings['weight']), .05, disabled=running(), help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
     @st.cache_data(show_spinner=False)
     def system_info():
         import torch
         data = {'cpu': platform.processor() or platform.machine() or 'Not detected',
                 'threads': os.cpu_count() or 1, 'cuda': torch.cuda.is_available(),
+                'cuda_build': torch.version.cuda,
                 'gpu': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
         try:
             import psutil
@@ -216,13 +211,27 @@ with settings_tab:
             data['ram_gb'] = None
         return data
     try:
-        info = system_info()
+        info, info_error = system_info(), None
+    except Exception as exc:
+        info, info_error = None, exc
+    # "cuda" only if PyTorch can use it (A7); if detection failed, the engine still checks
+    devices = device_choices(info['cuda']) if info else ['auto', 'cpu', 'cuda']
+    if settings['device'] not in devices:
+        settings['device'] = 'auto'
+    settings['device'] = st.selectbox('Compute device', devices, index=devices.index(settings['device']), disabled=running(), help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
+    settings['batch'] = st.number_input('Batch size', min_value=1, max_value=64, value=int(settings['batch']), step=1, disabled=running())
+    settings['top'] = st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, value=int(settings['top']), step=25, disabled=running())
+    settings['detect'] = st.checkbox('Also detect individual persons in group photos (YOLO)', value=settings['detect'], disabled=running())
+    settings['max_persons'] = st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, value=int(settings['max_persons']), disabled=running())
+    settings['conf'] = st.slider('Minimum confidence of the person detection', .1, .9, float(settings['conf']), .05, disabled=running())
+    settings['weight'] = st.slider('Weight of reference images (if any)', 0., 1., float(settings['weight']), .05, disabled=running(), help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
+    if info:
         st.caption(f"Detected: {info['cpu']} · {info['threads']} logical CPU cores · " +
                    (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unknown · ') +
-                   (f"CUDA: {info['gpu']}" if info['cuda'] else 'No CUDA GPU detected'))
+                   cuda_status(info['cuda'], info['cuda_build'], info['gpu']))
         st.info('Recommendation: choose auto. A batch size of 8 is a conservative starting point; reduce it if memory runs short. Model weights are downloaded on the first run.')
-    except Exception as exc:
-        st.caption(f'System details could not be determined ({exc}). Automatic device selection remains available.')
+    else:
+        st.caption(f'System details could not be determined ({info_error}). Automatic device selection remains available.')
 
 with run_tab:
     st.subheader('Start search')

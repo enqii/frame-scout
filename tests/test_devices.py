@@ -1,5 +1,22 @@
-"""Compute devices: person detection on the CLIP device (E14)."""
-from framescout_core import detection_options
+"""Compute devices: person detection on the CLIP device (E14), device choice in the app (A7)."""
+from framescout_core import cuda_status, detection_options, device_choices
+
+
+def test_cuda_is_offered_only_when_pytorch_can_use_it():
+    # A7: with the CPU build of PyTorch "cuda" could be selected and the engine then failed
+    assert device_choices(cuda_available=False) == ['auto', 'cpu']
+    assert device_choices(cuda_available=True) == ['auto', 'cpu', 'cuda']
+
+
+def test_cuda_status_names_the_gpu():
+    assert cuda_status(True, '12.6', 'NVIDIA GeForce RTX 4070') == 'CUDA: NVIDIA GeForce RTX 4070'
+
+
+def test_cuda_status_tells_a_cpu_build_from_a_missing_gpu():
+    # torch.version.cuda is None for the CPU build: a GPU would not be used even if present
+    assert 'CPU build' in cuda_status(False, None, None)
+    missing = cuda_status(False, '12.6', None)
+    assert 'No CUDA GPU' in missing and 'CPU build' not in missing
 
 
 def test_person_detection_runs_on_the_clip_device():
