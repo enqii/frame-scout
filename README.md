@@ -55,7 +55,10 @@ the installer picks the PyTorch build from the GPU and driver that `nvidia-smi` 
 CUDA 13.0 for GeForce RTX 20 series or newer (compute capability 7.5+) with driver 580 or
 newer, otherwise CUDA 12.6 (GeForce GTX 900 series or newer, compute capability 5.0 up
 to 9.x, driver 528.33 or newer; RTX 50 series cards need CUDA 13.0 and a current driver).
-If no build suits the GPU and driver, it explains why and installs the CPU version. These
+With several NVIDIA GPUs it prefers a build that suits all of them; otherwise it takes
+the build for the most capable GPU and names the GPUs it cannot use. If no build suits the
+GPU and driver, it explains why and installs the CPU version (or keeps an installed CUDA
+build). These
 limits come from the CUDA and PyTorch documentation as known when this was written; they
 have **not been tested on a GPU** yet. Under "AI settings" the app shows whether PyTorch
 can use the GPU; it offers "cuda" only then.
