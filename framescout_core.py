@@ -449,19 +449,25 @@ def draft_size(clip_size, person_detection):
 
 
 def group_batches(items, batch_size, size):
-    """Yield lists of consecutive items until each holds at least batch_size crops.
+    """Yield lists of consecutive items with at most batch_size crops each.
 
-    size(item) is the number of crops of an item (a photo). Each list but the last has a
-    total size of at least batch_size, so CLIP embeds the crops of several photos in one
-    forward pass instead of one photo at a time (E2). Items are read lazily: a list is
-    yielded as soon as it is full, before the next item is requested.
+    size(item) is the number of crops of an item (a photo). Items are added to a list as
+    long as their crops fit, so CLIP embeds the crops of several photos in one forward
+    pass instead of one photo at a time (E2), and a list never needs a second, small pass
+    for a few leftover crops (review). An item with more than batch_size crops is a list
+    on its own. Items are read lazily: a full list is yielded before the next item is
+    requested; otherwise a list is yielded when the next item does not fit any more.
     """
     if batch_size < 1:
         raise ValueError('batch_size must be at least 1')
     group, count = [], 0
     for item in items:
+        n = size(item)
+        if group and count + n > batch_size:
+            yield group
+            group, count = [], 0
         group.append(item)
-        count += size(item)
+        count += n
         if count >= batch_size:
             yield group
             group, count = [], 0

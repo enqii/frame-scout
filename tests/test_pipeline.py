@@ -18,18 +18,23 @@ def test_photos_are_grouped_until_the_batch_is_full():
     assert [[name for name, _ in g] for g in groups] == [['a', 'b'], ['c', 'd'], ['e']]
 
 
-def test_a_group_is_closed_as_soon_as_it_reaches_the_batch_size():
-    # photos with person crops have several crops each; a group never waits for more
-    # photos once it holds batch_size crops, even if it holds more than that
-    assert sizes(group_batches([('a', 3), ('b', 13), ('c', 2), ('d', 5), ('e', 1)], 8,
-                               size=lambda item: item[1])) == [[3, 13], [2, 5, 1]]
+def test_a_group_never_exceeds_the_batch_size():
+    # each group is one CLIP forward pass of at most batch_size crops (review: a group of
+    # 9 crops at batch size 8 needed a second pass for a single crop); a photo whose crops
+    # do not fit any more starts the next group, a photo with more crops than batch_size
+    # is a group on its own (embedded in several passes)
+    assert sizes(group_batches([('a', 3), ('b', 13), ('c', 2), ('d', 5), ('e', 1), ('f', 7), ('g', 2)], 8,
+                               size=lambda item: item[1])) == [[3], [13], [2, 5, 1], [7], [2]]
 
 
 def test_order_is_kept_and_nothing_is_lost():
     items = [(str(i), 1 + i % 4) for i in range(50)]
     groups = list(group_batches(items, 7, size=lambda item: item[1]))
     assert [item for group in groups for item in group] == items
-    assert all(sum(n for _, n in group) >= 7 for group in groups[:-1])
+    assert all(sum(n for _, n in group) <= 7 for group in groups)
+    # a group is closed only when the next photo does not fit
+    for group, following in zip(groups, groups[1:]):
+        assert sum(n for _, n in group) + following[0][1] > 7
     assert all(group for group in groups)
 
 
