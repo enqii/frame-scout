@@ -37,3 +37,12 @@ def test_every_detector_setting_changes_the_signature():
     base = feature_signature(**DEFAULTS)
     for key, value in changes.items():
         assert feature_signature(**{**DEFAULTS, key: value}) != base, key
+
+
+def test_detector_settings_are_ignored_without_person_detection():
+    # without detection only the full image is embedded, so moving e.g. the confidence
+    # slider must not force a complete re-analysis
+    off = {**DEFAULTS, 'person_detection': False}
+    base = feature_signature(**off)
+    for key, value in dict(max_persons=5, person_confidence=.5, yolo_model='yolo11s.pt').items():
+        assert feature_signature(**{**off, key: value}) == base, key
