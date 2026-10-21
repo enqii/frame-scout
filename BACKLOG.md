@@ -38,6 +38,9 @@ referenced in commits, pull requests and discussions.
 - [ ] **A1 – Reference images get overwritten:** uploads are always named `reference-1…n`;
       a second upload overwrites the first ones. Profiles with the same slug
       (e.g. "Rotes Auto"/"rotes-auto") share the folder.
+      (partly done 2026-10-21: uploads take the next free `reference-<n>` name and never
+      overwrite a file – needed because transliteration made more names share a folder,
+      e.g. "Bär"/"Baer" → `references/baer/`. Still open: one folder per profile.)
 - [ ] **A2 – `profiles.json` data loss:** `read_profiles` does not know the v3 format
       (returns `[]`, the next save overwrites the file). A JSON list → `AttributeError`
       (not caught). No backup before saving.
