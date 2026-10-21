@@ -40,10 +40,13 @@ supported Python version and run the installer again.
 Your search profiles are stored in `profiles.json`, which is not part of the
 repository: on the first start the app creates it from the shipped
 `profiles.example.json` and never overwrites it afterwards. Each time the app saves your
-profiles, it keeps the previous version as `profiles.json.bak`. If `profiles.json` cannot
-be read (e.g. after editing it by hand), the app shows the error and leaves the file
-unchanged; fix it in a text editor or restore the backup. The app also reads the older
-format `{"name": ["search text", ...]}` and saves it in the current format.
+profiles, it keeps the version from before that save as `profiles.json.bak`. Only this one
+step is kept: the next save (any edit, new or deleted profile) replaces the backup, so
+restore it right after a mistake, or copy `profiles.json` elsewhere for a lasting backup.
+If `profiles.json` cannot be read (e.g. after editing it by hand), the app shows the error
+and leaves the file unchanged; fix it in a text editor or restore the backup. The app also
+reads the older format `{"name": ["search text", ...]}` and saves it in the current
+format; the original stays in `profiles.json.bak` only until the second save.
 
 Checkouts from before the English user interface still have a `profiles.json` that git
 tracks.
