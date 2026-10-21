@@ -75,7 +75,8 @@ referenced in commits, pull requests and discussions.
       on Windows skips the `finally` that removes the temporary file, so each stop
       during the export can leave one such file; it is never reused (no broken
       thumbnail), only clutter. Fix idea: a recognizable `.tmp` name that the next run
-      (or the cleanup of E7) removes, taking parallel runs (A4) into account.
+      (or the cleanup of E7) removes. Since A4 only one engine at a time uses an output
+      folder (`run.lock`), so a run holding the lock can remove such files safely.
 - [x] **E14 – YOLO runs on the CPU, one photo at a time:** `crops_for` passes
       `device='cpu'` to the detector, even when CLIP runs on CUDA, and since E2 the decoding
       threads share one detector under a lock, so detection is serialized. With person
@@ -161,12 +162,32 @@ referenced in commits, pull requests and discussions.
       "Bär" → `baer`, "Café" → `cafe`, hash fallback for names such as "猫", Windows
       device names get `-profile`, at most 60 characters. Galleries under the old slugs
       (e.g. `b-r.html`) stay in `results/` until cleanup exists (E7).)
-- [ ] **A4 – Process handle only in the session:** browser reload → the run is orphaned,
+- [x] **A4 – Process handle only in the session:** browser reload → the run is orphaned,
       stopping is impossible, a second start is possible → two processes write to the
       same `run.log` (which gets truncated) and the same SQLite file ("database is
       locked"). Also applies to multiple tabs.
-- [ ] **A5 – Progress only for the analysis phase:** scoring, thumbnails and HTML export run
+      (done 2026-10-21: the engine holds an operating-system lock on
+      `<output>/run.lock` (`framescout_core.RunLock`: Windows byte-range lock, `flock`
+      elsewhere), which the system releases when the process ends in any way, also after
+      `kill()`; a second engine on the same output folder waits five seconds and exits
+      with code 3. It writes `<output>/run-status.json` (`StatusReporter`: process id,
+      phase, progress, final phase and exit code). The app derives "running" from the lock
+      and that file on every rerun and every two seconds (`run_active`), so a reload,
+      another tab or session shows the run, keeps the controls disabled and can stop it
+      (by the process id from the file, checked to be the engine, with child processes:
+      the venv's `python.exe` is a launcher whose child is the engine). Start holds the
+      lock while it truncates `run.log`, spawns the engine and writes the status
+      "starting", so two starts at the same moment cannot both succeed. A stop from the
+      app is marked "Stopped in the app" in the status file. Verified with real runs:
+      a parallel CLI start exits with 3, a killed run frees the lock, a new Streamlit
+      session (AppTest) shows and stops a run started by another one.)
+- [x] **A5 – Progress only for the analysis phase:** scoring, thumbnails and HTML export run
       afterwards without any indication while the bar is already full.
+      (done 2026-10-21: the status file has the phase – starting, looking for photos,
+      loading the models, analyzing, scoring, writing galleries – and the progress of
+      each (photos, then gallery cards); the app shows it (`status_text`,
+      `status_fraction`), and after the run "finished", "failed" with the error message
+      or "interrupted". The log names the scoring and export phases as well.)
 - [ ] **A6 – Folder count on every rerun:** `rglob` over the whole photo folder on every
       interaction; slow for large folders/network drives.
 - [x] **A7 – CUDA never available:** pip installs torch `+cpu`; "cuda" can still be selected.
@@ -178,7 +199,9 @@ referenced in commits, pull requests and discussions.
       `Install-FrameScout.bat cuda` (or update the driver) and start FrameScout again. Not
       run on a GPU: I11.)
 - [ ] **A8 – UX gaps:** deleting a profile without confirmation; settings only per session;
-      results without timestamp/reference to the profile state.
+      results without timestamp/reference to the profile state. Since A4 a reload shows a
+      running search again, but the settings and the photo folder it was started with are
+      back at their defaults (the status file does not record them).
 - [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
       `use_container_width` possibly deprecated (Streamlit 1.66).
       (done 2026-10-21: duplicate import removed, `EXT` lives in `framescout_core`;
@@ -190,13 +213,15 @@ referenced in commits, pull requests and discussions.
       a raised minimum version → do it together with I3.
       (I3 is done, but the user kept the Streamlit floor at `>=1.40` in PR #8: raising
       it and switching to `width` belong together in this item.)
-- [ ] **A11 – Progress bar parses German log text:** the app reads progress from `run.log`
+- [x] **A11 – Progress bar parses German log text:** the app reads progress from `run.log`
       with a regex on `Neu:`/`Cache:`/`Fehler:`. Translating the engine log (I7) breaks
       the progress bar unless both change together; a machine-readable progress line or
       status file (see P2) plus a test for the progress interpretation would decouple it.
       (partly done 2026-10-21: the line format lives in `framescout_core.progress_line`,
       the app parses it with `parse_progress`, both tested; the line is English now.
       Still open: a machine-readable status file (P2).)
+      (done 2026-10-21 with A4/A5: the app reads the progress from `run-status.json`;
+      `parse_progress` is removed, the progress line stays in the log for people.)
 - [ ] **A12 – Gallery downloads are re-derived from the current profile list:** the app
       maps profiles to `<slug>.html` with `profile_slugs` on the *current*
       `profiles.json`. After deleting, renaming or reordering profiles with colliding
@@ -204,7 +229,8 @@ referenced in commits, pull requests and discussions.
       "Rotes Auto" → "rotes auto!" now maps to the old `rotes-auto.html`. Fix: the engine
       writes a manifest (profile name → file, run timestamp) that the app reads – a new
       output format, so a design decision; fits the status file of P2 and A8 ("results
-      without reference to the profile state").
+      without reference to the profile state"). Since A4 the engine writes
+      `results/run-status.json`; the manifest could become part of it.
 - [ ] **A13 – Concurrent profile edits are lost:** the app reads `profiles.json` on every
       rerun and saves its whole list, so an edit made in another tab/session (or by hand)
       between that read and a save is overwritten; `profiles.json.bak` holds only the
@@ -241,8 +267,10 @@ referenced in commits, pull requests and discussions.
       2026-10-21 (A7/I3/E14): tests for the choice of the PyTorch build, `install_torch.py`
       (nvidia-smi and pip replaced) and the device choice of the app; the `.bat` file
       itself is not tested in CI.
-      Open: tests for cache signature/reuse, scoring and progress interpretation; a smoke
-      test with real models.)
+      2026-10-21 (A4/A5): tests for the run lock (also released when its process is
+      killed), the status file and the app's run state.
+      Open: tests for cache signature/reuse and scoring; tests of `app.py` itself (e.g.
+      Streamlit's `AppTest`, which needs Streamlit in CI); a smoke test with real models.)
 - [x] **I3 – `requirements.txt` unpinned;** no CUDA option in the installer.
       (done 2026-10-21: `torch==2.14.1` and `torchvision==0.29.1` are pinned
       (`framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, a test keeps both in sync);
@@ -353,8 +381,8 @@ Each unchecked item is implemented in its own pull request, strictly one after a
       run on a GPU, I11)
 
 ### P2 – Robust runs
-- [ ] Engine writes a status/lock file (PID, phase, progress); the app reconnects after a
-      reload and prevents parallel starts (A4, A5)
+- [x] Engine writes a status/lock file (PID, phase, progress); the app reconnects after a
+      reload and prevents parallel starts (A4, A5) (done 2026-10-21)
 - [ ] Persist settings in `settings.json` (A8)
 
 ### P3 – Search quality
