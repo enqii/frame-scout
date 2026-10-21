@@ -48,6 +48,10 @@ detection then run on the GPU. You can also choose directly:
 .\Install-FrameScout.bat cpu    # PyTorch for the CPU only
 ```
 
+Close FrameScout (the `Start-FrameScout.bat` window) before you run the installer: pip
+cannot replace PyTorch's files while the app uses them, and the app shows the new
+build only after it is started again.
+
 Running the installer again without an option (e.g. after an update) keeps an installed
 CUDA build and asks nothing; `cpu` or `cuda` switches between the two. If the GPU cannot
 be checked at that moment, an installed CUDA build is kept as well. For CUDA

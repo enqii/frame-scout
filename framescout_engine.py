@@ -20,7 +20,7 @@ import open_clip
 from PIL import Image, ImageOps, ImageFile
 
 from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, crop_label,
-                             detection_options, draft_size, ensure_thumbnail, feature_signature, group_batches, load_profiles,
+                             cuda_hint, detection_options, draft_size, ensure_thumbnail, feature_signature, group_batches, load_profiles,
                              prefetch, profile_slugs, progress_due, progress_line, store_group)
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
@@ -115,8 +115,7 @@ def main():
         parser.error('No supported images found. Please check the local photo folder.')
     device = ('cuda' if torch.cuda.is_available() else 'cpu') if args.device == 'auto' else args.device
     if device == 'cuda' and not torch.cuda.is_available():
-        parser.error('CUDA is not available; use --device cpu. For an NVIDIA GPU, install PyTorch with CUDA support: '
-                     'Install-FrameScout.bat cuda.')
+        parser.error(f'CUDA is not available; use --device cpu. {cuda_hint(torch.version.cuda)}')
     torch.set_num_threads(min(12, max(1, torch.get_num_threads())))
     output.mkdir(parents=True, exist_ok=True)
     print(f'{len(paths)} photos; {len(profiles)} search profiles; CLIP: {device}; '

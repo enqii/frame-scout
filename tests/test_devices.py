@@ -1,5 +1,5 @@
 """Compute devices: person detection on the CLIP device (E14), device choice in the app (A7)."""
-from framescout_core import cuda_status, detection_options, device_choices
+from framescout_core import cuda_hint, cuda_status, detection_options, device_choices
 
 
 def test_cuda_is_offered_only_when_pytorch_can_use_it():
@@ -12,14 +12,26 @@ def test_cuda_status_names_the_gpu():
     assert cuda_status(True, '12.6', 'NVIDIA GeForce RTX 4070') == 'CUDA: NVIDIA GeForce RTX 4070'
 
 
-def test_cuda_status_tells_a_cpu_build_from_a_missing_gpu():
+def test_cuda_status_tells_a_cpu_build_from_an_unusable_gpu():
     # torch.version.cuda is None for the CPU build: a GPU would not be used even if present
     cpu_build = cuda_status(False, None, None)
     assert 'CPU build' in cpu_build
     # the way to GPU support (A7): the installer option for the CUDA build
-    assert 'Install-FrameScout.bat cuda' in cpu_build
-    missing = cuda_status(False, '12.6', None)
-    assert 'No CUDA GPU' in missing and 'CPU build' not in missing
+    assert cuda_hint(None) in cpu_build
+    # a CUDA build that cannot use the GPU: often a driver too old for that build (review)
+    unusable = cuda_status(False, '13.0', None)
+    assert 'CPU build' not in unusable and 'CUDA 13.0' in unusable and 'driver' in unusable
+    assert cuda_hint('13.0') in unusable
+
+
+def test_cuda_hint_says_to_close_and_restart_frame_scout():
+    # review: pip cannot replace torch's files while the app has them loaded, and the app
+    # only sees the new build after a restart
+    for build in (None, '13.0'):
+        hint = cuda_hint(build)
+        assert 'Install-FrameScout.bat cuda' in hint
+        assert 'close FrameScout' in hint and 'start FrameScout again' in hint
+    assert 'driver' in cuda_hint('13.0')
 
 
 def test_person_detection_runs_on_the_clip_device():
