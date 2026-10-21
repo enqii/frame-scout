@@ -470,18 +470,32 @@ def device_choices(cuda_available):
     return ['auto', 'cpu'] + (['cuda'] if cuda_available else [])
 
 
-def cuda_status(cuda_available, cuda_build, gpu_name):
+def cuda_hint(torch_cuda):
+    """Return how to get GPU support when PyTorch cannot use CUDA (A7).
+
+    torch_cuda is torch.version.cuda (None for the CPU build). FrameScout must be closed
+    first: pip cannot replace torch's files while the app has them loaded, and the app sees
+    a new build only after a restart (review).
+    """
+    if torch_cuda is None:
+        return 'For an NVIDIA GPU, close FrameScout, run Install-FrameScout.bat cuda and start FrameScout again.'
+    return ('Update the NVIDIA driver, or close FrameScout, run Install-FrameScout.bat cuda (it picks the build '
+            'for the installed driver) and start FrameScout again.')
+
+
+def cuda_status(cuda_available, torch_cuda, gpu_name):
     """Describe whether the engine can use a CUDA GPU, for the app's system details.
 
-    cuda_build is torch.version.cuda: None for the CPU build of PyTorch, which never uses
-    a GPU, even an NVIDIA GPU with a current driver (A7).
+    torch_cuda is torch.version.cuda: None for the CPU build of PyTorch, which never uses
+    a GPU, even an NVIDIA GPU with a current driver (A7). A CUDA build that cannot use the
+    GPU often means a driver too old for that build, not a missing GPU (review).
     """
     if cuda_available:
         return f'CUDA: {gpu_name}'
-    if cuda_build is None:
-        return ('PyTorch without CUDA support (CPU build), so the analysis runs on the CPU. '
-                'For an NVIDIA GPU, run Install-FrameScout.bat cuda')
-    return f'No CUDA GPU detected (PyTorch for CUDA {cuda_build}), so the analysis runs on the CPU'
+    if torch_cuda is None:
+        return f'PyTorch without CUDA support (CPU build), so the analysis runs on the CPU. {cuda_hint(None)}'
+    return (f'PyTorch for CUDA {torch_cuda} finds no usable GPU (no NVIDIA GPU, or a driver too old for this '
+            f'build), so the analysis runs on the CPU. {cuda_hint(torch_cuda)}')
 
 
 # Input size of the person detection: it decides which persons are found, i.e. which
