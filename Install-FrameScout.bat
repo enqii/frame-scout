@@ -17,12 +17,12 @@ if not exist ".venv\Scripts\python.exe" (
    if not errorlevel 1 set "PYTHON_VERSION=%%V"
   )
  )
- if not defined PYTHON_VERSION (echo Python 3.12 bis 3.14 nicht gefunden. & pause & exit /b 1)
- echo Verwende Python !PYTHON_VERSION!
+ if not defined PYTHON_VERSION (echo Python 3.12 to 3.14 not found. & pause & exit /b 1)
+ echo Using Python !PYTHON_VERSION!
  py -!PYTHON_VERSION! -m venv .venv
- if errorlevel 1 (echo Erstellen der virtuellen Umgebung fehlgeschlagen. & pause & exit /b 1)
+ if errorlevel 1 (echo Creating the virtual environment failed. & pause & exit /b 1)
 )
 ".venv\Scripts\python.exe" -m pip install --no-cache-dir -r requirements.txt
-if errorlevel 1 (echo Installation fehlgeschlagen. Siehe Fehlermeldung. & pause & exit /b 1)
-".venv\Scripts\python.exe" -c "import torch,open_clip,ultralytics,streamlit;print('FrameScout: Importtest OK')"
+if errorlevel 1 (echo Installation failed. See the error message above. & pause & exit /b 1)
+".venv\Scripts\python.exe" -c "import torch,open_clip,ultralytics,streamlit;print('FrameScout: import test OK')"
 pause

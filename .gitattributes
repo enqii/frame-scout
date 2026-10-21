@@ -1,4 +1,4 @@
 * text=auto
-# cmd.exe erwartet CRLF in Batch-Dateien
+# cmd.exe expects CRLF line endings in batch files
 *.bat text eol=crlf
 *.cmd text eol=crlf

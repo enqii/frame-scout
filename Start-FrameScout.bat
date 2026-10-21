@@ -9,7 +9,7 @@ set "TMP=%CD%\.tmp"
 set "TEMP=%CD%\.tmp"
 if not exist ".tmp" mkdir ".tmp"
 if not exist ".venv\Scripts\python.exe" (
- echo Die Python-Umgebung fehlt. Bitte zuerst Install-FrameScout.bat starten.
+ echo The Python environment is missing. Please run Install-FrameScout.bat first.
  pause
  exit /b 1
 )
