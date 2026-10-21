@@ -63,8 +63,10 @@ With several NVIDIA GPUs it prefers a build that suits all of them; otherwise it
 the build for the most capable GPU and names the GPUs it cannot use. If no build suits the
 GPU and driver, it explains why and installs the CPU version (or keeps an installed CUDA
 build). These
-limits come from the CUDA and PyTorch documentation as known when this was written; they
-have **not been tested on a GPU** yet. Under "AI settings" the app shows whether PyTorch
+limits come from the CUDA and PyTorch documentation as known when this was written and
+are **not verified**. The GPU path has had a single test run so far (a GeForce RTX 4070
+with the CUDA 13.0 build and synthetic test images; the results matched a CPU run), so
+treat GPU support as experimental. Under "AI settings" the app shows whether PyTorch
 can use the GPU; it offers "cuda" only then.
 
 ### Updating an existing installation
