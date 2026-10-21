@@ -190,7 +190,8 @@ def main():
             print(f'CACHE ERROR {path}: {exc}', flush=True)
     con.close()
 
-    thumbs = output / 'vorschaubilder'; thumbs.mkdir(exist_ok=True)
+    # results/vorschaubilder/ of older versions is left alone; cleanup is E7
+    thumbs = output / 'thumbnails'; thumbs.mkdir(exist_ok=True)
     names = [p['name'] for p in profiles]
     slugs = dict(zip(names, profile_slugs(names)))
     nav = '<nav>' + ' · '.join(f'<a href="{quote(slugs[p["name"]] + ".html")}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
@@ -213,7 +214,7 @@ def main():
                 continue
             uri = html.escape(path.as_uri(), quote=True)
             rel = html.escape(str(path.relative_to(root)))
-            cards.append(f'<article><a href="{uri}" target="_blank"><img loading="lazy" src="vorschaubilder/{quote(thumb_name)}" alt="{rel}"></a>'
+            cards.append(f'<article><a href="{uri}" target="_blank"><img loading="lazy" src="thumbnails/{quote(thumb_name)}" alt="{rel}"></a>'
                          f'<p><b>#{rank}</b> · Similarity {score:.3f} · {html.escape(crop_label(label))}<br>'
                          f'<a href="{uri}" target="_blank">{html.escape(path.name)}</a></p><small>{rel}</small></article>')
         page = ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
