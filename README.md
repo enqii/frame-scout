@@ -117,9 +117,12 @@ starts with the new example profiles.
    Without person detection, JPEG photos are decoded at a reduced resolution, which
    makes the analysis noticeably faster; with person detection they keep their full
    resolution, so that small persons, e.g. in group photos, keep their detail.
-5. **Search & results:** start the analysis. Keep the browser open
-   during the search run if possible – start/stop is tied to the running Streamlit
-   session.
+5. **Search & results:** start the analysis. The page shows the current step (looking
+   for photos, loading the AI models, analyzing, scoring, writing the galleries) and its
+   progress. The search keeps running when you reload the page or close the browser tab
+   (as long as the `Start-FrameScout.bat` window stays open); opening the page again, also
+   in another tab, shows it again and lets you stop it. Only one search runs at a time:
+   while one runs, the controls are disabled in every tab, and a second start is refused.
 
 Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 
@@ -137,6 +140,10 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
   the log names it ("Thumbnail not possible").
 - Keep the `results` folder together: an HTML file exported on its own contains no
   thumbnails, and the links to the originals only work on this computer.
+- While a search runs, `results/run.lock` marks it as running and
+  `results/run-status.json` holds its step and progress; the app reads both. Both files
+  stay after the run (the status file then describes the last run) and can be deleted
+  when no search is running.
 - Photos that have already been analyzed are stored in `results/cache.sqlite3`. An
   interrupted run resumes from there on the next start (the few photos that were being
   analyzed at the moment of the stop are analyzed again), and new search profiles reuse
@@ -182,6 +189,12 @@ Manual start after installation:
 `profiles.json` exists once the app has been started; on a fresh clone use
 `--profiles .\profiles.example.json` instead.
 
+Only one search at a time can use an output folder: the engine holds a lock on
+`<output>\run.lock` while it runs and writes its progress to `<output>\run-status.json`.
+A second engine started on the same output folder (also while the app runs a search
+into `results`) waits up to five seconds and then exits with code 3. The app shows a
+search started from the command line into `results` as well, and its Stop button ends it.
+
 All engine options: `.\.venv\Scripts\python.exe framescout_engine.py --help`
 
 Tests (they need neither torch nor a model download):
@@ -203,7 +216,7 @@ Commits, one pull request per roadmap item).
 |---|---|
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
-| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles, thumbnails); standard library only |
+| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles, thumbnails, run lock and status file); standard library only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies (PyTorch pinned) |
 | `install_torch.py` | Installs the CPU or CUDA build of PyTorch; called by `Install-FrameScout.bat` |
