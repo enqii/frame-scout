@@ -74,6 +74,24 @@ def profile_slugs(names):
     return slugs
 
 
+def write_new_file(folder, stem, suffix, data):
+    """Write data to folder/<stem>-<n><suffix> with the smallest free n >= 1; return the path.
+
+    Never overwrites an existing file (exclusive create), so reference images of profiles
+    that share a folder cannot replace each other. Creates the folder if needed.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    n = 1
+    while True:
+        path = folder / f'{stem}-{n}{suffix}'
+        try:
+            with open(path, 'xb') as handle:
+                handle.write(data)
+            return path
+        except FileExistsError:
+            n += 1
+
+
 def generic_prompts(name, context='', features=''):
     """English CLIP prompts derived from a profile's name, context and features."""
     subject = name.strip()

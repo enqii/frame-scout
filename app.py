@@ -10,7 +10,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import EXT, profile_slugs, slugify
+from framescout_core import EXT, profile_slugs, slugify, write_new_file
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'
@@ -49,15 +49,14 @@ def cache_env():
     return env
 
 def add_ref_files(files, name):
+    # profiles with the same slug share the folder (A1); write_new_file never overwrites
     target_dir = REFS / slugify(name)
-    target_dir.mkdir(parents=True, exist_ok=True)
     paths = []
-    for i, f in enumerate(files):
+    for f in files:
         suffix = Path(f.name).suffix.lower()
         if suffix not in EXT:
             continue
-        target = target_dir / f'reference-{i+1}{suffix}'
-        target.write_bytes(f.getvalue())
+        target = write_new_file(target_dir, 'reference', suffix, f.getvalue())
         paths.append(target.relative_to(BASE).as_posix())
     return paths
 
