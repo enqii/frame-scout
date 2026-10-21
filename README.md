@@ -39,7 +39,11 @@ supported Python version and run the installer again.
 
 Your search profiles are stored in `profiles.json`, which is not part of the
 repository: on the first start the app creates it from the shipped
-`profiles.example.json` and never overwrites it afterwards.
+`profiles.example.json` and never overwrites it afterwards. Each time the app saves your
+profiles, it keeps the previous version as `profiles.json.bak`. If `profiles.json` cannot
+be read (e.g. after editing it by hand), the app shows the error and leaves the file
+unchanged; fix it in a text editor or restore the backup. The app also reads the older
+format `{"name": ["search text", ...]}` and saves it in the current format.
 
 Checkouts from before the English user interface still have a `profiles.json` that git
 tracks.
@@ -56,7 +60,11 @@ starts with the new example profiles.
    features, custom search texts and reference images. CLIP understands English best,
    so enter motif names and features in English where possible. On the first start the
    list contains a few example profiles (red car, golden retriever, mountain landscape,
-   …) that you can edit or delete.
+   …) that you can edit or delete. Uploaded reference images are copied to
+   `references/<profile name>/` (e.g. `references/red-car/`); a profile whose name
+   leads to a folder another profile already uses gets its own (`red-car-2`, …).
+   Removing reference images from a profile or deleting a profile does not delete the
+   files.
 3. **Photo source:** choose a local image folder (default: `photos` in the
    project folder). Subfolders are searched as well. Download and extract archives and
    online albums yourself beforehand – FrameScout does not download images from the
@@ -80,6 +88,8 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 - The gallery file is named after the profile in plain ASCII, e.g. "Red car" →
   `red-car.html`, "Bär" → `baer.html`; names that would collide get `-2`, `-3`, … in
   profile order, and names without Latin letters or digits (e.g. "猫") get a short hash.
+- A photo that is deleted or moved while a search runs is left out of the galleries;
+  the log names it ("Thumbnail not possible").
 - Keep the `results` folder together: an HTML file exported on its own contains no
   thumbnails, and the links to the originals only work on this computer.
 - Photos that have already been analyzed are stored in `results/cache.sqlite3`. An
@@ -142,7 +152,7 @@ Commits, one pull request per roadmap item).
 |---|---|
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
-| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, profile loading); standard library only |
+| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles, thumbnails); standard library only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies |
 | `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
