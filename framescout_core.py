@@ -460,7 +460,7 @@ def read_profiles(filename):
 
 
 def save_profiles(filename, profiles):
-    """Write profiles to filename as {"profiles": [...]}, keeping the previous file as .bak.
+    """Write profiles to filename as {"profiles": [...]} (other top-level keys are kept), with a .bak.
 
     The previous content is copied byte for byte to <filename>.bak first (replacing an
     older backup, so only the state before the latest save is kept); if that fails,
@@ -472,9 +472,18 @@ def save_profiles(filename, profiles):
         previous = filename.read_bytes()
     except FileNotFoundError:
         previous = None
+    document = {'profiles': profiles}
     if previous is not None:
         _replace_atomically(filename.with_name(filename.name + '.bak'), previous)
-    text = json.dumps({'profiles': profiles}, ensure_ascii=False, indent=2) + '\n'
+        try:
+            old = json.loads(previous.decode('utf-8-sig'))
+        except ValueError:  # unreadable: nothing to keep (the .bak has it)
+            old = None
+        # other top-level keys (e.g. hand-added metadata) are kept in their order; a v3
+        # file, whose keys are profile names, is not merged (review)
+        if isinstance(old, dict) and 'profiles' in old:
+            document = {**old, 'profiles': profiles}
+    text = json.dumps(document, ensure_ascii=False, indent=2) + '\n'
     _replace_atomically(filename, text.encode('utf-8'))
 
 
