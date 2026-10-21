@@ -573,26 +573,13 @@ def ensure_thumbnail(path, thumbs, legacy_thumbs, render, log):
         return None
 
 
-# Not anchored to the start of a line: stderr shares run.log, and a warning or a progress
-# bar written without a final newline can precede the progress line. The "Progress:"
-# prefix keeps other output from being read as progress.
-_PROGRESS = re.compile(r'Progress: (\d+)/(\d+) \| New: (\d+) \| Cached: (\d+) \| Errors: (\d+)')
-
-
 def progress_line(done, total, new, cached, errors):
-    """Return the progress line the engine prints to its log during the analysis."""
-    return f'Progress: {done}/{total} | New: {new} | Cached: {cached} | Errors: {errors}'
+    """Return the progress line the engine prints to its log during the analysis.
 
-
-def parse_progress(log_text):
-    """Return (done, total, new, cached, errors) of the last progress line, or None.
-
-    The app reads the engine's progress from run.log with this function, so the format
-    is defined in one place only (progress_line) and translating the log cannot
-    silently break the progress bar (A11).
+    For people reading the log only: the app reads the progress from the status file
+    (StatusReporter, A5), not from the log text (A11).
     """
-    matches = _PROGRESS.findall(log_text)
-    return tuple(map(int, matches[-1])) if matches else None
+    return f'Progress: {done}/{total} | New: {new} | Cached: {cached} | Errors: {errors}'
 
 
 def progress_due(before, after, total, every=25):
