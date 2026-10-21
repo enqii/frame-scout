@@ -89,8 +89,10 @@ def test_missing_or_blank_name_is_rejected(tmp_path, profile):
         load_profiles(write_profiles(tmp_path, {'profiles': [profile]}), [])
 
 
-def test_duplicate_names_are_rejected_case_insensitively(tmp_path):
-    path = write_profiles(tmp_path, {'profiles': [{'name': 'Red car'}, {'name': 'RED CAR'}]})
+@pytest.mark.parametrize('second', ['RED CAR', ' Red car', 'red car  '])
+def test_duplicate_names_are_rejected_case_and_whitespace_insensitively(tmp_path, second):
+    # names are stored stripped; " Red car" would otherwise merge with "Red car" (E10)
+    path = write_profiles(tmp_path, {'profiles': [{'name': 'Red car'}, {'name': second}]})
     with pytest.raises(ValueError):
         load_profiles(path, [])
 
@@ -122,7 +124,7 @@ def test_inline_profiles_are_appended_after_file_profiles(tmp_path):
 
 
 def test_inline_profile_must_not_duplicate_a_file_profile(tmp_path):
-    path = write_profiles(tmp_path, {'profiles': [{'name': 'Dog'}]})
+    path = write_profiles(tmp_path, {'profiles': [{'name': ' Dog'}]})
     with pytest.raises(ValueError):
         load_profiles(path, ['dog'])
 

@@ -120,9 +120,10 @@ def load_profiles(filename, inline):
         if not isinstance(item, dict):
             raise ValueError('Jedes Profil muss ein JSON-Objekt sein.')
         name = item.get('name', '')
-        if not isinstance(name, str) or not name.strip() or name.lower() in names:
+        # compare the stripped name: it is the one stored and used as key (E10)
+        if not isinstance(name, str) or not name.strip() or name.strip().lower() in names:
             raise ValueError(f'Profilname fehlt oder ist doppelt: {name!r}')
-        names.add(name.lower())
+        names.add(name.strip().lower())
         franchise = item.get('franchise', '')
         features = item.get('features', '')
         prompts = item.get('prompts', [])
