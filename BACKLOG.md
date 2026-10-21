@@ -14,7 +14,7 @@ referenced in commits, pull requests and discussions.
       bump the `ENGINE` signature (the cache is rebuilt once).
       (done 2026-10-21: `ViT-B-32-quickgelu`, same weights file; model name, `ENGINE` (v5)
       and `feature_signature` live in `framescout_core` with tests. Every photo is
-      analyzed once more after the update; the v4 rows stay in `cache.sqlite3` (E7).)
+      analyzed once more after the update; the v4 rows stay in `cache.sqlite3` (E11).)
 - [ ] **E2 – No batching across images:** `embed_images` only receives the crops of a single
       photo, so the batch size has almost no effect. Also: no parallel decoding, full
       resolution (no `Image.draft`), YOLO hard-coded to `device='cpu'`.
@@ -38,6 +38,14 @@ referenced in commits, pull requests and discussions.
 - [x] **E10 – Duplicate check before `strip()`:** "Joker" and " Joker" are not recognized as
       equal. (done 2026-10-21 in `framescout_core.load_profiles`; such a hand-edited
       `profiles.json` is now rejected instead of merging both profiles into one gallery.)
+- [ ] **E11 – Dead cache rows after an `ENGINE` bump:** after E1 (v4 → v5) every v4 row
+      (GELU embeddings) stays in `results/cache.sqlite3` and can never be reused, so the
+      file roughly doubles on the first run after the update and never shrinks. The
+      `signature` column is a hash, so rows of old engine versions can only be found for
+      setting combinations that are known in advance (e.g. the v1.1 defaults). Fix idea:
+      store `ENGINE` in its own column, then delete rows of other engine versions and
+      `VACUUM` – only with the user's consent (the cache is user data). Part of the
+      cleanup in E7.
 
 ### App (`app.py`)
 
@@ -187,7 +195,7 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 ### P4 – UX
 - [ ] Result gallery in the app, mark matches/copy them to a folder, "open folder",
       ZIP export with thumbnails
-- [ ] Cleanup of cache/thumbnails/orphaned HTML files (E7); optional HEIC/RAW support
+- [ ] Cleanup of cache/thumbnails/orphaned HTML files (E7, E11); optional HEIC/RAW support
 
 ### P5 – Distribution
 - [ ] Pinned dependencies, portable Python variant, uninstall script
