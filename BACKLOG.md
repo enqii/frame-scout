@@ -209,12 +209,17 @@ referenced in commits, pull requests and discussions.
       person detection with its maximum and confidence, reference weight – are kept in
       `settings.json` in the project folder (gitignored), so a reload, a restart, another
       tab or session shows them, also for a running search. The app reads the file on
-      every rerun and saves the values changed in a page run merged into the current file
+      every rerun (retrying a read that fails while another session replaces it) and
+      saves the values changed in a page run merged into the current file
       (`framescout_core.read_settings`/`save_settings`); only values that differ from the
       defaults are written, so the default photo folder follows a moved project folder.
-      Invalid values fall back to their defaults with a warning, an unreadable file is
-      never replaced, and a saved device PyTorch cannot use is used as "auto" but stays
-      saved. Two sessions changing the same setting at once: the last save wins.
+      The widgets have keys and get the saved values through their session state (passed
+      as `value=`, every save gave them a new identity and dropped the next change, PR #10
+      review); the app tells a change made in a session from another session's save, so
+      the latest action wins. Invalid values fall back to their defaults with a warning
+      and are removed with the next save, an unreadable file is never replaced (the page
+      keeps the settings it shows), and a saved device PyTorch cannot use is used as
+      "auto" but stays saved until another device or "Use auto from now on" is chosen.
       Still open: deleting a profile without confirmation; results without timestamp or
       reference to the profile state, see A12.)
 - [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
