@@ -115,8 +115,6 @@ def main():
         parser.error('Invalid value for batch-size, top, max-persons, person-confidence or reference-weight.')
     root = args.folder.resolve()
     output = args.output.resolve()
-    if not root.is_dir():
-        parser.error(f'Photo folder does not exist: {root}')
     if output == root:
         parser.error('The output folder must not be the photo folder.')
     output.mkdir(parents=True, exist_ok=True)
@@ -151,6 +149,10 @@ def main():
 
 def search(args, parser, root, output, status):
     """Run the search with the run lock of output held; report the phases to status (A5)."""
+    # checked here, not before the lock, so the app's status names the error: the folder
+    # can disappear between the click on Start and the engine start
+    if not root.is_dir():
+        parser.error(f'Photo folder does not exist: {root}')
     try:
         profiles = load_profiles(args.profiles.resolve() if args.profiles else None, args.character)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
