@@ -65,6 +65,11 @@ st.caption('Local AI search in large photo collections · your images stay on yo
 
 try:
     create_from_example(PROFILES, EXAMPLE_PROFILES)  # first start only; never overwrites
+except OSError as exc:  # e.g. a read-only project folder
+    st.error(f'Could not create profiles.json from profiles.example.json: {exc}. '
+             'Check that the project folder is writable.')
+    st.stop()
+try:
     profiles = read_profiles()
 except (OSError, ValueError) as exc:
     st.error(f'profiles.json is invalid: {exc}')
