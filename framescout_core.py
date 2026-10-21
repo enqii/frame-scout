@@ -5,7 +5,9 @@ without torch, Streamlit or any model download.
 """
 import hashlib
 import json
+import os
 import re
+import tempfile
 import unicodedata
 from pathlib import Path
 
@@ -95,24 +97,34 @@ def create_from_example(target, example):
 
     Used for profiles.json, the user's working file, which is not in the repository:
     the app creates it from the shipped profiles.example.json on the first start. An
-    existing file (even an empty one) is never replaced (exclusive create), and nothing
-    is created if the example is missing.
+    existing file (even an empty one) is never replaced, and nothing is created if the
+    example is missing. The copy is written to a temporary file next to target first and
+    only then published under the final name, so a crash or a parallel session never
+    sees a half-written target.
     """
     try:
         data = example.read_bytes()
     except FileNotFoundError:
         return False
+    fd, name = tempfile.mkstemp(dir=target.parent, prefix=target.name + '.', suffix='.tmp')
+    tmp = Path(name)
     try:
-        handle = open(target, 'xb')
+        with os.fdopen(fd, 'wb') as handle:
+            handle.write(data)
+        _publish_new(tmp, target)
     except FileExistsError:
         return False
-    try:
-        with handle:
-            handle.write(data)
-    except OSError:
-        target.unlink()  # we created it; do not leave a truncated copy behind
-        raise
+    finally:
+        tmp.unlink(missing_ok=True)
     return True
+
+
+def _publish_new(tmp, target):
+    """Give the complete file tmp the name target; raise FileExistsError if target exists."""
+    if os.name == 'nt':
+        os.rename(tmp, target)  # never replaces an existing file on Windows (any file system)
+    else:
+        os.link(tmp, target)  # POSIX rename would replace target; a hard link does not
 
 
 # Label of the uncropped photo among the crops; person crops are labelled "Person <n>".
