@@ -65,8 +65,6 @@ referenced in commits, pull requests and discussions.
 - [ ] **A7 – CUDA never available:** pip installs torch `+cpu`; "cuda" can still be selected.
 - [ ] **A8 – UX gaps:** deleting a profile without confirmation; settings only per session;
       results without timestamp/reference to the profile state.
-- [ ] **A13 – Unused `import time` in `app.py`:** left over; harmless, remove it with the
-      next change to the imports.
 - [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
       `use_container_width` possibly deprecated (Streamlit 1.66).
       (done 2026-10-21: duplicate import removed, `EXT` lives in `framescout_core`;
