@@ -2,14 +2,15 @@
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 rem Usage: Install-FrameScout.bat [cpu or cuda]
-rem Without an argument, GPU support is offered if an NVIDIA graphics driver is found.
-rem Running it again with the other variant switches the installed PyTorch build.
+rem Without an argument, an installed CUDA build of PyTorch is kept; otherwise GPU support
+rem is offered if an NVIDIA graphics driver is found. "cpu" or "cuda" switches the build.
 set "TORCH_VARIANT=%~1"
 if not "%TORCH_VARIANT%"=="" if /i not "%TORCH_VARIANT%"=="cpu" if /i not "%TORCH_VARIANT%"=="cuda" (
  echo Usage: Install-FrameScout.bat [cpu^|cuda]
  echo   cpu    PyTorch for the CPU
  echo   cuda   PyTorch with CUDA support for an NVIDIA GPU
- echo Without an argument, FrameScout asks if an NVIDIA graphics driver is found.
+ echo Without an argument, FrameScout keeps an installed CUDA build, otherwise it asks
+ echo if an NVIDIA graphics driver is found.
  pause
  exit /b 1
 )
@@ -37,21 +38,10 @@ if not exist ".venv\Scripts\python.exe" (
  py -!PYTHON_VERSION! -m venv .venv
  if errorlevel 1 (echo Creating the virtual environment failed. & pause & exit /b 1)
 )
-if "%TORCH_VARIANT%"=="" (
- set "TORCH_VARIANT=cpu"
- where nvidia-smi >nul 2>&1
- if not errorlevel 1 (
-  echo An NVIDIA graphics driver was found. FrameScout can use the GPU with CUDA.
-  choice /C YN /M "Install GPU support (CUDA, about 2.5 GB more download)"
-  if not errorlevel 2 set "TORCH_VARIANT=cuda"
- )
-)
-rem PyTorch first, from the PyTorch index (CPU or CUDA build); requirements.txt pins the same version
+rem PyTorch first (CPU or CUDA build); requirements.txt pins the same version. Without an
+rem argument install_torch.py keeps an installed CUDA build, otherwise it asks if it finds
+rem an NVIDIA driver.
 ".venv\Scripts\python.exe" install_torch.py %TORCH_VARIANT%
-if errorlevel 10 (
- echo Installing PyTorch for the CPU instead.
- ".venv\Scripts\python.exe" install_torch.py cpu
-)
 if errorlevel 1 (echo Installing PyTorch failed. See the error message above. & pause & exit /b 1)
 ".venv\Scripts\python.exe" -m pip install --no-cache-dir -r requirements.txt
 if errorlevel 1 (echo Installation failed. See the error message above. & pause & exit /b 1)

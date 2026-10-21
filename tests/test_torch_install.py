@@ -5,7 +5,7 @@ import pytest
 
 import install_torch
 from framescout_core import (TORCH_VERSION, TORCHVISION_VERSION, cuda_build, installed_build_matches,
-                             parse_gpu_query, torch_index_url, torch_requirements)
+                             installed_cuda_build, parse_gpu_query, torch_index_url, torch_requirements)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -93,6 +93,14 @@ def test_installed_build_is_recognized():
     assert not installed_build_matches(f'{v}+cpu', None, 'cpu')
 
 
+def test_installed_cuda_build():
+    assert installed_cuda_build(f'{TORCH_VERSION}+cu130') == 'cu130'
+    assert installed_cuda_build('2.13.0+cu128') == 'cu128'
+    assert installed_cuda_build(f'{TORCH_VERSION}+cpu') is None
+    assert installed_cuda_build(TORCH_VERSION) is None
+    assert installed_cuda_build(None) is None
+
+
 def test_torch_index_url():
     assert torch_index_url('cpu') == 'https://download.pytorch.org/whl/cpu'
     assert torch_index_url('cu126') == 'https://download.pytorch.org/whl/cu126'
@@ -125,6 +133,8 @@ class Ran:
 def nothing_installed(monkeypatch):
     # the tests decide what is "installed"; CI has no torch, the project venv has one
     monkeypatch.setattr(install_torch, 'installed_version', lambda name: None)
+    # and whether this PC has an NVIDIA driver
+    monkeypatch.setattr(install_torch, 'driver_found', lambda: False)
 
 
 def test_matching_build_is_not_installed_again(monkeypatch, capsys):
@@ -160,23 +170,117 @@ def test_cuda_installs_the_build_for_the_gpu(monkeypatch, capsys):
     assert 'NVIDIA GeForce RTX 4070' in capsys.readouterr().out
 
 
-def test_cuda_without_a_suitable_gpu_asks_for_the_cpu_build(monkeypatch):
-    # the installer falls back to the CPU build on this exit code
-    def no_driver():
-        raise ValueError('nvidia-smi was not found')
-    monkeypatch.setattr(install_torch, 'query_gpus', no_driver)
+def no_driver():
+    raise ValueError('nvidia-smi was not found')
+
+
+def test_cuda_without_a_suitable_gpu_installs_the_cpu_build(monkeypatch, capsys):
     ran = Ran()
     monkeypatch.setattr(install_torch.subprocess, 'run', ran)
-    assert install_torch.main(['cuda']) == install_torch.NO_CUDA_BUILD
+    monkeypatch.setattr(install_torch, 'query_gpus', no_driver)
+    assert install_torch.main(['cuda']) == 0
     monkeypatch.setattr(install_torch, 'query_gpus', lambda: '6.1, 512.95, NVIDIA GeForce GTX 1060\n')
-    assert install_torch.main(['cuda']) == install_torch.NO_CUDA_BUILD
-    assert ran.commands == []
+    assert install_torch.main(['cuda']) == 0
+    assert [command[-1] for command in ran.commands] == [torch_index_url('cpu')] * 2
+    assert 'for the CPU instead' in capsys.readouterr().out
 
 
 def test_a_pip_failure_is_reported_as_exit_code_1(monkeypatch):
-    # pip's own codes (e.g. 2) must not be mistaken for NO_CUDA_BUILD by the installer
     monkeypatch.setattr(install_torch.subprocess, 'run', Ran(code=2))
     assert install_torch.main(['cpu']) == 1
+
+
+# --- without an argument: ask only if useful, never drop an installed CUDA build (review) ---
+
+def installed(monkeypatch, build):
+    label = '' if build is None else '+' + build
+    versions = {'torch': TORCH_VERSION + label, 'torchvision': TORCHVISION_VERSION + label}
+    monkeypatch.setattr(install_torch, 'installed_version', versions.get)
+
+
+def never_ask():
+    raise AssertionError('must not ask')
+
+
+def test_installed_cuda_build_is_kept_without_an_argument(monkeypatch, capsys):
+    # re-running the installer (e.g. after git pull) must not replace GPU support with the
+    # CPU build: not on "N", not without nvidia-smi on PATH, not on a failing nvidia-smi
+    installed(monkeypatch, 'cu130')
+    monkeypatch.setattr(install_torch, 'query_gpus', no_driver)
+    monkeypatch.setattr(install_torch, 'driver_found', lambda: False)
+    monkeypatch.setattr(install_torch, 'ask_gpu_support', never_ask)
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main([]) == 0
+    assert ran.commands == []
+    out = capsys.readouterr().out
+    assert 'already installed' in out and 'Install-FrameScout.bat cpu' in out
+
+
+def test_explicit_cuda_keeps_the_installed_build_if_nvidia_smi_fails(monkeypatch, capsys):
+    installed(monkeypatch, 'cu126')
+    monkeypatch.setattr(install_torch, 'query_gpus', no_driver)
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main(['cuda']) == 0
+    assert ran.commands == [] and 'Keeping' in capsys.readouterr().out
+
+
+def test_explicit_cpu_replaces_a_cuda_build(monkeypatch):
+    installed(monkeypatch, 'cu130')
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main(['cpu']) == 0
+    assert torch_requirements('cpu')[0] in ran.commands[0]
+
+
+def test_an_older_cuda_install_is_updated_within_its_build(monkeypatch):
+    versions = {'torch': '2.13.0+cu126', 'torchvision': '0.28.0+cu126'}
+    monkeypatch.setattr(install_torch, 'installed_version', versions.get)
+    monkeypatch.setattr(install_torch, 'ask_gpu_support', never_ask)
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main([]) == 0
+    assert torch_requirements('cu126')[0] in ran.commands[0]
+
+
+def test_unknown_cuda_build_is_never_replaced_by_the_cpu_build(monkeypatch):
+    # e.g. a hand-installed +cu128: without a suitable build of the pinned version, stop
+    versions = {'torch': '2.13.0+cu128', 'torchvision': '0.28.0+cu128'}
+    monkeypatch.setattr(install_torch, 'installed_version', versions.get)
+    monkeypatch.setattr(install_torch, 'query_gpus', no_driver)
+    monkeypatch.setattr(install_torch, 'ask_gpu_support', never_ask)
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main([]) == 1
+    assert ran.commands == []
+
+
+def test_question_only_with_an_nvidia_driver(monkeypatch):
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    monkeypatch.setattr(install_torch, 'query_gpus', lambda: '8.9, 581.57, NVIDIA GeForce RTX 4070\n')
+    monkeypatch.setattr(install_torch, 'driver_found', lambda: False)
+    monkeypatch.setattr(install_torch, 'ask_gpu_support', never_ask)
+    assert install_torch.main([]) == 0
+    monkeypatch.setattr(install_torch, 'driver_found', lambda: True)
+    for answer, build in ((False, 'cpu'), (True, 'cu130')):
+        monkeypatch.setattr(install_torch, 'ask_gpu_support', lambda answer=answer: answer)
+        assert install_torch.main([]) == 0
+    assert [command[-1] for command in ran.commands] == [torch_index_url(b) for b in ('cpu', 'cpu', 'cu130')]
+
+
+def test_the_question_takes_yes_and_no(monkeypatch):
+    answers = iter(['maybe', 'y'])
+    monkeypatch.setattr('builtins.input', lambda prompt: next(answers))
+    assert install_torch.ask_gpu_support() is True
+    monkeypatch.setattr('builtins.input', lambda prompt: 'N')
+    assert install_torch.ask_gpu_support() is False
+
+    def closed(prompt):
+        raise EOFError
+    monkeypatch.setattr('builtins.input', closed)  # no console: no GPU support
+    assert install_torch.ask_gpu_support() is False
 
 
 def test_dry_run_installs_nothing(monkeypatch, capsys):

@@ -433,6 +433,12 @@ def installed_build_matches(torch_version, torchvision_version, build):
     return matches(torch_version, TORCH_VERSION) and matches(torchvision_version, TORCHVISION_VERSION)
 
 
+def installed_cuda_build(torch_version):
+    """Return the CUDA build ("cu130", ...) of an installed torch version, or None for a CPU build or none."""
+    label = (torch_version or '').partition('+')[2]
+    return label if label.startswith('cu') else None
+
+
 def torch_index_url(build):
     """Return the PyTorch package index of build ("cpu" or one of CUDA_BUILDS)."""
     if build != 'cpu' and build not in {b for b, *_ in CUDA_BUILDS}:
