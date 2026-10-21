@@ -92,6 +92,26 @@ def write_new_file(folder, stem, suffix, data):
             n += 1
 
 
+_PROGRESS = re.compile(
+    r'^(\d+)/(\d+) \| New: (\d+) \| Cached: (\d+) \| Errors: (\d+)[ \t\r]*$', re.MULTILINE)
+
+
+def progress_line(done, total, new, cached, errors):
+    """Return the progress line the engine prints to its log during the analysis."""
+    return f'{done}/{total} | New: {new} | Cached: {cached} | Errors: {errors}'
+
+
+def parse_progress(log_text):
+    """Return (done, total, new, cached, errors) of the last progress line, or None.
+
+    The app reads the engine's progress from run.log with this function, so the format
+    is defined in one place only (progress_line) and translating the log cannot
+    silently break the progress bar (A11).
+    """
+    matches = _PROGRESS.findall(log_text)
+    return tuple(map(int, matches[-1])) if matches else None
+
+
 def generic_prompts(name, context='', features=''):
     """English CLIP prompts derived from a profile's name, context and features."""
     subject = name.strip()

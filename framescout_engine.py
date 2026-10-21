@@ -17,7 +17,7 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import EXT, load_profiles, profile_slugs
+from framescout_core import EXT, load_profiles, profile_slugs, progress_line
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -160,7 +160,7 @@ def main():
                 errors += 1
                 print(f'FEHLER {path}: {exc}', flush=True)
             if n % 25 == 0 or n == len(paths):
-                print(f'{n}/{len(paths)} | Neu: {fresh} | Cache: {reused} | Fehler: {errors}', flush=True)
+                print(progress_line(n, len(paths), fresh, reused, errors), flush=True)
     except KeyboardInterrupt:
         print('\nUnterbrochen: bereits bearbeitete Bilder sind im Cache. Einfach erneut starten.')
         con.close()
