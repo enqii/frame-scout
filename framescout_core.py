@@ -143,9 +143,12 @@ def feature_signature(person_detection, max_persons, person_confidence, yolo_mod
     """Return the cache signature of the image features for these engine settings.
 
     Cached rows are reused only under the same signature, so any setting that changes
-    the stored embeddings or crops belongs here.
+    the stored embeddings or crops belongs here, and nothing else: without person
+    detection only the full image is embedded, so the detector settings are left out.
     """
-    config = [ENGINE, person_detection, max_persons, person_confidence, yolo_model]
+    config = [ENGINE, bool(person_detection)]
+    if person_detection:
+        config += [max_persons, person_confidence, yolo_model]
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
 
 
