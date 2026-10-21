@@ -1,5 +1,6 @@
 """The app's settings.json: defaults, validation and saving without losing data (framescout_core, A8)."""
 import json
+from pathlib import Path
 
 import pytest
 
@@ -114,14 +115,6 @@ def test_a_value_set_back_to_its_default_is_removed(tmp_path, defaults):
     assert stored(path) == {'top': 300}
 
 
-def test_a_value_equal_to_a_default_of_another_type_is_kept(tmp_path, defaults):
-    # True == 1 in Python: a boolean default must not swallow a number, or the reverse
-    path = tmp_path / 'settings.json'
-    defaults = {**defaults, 'batch_size': 1}
-    save_settings(path, {'batch_size': True, 'person_detection': 1}, defaults)
-    assert stored(path) == {'batch_size': True, 'person_detection': 1}
-
-
 def test_saving_never_replaces_an_unreadable_file(tmp_path, defaults):
     path = tmp_path / 'settings.json'
     path.write_text('{"top": 300', encoding='utf-8')
@@ -168,3 +161,61 @@ def test_a_replace_that_keeps_failing_raises_os_error(tmp_path, defaults, monkey
         save_settings(path, {'top': 400}, defaults, attempts=3, retry_delay=0)
     assert stored(path) == {'top': 300}
     assert [x.name for x in tmp_path.iterdir()] == ['settings.json']
+
+
+def test_a_transient_read_error_is_retried(tmp_path, defaults, monkeypatch):
+    # on Windows, reading fails for a moment while another session replaces the file (review)
+    path = write(tmp_path / 'settings.json', {'top': 300})
+    real_read = Path.read_text
+    calls = []
+
+    def flaky(self, *args, **kwargs):
+        calls.append(self)
+        if len(calls) == 1:
+            raise PermissionError('being replaced')
+        return real_read(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'read_text', flaky)
+    assert read_settings(path, defaults, retry_delay=0) == ({**defaults, 'top': 300}, [])
+    assert len(calls) == 2
+
+
+def test_a_read_error_that_persists_raises_os_error(tmp_path, defaults, monkeypatch):
+    path = write(tmp_path / 'settings.json', {'top': 300})
+
+    def failing(self, *args, **kwargs):
+        raise PermissionError('in use')
+
+    monkeypatch.setattr(Path, 'read_text', failing)
+    with pytest.raises(OSError):
+        read_settings(path, defaults, attempts=3, retry_delay=0)
+
+
+def test_float_noise_of_a_slider_is_rounded(tmp_path, defaults):
+    # a slider computes min + n * step, e.g. 0.1 + 4 * 0.05 = 0.30000000000000004 (review)
+    noisy = 0.1 + 4 * 0.05
+    assert noisy != 0.30
+    path = tmp_path / 'settings.json'
+    save_settings(path, {'person_confidence': noisy}, defaults)
+    assert not path.exists()  # equal to the default once rounded
+    save_settings(path, {'reference_weight': 0.1 + 0.2}, defaults)
+    assert stored(path) == {'reference_weight': 0.3}
+    write(path, {'person_confidence': noisy})
+    assert read_settings(path, defaults)[0]['person_confidence'] == 0.30
+
+
+def test_saving_removes_invalid_values_that_were_replaced_by_their_defaults(tmp_path, defaults):
+    # otherwise the warning about them would come back on every page run (review)
+    path = write(tmp_path / 'settings.json', {'batch_size': 0, 'device': 'gpu', 'theme': 'dark'})
+    save_settings(path, {'top': 300}, defaults)
+    assert stored(path) == {'theme': 'dark', 'top': 300}
+
+
+@pytest.mark.parametrize('changes', [{'batch_size': 0}, {'device': 'gpu'}, {'reference_weight': 2.0},
+                                     # True == 1 in Python: a bool is never taken for a number, or the reverse
+                                     {'batch_size': True}, {'person_detection': 1}])
+def test_an_invalid_change_raises_value_error_and_changes_nothing(tmp_path, defaults, changes):
+    path = write(tmp_path / 'settings.json', {'top': 300})
+    with pytest.raises(ValueError):
+        save_settings(path, changes, defaults)
+    assert stored(path) == {'top': 300}

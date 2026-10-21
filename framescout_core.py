@@ -757,16 +757,12 @@ def write_status(path, status, attempts=1, retry_delay=0.05):
 
     Tries up to attempts times, retry_delay seconds apart; never raises OSError.
     """
-    text = json.dumps(status, ensure_ascii=False, indent=1) + '\n'
-    for attempt in range(attempts):
-        try:
-            _publish_via_temp(Path(path), lambda tmp: tmp.write_text(text, encoding='utf-8'), os.replace,
-                              durable=False)
-            return True
-        except OSError:
-            if attempt + 1 < attempts:
-                time.sleep(retry_delay)
-    return False
+    data = (json.dumps(status, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
+    try:
+        _replace_with_retry(path, data, attempts, retry_delay, durable=False)
+    except OSError:
+        return False
+    return True
 
 
 def stopped_status(status):
@@ -1085,6 +1081,23 @@ def _replace_atomically(target, data):
     _publish_via_temp(target, lambda tmp: tmp.write_bytes(data), os.replace)
 
 
+def _replace_with_retry(target, data, attempts, retry_delay, durable=True):
+    """Replace target with the bytes data atomically, trying up to attempts times.
+
+    On Windows, replacing a file fails while another process or thread has it open, e.g. an
+    app session reading the status or settings file at that moment; the tries are
+    retry_delay seconds apart. Raises the last OSError if every try fails.
+    """
+    for attempt in range(max(attempts, 1)):
+        try:
+            _publish_via_temp(Path(target), lambda tmp: tmp.write_bytes(data), os.replace, durable=durable)
+            return
+        except OSError:
+            if attempt + 1 >= attempts:
+                raise
+            time.sleep(retry_delay)
+
+
 # The app's settings (A8): kept in settings.json in the project folder, so they survive a
 # browser reload and a restart. Only values that differ from the defaults are written, so
 # the default photo folder follows the project folder when it is moved.
@@ -1115,31 +1128,44 @@ def _setting_value(key, value):
         return value if number and isinstance(value, int) and low <= value <= high else None
     if key in _FLOAT_SETTINGS:
         low, high = _FLOAT_SETTINGS[key]
-        return float(value) if number and low <= value <= high else None  # NaN is never in range
+        # rounded: a slider computes min + n * step, e.g. 0.30000000000000004 (review)
+        return round(float(value), 4) if number and low <= value <= high else None  # NaN is never in range
     return None
 
 
-def _read_settings_file(filename):
-    """Return the JSON object of a settings file ({} if it is missing); ValueError if unreadable."""
-    try:
-        data = json.loads(Path(filename).read_text(encoding='utf-8-sig'))
-    except FileNotFoundError:
-        return {}
+def _read_settings_file(filename, attempts=5, retry_delay=0.05):
+    """Return the JSON object of a settings file ({} if it is missing); ValueError if unreadable.
+
+    On Windows, reading fails for a moment while another session replaces the file, so an
+    OSError is retried up to attempts times, retry_delay seconds apart (review).
+    """
+    for attempt in range(max(attempts, 1)):
+        try:
+            text = Path(filename).read_text(encoding='utf-8-sig')
+            break
+        except FileNotFoundError:
+            return {}
+        except OSError:
+            if attempt + 1 >= attempts:
+                raise
+            time.sleep(retry_delay)
+    data = json.loads(text)
     if not isinstance(data, dict):
         raise ValueError('The settings file must be a JSON object.')
     return data
 
 
-def read_settings(filename, defaults):
+def read_settings(filename, defaults, attempts=5, retry_delay=0.05):
     """Return (settings, problems) of the app's settings file.
 
     settings has the keys of defaults: a saved value replaces its default if it is allowed
     (the same range as the app's widget); a missing file gives the defaults. problems lists
     the saved values that are not allowed and were replaced by their defaults. Unknown keys
     are ignored (save_settings keeps them). Raises ValueError (including JSON and Unicode
-    decoding errors) for a file that is not a JSON object, and OSError if it cannot be read.
+    decoding errors) for a file that is not a JSON object, and OSError if it still cannot
+    be read after attempts tries.
     """
-    data = _read_settings_file(filename)
+    data = _read_settings_file(filename, attempts, retry_delay)
     settings, problems = dict(defaults), []
     for key in defaults:
         if key not in data:
@@ -1152,32 +1178,34 @@ def read_settings(filename, defaults):
     return settings, problems
 
 
-def _same_setting(value, default):
-    # True == 1 in Python: a bool and a number are never the same setting
-    return isinstance(value, bool) == isinstance(default, bool) and value == default
-
-
 def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05):
     """Write the changed settings into the app's settings file.
 
     changes are merged into the file as it is now (another tab or session may have saved
-    other settings in between); values equal to their default are removed and unknown keys
-    are kept. No file is created if there is nothing to write. The file is replaced
-    atomically; on Windows that fails while another session reads it at that moment, so it
-    is tried up to attempts times. Raises ValueError for an unreadable file, which is never
-    replaced, and OSError if writing keeps failing.
+    other settings in between). Saved values that are not allowed (read_settings replaced
+    them by their defaults and reported them) and values equal to their default are
+    removed; unknown keys are kept. No file is created if there is nothing to write. The
+    file is replaced atomically; on Windows that fails while another session reads it at
+    that moment, so reading and replacing are tried up to attempts times. Raises ValueError
+    for a change that is not allowed and for an unreadable file, which is never replaced,
+    and OSError if reading or writing keeps failing.
     """
     filename = Path(filename)
-    document = {**_read_settings_file(filename), **changes}
-    document = {k: v for k, v in document.items() if not (k in defaults and _same_setting(v, defaults[k]))}
+    normalized = {}
+    for key, value in changes.items():
+        allowed = _setting_value(key, value) if key in defaults else value
+        if allowed is None:
+            raise ValueError(f'{key}: {value!r} is not allowed')
+        normalized[key] = allowed
+    document = {}
+    for key, value in {**_read_settings_file(filename, attempts, retry_delay), **normalized}.items():
+        if key in defaults:
+            # after normalizing, a known setting has the type of its default (no True == 1)
+            value = _setting_value(key, value)
+            if value is None or value == defaults[key]:
+                continue
+        document[key] = value
     if not document and not filename.exists():
         return
     data = (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
-    for attempt in range(attempts):
-        try:
-            _replace_atomically(filename, data)
-            return
-        except OSError:
-            if attempt + 1 == attempts:
-                raise
-            time.sleep(retry_delay)
+    _replace_with_retry(filename, data, attempts, retry_delay)
