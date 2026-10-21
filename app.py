@@ -234,20 +234,80 @@ except (OSError, ValueError) as exc:
 active, run_status = run_state()
 st.session_state.page_run_state = (active, run_status)
 
-# read on every rerun: a reload, a restart, another tab or session shows the saved settings (A8)
+@st.cache_data(show_spinner=False)
+def system_info():
+    import torch
+    data = {'cpu': platform.processor() or platform.machine() or 'Not detected',
+            'threads': os.cpu_count() or 1, 'cuda': torch.cuda.is_available(),
+            'cuda_build': torch.version.cuda,
+            'gpu': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
+    try:
+        data['ram_gb'] = round(psutil.virtual_memory().total / (1024**3), 1)
+    except OSError:
+        data['ram_gb'] = None
+    return data
+
+try:
+    info, info_error = system_info(), None
+except Exception as exc:
+    info, info_error = None, exc
+# "cuda" only if PyTorch can use it (A7); if detection failed, the engine still checks
+devices = device_choices(info['cuda']) if info else ['auto', 'cpu', 'cuda']
+
 DEFAULT_SETTINGS = default_settings(BASE)
-settings_writable = True
+
+def setting_key(name):
+    """Return the session-state key of the widget of setting name (A8)."""
+    return 'setting_' + name
+
+def shown_setting(name, value):
+    """Return what the widget of setting name shows for a saved value: an unavailable device as auto (A7)."""
+    return 'auto' if name == 'device' and value not in devices else value
+
+# Settings (A8): settings.json is read on every rerun, so a reload, a restart, another tab
+# or session shows the saved settings. The widgets have keys and get the saved values
+# through their session state; passing them as value= would give a widget a new identity
+# after every save and drop the next change (review). settings_seen holds, per setting,
+# the saved value this session shows: a widget that differs from it was changed here and
+# is saved (the latest action wins); a saved value that differs from it was saved by
+# another tab or session and is shown here, unless this session changed it.
 try:
     saved_settings, settings_problems = read_settings(SETTINGS, DEFAULT_SETTINGS)
 except (OSError, ValueError) as exc:
-    # never save over a file the app cannot read, like profiles.json (A2)
-    saved_settings, settings_problems, settings_writable = dict(DEFAULT_SETTINGS), [], False
-    st.warning(f'{SETTINGS.name} cannot be read, so FrameScout uses the default settings and does not change '
-               f'the file. Fix it in a text editor or delete it to save settings again.\n\nDetails: {exc}')
+    # never save over a file the app cannot read, like profiles.json (A2); the widgets keep
+    # what they show (the defaults in a new session)
+    saved_settings, settings_problems = None, []
+    st.warning(f'{SETTINGS.name} cannot be read, so FrameScout does not change it and keeps the settings shown '
+               f'(the defaults in a new page). Fix it in a text editor or delete it to save settings again.'
+               f'\n\nDetails: {exc}')
 if settings_problems:
     st.warning(f'Some values in {SETTINGS.name} are not allowed and were replaced by their defaults: '
-               + '; '.join(settings_problems) + '. Changing such a setting in the app saves a valid value.')
-settings = dict(saved_settings)  # the widgets below update it with this page run's values
+               + '; '.join(settings_problems) + '. The next saved change removes them from the file.')
+seen = st.session_state.setdefault('settings_seen', {})
+changed_settings = {}
+for name, default in DEFAULT_SETTINGS.items():
+    key = setting_key(name)
+    saved = saved_settings[name] if saved_settings else default
+    if key not in st.session_state:  # a new page, or the widget was not drawn in the last page run
+        st.session_state[key], seen[name] = shown_setting(name, saved), saved
+    elif st.session_state[key] != shown_setting(name, seen.get(name, default)):
+        changed_settings[name] = st.session_state[key]
+    elif saved_settings and saved != seen.get(name, default):
+        st.session_state[key], seen[name] = shown_setting(name, saved), saved
+if st.session_state[setting_key('device')] not in devices:
+    st.session_state[setting_key('device')] = 'auto'
+if changed_settings:
+    # a failed save is tried again on the next rerun: the widget still differs from settings_seen
+    if saved_settings is None:
+        st.warning(f'The changed settings are used, but not saved, since {SETTINGS.name} cannot be read.')
+    else:
+        try:
+            save_settings(SETTINGS, changed_settings, DEFAULT_SETTINGS)
+            seen.update(changed_settings)
+        except (OSError, ValueError) as exc:
+            st.warning(f'The settings could not be saved to {SETTINGS.name}: {exc}. They are used for now, and '
+                       'saving is tried again the next time this page updates.')
+settings = {name: st.session_state[setting_key(name)] for name in DEFAULT_SETTINGS}
 p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source', 'AI settings', 'Search & results'])
 
 with p_tab:
@@ -316,7 +376,7 @@ with p_tab:
 
 with f_tab:
     st.subheader('Photo collection')
-    settings['photo_folder'] = st.text_input('Local photo folder (including subfolders)', value=settings['photo_folder'], disabled=active)
+    st.text_input('Local photo folder (including subfolders)', key=setting_key('photo_folder'), disabled=active)
     folder = Path(settings['photo_folder']).expanduser()
     if folder.is_dir():
         count = sum(1 for x in folder.rglob('*') if x.is_file() and x.suffix.lower() in EXT and RESULTS not in x.parents)
@@ -327,40 +387,27 @@ with f_tab:
 
 with settings_tab:
     st.subheader('AI processing')
-    @st.cache_data(show_spinner=False)
-    def system_info():
-        import torch
-        data = {'cpu': platform.processor() or platform.machine() or 'Not detected',
-                'threads': os.cpu_count() or 1, 'cuda': torch.cuda.is_available(),
-                'cuda_build': torch.version.cuda,
-                'gpu': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
-        try:
-            import psutil
-            data['ram_gb'] = round(psutil.virtual_memory().total / (1024**3), 1)
-        except (ImportError, OSError):
-            data['ram_gb'] = None
-        return data
-    try:
-        info, info_error = system_info(), None
-    except Exception as exc:
-        info, info_error = None, exc
-    # "cuda" only if PyTorch can use it (A7); if detection failed, the engine still checks
-    devices = device_choices(info['cuda']) if info else ['auto', 'cpu', 'cuda']
-    # a saved device this PyTorch cannot use (e.g. "cuda" after switching to the CPU build)
-    # is shown and used as "auto", but stays saved until another device is chosen
-    unavailable_device = settings['device'] not in devices
-    device = st.selectbox('Compute device', devices, index=0 if unavailable_device else devices.index(settings['device']), disabled=active, help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
-    if unavailable_device:
-        st.caption(f"The saved device \"{settings['device']}\" is not available, so auto is used.")
-    if not (unavailable_device and device == 'auto'):
-        settings['device'] = device
-    run_device = device
-    settings['batch_size'] = st.number_input('Batch size', min_value=1, max_value=64, value=int(settings['batch_size']), step=1, disabled=active)
-    settings['top'] = st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, value=int(settings['top']), step=25, disabled=active)
-    settings['person_detection'] = st.checkbox('Also detect individual persons in group photos (YOLO)', value=settings['person_detection'], disabled=active)
-    settings['max_persons'] = st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, value=int(settings['max_persons']), disabled=active)
-    settings['person_confidence'] = st.slider('Minimum confidence of the person detection', .1, .9, float(settings['person_confidence']), .05, disabled=active)
-    settings['reference_weight'] = st.slider('Weight of reference images (if any)', 0., 1., float(settings['reference_weight']), .05, disabled=active, help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
+    st.selectbox('Compute device', devices, key=setting_key('device'), disabled=active, help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
+    if seen.get('device', 'auto') not in devices:
+        # a saved device this PyTorch cannot use (e.g. "cuda" after switching to the CPU
+        # build) is shown and used as "auto", but stays saved, so it applies again once
+        # PyTorch can use it; choosing "auto" is no change, hence the button (review)
+        st.caption(f"The saved device \"{seen['device']}\" is not available, so auto is used. "
+                   'It is used again once PyTorch can use it.')
+        if st.button('Use auto from now on', disabled=active):
+            try:
+                save_settings(SETTINGS, {'device': 'auto'}, DEFAULT_SETTINGS)
+            except (OSError, ValueError) as exc:
+                st.warning(f'The settings could not be saved to {SETTINGS.name}: {exc}.')
+            else:
+                seen['device'] = 'auto'
+                st.rerun()
+    st.number_input('Batch size', min_value=1, max_value=64, step=1, key=setting_key('batch_size'), disabled=active)
+    st.number_input('Maximum matches per search profile', min_value=1, max_value=5000, step=25, key=setting_key('top'), disabled=active)
+    st.checkbox('Also detect individual persons in group photos (YOLO)', key=setting_key('person_detection'), disabled=active)
+    st.number_input('Maximum detected persons per photo', min_value=1, max_value=50, key=setting_key('max_persons'), disabled=active)
+    st.slider('Minimum confidence of the person detection', min_value=.1, max_value=.9, step=.05, key=setting_key('person_confidence'), disabled=active)
+    st.slider('Weight of reference images (if any)', min_value=0., max_value=1., step=.05, key=setting_key('reference_weight'), disabled=active, help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
     if info:
         st.caption(f"Detected: {info['cpu']} · {info['threads']} logical CPU cores · " +
                    (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unknown · ') +
@@ -368,16 +415,6 @@ with settings_tab:
         st.info('Recommendation: choose auto. A batch size of 8 is a conservative starting point; reduce it if memory runs short. Model weights are downloaded on the first run.')
     else:
         st.caption(f'System details could not be determined ({info_error}). Automatic device selection remains available.')
-
-# save what was changed in this page run, before a button below can rerun the page; a
-# failed save is tried again on the next rerun, since the widgets keep the changed value
-changed_settings = {k: v for k, v in settings.items() if v != saved_settings[k]}
-if changed_settings and settings_writable:
-    try:
-        save_settings(SETTINGS, changed_settings, DEFAULT_SETTINGS)
-    except (OSError, ValueError) as exc:
-        st.warning(f'The settings could not be saved to {SETTINGS.name}: {exc}. They apply for now, '
-                   'but a reload shows the saved ones again.')
 
 with run_tab:
     st.subheader('Start search')
@@ -388,7 +425,7 @@ with run_tab:
         stop = st.button('■ Stop search', disabled=not active, use_container_width=True)
     if start:
         cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), str(Path(settings['photo_folder']).resolve()),
-            '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',run_device,
+            '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',settings['device'],
             '--batch-size',str(settings['batch_size']),'--top',str(settings['top']),
             '--max-persons',str(settings['max_persons']),'--person-confidence',str(settings['person_confidence']),
             '--reference-weight',str(settings['reference_weight'])]
