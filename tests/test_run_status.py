@@ -3,13 +3,15 @@ import json
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-from framescout_core import (FINAL_PHASES, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, lock_held,
-                             read_status, run_active, same_run, status_fraction, status_text, stopped_status,
-                             write_status)
+import framescout_core
+from framescout_core import (FINAL_PHASES, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
+                             read_status, run_active, started_in_time, status_fraction, status_text,
+                             stopped_status, write_status)
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -292,7 +294,7 @@ def test_the_fraction_stays_between_zero_and_one():
     assert status_fraction({'phase': 'scoring', 'done': 'x', 'total': 10}) is None
 
 
-# --- write_status / stopped_status / same_run: the app marks a run it stopped ---
+# --- write_status / stopped_status: the app marks a run it stopped ---
 
 def test_write_status_round_trips(tmp_path):
     path = tmp_path / RUN_STATUS
@@ -318,10 +320,54 @@ def test_a_stopped_run_is_marked_interrupted_and_keeps_its_progress():
     assert status['phase'] == 'analyzing'  # the input is not changed
 
 
-def test_same_run_compares_process_and_start_time():
-    run = {'pid': 5, 'started': '2026-10-21T10:00:00+02:00', 'phase': 'analyzing'}
-    assert same_run(run, {**run, 'phase': 'scoring', 'done': 3})
-    assert not same_run(run, {**run, 'started': '2026-10-21T10:05:00+02:00'})
-    assert not same_run(run, {**run, 'pid': 6})
-    assert not same_run(run, None)
-    assert not same_run(None, None)
+# --- started_in_time: is a process with the status's pid really that run's? (review) ---
+
+STARTED = '2026-10-21T10:00:00+02:00'
+STARTED_EPOCH = datetime.fromisoformat(STARTED).timestamp()
+
+
+def test_the_run_process_was_created_before_its_status_was_written():
+    # the app writes "starting" right after Popen, the engine writes its status after it
+    # started; "started" has whole seconds, so a process created in the same second is accepted
+    status = {'pid': 5, 'started': STARTED}
+    assert started_in_time(status, STARTED_EPOCH - 3)
+    assert started_in_time(status, STARTED_EPOCH + 0.9)
+
+
+def test_a_process_that_reused_the_pid_later_is_not_the_run():
+    # a killed engine leaves a status that is not final; another process (even another
+    # engine with another --output) that gets the same pid later must not count (review)
+    status = {'pid': 5, 'started': STARTED}
+    assert not started_in_time(status, STARTED_EPOCH + 10)
+    assert not started_in_time(status, STARTED_EPOCH + 3600)
+
+
+def test_a_status_without_a_readable_start_time_matches_no_process():
+    assert not started_in_time({'pid': 5}, STARTED_EPOCH)
+    assert not started_in_time({'pid': 5, 'started': 'yesterday'}, STARTED_EPOCH)
+    assert not started_in_time({'pid': 5, 'started': 17}, STARTED_EPOCH)
+
+
+# --- final_status: the engine's final phase from its exit code (review) ---
+
+def test_exit_codes_map_to_final_phases():
+    assert final_status(0) == ('finished', None)
+    assert final_status(130) == ('interrupted', 'Interrupted (Ctrl+C).')
+    phase, message = final_status(1)
+    assert phase == 'failed' and '1' in message
+    assert all(final_status(code)[0] in FINAL_PHASES for code in (0, 1, 2, 3, 130))
+
+
+# --- lock_held when the lock file cannot be opened (review) ---
+
+def test_a_lock_file_that_cannot_be_opened_counts_as_held(tmp_path, monkeypatch):
+    # e.g. a PermissionError on Windows while the file is pending delete or blocked by an
+    # antivirus scanner: Start stays disabled instead of the page crashing
+    path = tmp_path / RUN_LOCK
+    path.write_bytes(b'')
+
+    def refuse(*args, **kwargs):
+        raise PermissionError(13, 'Access is denied')
+
+    monkeypatch.setattr(framescout_core.os, 'open', refuse)
+    assert lock_held(path)

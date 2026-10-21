@@ -682,12 +682,16 @@ def lock_held(path):
     """Return True if a process holds the RunLock on path; never creates the file.
 
     Checks by taking the lock for a moment, so a RunLock.acquire at that very moment fails
-    once: the engine therefore acquires with a timeout.
+    once: the engine and the app therefore acquire with a timeout. A file that exists but
+    cannot be opened (e.g. PermissionError while it is pending delete or held by an antivirus
+    scanner on Windows) counts as held, the safe side: no start (review).
     """
     try:
         fd = os.open(path, os.O_RDWR)
     except FileNotFoundError:
         return False
+    except OSError:
+        return True
     try:
         try:
             _try_lock(fd)
@@ -777,6 +781,30 @@ def stopped_status(status):
 def same_run(a, b):
     """Return True if the status dicts a and b belong to the same run (process id and start time)."""
     return bool(a and b) and a.get('pid') == b.get('pid') and a.get('started') == b.get('started')
+
+
+def started_in_time(status, create_time, tolerance=2.0):
+    """Return True if a process created at create_time (seconds since the epoch) can be the run of status.
+
+    The process of a run exists before its status is written (the app writes "starting"
+    after Popen, the engine its status after it started), so a process with the status's
+    pid that was created later got the pid after the run's process ended (review). The
+    tolerance covers the whole seconds of "started" and clock rounding.
+    """
+    try:
+        started = datetime.fromisoformat(status['started']).timestamp()
+    except (KeyError, TypeError, ValueError):
+        return False
+    return create_time <= started + tolerance
+
+
+def final_status(code):
+    """Return (phase, message) of the engine's final status for its exit code."""
+    if code == 0:
+        return 'finished', None
+    if code == 130:
+        return 'interrupted', 'Interrupted (Ctrl+C).'
+    return 'failed', f'The search ended with exit code {code}.'
 
 
 def read_status(path):
