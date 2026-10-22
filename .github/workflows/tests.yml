@@ -1,6 +1,7 @@
 # Runs the test suite on Windows, the platform FrameScout targets.
-# Only the development requirements (pytest) are installed: the tests cover
-# framescout_core, which uses the standard library only, so the job needs neither
+# Only the development requirements (pytest, numpy) are installed: the tests cover
+# framescout_core, which uses the standard library only, and framescout_scoring,
+# which needs numpy (E4/E5), so the job needs neither
 # torch nor any model download.
 name: tests
 

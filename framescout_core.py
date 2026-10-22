@@ -971,8 +971,9 @@ def load_profiles(filename, inline):
 
     filename: path of a profiles JSON file or None; inline: list of "NAME|CONTEXT|FEATURES"
     strings (CLI option --character). Returns a list of dicts with the keys "name",
-    "prompts" (generated + custom prompts) and "refs" (reference image paths, resolved
-    relative to the JSON file's folder). Raises ValueError for invalid input.
+    "prompts" (generated + custom prompts), "generated" (how many of the prompts are
+    generated templates; they are averaged into one query, E4) and "refs" (reference image
+    paths, resolved relative to the JSON file's folder). Raises ValueError for invalid input.
     """
     raw = list(_read_entries(filename)) if filename else []
     for item in inline:
@@ -987,7 +988,8 @@ def load_profiles(filename, inline):
         name = item['name']
         franchise, features = item.get('franchise', ''), item.get('features', '')
         prompts, refs = item.get('prompts', []), item.get('reference_images', [])
-        profiles.append({'name': name.strip(), 'prompts': generic_prompts(name, franchise, features) + prompts,
+        generated = generic_prompts(name, franchise, features)
+        profiles.append({'name': name.strip(), 'prompts': generated + prompts, 'generated': len(generated),
                          'refs': [((filename.parent if filename else Path.cwd()) / x).resolve() for x in refs]})
     return profiles
 
