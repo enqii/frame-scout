@@ -22,7 +22,8 @@ def write_profiles(folder, data, encoding='utf-8'):
 def test_name_only_profile_gets_four_generic_prompts(tmp_path):
     path = write_profiles(tmp_path, {'profiles': [{'name': 'Golden Retriever'}]})
     [profile] = load_profiles(path, [])
-    assert profile == {'name': 'Golden Retriever', 'prompts': generic('Golden Retriever'), 'refs': []}
+    assert profile == {'name': 'Golden Retriever', 'prompts': generic('Golden Retriever'), 'generated': 4,
+                       'refs': []}
 
 
 def test_context_features_and_custom_prompts_are_combined_in_order(tmp_path):
@@ -34,6 +35,8 @@ def test_context_features_and_custom_prompts_are_combined_in_order(tmp_path):
         'A photograph of Red car (Vehicles), with red bodywork, four wheels.',
         'An image showing red bodywork, four wheels, depicting Red car (Vehicles).',
         'a red sports car']
+    # the six generated prompts form the template ensemble, the custom one stays apart (E4)
+    assert profile['generated'] == 6
 
 
 def test_name_is_stripped(tmp_path):
@@ -63,6 +66,7 @@ def test_legacy_v3_mapping_of_names_to_prompts(tmp_path):
     assert [p['name'] for p in profiles] == ['Dog', 'Cat']
     assert profiles[0]['prompts'] == generic('Dog') + ['a dog on a meadow']
     assert profiles[1]['prompts'] == generic('Cat')
+    assert [p['generated'] for p in profiles] == [4, 4]
 
 
 @pytest.mark.parametrize('data', [

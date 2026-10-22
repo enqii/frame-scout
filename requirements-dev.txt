@@ -1,5 +1,8 @@
 # Development tools (not needed to run FrameScout).
-# The test suite only uses the standard library and pytest: no torch, no model download.
+# The test suite uses the standard library, pytest and numpy (for framescout_scoring,
+# E4/E5): no torch, no model download.
 # Capped at the tested major version so that a new pytest major cannot turn CI red
 # on unrelated pull requests; adopt the next major in its own change (see I3).
 pytest>=9,<10
+# Same floor as requirements.txt, capped at the tested major version like pytest.
+numpy>=2.5.4,<3
