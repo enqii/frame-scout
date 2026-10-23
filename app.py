@@ -310,6 +310,10 @@ p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source'
 
 with p_tab:
     st.subheader('Saved search profiles')
+    # hint only, no check of the input (user decision on E3: English search terms only)
+    st.info('Enter the search motif, context, features and custom search texts **in English**. The CLIP model '
+            'FrameScout uses understands practically only English: a word in another language, e.g. German '
+            '"Schwert" instead of "sword", can find completely different photos.')
     if 'notice' in st.session_state:
         st.warning(st.session_state.pop('notice'))
     if not profiles:
@@ -318,10 +322,10 @@ with p_tab:
     for index, p in enumerate(profiles):
         with st.expander(f"{p['name']}  ·  {p.get('franchise','')}"):
             with st.form(f'edit_{index}_{saves}'):
-                edit_name = st.text_input('Search motif', value=p['name'])
-                franchise = st.text_input('Context / origin (optional)', value=p.get('franchise', ''))
-                features = st.text_area('Distinctive features (optional; English works best)', value=p.get('features', ''))
-                prompts = st.text_area('Custom search texts (optional; one per line)', value='\n'.join(p.get('prompts', [])))
+                edit_name = st.text_input('Search motif (in English)', value=p['name'])
+                franchise = st.text_input('Context / origin (optional, in English)', value=p.get('franchise', ''))
+                features = st.text_area('Distinctive features (optional, in English)', value=p.get('features', ''))
+                prompts = st.text_area('Custom search texts (optional, in English; one per line)', value='\n'.join(p.get('prompts', [])))
                 st.caption('Existing reference images: ' + (', '.join(p.get('reference_images', [])) or 'none'))
                 refs_new = st.file_uploader('Add reference images', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}_{saves}')
                 clear_refs = st.checkbox('Remove the existing reference images from this profile')
@@ -353,10 +357,10 @@ with p_tab:
     # after an error the input stays for another try
     form_id = st.session_state.setdefault('new_profile_form', 0)
     with st.form('new_profile'):
-        name = st.text_input('Search motif *', placeholder='e.g. red car, golden retriever, mountain landscape', key=f'new_name_{form_id}')
-        franchise = st.text_input('Context / origin (optional)', placeholder='e.g. vehicles, pets, nature', key=f'new_context_{form_id}')
-        features = st.text_area('Distinctive features (optional; English works best)', placeholder='red bodywork, black roof, parked on a street', key=f'new_features_{form_id}')
-        prompts = st.text_area('Custom search texts (optional; one per line)', key=f'new_prompts_{form_id}')
+        name = st.text_input('Search motif (in English) *', placeholder='e.g. red car, golden retriever, mountain landscape', key=f'new_name_{form_id}')
+        franchise = st.text_input('Context / origin (optional, in English)', placeholder='e.g. vehicles, pets, nature', key=f'new_context_{form_id}')
+        features = st.text_area('Distinctive features (optional, in English)', placeholder='red bodywork, black roof, parked on a street', key=f'new_features_{form_id}')
+        prompts = st.text_area('Custom search texts (optional, in English; one per line)', key=f'new_prompts_{form_id}')
         uploads = st.file_uploader('Reference images (optional)', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'new_refs_{form_id}')
         create = st.form_submit_button('Add profile', disabled=active)
     if create:
@@ -370,7 +374,8 @@ with p_tab:
             if store(added, uploads or [], name, profiles):
                 st.session_state.new_profile_form = form_id + 1
                 st.rerun()
-    st.caption('FrameScout automatically creates several CLIP search texts from the name. No language model is required.')
+    st.caption('FrameScout automatically creates several English CLIP search texts from the name, context and features; '
+               'it does not translate them. No language model is required.')
 
 with f_tab:
     st.subheader('Photo collection')
