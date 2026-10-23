@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (DEVICES, SETTING_RANGES, SETTINGS_FILE, default_settings, read_settings,
-                             reconcile_settings, save_settings)
+from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, SETTING_RANGES, SETTINGS_FILE, default_settings,
+                             read_settings, reconcile_settings, save_settings)
 
 
 @pytest.fixture
@@ -27,7 +27,13 @@ def test_the_defaults_are_the_previous_session_defaults(tmp_path):
     assert SETTINGS_FILE == 'settings.json'
     assert default_settings(tmp_path) == {
         'photo_folder': str(tmp_path / 'photos'), 'device': 'auto', 'batch_size': 8, 'top': 150,
-        'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.35}
+        'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.3}
+
+
+def test_the_default_reference_weight_is_the_evaluated_one():
+    # 0.35 before E4/E5; 0.3 did best with the normalized scores on the local evaluation
+    # set (user decision in PR #11); a saved 0.35 in settings.json stays as it is
+    assert DEFAULT_REFERENCE_WEIGHT == 0.3
 
 
 def test_a_missing_file_gives_the_defaults(tmp_path, defaults):
@@ -202,8 +208,8 @@ def test_float_noise_of_a_slider_is_rounded(tmp_path, defaults):
     path = tmp_path / 'settings.json'
     save_settings(path, {'person_confidence': noisy}, defaults)
     assert not path.exists()  # equal to the default once rounded
-    save_settings(path, {'reference_weight': 0.1 + 0.2}, defaults)
-    assert stored(path) == {'reference_weight': 0.3}
+    save_settings(path, {'reference_weight': 0.15 + 0.2}, defaults)
+    assert stored(path) == {'reference_weight': 0.35}
     write(path, {'person_confidence': noisy})
     assert read_settings(path, defaults)[0]['person_confidence'] == 0.30
 
