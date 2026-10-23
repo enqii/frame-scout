@@ -33,9 +33,19 @@ referenced in commits, pull requests and discussions.
       in `cache.sqlite3` like after E1 (E11). Whole runs incl. model load and export took
       44 s → 19 s with and 30 s → 10–15 s without person detection. YOLO device: E14;
       thread counts on small CPUs: E17.)
-- [ ] **E3 – German motif names in English prompts:** e.g. "A photograph of Rotes Auto
+- [x] **E3 – German motif names in English prompts:** e.g. "A photograph of Rotes Auto
       (Fahrzeuge)." – OpenAI CLIP practically only understands English, while the UI
       placeholders are German.
+      (done 2026-10-23 by communication, user decision in PR #12: FrameScout supports
+      English search terms only. The profile tab shows a hint and labels the motif,
+      context, features and custom search text fields "in English"; README section
+      "Search terms in English". Hint text only: no check of the input, no warning, no
+      translation, no extra profile field. Measured with the current model on one
+      collection (about 5,000 cosplay photos, PR #12 comment): German queries found the
+      nearest English query for 25 of 40 everyday words; the German and English top 50
+      agreed by 0–58 % for 16 motifs of the collection; "Sword" AP@40 0.721 vs
+      "Schwert" 0.000 (German top 40 mostly unlabelled, so a lower bound). Multilingual
+      model: E21.)
 - [x] **E4 – Maximum instead of mean over prompts:** prone to noise; a generic prompt can
       dominate. An averaged prompt ensemble is common practice.
       (done 2026-10-23: `framescout_scoring.text_queries` averages the generated templates,
@@ -155,6 +165,21 @@ referenced in commits, pull requests and discussions.
       collection or ask the user first, and use a second, non-cosplay collection. The
       tooling (`evaluate.py`, labelling page, metrics) lives outside the repo under
       `.tmp/eval-e4e5/`; consider a reusable, documented version.
+- [ ] **E21 – No multilingual search:** FrameScout supports English search terms only
+      (E3, user decision in PR #12: "consider a multilingual CLIP later"). Option: the
+      OpenCLIP model `xlm-roberta-base-ViT-B-32` (`laion5b_s13b_b90k`) as an optional
+      model choice next to OpenAI CLIP (default). Costs found in PR #12, not verified by a
+      run: about 1.47 GB of weights plus about 10 MB of `xlm-roberta-base` config and
+      tokenizer on the first use; a new dependency `transformers` (with `tokenizers`;
+      Python 3.14 untested); its own image tower, so its own cache signature (`ENGINE`)
+      and every photo analyzed once more (old rows stay, E11); roughly +1 GB RAM;
+      analysis speed per photo about the same (same ViT-B/32 image tower); the default
+      reference weight (0.3, E5) was tuned on OpenAI CLIP and must be evaluated again
+      (E20). Model card: ImageNet 62.3 % (English), Italian ImageNet 43 % vs 21 % for an
+      English B/32; no German figure. Other multilingual OpenCLIP models:
+      `ViT-B-16-SigLIP-i18n-256` (about 1.48 GB), `nllb-clip-base` (about 2 GB). Builds
+      on the model choice of the roadmap item "Optional stronger models"; a download and
+      a new dependency are hold points.
 
 ### App (`app.py`)
 
@@ -474,9 +499,12 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 ### P3 – Search quality
 - [x] Average the prompt ensemble, normalize scores per profile (E4, E5) (done 2026-10-23;
       evaluation limits: E20)
-- [ ] Solve the German-language problem: multilingual CLIP (`xlm-roberta-base-ViT-B-32`) or
-      an explicit "English search term" field (E3)
+- [x] Solve the German-language problem: English search terms only, said in the app and
+      the README (E3) (done 2026-10-23; multilingual CLIP or an "English search term"
+      field were not chosen, multilingual model: E21)
 - [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note
+- [ ] Optional multilingual CLIP model (`xlm-roberta-base-ViT-B-32`), built on the model
+      choice of the previous item (E21)
 
 ### P4 – UX
 - [ ] Result gallery in the app, mark matches/copy them to a folder, "open folder",
