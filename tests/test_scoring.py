@@ -2,7 +2,8 @@
 import numpy as np
 import pytest
 
-from framescout_scoring import MIN_SCORES, Match, best_scores, rank_photos, score_caption, spread, text_queries
+from framescout_scoring import (MIN_SCORES, Match, best_scores, photo_scores, rank_photos, score_caption, spread,
+                                text_queries)
 
 
 def unit(*rows):
@@ -132,3 +133,46 @@ def test_caption_of_a_normalized_score_names_the_raw_similarities():
 
 def test_caption_of_raw_scores_keeps_the_similarity():
     assert score_caption(Match(.3123, 0, .25, .9), False) == ('Similarity 0.312', 'text 0.250 · image 0.900')
+
+
+def test_spread_ignores_values_that_are_not_finite():
+    # one broken cache row must not change the scale of every other photo (review)
+    values = np.arange(1., 11.)
+    mean, std = spread([values, np.array([np.nan, np.inf])])
+    assert mean == pytest.approx(values.mean()) and std == pytest.approx(values.std())
+
+
+@pytest.mark.parametrize('weight', [0, 1])
+def test_a_channel_without_weight_does_not_block_the_normalization(weight):
+    # weight 0: the reference images do not count, so their missing spread does not matter;
+    # weight 1: the same for the text (review)
+    flat = [np.full(len(t), .6) for t in TEXT]
+    text, visual = (TEXT, flat) if weight == 0 else (flat, VISUAL)
+    normalized, matches = rank_photos(text, visual, weight)
+    assert normalized
+    channel = TEXT if weight == 0 else VISUAL
+    assert [m.score for m in matches] == pytest.approx([max(z(channel, s) for s in c) for c in channel])
+    assert matches[3].text == pytest.approx(text[3][0]) and matches[3].visual == pytest.approx(visual[3][0])
+
+
+QUERIES = {'Dog': (unit([1, 0], [0, 1]), None), 'Cat': (unit([1, 1]), unit([1, 0]))}
+
+
+def test_photo_scores_give_every_profile_its_crop_scores():
+    features = unit([1, 0], [0, 1], [1, 1])
+    text, visual = photo_scores(features, ['Full image', 'Person 1', 'Person 2'], QUERIES)
+    np.testing.assert_allclose(text['Dog'], [1, 1, np.sqrt(.5)], rtol=1e-6)
+    np.testing.assert_allclose(text['Cat'], [np.sqrt(.5), np.sqrt(.5), 1], rtol=1e-6)
+    assert list(visual) == ['Cat']
+    np.testing.assert_allclose(visual['Cat'], [1, 0, np.sqrt(.5)], atol=1e-6)
+
+
+@pytest.mark.parametrize('features, labels', [
+    (unit([1, 0], [0, 1]), ['Full image']),                       # fewer labels than crops
+    (np.empty((0, 2), dtype=np.float32), []),                     # no crop at all
+    (np.array([[np.nan, 0.]], dtype=np.float32), ['Full image']),  # broken vector
+])
+def test_photo_scores_reject_a_broken_cache_row(features, labels):
+    # the engine logs "CACHE ERROR" and skips the photo, as before E5 (review)
+    with pytest.raises(ValueError):
+        photo_scores(features, labels, QUERIES)
