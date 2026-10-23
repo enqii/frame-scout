@@ -314,7 +314,8 @@ Commits, one pull request per roadmap item).
 | `.github/` | CI workflow (`workflows/tests.yml`) and pull request template |
 | `Install-FrameScout.bat` / `Start-FrameScout.bat` | Installation and start on Windows |
 | `BACKLOG.md` | Known weaknesses and roadmap |
-| `CLAUDE.md` | Project onboarding and development workflow |
+| `CLAUDE.md` | Rules for Claude Code and the development workflow |
+| `docs/ARCHITECTURE.md` | Architecture and runtime details for contributors |
 | `.claude/` | Claude Code project settings and the `/roadmap` workflow skill |
 | `profiles.json`, `settings.json`, `photos/`, `references/`, `results/`, `run.log` | User data and runtime output (not in the repo) |
 | `.venv/`, `.cache/`, `.tmp/`, `yolo11n.pt` | Environment, caches and model weights (not in the repo) |
