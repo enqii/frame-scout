@@ -140,6 +140,14 @@ starts with the new example profiles.
    (as long as the `Start-FrameScout.bat` window stays open); opening the page again, also
    in another tab, shows it again and lets you stop it. Only one search runs at a time:
    while one runs, the controls are disabled in every tab, and a second start is refused.
+   Below, **Results** shows the last finished search: choose a search profile to see its
+   photos as thumbnails, best first, 48 per page, with rank, score, the best-matching part
+   ("Full image" or "Person 1", …) and the file name. "Open" opens a photo in your image
+   viewer, "Folder" shows it in its folder; "Open gallery in browser" and "Open results
+   folder" open the HTML gallery and the `results` folder. These buttons use the programs
+   of the computer FrameScout runs on. The date of the search is shown, and a profile you
+   changed (search texts or reference images), renamed or deleted since is marked, since
+   its results no longer fit it.
 
 Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 
@@ -170,6 +178,12 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
 
 ## Results
 
+- `results/results.json` lists what the galleries of the last finished search show
+  (date, photo folder, settings and, per profile, the ranked photos with their scores and
+  thumbnails); the app reads it to show the results. It is replaced at the end of every
+  search that finishes, so a stopped search keeps showing the previous results. Results
+  folders of earlier versions have no such file: the app then lists their HTML files by
+  name until the next search.
 - One HTML gallery per search profile is written to `results/`; the thumbnails are
   stored in `results/thumbnails/`. Clicking a photo opens the original. (Versions
   before the English UI used `results/vorschaubilder/`; that folder is no longer
@@ -291,7 +305,7 @@ Commits, one pull request per roadmap item).
 |---|---|
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
-| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file); standard library only |
+| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file, result file); standard library only |
 | `framescout_scoring.py` | Scoring of the engine: prompt ensemble, scaling and weighting of text and reference scores; numpy only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies (PyTorch pinned) |
