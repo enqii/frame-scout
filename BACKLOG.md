@@ -172,7 +172,7 @@ referenced in commits, pull requests and discussions.
       model choice next to OpenAI CLIP (default). Costs found in PR #12, not verified by a
       run: about 1.47 GB of weights plus about 10 MB of `xlm-roberta-base` config and
       tokenizer on the first use; a new dependency `transformers` (with `tokenizers`;
-      Python 3.14 untested); its own image tower, so its own cache signature (`ENGINE`)
+      Python 3.14 untested); its own image tower, so its own cache signature (`engine_id`, E22)
       and every photo analyzed once more (old rows stay, E11); roughly +1 GB RAM;
       analysis speed per photo about the same (same ViT-B/32 image tower); the default
       reference weight (0.3, E5) was tuned on OpenAI CLIP and must be evaluated again
