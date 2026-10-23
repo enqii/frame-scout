@@ -226,8 +226,32 @@ def open_path(path):
         subprocess.Popen(open_command(path, platform.system()))
 
 def reveal_path(path):
-    """Show the file path in the file manager of the computer the app runs on."""
-    subprocess.Popen(reveal_command(path, platform.system()))
+    """Show the file path in the file manager of the computer the app runs on, selected if possible."""
+    if os.name != 'nt':
+        subprocess.Popen(reveal_command(path, platform.system()))
+        return
+    # the shell function behind "explorer /select,", which did not select a file with a
+    # comma in its name (checked on Windows 11); COM is initialized for this script thread
+    import ctypes
+    from ctypes import wintypes
+    ole32, shell32 = ctypes.windll.ole32, ctypes.windll.shell32
+    shell32.ILCreateFromPathW.restype = ctypes.c_void_p
+    shell32.ILCreateFromPathW.argtypes = [wintypes.LPCWSTR]
+    shell32.ILFree.argtypes = [ctypes.c_void_p]
+    shell32.SHOpenFolderAndSelectItems.argtypes = [ctypes.c_void_p, wintypes.UINT, ctypes.c_void_p, wintypes.DWORD]
+    ole32.CoInitialize(None)
+    try:
+        item = shell32.ILCreateFromPathW(str(path))
+        if not item:
+            raise OSError(f'Windows does not find {path}')
+        try:
+            result = shell32.SHOpenFolderAndSelectItems(item, 0, None, 0)
+        finally:
+            shell32.ILFree(item)
+    finally:
+        ole32.CoUninitialize()
+    if result != 0:
+        raise OSError(f'Explorer reported error {result & 0xFFFFFFFF:#010x}')
 
 def gallery_action(action, path, what):
     """Run action(path) for a gallery button; a failure becomes a note above the gallery."""
@@ -314,7 +338,7 @@ def show_results(results):
     except OSError:
         pass  # deleted or in use: the other buttons still work
     if st.session_state.get('gallery_notice'):
-        st.warning(st.session_state.pop('gallery_notice'))
+        st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
     cards = entry['cards']
     pages = page_count(len(cards), GALLERY_PAGE_SIZE)
     page = 1
@@ -650,7 +674,7 @@ with run_tab:
     last_results, results_error = load_results()
     if results_error:
         st.warning(f'{RESULTS_FILE} cannot be read, so the results of the last search are not shown here. Starting '
-                   f'the search again writes it anew.\n\nDetails: {results_error}')
+                   f'the search again writes it anew.\n\nDetails: {plain(str(results_error))}')
     if last_results:
         show_results(last_results)
     elif RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
@@ -664,7 +688,7 @@ with run_tab:
             st.caption(f'Open the local gallery: {plain(str(page))}')
         st.button('Open results folder', on_click=open_results_folder)
         if st.session_state.get('gallery_notice'):
-            st.warning(st.session_state.pop('gallery_notice'))
+            st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
     else:
         st.caption('After the first search run, its results appear here.')
     st.caption('The HTML galleries in the results folder link to the local thumbnails and original photos; keep '

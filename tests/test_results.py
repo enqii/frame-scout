@@ -153,12 +153,6 @@ def test_open_and_reveal_commands_per_system():
     assert reveal_command(photo, 'Linux') == ['xdg-open', str(photo.parent)]
 
 
-def test_explorer_gets_the_select_switch_and_the_quoted_path_in_one_command_line():
-    # Explorer parses its own command line: "/select," must be followed by the path in quotes
-    # within the same argument, which a list of arguments would quote as a whole
-    assert reveal_command(Path(r'C:\My photos\a.jpg'), 'Windows') == r'explorer /select,"C:\My photos\a.jpg"'
-
-
 def test_only_existing_image_files_can_be_opened(tmp_path):
     photo = tmp_path / 'a.JPG'
     photo.write_bytes(b'x')

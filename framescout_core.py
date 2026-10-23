@@ -1412,12 +1412,11 @@ def open_command(path, system):
 def reveal_command(path, system):
     """Return the command that shows the file path in the file manager of system (platform.system()).
 
-    On Windows a command line string: Explorer reads /select,"<path>" as one switch, which
-    an argument list would quote as a whole. Linux has no common way to select a file, so
-    its folder is opened.
+    Not for Windows: there the app calls the shell function SHOpenFolderAndSelectItems,
+    since "explorer /select," parses its own command line and, checked on Windows 11, did
+    not select a file whose name contains a comma. Linux has no common way to select a
+    file, so its folder is opened.
     """
-    if system == 'Windows':
-        return f'explorer /select,"{path}"'
     if system == 'Darwin':
         return ['open', '-R', str(path)]
     return ['xdg-open', str(Path(path).parent)]
