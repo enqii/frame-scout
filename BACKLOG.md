@@ -91,7 +91,8 @@ referenced in commits, pull requests and discussions.
       shows e.g. #2, #3, #4 and fewer than `--top` cards although lower-ranked photos
       exist. Fix idea: rank only the photos that got a card and fill up to `--top`.
       Also: `ensure_thumbnail` repeats the `stat()` done during scoring; the mtime could
-      be kept with the score (PR #6 review).
+      be kept with the score (PR #6 review). Since P4 (A) the app's result gallery shows
+      the same gaps: `results.json` keeps the ranks of the HTML gallery.
 - [ ] **E13 – Interrupted thumbnail writes leave temporary files:** since PR #6 a
       thumbnail is written as `thumbnails/<hash>.jpg.<random>.jpg` and renamed when
       complete. The app's Stop button ends the engine with `terminate()`/`kill()`, which
@@ -248,6 +249,19 @@ referenced in commits, pull requests and discussions.
       second, non-cosplay collection (E20). On another PC, the labels, the photos and
       the tooling have to be brought along or made anew.
 
+- [ ] **E23 – Cleanup must keep what `results.json` references:** since P4 (A) the app
+      shows the last search from `results/results.json`, whose cards name thumbnails in
+      `results/thumbnails/` and the galleries' HTML files. The cleanup of E7 must not
+      delete thumbnails or galleries still listed there (nor those linked by HTML
+      galleries that are kept), or the app shows "No thumbnail".
+- [ ] **E24 – An interrupted export leaves galleries newer than `results.json`:** the
+      engine writes `results.json` only after all galleries, so a search stopped while it
+      writes the galleries has already replaced some HTML files, while the app still shows
+      the previous complete search (its date is shown, and the status says that the last
+      run did not finish). Opening such a gallery from the app shows the newer, partial
+      result. Fix idea: write the galleries under temporary names and publish them
+      together with `results.json` at the end. Found in PR #14.
+
 ### App (`app.py`)
 
 - [x] **A1 – Reference images get overwritten:** uploads are always named `reference-1…n`;
@@ -344,6 +358,9 @@ referenced in commits, pull requests and discussions.
       "auto" but stays saved until another device or "Use auto from now on" is chosen.
       Still open: deleting a profile without confirmation; results without timestamp or
       reference to the profile state, see A12.)
+      (2026-10-23, P4 (A): the app shows the date of the search whose results it shows and
+      marks a profile changed, renamed or deleted since, from `results.json` (A12). Still
+      open: deleting a profile without confirmation.)
 - [x] **A9 – Minor issues:** duplicate `import os`; `EXT` duplicated in app and engine;
       `use_container_width` possibly deprecated (Streamlit 1.66).
       (done 2026-10-21: duplicate import removed, `EXT` lives in `framescout_core`;
@@ -354,7 +371,8 @@ referenced in commits, pull requests and discussions.
       `streamlit>=1.40` (the release notes name 1.48 – not verified), so switching needs
       a raised minimum version → do it together with I3.
       (I3 is done, but the user kept the Streamlit floor at `>=1.40` in PR #8: raising
-      it and switching to `width` belong together in this item.)
+      it and switching to `width` belong together in this item. The result gallery of P4
+      (A) uses `use_container_width` for its buttons as well.)
 - [x] **A11 – Progress bar parses German log text:** the app reads progress from `run.log`
       with a regex on `Neu:`/`Cache:`/`Fehler:`. Translating the engine log (I7) breaks
       the progress bar unless both change together; a machine-readable progress line or
@@ -364,7 +382,7 @@ referenced in commits, pull requests and discussions.
       Still open: a machine-readable status file (P2).)
       (done 2026-10-21 with A4/A5: the app reads the progress from `run-status.json`;
       `parse_progress` is removed, the progress line stays in the log for people.)
-- [ ] **A12 – Gallery downloads are re-derived from the current profile list:** the app
+- [x] **A12 – Gallery downloads are re-derived from the current profile list:** the app
       maps profiles to `<slug>.html` with `profile_slugs` on the *current*
       `profiles.json`. After deleting, renaming or reordering profiles with colliding
       slugs, a button can serve another (deleted) profile's stale gallery, e.g. delete
@@ -373,6 +391,14 @@ referenced in commits, pull requests and discussions.
       output format, so a design decision; fits the status file of P2 and A8 ("results
       without reference to the profile state"). Since A4 the engine writes
       `results/run-status.json`; the manifest could become part of it.
+      (done 2026-10-23 in P4 (A), user decision in PR #14: the engine writes
+      `results/results.json` after the galleries – run start and end, photo folder,
+      settings and per profile its name, a fingerprint of its search texts and reference
+      image paths (`framescout_core.search_fingerprint`), the gallery file and every card;
+      a separate file, not part of the status file. The app shows the galleries of that
+      search under the names they were made for and marks a profile changed, renamed or
+      deleted since. Results folders without the file list their HTML files by name.
+      Partial exports: E24.)
 - [ ] **A13 – Concurrent profile edits are lost:** the app reads `profiles.json` on every
       rerun and saves its whole list, so an edit made in another tab/session (or by hand)
       between that read and a save is overwritten; `profiles.json.bak` holds only the
@@ -400,6 +426,53 @@ referenced in commits, pull requests and discussions.
       Older than A8, but since A8 an empty field is also saved in `settings.json` and comes
       back after a restart. Fix: treat an empty or whitespace-only folder as missing in the
       app (and possibly reject it in the engine). Found in PR #10.
+
+- [ ] **A17 – Marks and copying (roadmap P4 (B)): open decisions.** Asked in PR #14 and
+      deferred to P4 (B); answer them before implementing it. The user asked what a mark is
+      for ("Wozu dient eine Markierung?"): FrameScout ranks candidates, not certain hits;
+      a mark records which of them the user has checked to be a real match, so that only
+      those are copied (B) or exported (C); later marks could also improve the search
+      (e.g. as reference images or "not this" examples).
+      - Q4 – meaning: (a) per profile ("this photo is a match for Red car"), kept across
+        later searches, keyed by profile name + photo path (recommended); (b) one global
+        selection across all profiles; (c) for the browser session only. States: two,
+        marked or not (recommended), or three (match / no match / open; would hide
+        rejects and could feed back into the search later). Storage: (a) `marks.json` in
+        the project folder, gitignored, written atomically under a lock like
+        `settings.json`, treated as user data (recommended); (b) `results/marks.json`
+        (the cleanup of E7 could delete it); (c) in `profiles.json` (schema change, a hold
+        point). A renamed profile keeps its marks, like its reference folder.
+      - Q5 – copying, with fixed rules in every option: copy only (`shutil.copy2`, keeps
+        the date), never move or delete originals, never overwrite in the target; a file
+        with the same name and content is skipped as "already there", the same name with
+        other content becomes `name (2).jpg`. Target folder: (a) an editable field,
+        prefilled with `<Pictures>\FrameScout\<profile slug>` and saved in
+        `settings.json`, outside the project folder so an uninstall (P5) never deletes
+        copies (recommended); (b) an empty field the user must fill; (c) a folder in the
+        project folder. Layout: (a) flat (recommended); (b) keep the subfolders of the
+        photo folder. A target inside the photo folder (the copies would be analyzed
+        again and appear twice): (a) refuse with an explanation (recommended); (b) warn.
+      Mockup (below the gallery of P4 (A)): a "Match" checkbox per card; "Marked: 23
+      photos of "Red car"", a "Copy to folder" field, "Copy 23 marked photos", "Open
+      target folder", and a summary "20 copied · 2 already there · 1 renamed · 0 failed".
+- [ ] **A18 – ZIP export (roadmap P4 (C)): open decision.** Asked in PR #14 and deferred to
+      P4 (C). Q6 – content: (a) the gallery HTML with its links rewritten to a
+      `thumbnails/` folder in the ZIP, plus those thumbnails, about 3 MB per 150 cards, as
+      a browser download; the links to the originals stay `file://` and work only on
+      this computer (recommended); (b) as (a) plus larger previews (~1200 px, ~250 KB
+      each, about 40 MB per 150 cards) so the ZIP can be viewed on another computer
+      (Pillow in the app; it is already a dependency); (c) as (a) plus the originals
+      (can be gigabytes, written to disk; copying of P4 (B) covers this). Scope: (a) two
+      buttons, all cards and marked only (recommended); (b) all cards only. It replaces
+      the app's "Download HTML (without thumbnails)". The HTML rendering would move from
+      the engine to `framescout_core` so the app can write a gallery of the marked photos.
+- [ ] **A19 – "Open" and "Folder" are checked on Windows only:** the gallery buttons of P4
+      (A) open a photo with `os.startfile` and select it with the shell function
+      `SHOpenFolderAndSelectItems` (checked on Windows 11 from the app in a browser,
+      also with a space and a comma in the path; `explorer /select,` did not select a file
+      with a comma). On macOS (`open`, `open -R`) and Linux (`xdg-open`, which opens the
+      folder without selecting the file) they are untested. They act on the computer the
+      app runs on, which is the user's own as long as the app listens on `127.0.0.1`.
 
 ### Installation / project
 
@@ -574,8 +647,15 @@ Stronger and multilingual models moved to P4b (user decision in PR #13: evaluate
 on the user's home PC first).
 
 ### P4 – UX
-- [ ] Result gallery in the app, mark matches/copy them to a folder, "open folder",
-      ZIP export with thumbnails
+The item "Result gallery in the app, mark matches/copy them to a folder, "open folder",
+ZIP export with thumbnails" is split into three pull requests, in this order (user
+decision in PR #14):
+- [x] (A) Result gallery in the app: the engine writes `results/results.json`; the app shows
+      the last search as a thumbnail grid with "Open", "Folder", "Open gallery in
+      browser" and "Open results folder", and marks profiles changed since (A12, part of A8)
+      (done 2026-10-23; macOS/Linux untested: A19)
+- [ ] (B) Mark matches and copy them to a folder (open decisions: A17)
+- [ ] (C) ZIP export with thumbnails (open decision: A18)
 - [ ] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
       optional HEIC/RAW support
 
