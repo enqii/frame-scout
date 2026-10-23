@@ -38,7 +38,7 @@
 - [ ] Out-of-scope findings added to `BACKLOG.md` as new items (IDs: …), or none found;
       declined review findings that defer work name their backlog ID (no GitHub issues)
 - [ ] `README.md` updated, or not affected
-- [ ] `CLAUDE.md` updated, or not affected
+- [ ] `docs/ARCHITECTURE.md` updated (and `CLAUDE.md` for rule changes), or not affected
 - [ ] User data untouched (`profiles.json` of the user, `photos/`, `references/`, `results/`, `run.log`)
 - [ ] Only files belonging to this item changed (`git diff --stat origin/main...HEAD`)
 
