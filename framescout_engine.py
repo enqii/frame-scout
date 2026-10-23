@@ -107,7 +107,7 @@ def main():
     parser.add_argument('folder', type=Path, help='photo folder (subfolders are searched recursively)')
     parser.add_argument('--profiles', type=Path, help='JSON file with search profiles (see profiles.example.json)')
     parser.add_argument('--character', action='append', default=[], metavar='NAME|CONTEXT|FEATURES',
-                        help='inline search profile, can be repeated; e.g. "Red car|Vehicles|red paint, black roof"')
+                        help='inline search profile in English, can be repeated; e.g. "Red car|Vehicles|red paint, black roof"')
     parser.add_argument('--output', type=Path, default=Path('results'))
     parser.add_argument('--device', choices=DEVICES, default='auto')  # the app offers the same (A8 review)
     parser.add_argument('--batch-size', type=int, default=8)
