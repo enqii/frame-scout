@@ -35,7 +35,7 @@ referenced in commits, pull requests and discussions.
       thread counts on small CPUs: E17.)
 - [x] **E3 – German motif names in English prompts:** e.g. "A photograph of Rotes Auto
       (Fahrzeuge)." – OpenAI CLIP practically only understands English, while the UI
-      placeholders are German.
+      placeholders were German (English since I7).
       (done 2026-10-23 by communication, user decision in PR #12: FrameScout supports
       English search terms only. The profile tab shows a hint and labels the motif,
       context, features and custom search text fields "in English"; README section
