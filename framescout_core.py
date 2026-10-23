@@ -1278,15 +1278,22 @@ _GALLERY_NAME = re.compile(r'[^\\/:*?"<>|\x00-\x1f]+\.html')
 _THUMBNAIL_NAME = re.compile(r'[0-9a-f]{24}\.jpg')
 
 
-def search_fingerprint(profile):
+def search_fingerprint(profile, base):
     """Return a short hash of what decides a profile's search, for a profile of load_profiles.
 
     That is its search texts (generated from name, context and features, plus the custom
     ones) and its reference image paths: the app compares it with the current profile to
-    say that a result is older than the last change of the profile.
+    say that a result is older than the last change of the profile. base is the resolved
+    folder of the profiles file: a reference inside it counts by its path relative to it,
+    so moving the project folder does not change the fingerprint (review).
     """
+    def reference(path):
+        try:
+            return path.relative_to(base).as_posix()
+        except ValueError:
+            return str(path)
     data = {'prompts': profile['prompts'], 'generated': profile['generated'],
-            'references': [str(x) for x in profile['refs']]}
+            'references': [reference(x) for x in profile['refs']]}
     return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -1297,7 +1304,8 @@ def profile_fingerprints(filename):
     """
     if not read_profiles(filename):
         return {}
-    return {p['name']: search_fingerprint(p) for p in load_profiles(filename, [])}
+    base = Path(filename).resolve().parent
+    return {p['name']: search_fingerprint(p, base) for p in load_profiles(filename, [])}
 
 
 def profile_state(entry, fingerprints):
@@ -1311,9 +1319,13 @@ def profile_state(entry, fingerprints):
     return 'current' if current == entry['fingerprint'] else 'changed'
 
 
-def result_card(rank, path, root, label, score, text, visual, caption, detail, thumbnail):
-    """Return the result file's entry of one gallery card (path: the photo, root: the photo folder)."""
-    return {'rank': rank, 'path': str(path), 'relative': str(Path(path).relative_to(root)), 'label': label,
+def result_card(rank, path, relative, label, score, text, visual, caption, detail, thumbnail):
+    """Return the result file's entry of one gallery card.
+
+    path: the photo; relative: its path in the photo folder as the HTML gallery shows it
+    (computed once by the engine for both, review).
+    """
+    return {'rank': rank, 'path': str(path), 'relative': relative, 'label': label,
             'score': score, 'text': text, 'visual': visual, 'caption': caption, 'detail': detail,
             'thumbnail': thumbnail}
 
@@ -1366,6 +1378,7 @@ def read_results(path):
     profiles = data.get('profiles')
     if not isinstance(profiles, list):
         raise ValueError('"profiles" must be a list')
+    names = set()
     for entry in profiles:
         if (not isinstance(entry, dict) or not isinstance(entry.get('name'), str) or not entry['name']
                 or not isinstance(entry.get('fingerprint'), str) or not isinstance(entry.get('gallery'), str)
@@ -1373,6 +1386,9 @@ def read_results(path):
             raise ValueError(f'invalid profile entry: {entry!r}'[:300])
         if not _GALLERY_NAME.fullmatch(entry['gallery']):
             raise ValueError(f"invalid gallery file name: {entry['gallery']!r}")
+        if entry['name'] in names:  # the app picks a profile by its name (review)
+            raise ValueError(f"duplicate profile name: {entry['name']!r}")
+        names.add(entry['name'])
         for card in entry['cards']:
             _check_card(card)
     return data

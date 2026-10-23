@@ -12,7 +12,7 @@ THUMB = '1c6b57780fa2df6f925b878c.jpg'
 
 
 def card(rank=1, **changes):
-    return {**result_card(rank, Path(r'C:\photos\sub\a.jpg'), Path(r'C:\photos'), 'Full image', 3.125, 0.31, None,
+    return {**result_card(rank, Path(r'C:\photos\sub\a.jpg'), r'sub\a.jpg', 'Full image', 3.125, 0.31, None,
                           'Score +3.12', 'text 0.310', THUMB), **changes}
 
 
@@ -24,16 +24,17 @@ def document(cards=None, **profile):
 
 
 def write_profiles(folder, profiles):
+    folder.mkdir(parents=True, exist_ok=True)
     path = folder / 'profiles.json'
     path.write_text(json.dumps({'profiles': profiles}), encoding='utf-8')
     return path
 
 
 def test_a_card_holds_what_the_app_shows_and_opens():
-    c = result_card(2, Path('/photos/sub/a.jpg'), Path('/photos'), 'Person 1', 1.5, 0.3, 0.8, 'Score +1.50',
+    # the relative path as the engine shows it in the HTML gallery, computed once (review)
+    c = result_card(2, Path('/photos/sub/a.jpg'), 'sub/a.jpg', 'Person 1', 1.5, 0.3, 0.8, 'Score +1.50',
                     'text 0.300 · image 0.800', THUMB)
-    assert c == {'rank': 2, 'path': str(Path('/photos/sub/a.jpg')), 'relative': str(Path('sub/a.jpg')),
-                 'label': 'Person 1',
+    assert c == {'rank': 2, 'path': str(Path('/photos/sub/a.jpg')), 'relative': 'sub/a.jpg', 'label': 'Person 1',
                  'score': 1.5, 'text': 0.3, 'visual': 0.8, 'caption': 'Score +1.50',
                  'detail': 'text 0.300 · image 0.800', 'thumbnail': THUMB}
 
@@ -94,6 +95,16 @@ def test_names_that_could_leave_the_results_folder_are_rejected(tmp_path, profil
         read_results(path)
 
 
+def test_duplicate_profile_names_are_rejected(tmp_path):
+    # the app picks a profile by its name (review)
+    path = tmp_path / RESULTS_FILE
+    data = document()
+    data['profiles'].append(dict(data['profiles'][0]))
+    path.write_text(json.dumps(data), encoding='utf-8')
+    with pytest.raises(ValueError, match='Red car'):
+        read_results(path)
+
+
 def test_the_fingerprint_follows_the_search_texts_and_the_reference_images(tmp_path):
     (tmp_path / 'r.jpg').write_bytes(b'x')
     base = {'name': 'Red car', 'franchise': 'Vehicles', 'features': 'red paint', 'prompts': ['a red car'],
@@ -101,7 +112,7 @@ def test_the_fingerprint_follows_the_search_texts_and_the_reference_images(tmp_p
 
     def fingerprint(**changes):
         [profile] = load_profiles(write_profiles(tmp_path, [{**base, **changes}]), [])
-        return search_fingerprint(profile)
+        return search_fingerprint(profile, tmp_path)
 
     same = fingerprint()
     assert fingerprint() == same
@@ -116,9 +127,22 @@ def test_profile_fingerprints_of_the_apps_profile_file(tmp_path):
     path = write_profiles(tmp_path, [{'name': 'Red car'}, {'name': 'Bicycle', 'features': 'two wheels'}])
     fingerprints = profile_fingerprints(path)
     assert list(fingerprints) == ['Red car', 'Bicycle']
-    assert fingerprints == {p['name']: search_fingerprint(p) for p in load_profiles(path, [])}
+    assert fingerprints == {p['name']: search_fingerprint(p, tmp_path) for p in load_profiles(path, [])}
     assert profile_fingerprints(write_profiles(tmp_path, [])) == {}
     assert profile_fingerprints(tmp_path / 'missing.json') == {}
+
+
+def test_a_moved_project_folder_keeps_the_fingerprints(tmp_path):
+    # references inside the profile file's folder count by their path relative to it, so
+    # moving the project folder does not mark every profile with references as changed (review)
+    profile = {'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}
+    before = profile_fingerprints(write_profiles(tmp_path / 'C' / 'FrameScout', [profile]))
+    after = profile_fingerprints(write_profiles(tmp_path / 'D' / 'Tools' / 'FrameScout', [profile]))
+    assert before == after
+    # a reference outside it counts by its absolute path
+    outside = {**profile, 'reference_images': [str(tmp_path / 'elsewhere.jpg')]}
+    [loaded] = load_profiles(write_profiles(tmp_path / 'C' / 'FrameScout', [outside]), [])
+    assert search_fingerprint(loaded, tmp_path / 'C' / 'FrameScout') != before['Red car']
 
 
 def test_profile_state_compares_the_search_with_the_current_profile():

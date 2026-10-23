@@ -378,6 +378,8 @@ def search(args, parser, root, output, status):
 
     names = [p['name'] for p in profiles]
     slugs = dict(zip(names, profile_slugs(names)))
+    # the folder the reference paths of profiles.json are relative to, as for the app (review)
+    profiles_base = args.profiles.resolve().parent if args.profiles else Path.cwd()
     nav = '<nav>' + ' · '.join(f'<a href="{quote(slugs[p["name"]] + ".html")}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
     style = '''body{font:16px system-ui;background:#181818;color:#eee;margin:24px}a{color:#a9d2ff}
     main{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:16px}
@@ -401,10 +403,11 @@ def search(args, parser, root, output, status):
             if thumb_name is None:
                 continue
             uri = html.escape(path.as_uri(), quote=True)
-            rel = html.escape(str(path.relative_to(root)))
+            relative = str(path.relative_to(root))  # once, for the HTML card and results.json (review)
+            rel = html.escape(relative)
             score, detail = score_caption(match, normalized[name])
             label = crop_label(label)
-            entries.append(result_card(rank, path, root, label, match.score, match.text, match.visual, score, detail,
+            entries.append(result_card(rank, path, relative, label, match.score, match.text, match.visual, score, detail,
                                        thumb_name))
             cards.append(f'<article><a href="{uri}" target="_blank"><img loading="lazy" src="thumbnails/{quote(thumb_name)}" alt="{rel}"></a>'
                          f'<p><b>#{rank}</b> · {score} · {html.escape(label)}<br><small>{detail}</small><br>'
@@ -416,7 +419,7 @@ def search(args, parser, root, output, status):
                 ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original.</p><main>' + ''.join(cards) + '</main></html>')
         target = output / (slugs[name] + '.html'); target.write_text(page, encoding='utf-8')
         print(f'{name}: {target}', flush=True)
-        results.append({'name': name, 'fingerprint': search_fingerprint(p), 'gallery': target.name,
+        results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': target.name,
                         'normalized': normalized[name], 'cards': entries})
     # after all galleries, so the file always describes a complete export (A12)
     settings = {'device': device, 'batch_size': args.batch_size, 'top': args.top,
