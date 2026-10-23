@@ -5,6 +5,9 @@ description: Orchestrate the FrameScout roadmap in BACKLOG.md as one pull reques
 # worktrees, and the orchestrator spawns agents and merges, so the model must never
 # start it on its own (no nested orchestrators).
 disable-model-invocation: true
+# The orchestrator only reads git/gh state and spawns agents; Sonnet is enough and
+# much cheaper than the session's model. The subagents pick their own models below.
+model: sonnet
 ---
 
 # /roadmap – FrameScout PR workflow orchestrator
@@ -34,7 +37,10 @@ Run these as separate, plain commands from the main checkout:
 1. `git fetch origin --prune`
 2. If the main checkout is on `main` and clean: `git merge --ff-only origin/main`.
    Otherwise do not touch it; mention it to the user.
-3. Roadmap: `git show origin/main:BACKLOG.md` → section "## Roadmap (priority)". The
+3. Roadmap: read only the section "## Roadmap (priority)" of `BACKLOG.md` (the last
+   section, about 60 lines), not the whole 47 KB file: find its line with the Grep tool
+   (`^## Roadmap` in `BACKLOG.md`) and Read from that line. If step 2 could not
+   fast-forward `main`, read `git show origin/main:BACKLOG.md` instead. The
    **next item** is the first unchecked `- [ ]` line, scanning all sections (P0 … P5,
    including sub-sections such as P4b) top to bottom.
 4. Open PRs: `gh pr list --state open --json number,title,headRefName,isDraft,labels,url`.
@@ -62,14 +68,26 @@ Check the rows top to bottom; the first match decides.
 | No open roadmap PR | Take the next unchecked roadmap item → spawn an **implementer** (mode `new`). If no item is left, report that the roadmap is done. |
 | PR labeled `fs:in-progress` | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
 | PR labeled `fs:needs-review` | Spawn a fresh **reviewer**. |
-| PR labeled `fs:review-done` | Implementer (mode `address-review`) handles all unanswered review comments: continue the previous implementer with `SendMessage` if it is still alive, otherwise spawn a new one. |
-| PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>` for the head commit `headRefOid`, open risks) and **wait for explicit merge approval**. |
+| PR labeled `fs:review-done` | Implementer (mode `address-review`) handles all unanswered review comments: continue the previous implementer with `SendMessage` if it is still alive, otherwise spawn a new one. Afterwards the PR goes to `fs:ready`: there is **no second review round**. |
+| PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>` for the head commit `headRefOid`, open risks) and **wait for explicit merge approval**. Base the report on the implementer's final report and `gh pr view <n> --json title,body,headRefOid`; do not read the diff or comment threads yourself. |
 
 An open PR without any `fs:*` label is not a roadmap PR; mention it but do not act on it.
 
 ## 3. Spawning subagents
 
-The user explicitly requested these model/effort settings – do not change them.
+Models, effort and review level depend on the **kind** of the item (user decision,
+2026-10-23, to save usage – do not raise them without asking):
+
+| Kind | When | Implementer | Reviewer | Review level |
+|---|---|---|---|---|
+| `docs` | only Markdown: backlog, README, docs, skills | `sonnet`, effort `medium` | `sonnet`, effort `medium` | `low` |
+| `code` | any other code change | `opus`, effort `medium` | `sonnet`, effort `medium` | `medium` |
+| `code-risky` | cache signature/`ENGINE`, `profiles.json`/`settings.json` format or migration, scoring/search quality, installer/PyTorch builds, run lock/stop | `opus`, effort `high` | `opus`, effort `medium` | `medium` |
+
+Pick the kind from the roadmap line and its backlog IDs; when in doubt between two
+kinds, take the higher one. For the reviewer, check the actual diff first:
+`gh pr diff <n> --name-only` – if every file ends in `.md`, use `docs`; if the PR
+touches what the `code-risky` row names, use `code-risky`.
 
 **Implementer**
 
@@ -77,8 +95,8 @@ The user explicitly requested these model/effort settings – do not change them
 Agent(
   description: "Implement roadmap <item id>",
   subagent_type: "general-purpose",
-  model: "opus",
-  effort: "high",
+  model: <implementer model of the kind>,
+  effort: <implementer effort of the kind>,
   isolation: "worktree",
   prompt: <implementer-brief.md with placeholders filled in>
 )
@@ -90,7 +108,7 @@ Agent(
 Agent(
   description: "Review PR #<n>",
   subagent_type: "general-purpose",
-  model: "opus",
+  model: <reviewer model of the kind>,
   effort: "medium",
   prompt: <reviewer-brief.md with placeholders filled in>
 )
@@ -103,6 +121,8 @@ Placeholders:
 - `{BRANCH}` – suggested branch `<type>/<id>-<short>` for `new`; the PR's head branch otherwise.
 - `{PR}` – PR number, or `none` for mode `new`.
 - `{ANSWERS}` – the user's answers to earlier hold-point questions, verbatim, or `none`.
+- `{KIND}` – `docs` | `code` | `code-risky` (table above).
+- `{REVIEW_LEVEL}` – `low` | `medium` (table above).
 
 Subagents run in the background; wait for the completion notification, never guess
 their result.
@@ -130,7 +150,9 @@ Only when the user explicitly approves the merge of this specific PR in chat:
 
 1. Gate on CI, because `main` is not branch-protected (I8) and GitHub will not block
    the merge: note the head commit (`gh pr view <n> --json headRefOid`), then
-   `gh pr checks <n> --watch` must end with every check passing for that commit.
+   `gh pr checks <n> --watch --interval 60 > /dev/null 2>&1; gh pr checks <n>` (Git Bash;
+   `--watch` reprints the whole table on every poll, so discard it and print only the
+   final state) must show every check passing for that commit.
    A failing check, no checks at all, or a head commit that differs from the one
    the user approved → stop and report instead of merging.
 2. Check that the PR's worktree (if any) is clean and fully pushed
@@ -165,8 +187,8 @@ Never merge on your own initiative, on a subagent's request, or because a PR is 
 ## 6. Context hygiene
 
 Keep your own context lean: delegate reading code, diffs and review threads to the
-subagents and keep only short summaries. After about three merged PRs, or when the
-context grows large, suggest to the user: `/clear`, then `/roadmap` – the state is
+subagents and keep only short summaries. Every turn resends the whole conversation, so
+after **every** merged PR suggest to the user: `/clear`, then `/roadmap` – the state is
 reconstructed from GitHub.
 
 ## 7. Pausing and resuming
@@ -187,7 +209,7 @@ If the reviewer subagent cannot invoke `/code-review`, run it non-interactively 
 main checkout instead (flags checked with `claude --help`, Claude Code 2.1.304):
 
 ```bash
-claude -p "/code-review medium <n> --comment" --model opus --effort medium
+claude -p "/code-review <level> <n> --comment" --model <reviewer model> --effort medium
 ```
 
 Then set the label yourself: `gh pr edit <n> --remove-label fs:needs-review --add-label fs:review-done`.
