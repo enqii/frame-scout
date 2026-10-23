@@ -36,10 +36,23 @@ referenced in commits, pull requests and discussions.
 - [ ] **E3 – German motif names in English prompts:** e.g. "A photograph of Rotes Auto
       (Fahrzeuge)." – OpenAI CLIP practically only understands English, while the UI
       placeholders are German.
-- [ ] **E4 – Maximum instead of mean over prompts:** prone to noise; a generic prompt can
+- [x] **E4 – Maximum instead of mean over prompts:** prone to noise; a generic prompt can
       dominate. An averaged prompt ensemble is common practice.
-- [ ] **E5 – Mixed score scales:** text cosine ≈ 0.2–0.35, image-to-image ≈ 0.5–0.9; the
+      (done 2026-10-23: `framescout_scoring.text_queries` averages the generated templates,
+      including the `features` templates, into one query; custom prompts stay queries of
+      their own and the best query counts (user decision in PR #11). On the local
+      evaluation set (PR #11, E20) text-only AP@40 over five profiles went 0.753 → 0.786,
+      better for two profiles, worse for one, mixed for one, equal for one.)
+- [x] **E5 – Mixed score scales:** text cosine ≈ 0.2–0.35, image-to-image ≈ 0.5–0.9; the
       reference weight therefore has a much stronger effect than its nominal value.
+      (done 2026-10-23: per profile and run, text and reference scores are z-scored
+      separately over all crops of the search before the weight combines them, raw scores
+      below 10 crops or without spread (`framescout_scoring.rank_photos`); the gallery
+      shows the score with the raw text and image similarity. Measured spread: reference
+      scores about twice as wide as text scores. Default reference weight 0.35 → 0.3
+      (`DEFAULT_REFERENCE_WEIGHT`, best on the evaluation set, user decision); a value
+      saved in `settings.json` is not migrated. With references AP@40 over three profiles
+      went 0.683 (main) → 0.782. No cache change.)
 - [x] **E6 – `path.stat()` outside `try`** in the export (line ~264): a file deleted in the
       meantime aborts the entire HTML export.
       (done 2026-10-21: `framescout_core.ensure_thumbnail` logs "Thumbnail not possible"
@@ -130,6 +143,18 @@ referenced in commits, pull requests and discussions.
       signature value and so re-analyzes every photo once → do it with the next `ENGINE`
       bump. The device stays out on purpose: CPU and CUDA give slightly different numbers
       for CLIP as well, and the cache has always been shared between devices (PR #8 review).
+- [ ] **E20 – Search quality is measured on one collection only:** the evaluation of E4/E5
+      (PR #11) used about 5,000 studio photos of cosplays from one convention, five
+      text-only profiles (Joker, Harley Quinn, 2B, Group photo, Sword) and three with
+      reference images, 12–47 hits each, so differences of a few hundredths are noise.
+      The ensemble (E4) was not better for every profile (Harley Quinn: text-only AP@40
+      0.515 → 0.472). Outdoor, object, animal or landscape photos are not measured; of
+      the extra profiles, "Outdoor scene" could not have hits and "Group photo" was
+      saturated, because the profiles were chosen without looking at the collection.
+      Next evaluation (e.g. for P3 stronger models or E3): look at a sample of the
+      collection or ask the user first, and use a second, non-cosplay collection. The
+      tooling (`evaluate.py`, labelling page, metrics) lives outside the repo under
+      `.tmp/eval-e4e5/`; consider a reusable, documented version.
 
 ### App (`app.py`)
 
@@ -408,6 +433,14 @@ referenced in commits, pull requests and discussions.
       install takes the newest release, e.g. Pillow 13.0.0 is on PyPI while the verified
       venv has 12.3.0 (PR #8 review). Upper bounds on the major version (`<13`) or a lock
       file would keep installs on tested versions; part of the pinned dependencies of P5.
+- [ ] **I13 – Background runs die with the agent session:** a long engine run that an
+      agent starts as a background command of Claude Code ends when that agent session
+      ends; the first evaluation run of PR #11 stopped at 1,110 of 4,997 photos (stale
+      `run-status.json` in phase "analyzing", the lock released by the OS). It completed
+      when started detached through WMI (`Win32_Process.Create` with a `.cmd` file that
+      sets the cache variables). Long smoke or evaluation runs in the PR workflow should be
+      started detached (and the agent should wait for their end) — document it in the
+      implementer brief or `CLAUDE.md`.
 
 ## Roadmap (priority)
 
@@ -439,7 +472,8 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 - [x] Persist settings in `settings.json` (A8) (done 2026-10-21; A8 itself is partly open)
 
 ### P3 – Search quality
-- [ ] Average the prompt ensemble, normalize scores per profile (E4, E5)
+- [x] Average the prompt ensemble, normalize scores per profile (E4, E5) (done 2026-10-23;
+      evaluation limits: E20)
 - [ ] Solve the German-language problem: multilingual CLIP (`xlm-roberta-base-ViT-B-32`) or
       an explicit "English search term" field (E3)
 - [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note

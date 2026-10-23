@@ -180,16 +180,23 @@ The main number on a card is the **Score**: how far the best part of the photo l
 above the average of all photos of this search, in standard deviations. A score of
 +2 means "clearly more similar than most photos in this folder", 0 means "average".
 Text and reference images are scaled this way separately before the **weight of the
-reference images** (AI settings) combines them, so a weight of 0.35 really means 35 %
-reference images and 65 % text. The small numbers below are the raw similarities of
-that part with the text and with the reference images. Scores therefore depend on the
-folder searched: the same photo can get a different score in another folder. With
-very few photos (fewer than ten image parts), the gallery shows the raw weighted
-"Similarity" instead.
+reference images** (AI settings) combines them, so the default weight of 0.3 really
+means 30 % reference images and 70 % text. The weight only matters for profiles with
+reference images. The small numbers below are the raw similarities of that part with
+the text and with the reference images. Scores therefore depend on the folder searched:
+the same photo can get a different score in another folder. With very few photos
+(fewer than ten image parts), the gallery shows the raw weighted "Similarity" instead.
 
 Changed in 2026-10: before, the best single generated search text decided and the raw
 similarities were added up, so reference images weighed much more than their nominal
-weight. Rankings and numbers of older galleries differ; no photo is analyzed again.
+weight (the reference scores spread about twice as wide as the text scores). The
+default weight changed from 0.35 to 0.3, the value that worked best in a local test
+with about 5,000 cosplay photos (a single collection, so treat it as a starting
+point). If you never changed the weight, the new default applies automatically
+(`settings.json` stores only values that differ from the defaults). A weight you set
+yourself, or a `reference_weight` written into `settings.json` by hand (also 0.35), is
+kept as it is; set the slider to 0.3 to use the new default. Rankings and numbers of
+older galleries differ; no photo is analyzed again.
 
 ### How reliable are the matches?
 
