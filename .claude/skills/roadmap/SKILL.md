@@ -35,7 +35,8 @@ Run these as separate, plain commands from the main checkout:
 2. If the main checkout is on `main` and clean: `git merge --ff-only origin/main`.
    Otherwise do not touch it; mention it to the user.
 3. Roadmap: `git show origin/main:BACKLOG.md` → section "## Roadmap (priority)". The
-   **next item** is the first unchecked `- [ ]` line, scanning P0 → P5 top to bottom.
+   **next item** is the first unchecked `- [ ]` line, scanning all sections (P0 … P5,
+   including sub-sections such as P4b) top to bottom.
 4. Open PRs: `gh pr list --state open --json number,title,headRefName,isDraft,labels,url`.
    A **roadmap PR** is an open PR with an `fs:*` label.
 5. Local worktrees: `git worktree list`. For every worktree under `.claude/worktrees/`:
