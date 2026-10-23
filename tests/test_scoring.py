@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from framescout_scoring import MIN_SCORES, Match, best_scores, rank_photos, spread, text_queries
+from framescout_scoring import MIN_SCORES, Match, best_scores, rank_photos, score_caption, spread, text_queries
 
 
 def unit(*rows):
@@ -123,3 +123,12 @@ def test_no_visual_spread_falls_back_to_raw_scores_for_both_channels():
 
 def test_no_photos():
     assert rank_photos([], None, .35) == (False, [])
+
+
+def test_caption_of_a_normalized_score_names_the_raw_similarities():
+    assert score_caption(Match(1.8449, 0, .28149, .7123), True) == ('Score +1.84', 'text 0.281 · image 0.712')
+    assert score_caption(Match(-0.5, 0, .2, None), True) == ('Score -0.50', 'text 0.200')
+
+
+def test_caption_of_raw_scores_keeps_the_similarity():
+    assert score_caption(Match(.3123, 0, .25, .9), False) == ('Similarity 0.312', 'text 0.250 · image 0.900')

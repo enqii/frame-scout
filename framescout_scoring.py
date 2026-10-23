@@ -80,3 +80,10 @@ def rank_photos(text, visual, weight):
         matches.append(Match(float(combined[crop]), crop, float(text_scores[crop]),
                              None if visual is None else float(visual_scores[crop])))
     return normalized, matches
+
+
+def score_caption(match, normalized):
+    """(main line, detail line) of a gallery card: the score and the raw similarities."""
+    main = f'Score {match.score:+.2f}' if normalized else f'Similarity {match.score:.3f}'
+    detail = f'text {match.text:.3f}' + ('' if match.visual is None else f' · image {match.visual:.3f}')
+    return main, detail
