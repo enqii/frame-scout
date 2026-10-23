@@ -232,9 +232,13 @@ referenced in commits, pull requests and discussions.
       model side by side (never deleted, E11; ~10–15 MB per model for 5,000 photos,
       depending on the embedding size, 512 or 768); the
       model name in the log line and the gallery note; the QuickGELU config check of
-      `test_signature.py` for every registry entry. Already model-independent:
-      `draft_size` reads the model's input size, the z-scores (E5) absorb the score
-      scales; only the raw-score fallback shows other numbers (SigLIP cosines are lower).
+      `test_signature.py` for every registry entry. Input size: the engine passes
+      `getattr(model.visual, 'image_size', 224)` to `draft_size` and silently falls back
+      to 224 (448 px drafting); open_clip's timm towers (SigLIP) set `image_size` from
+      their config, but record each model's input size in the registry and test it
+      against the open_clip config (no weights needed), so a 256/384 px model is never
+      drafted too small. The z-scores (E5) absorb the score scales; only the raw-score
+      fallback shows other numbers (SigLIP cosines are lower).
       **Evaluation plan** (search-quality hold point; E20): implement the plumbing
       first, then run each candidate with `--model` into `.tmp/`. The existing labels
       (`.tmp/eval-labels/` in the original checkout, not in the repository: five usable
