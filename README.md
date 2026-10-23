@@ -169,9 +169,31 @@ Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
   the first such search after the update analyzes every photo once more; searches with
   person detection keep using their existing analyses.
 
+### What the numbers in a gallery mean
+
+FrameScout compares every photo (and every person found in it) with the search texts
+of a profile and, if the profile has any, with its reference images. The texts it
+generates from the name, context and features are combined into one search text;
+each custom search text counts on its own, and the best one decides.
+
+The main number on a card is the **Score**: how far the best part of the photo lies
+above the average of all photos of this search, in standard deviations. A score of
++2 means "clearly more similar than most photos in this folder", 0 means "average".
+Text and reference images are scaled this way separately before the **weight of the
+reference images** (AI settings) combines them, so a weight of 0.35 really means 35 %
+reference images and 65 % text. The small numbers below are the raw similarities of
+that part with the text and with the reference images. Scores therefore depend on the
+folder searched: the same photo can get a different score in another folder. With
+very few photos (fewer than ten image parts), the gallery shows the raw weighted
+"Similarity" instead.
+
+Changed in 2026-10: before, the best single generated search text decided and the raw
+similarities were added up, so reference images weighed much more than their nominal
+weight. Rankings and numbers of older galleries differ; no photo is analyzed again.
+
 ### How reliable are the matches?
 
-The displayed "Similarity" is a relative ranking value, **not a probability
+The displayed score is a relative ranking value, **not a probability
 and not a reliable identification**. FrameScout can miss matches or return false matches
 – especially with large group photos, small or inconspicuous motifs, and when comparing
 drawings/artwork with real photos. Person detection helps with people in group photos;
@@ -212,7 +234,7 @@ search started from the command line into `results` as well, and its Stop button
 
 All engine options: `.\.venv\Scripts\python.exe framescout_engine.py --help`
 
-Tests (they need neither torch nor a model download):
+Tests (they need neither torch nor a model download; `requirements-dev.txt` adds pytest and numpy):
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
@@ -232,6 +254,7 @@ Commits, one pull request per roadmap item).
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
 | `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file); standard library only |
+| `framescout_scoring.py` | Scoring of the engine: prompt ensemble, scaling and weighting of text and reference scores; numpy only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies (PyTorch pinned) |
 | `install_torch.py` | Installs the CPU or CUDA build of PyTorch; called by `Install-FrameScout.bat` |
