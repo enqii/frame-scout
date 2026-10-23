@@ -24,6 +24,7 @@ from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEVICES, DRAFT_REDUCIN
                              RUN_STATUS, RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
                              ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch, profile_slugs,
                              progress_due, progress_line, store_group)
+from framescout_scoring import best_scores, rank_photos, score_caption, text_queries
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -42,6 +43,12 @@ THUMBNAIL_SIZE = 380
 LOCK_TIMEOUT = 5
 # exit code when another search already uses the output folder (A4)
 EXIT_BUSY = 3
+# explanation of the numbers on the gallery cards (E5)
+SCORE_NOTE = ('"Score" says how far the best part of a photo lies above the average of all photos of this search, '
+              'in standard deviations (text and reference images are scaled separately and then weighted); '
+              'the small numbers are its raw similarity with the text and the reference images.')
+RAW_NOTE = ('The scores could not be scaled (too few photos or no spread), so "Similarity" is the raw weighted similarity; '
+            'the small numbers are its raw similarity with the text and the reference images.')
 
 
 class Parser(argparse.ArgumentParser):
@@ -206,7 +213,9 @@ def search(args, parser, root, output, status):
                     ref_vectors.append(embed_images([open_image(ref)])[0])
                 except Exception as exc:
                     parser.error(f'Reference image cannot be read ({ref}): {exc}')
-            profile_vectors[p['name']] = (t.cpu().numpy(), np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
+            # the generated templates are averaged into one query, custom prompts stay apart (E4)
+            profile_vectors[p['name']] = (text_queries(t.cpu().numpy(), p['generated']),
+                                          np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
 
     detector = None
     if not args.no_person_detection:
@@ -314,7 +323,11 @@ def search(args, parser, root, output, status):
 
     print('Scoring the photos for each search profile ...', flush=True)
     status.update('scoring', total=len(paths))
-    scores = {p['name']: [] for p in profiles}
+    # first the per-crop text and reference scores of every photo, then per profile the
+    # normalization over all crops of this search and the combination (E4, E5)
+    scored, crop_labels = [], []
+    text_scores = {p['name']: [] for p in profiles}
+    visual_scores = {p['name']: [] for p in profiles}
     for number, path in enumerate(paths, 1):
         status.update(done=number, force=number == len(paths))
         try:
@@ -325,19 +338,28 @@ def search(args, parser, root, output, status):
                 continue
             labels = json.loads(record[2]); features = unpack(record[3])
             features /= np.maximum(np.linalg.norm(features, axis=1, keepdims=True), 1e-8)
-            for p in profiles:
-                texts, refs = profile_vectors[p['name']]
-                text_scores = (features @ texts.T).max(axis=1)
-                if refs is not None:
-                    visual_scores = (features @ refs.T).max(axis=1)
-                    combined = (1-args.reference_weight) * text_scores + args.reference_weight * visual_scores
-                else:
-                    combined = text_scores
-                best = int(np.argmax(combined))
-                scores[p['name']].append((float(combined[best]), path, labels[best]))
+            photo_text = {name: best_scores(features, queries) for name, (queries, _) in profile_vectors.items()}
+            photo_visual = {name: best_scores(features, refs) for name, (_, refs) in profile_vectors.items()
+                            if refs is not None}
         except Exception as exc:
             print(f'CACHE ERROR {path}: {exc}', flush=True)
+            continue
+        scored.append(path); crop_labels.append(labels)
+        for name in profile_vectors:
+            text_scores[name].append(photo_text[name])
+            if name in photo_visual:
+                visual_scores[name].append(photo_visual[name])
     con.close()
+    scores, normalized = {}, {}
+    for p in profiles:
+        name = p['name']
+        has_refs = profile_vectors[name][1] is not None
+        normalized[name], matches = rank_photos(text_scores[name], visual_scores[name] if has_refs else None,
+                                                args.reference_weight)
+        if not normalized[name] and scored:
+            print(f'{name}: too few photos (or no spread) to normalize the scores; '
+                  'the gallery shows the raw similarity.', flush=True)
+        scores[name] = [(m, path, labels[m.crop]) for m, path, labels in zip(matches, scored, crop_labels)]
 
     thumbs = output / 'thumbnails'; thumbs.mkdir(exist_ok=True)
     # thumbnail folder of older versions: thumbnails are copied from it instead of being
@@ -360,7 +382,7 @@ def search(args, parser, root, output, status):
     article{background:#292929;padding:12px;border-radius:10px;overflow-wrap:anywhere}
     img{width:100%;height:250px;object-fit:contain;background:#111;border-radius:5px}
     small{color:#bbb}nav{margin-bottom:22px}'''
-    rankings = {name: sorted(found, key=lambda x: x[0], reverse=True)[:args.top] for name, found in scores.items()}
+    rankings = {name: sorted(found, key=lambda x: x[0].score, reverse=True)[:args.top] for name, found in scores.items()}
     total_cards = sum(len(ranked) for ranked in rankings.values())
     print('Writing the galleries ...', flush=True)
     status.update('exporting', total=total_cards)
@@ -368,7 +390,7 @@ def search(args, parser, root, output, status):
     for p in profiles:
         name = p['name']; ranked = rankings[name]
         cards = []
-        for rank, (score, path, label) in enumerate(ranked, 1):
+        for rank, (match, path, label) in enumerate(ranked, 1):
             cards_done += 1
             status.update(done=cards_done, force=cards_done == total_cards)
             # skips (and logs) photos deleted or unreadable since scoring instead of aborting (E6)
@@ -377,13 +399,15 @@ def search(args, parser, root, output, status):
                 continue
             uri = html.escape(path.as_uri(), quote=True)
             rel = html.escape(str(path.relative_to(root)))
+            score, detail = score_caption(match, normalized[name])
             cards.append(f'<article><a href="{uri}" target="_blank"><img loading="lazy" src="thumbnails/{quote(thumb_name)}" alt="{rel}"></a>'
-                         f'<p><b>#{rank}</b> · Similarity {score:.3f} · {html.escape(crop_label(label))}<br>'
+                         f'<p><b>#{rank}</b> · {score} · {html.escape(crop_label(label))}<br><small>{detail}</small><br>'
                          f'<a href="{uri}" target="_blank">{html.escape(path.name)}</a></p><small>{rel}</small></article>')
         page = ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                 f'<title>FrameScout – {html.escape(name)}</title><style>{style}</style>' + nav +
                 f'<h1>{html.escape(name)} – Top {len(cards)}</h1><p>Automatically generated ranking, not a guaranteed identification. '
-                '"Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original.</p><main>' + ''.join(cards) + '</main></html>')
+                + (SCORE_NOTE if normalized[name] else RAW_NOTE) +
+                ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original.</p><main>' + ''.join(cards) + '</main></html>')
         target = output / (slugs[name] + '.html'); target.write_text(page, encoding='utf-8')
         print(f'{name}: {target}', flush=True)
     print(f'Done. New photo analyses: {fresh}, from cache: {reused}. Further search profiles can reuse the existing cache.')
