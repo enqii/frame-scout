@@ -310,14 +310,15 @@ p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source'
 
 with p_tab:
     st.subheader('Saved search profiles')
-    # hint only, no check of the input (user decision on E3: English search terms only)
-    st.info('Enter the search motif, context, features and custom search texts **in English**. The CLIP model '
-            'FrameScout uses understands practically only English: a word in another language, e.g. German '
-            '"Schwert" instead of "sword", can find completely different photos.')
+    # first, so that a one-shot save notice is not missed below the static hint (review)
     if 'notice' in st.session_state:
         st.warning(st.session_state.pop('notice'))
-    if not profiles:
-        st.info('Create a search profile first.')
+    # hint only, no check of the input (user decision on E3: English search terms only);
+    # one box with the call to action on an empty list (review)
+    st.info(('Create a search profile first. ' if not profiles else '') +
+            'Enter the search motif, context, features and custom search texts **in English**. The CLIP model '
+            'FrameScout uses understands practically only English: a word in another language, e.g. German '
+            '"Schwert" instead of "sword", can find completely different photos.')
     saves = st.session_state.get('saves', 0)
     for index, p in enumerate(profiles):
         with st.expander(f"{p['name']}  ·  {p.get('franchise','')}"):
