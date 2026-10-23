@@ -16,10 +16,10 @@ change below.
 1. Run the code review on the PR and post the findings as PR comments:
 
    ```
-   /code-review medium {PR} --comment
+   /code-review {REVIEW_LEVEL} {PR} --comment
    ```
 
-   Use the Skill tool with skill `code-review` and args `medium {PR} --comment`. If that
+   Use the Skill tool with skill `code-review` and args `{REVIEW_LEVEL} {PR} --comment`. If that
    is not possible in your context, stop and tell the orchestrator, which then uses the
    fallback in `SKILL.md`.
 2. Swap the state label:
