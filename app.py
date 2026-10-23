@@ -1,6 +1,7 @@
 """FrameScout: local Streamlit user interface for framescout_engine.py."""
 import os
 import platform
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -8,11 +9,12 @@ from pathlib import Path
 import psutil
 import streamlit as st
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, SETTING_RANGES,
-                             SETTINGS_FILE, RunLock, StatusReporter, create_from_example, cuda_status,
-                             default_settings, device_choices, finish_reference_move, lock_held, profile_slugs,
-                             read_profiles, read_settings, read_status, reconcile_settings, reference_folder,
-                             run_active, save_profiles, save_settings,
+from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EXT, FINAL_PHASES, GALLERY_PAGE_SIZE, PHASE_LABELS, RESULTS_FILE,
+                             RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTINGS_FILE, RunLock, StatusReporter,
+                             create_from_example, cuda_status, default_settings, device_choices, finish_reference_move,
+                             lock_held, open_command, openable_photo, page_cards, page_count, profile_fingerprints,
+                             profile_state, read_profiles, read_results, read_settings, read_status, reconcile_settings,
+                             reference_folder, reveal_command, run_active, save_profiles, save_settings,
                              stage_reference_move, started_in_time, status_fraction, status_text, stopped_status,
                              undo_reference_move, update_backup_references, write_new_file, write_status)
 
@@ -26,6 +28,12 @@ LOG = BASE / 'run.log'
 # held by the engine while it runs, and its phase and progress (A4, A5)
 LOCK = RESULTS / RUN_LOCK
 STATUS = RESULTS / RUN_STATUS
+# what the galleries of the last search show (A12) and their thumbnails
+RESULTS_JSON = RESULTS / RESULTS_FILE
+THUMBS = RESULTS / 'thumbnails'
+GALLERY_COLUMNS = 4
+# Markdown characters, escaped in file names shown with st.markdown/st.caption
+MARKDOWN_CHARS = re.compile(r'([\\`*_{}\[\]()#+\-.!|<>~$])')
 UPLOAD_TYPES = sorted(x.lstrip('.') for x in EXT)
 # labels of the profile fields, shared by the edit and the new-profile form (review);
 # search terms are English only (E3)
@@ -209,6 +217,129 @@ def end_processes(pids):
             pass
     psutil.wait_procs(remaining, timeout=5)
     return set(targets)
+
+def open_path(path):
+    """Open the file or folder path with its default program on the computer the app runs on."""
+    if os.name == 'nt':
+        os.startfile(str(path))
+    else:
+        subprocess.Popen(open_command(path, platform.system()))
+
+def reveal_path(path):
+    """Show the file path in the file manager of the computer the app runs on."""
+    subprocess.Popen(reveal_command(path, platform.system()))
+
+def gallery_action(action, path, what):
+    """Run action(path) for a gallery button; a failure becomes a note above the gallery."""
+    if path is None:
+        st.session_state.gallery_notice = f'{what} no longer exists.'
+        return
+    try:
+        action(path)
+    except OSError as exc:
+        st.session_state.gallery_notice = f'{what} could not be opened: {exc}'
+
+def open_photo(path):
+    # only an existing image file: never start a program named in results.json
+    gallery_action(open_path, openable_photo(path), f'The photo {path}')
+
+def show_photo(path):
+    gallery_action(reveal_path, openable_photo(path), f'The photo {path}')
+
+def open_gallery(name):
+    page = RESULTS / name  # a plain file name, checked by read_results
+    gallery_action(open_path, page if page.is_file() else None, f'The gallery {page}')
+
+def open_results_folder():
+    gallery_action(open_path, RESULTS if RESULTS.is_dir() else None, f'The results folder {RESULTS}')
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_results(path, mtime_ns, size):
+    """read_results, read again only when the file changes (mtime_ns and size are the cache key)."""
+    return read_results(Path(path))
+
+def load_results():
+    """Return (results of the last search or None, error or None) (A12)."""
+    try:
+        stat = RESULTS_JSON.stat()
+        return cached_results(str(RESULTS_JSON), stat.st_mtime_ns, stat.st_size), None
+    except FileNotFoundError:
+        return None, None
+    except (OSError, ValueError) as exc:
+        return None, exc
+
+def plain(text):
+    """Return text with its Markdown characters escaped, e.g. a file name for st.markdown/st.caption."""
+    return MARKDOWN_CHARS.sub(r'\\\1', text)
+
+def run_date(results):
+    return str(results.get('finished', '')).replace('T', ' ')[:16]
+
+@st.fragment
+def show_results(results):
+    """The galleries of the last search as a grid of thumbnails; its buttons rerun only this part (P4)."""
+    entries = results['profiles']
+    if not entries:
+        st.caption('The last search wrote no galleries.')
+        return
+    try:
+        fingerprints = profile_fingerprints(PROFILES)
+    except (OSError, ValueError):
+        fingerprints = {}
+    states = {e['name']: profile_state(e, fingerprints) for e in entries}
+    suffix = {'current': '', 'changed': ' (changed since this search)', 'missing': ' (no longer a search profile)'}
+    names = [e['name'] for e in entries]
+    if st.session_state.get('results_profile') not in names:
+        st.session_state.pop('results_profile', None)  # e.g. a profile of an earlier search
+    name = st.selectbox('Search profile', names, key='results_profile', format_func=lambda n: n + suffix[states[n]])
+    entry = entries[names.index(name)]
+    settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
+    st.caption(f"Search from {run_date(results)} · photo folder {plain(str(results.get('photo_folder', '')))} · "
+               f"{len(entry['cards']):,} photos (at most {settings.get('top', '?')}), best first. "
+               'A ranking by similarity, not a guaranteed identification.')
+    if states[name] == 'changed':
+        st.info(f'"{name}" was changed after this search (search texts or reference images), so these results '
+                'may not fit it any more. Start the search again to update them.')
+    elif states[name] == 'missing':
+        st.info(f'"{name}" is no longer one of your search profiles (renamed or deleted). These are its results '
+                f'from the search of {run_date(results)}.')
+    c1, c2, c3 = st.columns(3)
+    c1.button('Open gallery in browser', on_click=open_gallery, args=(entry['gallery'],), use_container_width=True,
+              help=f"Opens {entry['gallery']} from the results folder in your web browser.")
+    c2.button('Open results folder', on_click=open_results_folder, use_container_width=True)
+    page_file = RESULTS / entry['gallery']
+    try:
+        c3.download_button('Download HTML (without thumbnails)', page_file.read_bytes(), file_name=page_file.name,
+                           mime='text/html', use_container_width=True, key='dl_results_gallery')
+    except OSError:
+        pass  # deleted or in use: the other buttons still work
+    if st.session_state.get('gallery_notice'):
+        st.warning(st.session_state.pop('gallery_notice'))
+    cards = entry['cards']
+    pages = page_count(len(cards), GALLERY_PAGE_SIZE)
+    page = 1
+    if pages > 1:
+        key = 'results_page_' + name
+        if st.session_state.get(key, 1) not in range(1, pages + 1):
+            st.session_state.pop(key, None)  # a page of a longer list of an earlier search
+        page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key)
+    shown = page_cards(cards, page, GALLERY_PAGE_SIZE)
+    for start in range(0, len(shown), GALLERY_COLUMNS):
+        for column, card in zip(st.columns(GALLERY_COLUMNS), shown[start:start + GALLERY_COLUMNS]):
+            with column:
+                thumb = THUMBS / card['thumbnail']  # a plain file name, checked by read_results
+                if thumb.is_file():
+                    st.image(str(thumb))
+                else:
+                    st.caption('No thumbnail')
+                st.markdown(f"**#{card['rank']}** · {plain(card['caption'])} · {plain(card['label'])}")
+                st.caption(f"{plain(card['detail'])}  \n{plain(card['relative'])}")
+                b1, b2 = st.columns(2)
+                b1.button('Open', key=f"open_{card['rank']}", on_click=open_photo, args=(card['path'],),
+                          use_container_width=True, help='Opens the photo in your image viewer.')
+                b2.button('Folder', key=f"reveal_{card['rank']}", on_click=show_photo, args=(card['path'],),
+                          use_container_width=True, help='Shows the photo in its folder.')
+    st.caption('"Open" and "Folder" use the programs of the computer FrameScout runs on.')
 
 def cache_env():
     env = os.environ.copy()
@@ -514,14 +645,27 @@ with run_tab:
                 st.code('\n'.join(lines[-35:]) or 'No output yet', language='text')
     show_status()
     st.divider()
-    st.subheader('Result galleries')
-    if RESULTS.exists():
-        # same file names as the engine: unique slugs in profile order
-        for p, slug in zip(profiles, profile_slugs([q['name'].strip() for q in profiles])):
-            page = RESULTS/(slug+'.html')
-            if page.exists():
-                st.download_button(f"Export HTML: {p['name']}", page.read_bytes(), file_name=page.name, mime='text/html', key=f'dl_{p["name"]}')
-                st.caption(f'Open the local gallery: {page}')
-        st.caption('Open the HTML files in your file manager. They link to the local thumbnails and original photos; keep the results folder together for the complete gallery.')
+    st.subheader('Results')
+    # the galleries of the last complete search, as the engine wrote them (A12)
+    last_results, results_error = load_results()
+    if results_error:
+        st.warning(f'{RESULTS_FILE} cannot be read, so the results of the last search are not shown here. Starting '
+                   f'the search again writes it anew.\n\nDetails: {results_error}')
+    if last_results:
+        show_results(last_results)
+    elif RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
+        # galleries of a search before results.json: listed by file name, since the
+        # current profile list may no longer match them (A12)
+        st.caption('These galleries come from a search by an earlier FrameScout version. Start the search again '
+                   'to see its results here.')
+        for page in old_pages:
+            st.download_button(f'Download {page.name}', page.read_bytes(), file_name=page.name, mime='text/html',
+                               key=f'dl_{page.name}')
+            st.caption(f'Open the local gallery: {plain(str(page))}')
+        st.button('Open results folder', on_click=open_results_folder)
+        if st.session_state.get('gallery_notice'):
+            st.warning(st.session_state.pop('gallery_notice'))
     else:
-        st.caption('After the first search run, the HTML galleries appear in the results folder.')
+        st.caption('After the first search run, its results appear here.')
+    st.caption('The HTML galleries in the results folder link to the local thumbnails and original photos; keep '
+               'the results folder together for the complete gallery.')
