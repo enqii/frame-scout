@@ -394,7 +394,7 @@ referenced in commits, pull requests and discussions.
       (done 2026-10-23 in P4 (A), user decision in PR #14: the engine writes
       `results/results.json` after the galleries – run start and end, photo folder,
       settings and per profile its name, a fingerprint of its search texts and reference
-      image paths (`framescout_core.search_fingerprint`), the gallery file and every card;
+      image paths (`framescout_core.search_fingerprint`; relative to the project folder, so moving it changes nothing), the gallery file and every card;
       a separate file, not part of the status file. The app shows the galleries of that
       search under the names they were made for and marks a profile changed, renamed or
       deleted since. Results folders without the file list their HTML files by name.
