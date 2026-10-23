@@ -194,18 +194,20 @@ referenced in commits, pull requests and discussions.
       **Candidates** (open_clip 3.3.0 names). CPU time: `encode_image`, batch 8, random
       weights (weights do not change the speed), Core Ultra 9 285K with 12 torch
       threads; every row measured, repeated runs differ by up to ~5 %; a typical laptop
-      CPU is probably 3–5× slower, the factor is the portable part. RAM: fp32 parameters. ImageNet zero-shot and Flickr30k retrieval from
-      open_clip's `docs/openclip_results.csv`.
+      CPU is probably 3–5× slower, the factor is the portable part. RAM: fp32
+      parameters. ImageNet: zero-shot top-1 from open_clip's
+      `docs/openclip_results.csv`. Flickr: Flickr30k image retrieval R@1 (a text finds
+      its image, FrameScout's task) from `docs/openclip_retrieval_results.csv`.
 
   | Model / weights | Download | RAM | CPU ms/crop | Factor | ImageNet | Flickr | Extra dependency | License |
   |---|---|---|---|---|---|---|---|---|
-  | `ViT-B-32-quickgelu` / `openai` (default) | 605 MB | 0.6 GB | 10.7 | 1× | 63.3 % | 0.69 | – | MIT |
-  | `ViT-B-16` / `datacomp_xl_s13b_b90k` | 599 MB | 0.6 GB | 41.4 | ~4× | 73.5 % | 0.76 | – | MIT |
-  | `ViT-B-16-SigLIP` / `webli` | 813 MB | 0.8 GB | 42.6 | ~4× | 76.0 % | 0.82 | `transformers` | Apache-2.0 |
+  | `ViT-B-32-quickgelu` / `openai` (default) | 605 MB | 0.6 GB | 10.7 | 1× | 63.3 % | 0.59 | – | MIT |
+  | `ViT-B-16` / `datacomp_xl_s13b_b90k` | 599 MB | 0.6 GB | 41.4 | ~4× | 73.5 % | 0.68 | – | MIT |
+  | `ViT-B-16-SigLIP` / `webli` | 813 MB | 0.8 GB | 42.6 | ~4× | 76.0 % | 0.75 | `transformers` | Apache-2.0 |
   | `ViT-B-16-SigLIP2` / `webli` (224 px; `-256`: 54.8 ms) | 1.50 GB + 34 MB tokenizer | 1.5 GB | 42.2 | ~4× | ~78 % (paper, unverified) | – | `transformers` | Apache-2.0, multilingual |
   | `ViT-B-32-SigLIP2-256` / `webli` | 1.51 GB | 1.5 GB | 14.1 | ~1.3× | ~74 % (paper, unverified) | – | `transformers` | Apache-2.0, multilingual |
-  | `ViT-L-14` / `datacomp_xl_s13b_b90k` | 1.71 GB | 1.7 GB | 190.4 | ~18× | 79.2 % | 0.81 | – | MIT |
-  | `ViT-L-14-quickgelu` / `openai` | 1.71 GB | 1.7 GB | 200.9–204.9 | ~19× | 75.5 % | 0.75 | – | MIT |
+  | `ViT-L-14` / `datacomp_xl_s13b_b90k` | 1.71 GB | 1.7 GB | 190.4 | ~18× | 79.2 % | 0.73 | – | MIT |
+  | `ViT-L-14-quickgelu` / `openai` | 1.71 GB | 1.7 GB | 200.9–204.9 | ~19× | 75.5 % | 0.65 | – | MIT |
 
   Left out: Apple's DFN2B weights (best B/16 and L/14 figures, but license
       `apple-amlr`, research only) and `ViT-SO400M-14-SigLIP` (3.5 GB, ~24×, 82.0 %: not
