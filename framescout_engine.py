@@ -12,6 +12,7 @@ import sqlite3
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -20,10 +21,11 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEVICES, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RUN_LOCK,
-                             RUN_STATUS, RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
-                             ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch, profile_slugs,
-                             progress_due, progress_line, store_group)
+from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEVICES, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL,
+                             RESULTS_FILE, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, crop_label, cuda_hint, detection_options,
+                             draft_size, final_status, ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch,
+                             profile_slugs, progress_due, progress_line, result_card, results_document, search_fingerprint,
+                             store_group, write_results)
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
@@ -387,9 +389,10 @@ def search(args, parser, root, output, status):
     print('Writing the galleries ...', flush=True)
     status.update('exporting', total=total_cards)
     cards_done = 0
+    results = []  # the content of results.json: what each gallery shows (A12)
     for p in profiles:
         name = p['name']; ranked = rankings[name]
-        cards = []
+        cards, entries = [], []
         for rank, (match, path, label) in enumerate(ranked, 1):
             cards_done += 1
             status.update(done=cards_done, force=cards_done == total_cards)
@@ -400,8 +403,11 @@ def search(args, parser, root, output, status):
             uri = html.escape(path.as_uri(), quote=True)
             rel = html.escape(str(path.relative_to(root)))
             score, detail = score_caption(match, normalized[name])
+            label = crop_label(label)
+            entries.append(result_card(rank, path, root, label, match.score, match.text, match.visual, score, detail,
+                                       thumb_name))
             cards.append(f'<article><a href="{uri}" target="_blank"><img loading="lazy" src="thumbnails/{quote(thumb_name)}" alt="{rel}"></a>'
-                         f'<p><b>#{rank}</b> · {score} · {html.escape(crop_label(label))}<br><small>{detail}</small><br>'
+                         f'<p><b>#{rank}</b> · {score} · {html.escape(label)}<br><small>{detail}</small><br>'
                          f'<a href="{uri}" target="_blank">{html.escape(path.name)}</a></p><small>{rel}</small></article>')
         page = ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                 f'<title>FrameScout – {html.escape(name)}</title><style>{style}</style>' + nav +
@@ -410,6 +416,14 @@ def search(args, parser, root, output, status):
                 ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original.</p><main>' + ''.join(cards) + '</main></html>')
         target = output / (slugs[name] + '.html'); target.write_text(page, encoding='utf-8')
         print(f'{name}: {target}', flush=True)
+        results.append({'name': name, 'fingerprint': search_fingerprint(p), 'gallery': target.name,
+                        'normalized': normalized[name], 'cards': entries})
+    # after all galleries, so the file always describes a complete export (A12)
+    settings = {'device': device, 'batch_size': args.batch_size, 'top': args.top,
+                'person_detection': not args.no_person_detection, 'max_persons': args.max_persons,
+                'person_confidence': args.person_confidence, 'reference_weight': args.reference_weight}
+    write_results(output / RESULTS_FILE, results_document(status.state['started'],
+                  datetime.now().astimezone().isoformat(timespec='seconds'), root, settings, len(paths), results))
     print(f'Done. New photo analyses: {fresh}, from cache: {reused}. Further search profiles can reuse the existing cache.')
     return 0
 
