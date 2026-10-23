@@ -4,6 +4,7 @@ import platform
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import psutil
@@ -223,12 +224,17 @@ def open_path(path):
     if os.name == 'nt':
         os.startfile(str(path))
     else:
-        subprocess.Popen(open_command(path, platform.system()))
+        start_launcher(open_command(path, platform.system()))
+
+def start_launcher(cmd):
+    """Start cmd (open, xdg-open) without waiting; a thread reaps it, so no zombie stays (review)."""
+    process = subprocess.Popen(cmd)
+    threading.Thread(target=process.wait, daemon=True).start()
 
 def reveal_path(path):
     """Show the file path in the file manager of the computer the app runs on, selected if possible."""
     if os.name != 'nt':
-        subprocess.Popen(reveal_command(path, platform.system()))
+        start_launcher(reveal_command(path, platform.system()))
         return
     # the shell function behind "explorer /select,", which did not select a file with a
     # comma in its name (checked on Windows 11); COM is initialized for this script thread
@@ -239,7 +245,9 @@ def reveal_path(path):
     shell32.ILCreateFromPathW.argtypes = [wintypes.LPCWSTR]
     shell32.ILFree.argtypes = [ctypes.c_void_p]
     shell32.SHOpenFolderAndSelectItems.argtypes = [ctypes.c_void_p, wintypes.UINT, ctypes.c_void_p, wintypes.DWORD]
-    ole32.CoInitialize(None)
+    # S_OK or S_FALSE: this call holds a reference to undo; a thread whose COM was
+    # initialized in another mode (RPC_E_CHANGED_MODE, negative) must keep it (review)
+    initialized = ole32.CoInitialize(None) >= 0
     try:
         item = shell32.ILCreateFromPathW(str(path))
         if not item:
@@ -249,8 +257,9 @@ def reveal_path(path):
         finally:
             shell32.ILFree(item)
     finally:
-        ole32.CoUninitialize()
-    if result != 0:
+        if initialized:
+            ole32.CoUninitialize()
+    if result < 0:  # FAILED(); a success code such as S_FALSE is no error (review)
         raise OSError(f'Explorer reported error {result & 0xFFFFFFFF:#010x}')
 
 def gallery_action(action, path, what):
@@ -282,6 +291,21 @@ def cached_results(path, mtime_ns, size):
     """read_results, read again only when the file changes (mtime_ns and size are the cache key)."""
     return read_results(Path(path))
 
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_fingerprints(path, mtime_ns, size):
+    """profile_fingerprints, computed again only when profiles.json changes (review: not on every click)."""
+    return profile_fingerprints(Path(path))
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def cached_bytes(path, mtime_ns, size):
+    """The content of a file, read again only when it changes (the gallery's HTML download)."""
+    return Path(path).read_bytes()
+
+def file_key(path):
+    """(path, mtime_ns, size) of path, the cache key of the functions above."""
+    stat = Path(path).stat()
+    return str(path), stat.st_mtime_ns, stat.st_size
+
 def load_results():
     """Return (results of the last search or None, error or None) (A12)."""
     try:
@@ -307,33 +331,41 @@ def show_results(results):
         st.caption('The last search wrote no galleries.')
         return
     try:
-        fingerprints = profile_fingerprints(PROFILES)
+        fingerprints = cached_fingerprints(*file_key(PROFILES))
     except (OSError, ValueError):
         fingerprints = {}
     states = {e['name']: profile_state(e, fingerprints) for e in entries}
-    suffix = {'current': '', 'changed': ' (changed since this search)', 'missing': ' (no longer a search profile)'}
     names = [e['name'] for e in entries]
     if st.session_state.get('results_profile') not in names:
         st.session_state.pop('results_profile', None)  # e.g. a profile of an earlier search
-    name = st.selectbox('Search profile', names, key='results_profile', format_func=lambda n: n + suffix[states[n]])
+    # the options are the plain names: a state note in them would give the widget a new
+    # identity in Streamlit versions that do not use the key as its identity and jump back
+    # to the first profile whenever a profile is edited (review); the notes are shown below
+    name = st.selectbox('Search profile', names, key='results_profile')
     entry = entries[names.index(name)]
     settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
     st.caption(f"Search from {run_date(results)} · photo folder {plain(str(results.get('photo_folder', '')))} · "
                f"{len(entry['cards']):,} photos (at most {settings.get('top', '?')}), best first. "
                'A ranking by similarity, not a guaranteed identification.')
     if states[name] == 'changed':
-        st.info(f'"{name}" was changed after this search (search texts or reference images), so these results '
-                'may not fit it any more. Start the search again to update them.')
+        st.info(f'"{plain(name)}" was changed after this search (search texts or reference images), so these '
+                'results may not fit it any more. Start the search again to update them.')
     elif states[name] == 'missing':
-        st.info(f'"{name}" is no longer one of your search profiles (renamed or deleted). These are its results '
-                f'from the search of {run_date(results)}.')
+        st.info(f'"{plain(name)}" is no longer one of your search profiles (renamed or deleted). These are its '
+                f'results from the search of {run_date(results)}.')
+    others = {state: [plain(n) for n in names if n != name and states[n] == state] for state in ('changed', 'missing')}
+    if others['changed'] or others['missing']:
+        st.caption(' · '.join(text + ', '.join(found) for text, found in (
+            ('Changed since this search: ', others['changed']),
+            ('No longer search profiles: ', others['missing'])) if found))
     c1, c2, c3 = st.columns(3)
     c1.button('Open gallery in browser', on_click=open_gallery, args=(entry['gallery'],), use_container_width=True,
               help=f"Opens {entry['gallery']} from the results folder in your web browser.")
     c2.button('Open results folder', on_click=open_results_folder, use_container_width=True)
     page_file = RESULTS / entry['gallery']
     try:
-        c3.download_button('Download HTML (without thumbnails)', page_file.read_bytes(), file_name=page_file.name,
+        # cached: a click on Open or Folder reruns this fragment (review)
+        c3.download_button('Download HTML (without thumbnails)', cached_bytes(*file_key(page_file)), file_name=page_file.name,
                            mime='text/html', use_container_width=True, key='dl_results_gallery')
     except OSError:
         pass  # deleted or in use: the other buttons still work
@@ -348,22 +380,26 @@ def show_results(results):
             st.session_state.pop(key, None)  # a page of a longer list of an earlier search
         page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key)
     shown = page_cards(cards, page, GALLERY_PAGE_SIZE)
-    for start in range(0, len(shown), GALLERY_COLUMNS):
-        for column, card in zip(st.columns(GALLERY_COLUMNS), shown[start:start + GALLERY_COLUMNS]):
-            with column:
-                thumb = THUMBS / card['thumbnail']  # a plain file name, checked by read_results
-                if thumb.is_file():
-                    st.image(str(thumb))
-                else:
-                    st.caption('No thumbnail')
-                st.markdown(f"**#{card['rank']}** · {plain(card['caption'])} · {plain(card['label'])}")
-                st.caption(f"{plain(card['detail'])}  \n{plain(card['relative'])}")
-                b1, b2 = st.columns(2)
-                b1.button('Open', key=f"open_{card['rank']}", on_click=open_photo, args=(card['path'],),
-                          use_container_width=True, help='Opens the photo in your image viewer.')
-                b2.button('Folder', key=f"reveal_{card['rank']}", on_click=show_photo, args=(card['path'],),
-                          use_container_width=True, help='Shows the photo in its folder.')
     st.caption('"Open" and "Folder" use the programs of the computer FrameScout runs on.')
+    # a new container for every profile, page and card count: in a fragment rerun with fewer
+    # cards (the shorter last page) the rows of the previous page stayed in the browser
+    # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
+    with st.container(key=f'gallery_{names.index(name)}_{page}_{len(shown)}'):
+        for start in range(0, len(shown), GALLERY_COLUMNS):
+            for column, card in zip(st.columns(GALLERY_COLUMNS), shown[start:start + GALLERY_COLUMNS]):
+                with column:
+                    thumb = THUMBS / card['thumbnail']  # a plain file name, checked by read_results
+                    if thumb.is_file():
+                        st.image(str(thumb))
+                    else:
+                        st.caption('No thumbnail')
+                    st.markdown(f"**#{card['rank']}** · {plain(card['caption'])} · {plain(card['label'])}")
+                    st.caption(f"{plain(card['detail'])}  \n{plain(card['relative'])}")
+                    b1, b2 = st.columns(2)
+                    b1.button('Open', key=f"open_{card['rank']}", on_click=open_photo, args=(card['path'],),
+                              use_container_width=True, help='Opens the photo in your image viewer.')
+                    b2.button('Folder', key=f"reveal_{card['rank']}", on_click=show_photo, args=(card['path'],),
+                              use_container_width=True, help='Shows the photo in its folder.')
 
 def cache_env():
     env = os.environ.copy()
