@@ -5,8 +5,9 @@ normalized vector, the usual CLIP prompt ensemble) followed by its custom prompt
 crop's text score is its best cosine similarity with one of these queries (E4). Text
 scores (about 0.2-0.35 with CLIP) and image-to-image scores (about 0.5-0.9) have different
 scales, so per profile and run both are z-scored over all crops of the searched photos
-before the reference weight combines them (E5). A score is then "standard deviations
-above the average crop of this search", a relative ranking value, not a probability.
+before the reference weight combines them (E5). A text-only score is then "standard
+deviations above the average crop of this search"; with reference images it is the
+weighted sum of both z-scores. A relative ranking value, not a probability.
 """
 from typing import NamedTuple, Optional
 

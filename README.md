@@ -177,12 +177,16 @@ generates from the name, context and features are combined into one search text;
 each custom search text counts on its own, and the best one decides.
 
 The main number on a card is the **Score**: how far the best part of the photo lies
-above the average of all photos of this search, in standard deviations. A score of
-+2 means "clearly more similar than most photos in this folder", 0 means "average".
-Text and reference images are scaled this way separately before the **weight of the
-reference images** (AI settings) combines them, so the default weight of 0.3 really
-means 30 % reference images and 70 % text. The weight only matters for profiles with
-reference images. The small numbers below are the raw similarities of that part with
+above the average image part of this search (every whole photo and every person crop
+counts), measured in standard deviations of this search. For a profile without
+reference images a score of +2 means "clearly more similar than most image parts in
+this folder", 0 means "average". Text and reference images are scaled this way
+separately before the **weight of the reference images** (AI settings) mixes them, so
+the default weight of 0.3 really means 30 % reference images and 70 % text; the mixed
+score is a weighted sum of the two scaled scores and therefore only roughly in
+standard deviations. The weight only matters for profiles with
+reference images; with a weight of 0 only the text and with 1 only the reference images
+count. The small numbers below are the raw similarities of that part with
 the text and with the reference images. Scores therefore depend on the folder searched:
 the same photo can get a different score in another folder. With very few photos
 (fewer than ten image parts), the gallery shows the raw weighted "Similarity" instead.
@@ -192,10 +196,10 @@ similarities were added up, so reference images weighed much more than their nom
 weight (the reference scores spread about twice as wide as the text scores). The
 default weight changed from 0.35 to 0.3, the value that worked best in a local test
 with about 5,000 cosplay photos (a single collection, so treat it as a starting
-point). If you never changed the weight, the new default applies automatically
-(`settings.json` stores only values that differ from the defaults). A weight you set
-yourself, or a `reference_weight` written into `settings.json` by hand (also 0.35), is
-kept as it is; set the slider to 0.3 to use the new default. Rankings and numbers of
+point). `settings.json` stores only values that differ from the defaults, so a
+saved weight other than 0.35 is kept as it is, and everyone else gets 0.3 – also if
+you had deliberately set the slider to 0.35 (the old default was never saved). To keep
+0.35, set the slider to 0.35 again; to use the new default, set it to 0.3. Rankings and numbers of
 older galleries differ; no photo is analyzed again.
 
 ### How reliable are the matches?

@@ -44,8 +44,9 @@ LOCK_TIMEOUT = 5
 # exit code when another search already uses the output folder (A4)
 EXIT_BUSY = 3
 # explanation of the numbers on the gallery cards (E5)
-SCORE_NOTE = ('"Score" says how far the best part of a photo lies above the average of all photos of this search, '
-              'in standard deviations (text and reference images are scaled separately and then weighted); '
+SCORE_NOTE = ('"Score" says how far the best part of a photo lies above the average image part (whole photo or '
+              'person) of this search, in its standard deviations; with reference images it is a weighted mix of '
+              'the scaled text and image scores; '
               'the small numbers are its raw similarity with the text and the reference images.')
 RAW_NOTE = ('The scores could not be scaled (too few photos or no spread), so "Similarity" is the raw weighted similarity; '
             'the small numbers are its raw similarity with the text and the reference images.')
