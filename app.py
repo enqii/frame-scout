@@ -27,6 +27,12 @@ LOG = BASE / 'run.log'
 LOCK = RESULTS / RUN_LOCK
 STATUS = RESULTS / RUN_STATUS
 UPLOAD_TYPES = sorted(x.lstrip('.') for x in EXT)
+# labels of the profile fields, shared by the edit and the new-profile form (review);
+# search terms are English only (E3)
+LABEL_NAME = 'Search motif (in English)'
+LABEL_CONTEXT = 'Context / origin (optional, in English)'
+LABEL_FEATURES = 'Distinctive features (optional, in English)'
+LABEL_PROMPTS = 'Custom search texts (optional, in English; one per line)'
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
@@ -323,10 +329,10 @@ with p_tab:
     for index, p in enumerate(profiles):
         with st.expander(f"{p['name']}  ·  {p.get('franchise','')}"):
             with st.form(f'edit_{index}_{saves}'):
-                edit_name = st.text_input('Search motif (in English)', value=p['name'])
-                franchise = st.text_input('Context / origin (optional, in English)', value=p.get('franchise', ''))
-                features = st.text_area('Distinctive features (optional, in English)', value=p.get('features', ''))
-                prompts = st.text_area('Custom search texts (optional, in English; one per line)', value='\n'.join(p.get('prompts', [])))
+                edit_name = st.text_input(LABEL_NAME, value=p['name'])
+                franchise = st.text_input(LABEL_CONTEXT, value=p.get('franchise', ''))
+                features = st.text_area(LABEL_FEATURES, value=p.get('features', ''))
+                prompts = st.text_area(LABEL_PROMPTS, value='\n'.join(p.get('prompts', [])))
                 st.caption('Existing reference images: ' + (', '.join(p.get('reference_images', [])) or 'none'))
                 refs_new = st.file_uploader('Add reference images', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}_{saves}')
                 clear_refs = st.checkbox('Remove the existing reference images from this profile')
@@ -358,10 +364,10 @@ with p_tab:
     # after an error the input stays for another try
     form_id = st.session_state.setdefault('new_profile_form', 0)
     with st.form('new_profile'):
-        name = st.text_input('Search motif (in English) *', placeholder='e.g. red car, golden retriever, mountain landscape', key=f'new_name_{form_id}')
-        franchise = st.text_input('Context / origin (optional, in English)', placeholder='e.g. vehicles, pets, nature', key=f'new_context_{form_id}')
-        features = st.text_area('Distinctive features (optional, in English)', placeholder='red bodywork, black roof, parked on a street', key=f'new_features_{form_id}')
-        prompts = st.text_area('Custom search texts (optional, in English; one per line)', key=f'new_prompts_{form_id}')
+        name = st.text_input(LABEL_NAME + ' *', placeholder='e.g. red car, golden retriever, mountain landscape', key=f'new_name_{form_id}')
+        franchise = st.text_input(LABEL_CONTEXT, placeholder='e.g. vehicles, pets, nature', key=f'new_context_{form_id}')
+        features = st.text_area(LABEL_FEATURES, placeholder='red bodywork, black roof, parked on a street', key=f'new_features_{form_id}')
+        prompts = st.text_area(LABEL_PROMPTS, key=f'new_prompts_{form_id}')
         uploads = st.file_uploader('Reference images (optional)', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'new_refs_{form_id}')
         create = st.form_submit_button('Add profile', disabled=active)
     if create:
