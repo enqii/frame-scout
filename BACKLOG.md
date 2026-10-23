@@ -161,10 +161,11 @@ referenced in commits, pull requests and discussions.
       0.515 → 0.472). Outdoor, object, animal or landscape photos are not measured; of
       the extra profiles, "Outdoor scene" could not have hits and "Group photo" was
       saturated, because the profiles were chosen without looking at the collection.
-      Next evaluation (e.g. for P3 stronger models or E3): look at a sample of the
-      collection or ask the user first, and use a second, non-cosplay collection. The
-      tooling (`evaluate.py`, labelling page, metrics) lives outside the repo under
-      `.tmp/eval-e4e5/`; consider a reusable, documented version.
+      Next evaluation (e.g. for stronger models, E22, or a multilingual one, E21): look at
+      a sample of the collection or ask the user first, and use a second, non-cosplay
+      collection. The tooling (`evaluate.py`, labelling page, metrics) and the labels
+      live outside the repo (now under `.tmp/eval-labels/` in the original checkout);
+      consider a reusable, documented version.
 - [ ] **E21 – No multilingual search:** FrameScout supports English search terms only
       (E3, user decision in PR #12: "consider a multilingual CLIP later"). Option: the
       OpenCLIP model `xlm-roberta-base-ViT-B-32` (`laion5b_s13b_b90k`) as an optional
@@ -178,8 +179,67 @@ referenced in commits, pull requests and discussions.
       (E20). Model card: ImageNet 62.3 % (English), Italian ImageNet 43 % vs 21 % for an
       English B/32; no German figure. Other multilingual OpenCLIP models:
       `ViT-B-16-SigLIP-i18n-256` (about 1.48 GB), `nllb-clip-base` (about 2 GB). Builds
-      on the model choice of the roadmap item "Optional stronger models"; a download and
-      a new dependency are hold points.
+      on the model choice of the roadmap item "Optional stronger models" (E22): one more
+      registry entry with `multilingual=True`, and the "in English" hint of the app and
+      the README depends on the selected model. SigLIP 2 (a candidate of E22) has a
+      multilingual tokenizer and training data and may cover this item as well; check
+      it with German queries before adding `xlm-roberta-base-ViT-B-32`. A download and a
+      new dependency are hold points.
+- [ ] **E22 – Only one CLIP model, no stronger option:** FrameScout always uses OpenAI
+      CLIP ViT-B/32. Investigated in PR #13 (no weights downloaded; continue from here).
+      **User decisions (PR #13):** the default stays `ViT-B-32-quickgelu`/`openai`; if a
+      SigLIP model is chosen, `transformers` goes into `requirements.txt`; the
+      evaluation runs on the user's home PC, so the roadmap item moved behind P4; the
+      list of offered models is still open.
+      **Candidates** (open_clip 3.3.0 names). CPU time: `encode_image`, batch 8, random
+      weights (weights do not change the speed), Core Ultra 9 285K with 12 torch
+      threads; a typical laptop CPU is probably 3–5× slower, the factor is the portable
+      part. RAM: fp32 parameters. ImageNet zero-shot and Flickr30k retrieval from
+      open_clip's `docs/openclip_results.csv`.
+
+  | Model / weights | Download | RAM | CPU ms/crop | Factor | ImageNet | Flickr | Extra dependency | License |
+  |---|---|---|---|---|---|---|---|---|
+  | `ViT-B-32-quickgelu` / `openai` (default) | 605 MB | 0.6 GB | 10.7 | 1× | 63.3 % | 0.69 | – | MIT |
+  | `ViT-B-16` / `datacomp_xl_s13b_b90k` | 599 MB | 0.6 GB | 44.8 | ~4× | 73.5 % | 0.76 | – | MIT |
+  | `ViT-B-16-SigLIP` / `webli` | 813 MB | 0.8 GB | 42.6 | ~4× | 76.0 % | 0.82 | `transformers` | Apache-2.0 |
+  | `ViT-B-16-SigLIP2` / `webli` (224 px; `-256`: 54.8 ms) | 1.50 GB + 34 MB tokenizer | 1.5 GB | ~43 (not measured, same image tower as SigLIP) | ~4× | ~78 % (paper, unverified) | – | `transformers` | Apache-2.0, multilingual |
+  | `ViT-B-32-SigLIP2-256` / `webli` | 1.51 GB | 1.5 GB | 14.1 | ~1.3× | ~74 % (paper, unverified) | – | `transformers` | Apache-2.0, multilingual |
+  | `ViT-L-14` / `datacomp_xl_s13b_b90k` | 1.71 GB | 1.7 GB | 204.9 | ~19× | 79.2 % | 0.81 | – | MIT |
+  | `ViT-L-14-quickgelu` / `openai` | 1.71 GB | 1.7 GB | 204.9 | ~19× | 75.5 % | 0.75 | – | MIT |
+
+  Left out: Apple's DFN2B weights (best B/16 and L/14 figures, but license
+      `apple-amlr`, research only) and `ViT-SO400M-14-SigLIP` (3.5 GB, ~24×, 82.0 %: not
+      worth it on a CPU). The DataComp repositories ship only `.bin` (pickle) weights.
+      `transformers` 5.x needs `huggingface-hub>=1.31,<3` (2.2.0 installed) and
+      `tokenizers` 0.23 (abi3 wheel); about 16 MB, Python 3.14 untested; the SigLIP
+      tokenizers ship `tokenizer.json`, so `sentencepiece` should not be needed
+      (unverified). Speed matters only for the first analysis and new photos: cached
+      features keep later searches fast. Whole runs on this PC with person detection
+      (1.85 crops per photo on the ~5,000-photo collection), estimated from the E2 timings
+      and the per-crop times, not run: default ~7 min, B/16 class ~12 min, L/14
+      ~35–40 min.
+      **Planned plumbing:** a `MODELS` registry in `framescout_core` (stable key →
+      open_clip name, pretrained tag, label, download size, CPU factor, extra
+      dependency, `multilingual` flag); `engine_id(model)` returns exactly today's
+      `ENGINE` for the default, so its `feature_signature` stays identical (golden test)
+      and no photo is analyzed again; `feature_signature(..., model=DEFAULT_MODEL)`; a new
+      optional engine option `--model <key>` with the registry keys (no free-text names);
+      settings key `model` (validated like `device`); a selectbox in the AI settings tab
+      whose labels show the CPU factor and the first-use download size, and a caption
+      that a new model analyzes every photo once while the cache keeps the rows of each
+      model side by side (never deleted, E11; ~14 MB per model for 5,000 photos); the
+      model name in the log line and the gallery note; the QuickGELU config check of
+      `test_signature.py` for every registry entry. Already model-independent:
+      `draft_size` reads the model's input size, the z-scores (E5) absorb the score
+      scales; only the raw-score fallback shows other numbers (SigLIP cosines are lower).
+      **Evaluation plan** (search-quality hold point; E20): implement the plumbing
+      first, then run each candidate with `--model` into `.tmp/`. The existing labels
+      (`.tmp/eval-labels/` in the original checkout, not in the repository: five usable
+      profiles on the ~5,000 cosplay photos) judge only the top 40 of ViT-B/32 variants,
+      so each model needs a new labelling pool (about 100–250 judgments per model), then
+      AP@40 per profile and a re-check of the reference weight (0.3, E5) per model. Add a
+      second, non-cosplay collection (E20). On another PC, the labels, the photos and
+      the tooling have to be brought along or made anew.
 
 ### App (`app.py`)
 
@@ -502,15 +562,21 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 - [x] Solve the German-language problem: English search terms only, said in the app and
       the README (E3) (done 2026-10-23; multilingual CLIP or an "English search term"
       field were not chosen, multilingual model: E21)
-- [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note
-- [ ] Optional multilingual CLIP model (`xlm-roberta-base-ViT-B-32`), built on the model
-      choice of the previous item (E21)
+
+Stronger and multilingual models moved to P4b (user decision in PR #13: evaluate them
+on the user's home PC first).
 
 ### P4 – UX
 - [ ] Result gallery in the app, mark matches/copy them to a folder, "open folder",
       ZIP export with thumbnails
 - [ ] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
       optional HEIC/RAW support
+
+### P4b – Search models (evaluate at home first)
+- [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note (E22;
+      investigation, candidates and user decisions recorded there)
+- [ ] Optional multilingual CLIP model (`xlm-roberta-base-ViT-B-32`), built on the model
+      choice of the previous item (E21)
 
 ### P5 – Distribution
 - [ ] Pinned dependencies (I12), portable Python variant, uninstall script

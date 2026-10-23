@@ -116,7 +116,7 @@ The roadmap is implemented semi-autonomously, **one pull request per roadmap ite
 - **Merge:** only after the user's explicit approval in chat and with all CI checks of the approved head commit green, as a rebase merge (`gh pr merge <PR> --rebase --delete-branch`), followed by worktree and branch cleanup and updating local `main` – the exact procedure is in `/roadmap` → "Merge".
 - **Definition of done:** all checklist items of the PR template are true – summary and backlog IDs, modified files, migration/compatibility consequences, tests executed (with output) vs. not executed, CI checks green, `BACKLOG.md`/`README.md`/`CLAUDE.md` updated where needed, user data untouched, review findings addressed or declined.
 - **Hold points** – the implementer stops and returns a question instead of guessing; the orchestrator asks the user (and posts the question as a PR comment once a PR exists):
-  - product/design decisions (e.g. P3 multilingual search or stronger models, P4 gallery/UX, P5 distribution);
+  - product/design decisions (e.g. P4b stronger or multilingual search models, P4 gallery/UX, P5 distribution);
   - breaking changes: `profiles.json` schema, CLI options, cache invalidation, folder renames;
   - new dependencies or downloads, unless the roadmap item explicitly names them (e.g. `pytest` in step (1));
   - anything that cannot be verified locally (e.g. CUDA without an NVIDIA GPU) → the PR is marked "not runtime-tested";
