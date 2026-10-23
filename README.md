@@ -153,14 +153,16 @@ the motif name, the context, the features and your custom search texts in Englis
 "sword" instead of German "Schwert". The app does not check the language.
 
 Some common words of other languages come close to their English counterparts, many
-do not, and the results do not show which case you are in. In a local test with about 5,000 cosplay
-photos (one collection, so an observation, not a guarantee):
+do not, and the results do not show which case you are in. In a local test with one
+collection of about 5,000 event photos (so an observation, not a guarantee):
 
 - A profile "Sword" (context "Prop", features "a blade with a hilt, held in the hand")
   put 29 photos with a sword among its first 40 results. The same profile in German
-  ("Schwert", "Requisite", "eine Klinge mit Griff, in der Hand gehalten") had none of the
-  photos known to show a sword among its first 40. With the motif name alone, only 1 of
-  the first 50 photos for "Schwert" was also among the first 50 for "Sword".
+  ("Schwert", "Requisite", "eine Klinge mit Griff, in der Hand gehalten") ranked almost
+  completely different photos first: none of its first 40 was one of the photos known
+  to show a sword (most of them had not been checked, so it may have found a few). With
+  the motif name alone, only 1 of the first 50 photos for "Schwert" was also among the
+  first 50 for "Sword".
 - For 16 motifs in that collection, the first 50 results of the German and the English
   word agreed by 0 % (Regenschirm/umbrella) to 58 % (Blumen/flowers).
 
@@ -220,7 +222,7 @@ Changed in 2026-10: before, the best single generated search text decided and th
 similarities were added up, so reference images weighed much more than their nominal
 weight (the reference scores spread about twice as wide as the text scores). The
 default weight changed from 0.35 to 0.3, the value that worked best in a local test
-with about 5,000 cosplay photos (a single collection, so treat it as a starting
+with about 5,000 event photos (a single collection, so treat it as a starting
 point). `settings.json` stores only values that differ from the defaults, so a
 saved weight other than 0.35 is kept as it is, and everyone else gets 0.3 – also if
 you had deliberately set the slider to 0.35 (the old default was never saved). To keep
