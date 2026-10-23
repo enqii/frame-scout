@@ -20,7 +20,7 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEVICES, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RUN_LOCK,
+from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEVICES, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
                              ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch, profile_slugs,
                              progress_due, progress_line, store_group)
@@ -115,7 +115,7 @@ def main():
     parser.add_argument('--max-persons', type=int, default=12)
     parser.add_argument('--person-confidence', type=float, default=.3)
     parser.add_argument('--yolo-model', default='yolo11n.pt')
-    parser.add_argument('--reference-weight', type=float, default=.35,
+    parser.add_argument('--reference-weight', type=float, default=DEFAULT_REFERENCE_WEIGHT,
                         help='weight of the reference image score (0..1); profiles without reference images use text only')
     args = parser.parse_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):

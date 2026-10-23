@@ -8,7 +8,7 @@ from pathlib import Path
 import psutil
 import streamlit as st
 
-from framescout_core import (DEVICES, EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, SETTING_RANGES,
+from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EXT, FINAL_PHASES, PHASE_LABELS, RUN_LOCK, RUN_STATUS, SETTING_RANGES,
                              SETTINGS_FILE, RunLock, StatusReporter, create_from_example, cuda_status,
                              default_settings, device_choices, finish_reference_move, lock_held, profile_slugs,
                              read_profiles, read_settings, read_status, reconcile_settings, reference_folder,
@@ -415,7 +415,9 @@ with settings_tab:
     st.checkbox('Also detect individual persons in group photos (YOLO)', key=setting_key('person_detection'), disabled=active)
     st.number_input('Maximum detected persons per photo', **number_range('max_persons'), key=setting_key('max_persons'), disabled=active)
     st.slider('Minimum confidence of the person detection', **number_range('person_confidence'), step=.05, key=setting_key('person_confidence'), disabled=active)
-    st.slider('Weight of reference images (if any)', **number_range('reference_weight'), step=.05, key=setting_key('reference_weight'), disabled=active, help='0 = text only; 0.35 = 35 % reference images and 65 % text.')
+    st.slider('Weight of reference images (if any)', **number_range('reference_weight'), step=.05, key=setting_key('reference_weight'), disabled=active, help=f'0 = text only; {DEFAULT_REFERENCE_WEIGHT:g} (default) = {DEFAULT_REFERENCE_WEIGHT:.0%} reference images '
+              f'and {1 - DEFAULT_REFERENCE_WEIGHT:.0%} text. Text and reference scores are scaled to the photos of '
+              'the search before they are weighted.')
     if info:
         st.caption(f"Detected: {info['cpu']} · {info['threads']} logical CPU cores · " +
                    (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unknown · ') +

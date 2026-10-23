@@ -1111,6 +1111,10 @@ DEVICES = ('auto', 'cpu', 'cuda')
 # bounds mark a float setting.
 SETTING_RANGES = {'batch_size': (1, 64), 'top': (1, 5000), 'max_persons': (1, 50),
                   'person_confidence': (0.1, 0.9), 'reference_weight': (0.0, 1.0)}
+# default weight of the reference images: 0.35 before the scores were normalized (E5);
+# 0.3 did best on the local evaluation set (user decision in PR #11). A value saved in
+# settings.json is kept as it is, also the old default.
+DEFAULT_REFERENCE_WEIGHT = 0.3
 # seconds save_settings waits for the lock around its read-merge-write
 SETTINGS_LOCK_TIMEOUT = 5.0
 
@@ -1118,7 +1122,8 @@ SETTINGS_LOCK_TIMEOUT = 5.0
 def default_settings(base):
     """Return the app's default settings; base is the project folder (photos/ is the default input)."""
     return {'photo_folder': str(Path(base) / 'photos'), 'device': 'auto', 'batch_size': 8, 'top': 150,
-            'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.35}
+            'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30,
+            'reference_weight': DEFAULT_REFERENCE_WEIGHT}
 
 
 def _setting_value(key, value):
