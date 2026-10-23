@@ -105,7 +105,7 @@ def unpack(blob):
 def main():
     parser = Parser(description='FrameScout: local image search by name, reference images and optional features.')
     parser.add_argument('folder', type=Path, help='photo folder (subfolders are searched recursively)')
-    parser.add_argument('--profiles', type=Path, help='JSON file with search profiles (see profiles.example.json)')
+    parser.add_argument('--profiles', type=Path, help='JSON file with search profiles, texts in English (see profiles.example.json)')
     parser.add_argument('--character', action='append', default=[], metavar='NAME|CONTEXT|FEATURES',
                         help='inline search profile in English, can be repeated; e.g. "Red car|Vehicles|red paint, black roof"')
     parser.add_argument('--output', type=Path, default=Path('results'))
