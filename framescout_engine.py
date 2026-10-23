@@ -24,7 +24,7 @@ from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIG
                              RUN_STATUS, RunLock, StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
                              ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch, profile_slugs,
                              progress_due, progress_line, store_group)
-from framescout_scoring import best_scores, rank_photos, score_caption, text_queries
+from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -338,9 +338,8 @@ def search(args, parser, root, output, status):
                 continue
             labels = json.loads(record[2]); features = unpack(record[3])
             features /= np.maximum(np.linalg.norm(features, axis=1, keepdims=True), 1e-8)
-            photo_text = {name: best_scores(features, queries) for name, (queries, _) in profile_vectors.items()}
-            photo_visual = {name: best_scores(features, refs) for name, (_, refs) in profile_vectors.items()
-                            if refs is not None}
+            # a broken row (labels and vectors do not match, scores not finite) is skipped
+            photo_text, photo_visual = photo_scores(features, labels, profile_vectors)
         except Exception as exc:
             print(f'CACHE ERROR {path}: {exc}', flush=True)
             continue

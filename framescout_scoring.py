@@ -49,13 +49,32 @@ def best_scores(features, queries):
     return (features @ queries.T).max(axis=1)
 
 
+def photo_scores(features, labels, profile_vectors):
+    """Per-crop text and reference scores of one cached photo for every profile.
+
+    features: the photo's normalized crop vectors; labels: its crop labels;
+    profile_vectors: {name: (queries, reference vectors or None)}. Returns (text, visual):
+    {name: scores per crop}, visual only for profiles with reference images. Raises
+    ValueError for a broken cache row (labels and vectors do not match, no crop, scores
+    that are not finite); the engine skips such a photo, so it cannot break a search.
+    """
+    if len(labels) != len(features) or not len(features):
+        raise ValueError(f'{len(labels)} crop labels for {len(features)} feature vectors')
+    text = {name: best_scores(features, queries) for name, (queries, _) in profile_vectors.items()}
+    visual = {name: best_scores(features, refs) for name, (_, refs) in profile_vectors.items() if refs is not None}
+    if not all(np.isfinite(scores).all() for scores in (*text.values(), *visual.values())):
+        raise ValueError('the cached feature vectors give scores that are not finite')
+    return text, visual
+
+
 def spread(arrays):
-    """(mean, standard deviation) over all values of arrays, or None if it cannot normalize."""
+    """(mean, standard deviation) over the finite values of arrays, or None if it cannot normalize."""
     values = np.concatenate(arrays) if arrays else np.empty(0)
+    values = values[np.isfinite(values)]
     if values.size < MIN_SCORES:
         return None
     mean, std = float(values.mean()), float(values.std())
-    return (mean, std) if np.isfinite(std) and std >= MIN_SPREAD else None
+    return (mean, std) if std >= MIN_SPREAD else None
 
 
 def rank_photos(text, visual, weight):
@@ -64,21 +83,23 @@ def rank_photos(text, visual, weight):
     text: one array per photo with the text score of each crop; visual: the same for the
     reference images, or None for a profile without them; weight: the reference weight.
     Returns (normalized, matches): matches holds one Match per photo in input order;
-    normalized is False if the raw scores had to be used (too few crops, no spread).
+    normalized is False if the raw scores had to be used (too few crops, no spread). Only
+    a channel that counts (weight above 0) needs a spread: with weight 0 the reference
+    images and with weight 1 the text do not decide the ranking.
     """
-    stats = [spread(text)] + ([spread(visual)] if visual is not None else [])
-    normalized = all(s is not None for s in stats)
+    channels = [(text, 1.0 if visual is None else 1 - weight)] + ([(visual, weight)] if visual is not None else [])
+    stats = [spread(scores) if share > 0 else None for scores, share in channels]
+    normalized = all(s is not None for s, (_, share) in zip(stats, channels) if share > 0)
     matches = []
-    for photo, text_scores in enumerate(text):
-        text_scores = np.asarray(text_scores, dtype=np.float64)
-        combined = (text_scores - stats[0][0]) / stats[0][1] if normalized else text_scores
-        if visual is not None:
-            visual_scores = np.asarray(visual[photo], dtype=np.float64)
-            scaled = (visual_scores - stats[1][0]) / stats[1][1] if normalized else visual_scores
-            combined = (1 - weight) * combined + weight * scaled
+    for photo in range(len(text)):
+        combined = 0.0
+        for (scores, share), stat in zip(channels, stats):
+            if share > 0:
+                values = np.asarray(scores[photo], dtype=np.float64)
+                combined = combined + share * ((values - stat[0]) / stat[1] if normalized else values)
         crop = int(np.argmax(combined))
-        matches.append(Match(float(combined[crop]), crop, float(text_scores[crop]),
-                             None if visual is None else float(visual_scores[crop])))
+        matches.append(Match(float(combined[crop]), crop, float(text[photo][crop]),
+                             None if visual is None else float(visual[photo][crop])))
     return normalized, matches
 
 
