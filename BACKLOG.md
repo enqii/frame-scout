@@ -229,7 +229,8 @@ referenced in commits, pull requests and discussions.
       settings key `model` (validated like `device`); a selectbox in the AI settings tab
       whose labels show the CPU factor and the first-use download size, and a caption
       that a new model analyzes every photo once while the cache keeps the rows of each
-      model side by side (never deleted, E11; ~14 MB per model for 5,000 photos); the
+      model side by side (never deleted, E11; ~10–15 MB per model for 5,000 photos,
+      depending on the embedding size, 512 or 768); the
       model name in the log line and the gallery note; the QuickGELU config check of
       `test_signature.py` for every registry entry. Already model-independent:
       `draft_size` reads the model's input size, the z-scores (E5) absorb the score
