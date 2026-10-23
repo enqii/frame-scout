@@ -10,6 +10,8 @@ matching photos as an HTML gallery.
 - **General-purpose:** People, objects, vehicles, animals, landscapes, scenes.
 - **No language model:** Search is based on OpenAI CLIP (ViT-B/32), optionally combined with
   YOLO11n person detection for group photos.
+- **English search terms:** CLIP understands practically only English, so describe your
+  motifs in English (see [Search terms in English](#search-terms-in-english)).
 
 > **Status:** Prototype (v1.1). Open issues and the roadmap are listed in
 > [BACKLOG.md](BACKLOG.md).
@@ -94,8 +96,8 @@ starts with the new example profiles.
 1. Double-click `Start-FrameScout.bat`. Your browser opens
    <http://127.0.0.1:8501>.
 2. **Search profiles:** name the motif and optionally add context, distinctive
-   features, custom search texts and reference images. CLIP understands English best,
-   so enter motif names and features in English where possible. On the first start the
+   features, custom search texts and reference images. Write all of these texts in
+   English (see [Search terms in English](#search-terms-in-english)). On the first start the
    list contains a few example profiles (red car, golden retriever, mountain landscape,
    …) that you can edit or delete. Uploaded reference images are copied to
    `references/<profile name>/` (e.g. `references/red-car/`); a profile whose name
@@ -140,6 +142,29 @@ starts with the new example profiles.
    while one runs, the controls are disabled in every tab, and a second start is refused.
 
 Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
+
+### Search terms in English
+
+FrameScout supports **English search terms only**. The CLIP model it uses (OpenAI
+ViT-B/32) was trained on mostly English image captions and understands practically only
+English. FrameScout puts the motif name, context and features into English sentences
+(e.g. "A photograph of red car (vehicles).") and does not translate anything. So write
+the motif name, the context, the features and your custom search texts in English, e.g.
+"sword" instead of German "Schwert". The app does not check the language.
+
+Some common words of other languages come close to their English counterparts, many
+do not, and the results do not show which case you are in. In a local test with about 5,000 cosplay
+photos (one collection, so an observation, not a guarantee):
+
+- A profile "Sword" (context "Prop", features "a blade with a hilt, held in the hand")
+  put 29 photos with a sword among its first 40 results. The same profile in German
+  ("Schwert", "Requisite", "eine Klinge mit Griff, in der Hand gehalten") had none of the
+  photos known to show a sword among its first 40. With the motif name alone, only 1 of
+  the first 50 photos for "Schwert" was also among the first 50 for "Sword".
+- For 16 motifs in that collection, the first 50 results of the German and the English
+  word agreed by 0 % (Regenschirm/umbrella) to 58 % (Blumen/flowers).
+
+A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
 
 ## Results
 
