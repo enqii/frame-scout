@@ -23,10 +23,10 @@ from PIL import Image, ImageOps, ImageFile
 
 from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
                              DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RESULTS_FILE, RUN_LOCK, RUN_STATUS, RunLock,
-                             StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
+                             StatusReporter, auto_cleanup, crop_label, cuda_hint, detection_options, draft_size, final_status,
                              ensure_thumbnail, group_batches, load_profiles, prefetch, prepare_cache, profile_slugs,
-                             progress_due, progress_line, result_card, results_document, search_fingerprint, store_group,
-                             write_results)
+                             progress_due, progress_line, result_card, results_document, search_fingerprint, size_text,
+                             store_group, write_results)
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
@@ -362,7 +362,8 @@ def search(args, parser, root, output, status):
 
     thumbs = output / 'thumbnails'; thumbs.mkdir(exist_ok=True)
     # thumbnail folder of older versions: thumbnails are copied from it instead of being
-    # rendered again, but it is never changed (old galleries link it; cleanup is E7)
+    # rendered again; it is never written (old galleries link it), and the cleanup removes
+    # its files once no gallery links them (E7)
     legacy_thumbs = output / 'vorschaubilder'
 
     def render_thumbnail(path, target):
@@ -424,6 +425,19 @@ def search(args, parser, root, output, status):
                 'person_confidence': args.person_confidence, 'reference_weight': args.reference_weight}
     write_results(output / RESULTS_FILE, results_document(status.state['started'],
                   datetime.now().astimezone().isoformat(timespec='seconds'), root, settings, len(paths), results))
+    # the harmless part of the cleanup (E7, E13): temporary thumbnails of a stopped export
+    # and thumbnails neither results.json nor any HTML file in the output folder links;
+    # the run lock is still held, so no other search writes thumbnails meanwhile
+    try:
+        cleaned = auto_cleanup(output)
+    except Exception as exc:  # never fails a finished search
+        print(f'Cleanup of the thumbnails skipped: {exc}', flush=True)
+    else:
+        if cleaned['files']:
+            print(f"Removed {cleaned['files']} unused or temporary thumbnails ({size_text(cleaned['freed'])}).",
+                  flush=True)
+        for note in cleaned['skipped']:
+            print(note, flush=True)
     print(f'Done. New photo analyses: {fresh}, from cache: {reused}. Further search profiles can reuse the existing cache.')
     return 0
 

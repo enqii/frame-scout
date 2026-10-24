@@ -18,3 +18,9 @@ def test_the_engine_uses_the_shared_default_reference_weight():
     default = option_default_node('--reference-weight')
     assert isinstance(default, ast.Name) and default.id == 'DEFAULT_REFERENCE_WEIGHT', \
         f'--reference-weight must default to DEFAULT_REFERENCE_WEIGHT, found {ast.dump(default) if default else None}'
+
+
+def test_the_engine_uses_the_shared_default_yolo_model():
+    # known_signatures computes the cache signatures of the app's settings with it (E11)
+    default = option_default_node('--yolo-model')
+    assert isinstance(default, ast.Name) and default.id == 'DEFAULT_YOLO_MODEL'
