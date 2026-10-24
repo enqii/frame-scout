@@ -71,7 +71,8 @@ referenced in commits, pull requests and discussions.
       signatures) and HTML files of renamed/deleted profiles grow without bound. Since
       I7 the thumbnail folder of older versions, `vorschaubilder/`, is no longer written
       but stays in `results/` (galleries of profiles that were not regenerated still
-      link it).
+      link it). A cleanup must never delete `results/marks.json` (the user's marks, A17)
+      or `marks.json.lock`.
 - [ ] **E8 – Cache key = absolute path:** moving the photo folder forces a complete
       recomputation.
 - [ ] **E9 – `yolo11n.pt` ends up in the project root** instead of `.cache/`; not documented.
@@ -427,34 +428,35 @@ referenced in commits, pull requests and discussions.
       back after a restart. Fix: treat an empty or whitespace-only folder as missing in the
       app (and possibly reject it in the engine). Found in PR #10.
 
-- [ ] **A17 – Marks and copying (roadmap P4 (B)): open decisions.** Asked in PR #14 and
-      deferred to P4 (B); answer them before implementing it. The user asked what a mark is
-      for ("Wozu dient eine Markierung?"): FrameScout ranks candidates, not certain hits;
-      a mark records which of them the user has checked to be a real match, so that only
-      those are copied (B) or exported (C); later marks could also improve the search
-      (e.g. as reference images or "not this" examples).
-      - Q4 – meaning: (a) per profile ("this photo is a match for Red car"), kept across
-        later searches, keyed by profile name + photo path (recommended); (b) one global
-        selection across all profiles; (c) for the browser session only. States: two,
-        marked or not (recommended), or three (match / no match / open; would hide
-        rejects and could feed back into the search later). Storage: (a) `marks.json` in
-        the project folder, gitignored, written atomically under a lock like
-        `settings.json`, treated as user data (recommended); (b) `results/marks.json`
-        (the cleanup of E7 could delete it); (c) in `profiles.json` (schema change, a hold
-        point). A renamed profile keeps its marks, like its reference folder.
-      - Q5 – copying, with fixed rules in every option: copy only (`shutil.copy2`, keeps
-        the date), never move or delete originals, never overwrite in the target; a file
-        with the same name and content is skipped as "already there", the same name with
-        other content becomes `name (2).jpg`. Target folder: (a) an editable field,
-        prefilled with `<Pictures>\FrameScout\<profile slug>` and saved in
-        `settings.json`, outside the project folder so an uninstall (P5) never deletes
-        copies (recommended); (b) an empty field the user must fill; (c) a folder in the
-        project folder. Layout: (a) flat (recommended); (b) keep the subfolders of the
-        photo folder. A target inside the photo folder (the copies would be analyzed
-        again and appear twice): (a) refuse with an explanation (recommended); (b) warn.
-      Mockup (below the gallery of P4 (A)): a "Match" checkbox per card; "Marked: 23
-      photos of "Red car"", a "Copy to folder" field, "Copy 23 marked photos", "Open
-      target folder", and a summary "20 copied · 2 already there · 1 renamed · 0 failed".
+- [x] **A17 – Marks and copying (roadmap P4 (B)): decided.** Asked in PR #14, deferred to
+      P4 (B) and answered by the user on 2026-10-25 (user decision). FrameScout ranks
+      candidates, not certain hits; a mark records what the user checked.
+      - Q4 – meaning: per profile, keyed by profile name + photo path, kept across later
+        searches; a renamed profile keeps its marks. States: **three** (match / no match /
+        open), with an option to hide photos marked as no match (not the recommended two
+        states); using rejects as feedback for the search: A20. Storage:
+        **`results/marks.json`** (not the recommended project-folder file), written
+        atomically under a lock (`marks.json.lock`) and treated as user data: the engine
+        never writes it, and the cleanup of E7 must never delete it.
+      - Q5 – copying: copy only (`shutil.copy2`, keeps the date), never move or delete
+        originals, never overwrite in the target; the same name and content is skipped as
+        "already there", the same name with other content becomes `name (2).jpg`. Target
+        folder: an editable field, prefilled with `<Pictures>\FrameScout\<profile slug>`
+        (the gallery's slug; the Pictures folder from Windows, also when it was moved)
+        and saved per profile in `settings.json` (`copy_folders`). Layout: flat. A
+        target inside the photo folder (of the shown search or the current setting) is
+        refused with an explanation.
+      - UI: below each gallery card a three-state control (Open / Match / No match);
+        below the gallery "Marked: N photos of "<profile>"", "Copy to folder", "Copy N
+        marked photos", "Open target folder" and the summary "20 copied · 2 already there
+        · 1 renamed · 0 failed".
+      (done 2026-10-25: `framescout_core.read_marks`/`save_marks`/`rename_marks`,
+      `copy_target`/`copy_photos`/`copy_summary_text`/`default_copy_folder` and
+      `read_copy_folders`/`save_copy_folder`/`rename_copy_folder`, used by `app.py`.
+      Galleries of profiles that are no longer search profiles (renamed or deleted) cannot
+      be marked, so no marks are left under an old name; their existing marks can still
+      be copied. Checked with Streamlit's `AppTest`, not yet in a browser. Marks follow
+      the absolute photo path: A21.)
 - [ ] **A18 – ZIP export (roadmap P4 (C)): open decision.** Asked in PR #14 and deferred to
       P4 (C). Q6 – content: (a) the gallery HTML with its links rewritten to a
       `thumbnails/` folder in the ZIP, plus those thumbnails, about 3 MB per 150 cards, as
@@ -473,6 +475,20 @@ referenced in commits, pull requests and discussions.
       with a comma). On macOS (`open`, `open -R`) and Linux (`xdg-open`, which opens the
       folder without selecting the file) they are untested. They act on the computer the
       app runs on, which is the user's own as long as the app listens on `127.0.0.1`.
+      The same holds for "Open target folder" of A17, whose default target uses
+      `~/Pictures` outside Windows (untested).
+- [ ] **A20 – Marks do not feed back into the search:** marks (A17) are only used to copy
+      matches. Photos marked as match could serve as extra reference images and photos
+      marked as no match as "not this" examples of a profile, e.g. by lowering the score
+      of photos similar to the rejects. This changes search quality, so it needs a local
+      evaluation set first (hold point). Out of scope of P4 (B) (user decision on A17).
+- [ ] **A21 – Marks follow the absolute photo path:** `results/marks.json` keys a mark by
+      the photo's full path, like the cache (E8). After moving or renaming the photo folder
+      (or a subfolder, or the photo) the old marks no longer apply: they stay in the file
+      but are not shown, are counted as "not among the results of this search" and fail
+      with "the photo no longer exists" when copied. Fix idea: key by the path relative
+      to the photo folder and match a moved folder, or offer to carry marks over. Found
+      in the PR of A17.
 
 ### Installation / project
 
@@ -654,10 +670,11 @@ decision in PR #14):
       the last search as a thumbnail grid with "Open", "Folder", "Open gallery in
       browser" and "Open results folder", and marks profiles changed since (A12, part of A8)
       (done 2026-10-23; macOS/Linux untested: A19)
-- [ ] (B) Mark matches and copy them to a folder (open decisions: A17)
+- [x] (B) Mark matches and copy them to a folder (A17) (done 2026-10-25; marks in
+      `results/marks.json`, three states; feedback into the search: A20)
 - [ ] (C) ZIP export with thumbnails (open decision: A18)
 - [ ] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
-      optional HEIC/RAW support
+      never delete `results/marks.json` (A17); optional HEIC/RAW support
 
 ### P4b – Search models (evaluate at home first)
 - [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note (E22;
