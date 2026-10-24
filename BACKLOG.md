@@ -490,6 +490,15 @@ referenced in commits, pull requests and discussions.
       with "the photo no longer exists" when copied. Fix idea: key by the path relative
       to the photo folder and match a moved folder, or offer to carry marks over. Found
       in the PR of A17.
+- [ ] **A22 – Marks of a deleted profile pass to a new profile of the same name:** marks
+      (A17) and the saved copy folder are keyed by the profile name only. Deleting a
+      profile keeps them (FrameScout never deletes user data silently), so a profile
+      created later under the same name shows the old marks and copies them, and a
+      profile renamed to that name gets them merged into its own (`rename_marks`; its own
+      marks win for the same photo). Fix options, each a user decision: delete or archive
+      a profile's marks when it is deleted (asking in the app first), or give profiles a
+      stable id in `profiles.json` (schema change, hold point). Found in the review of
+      PR #16.
 
 ### Installation / project
 

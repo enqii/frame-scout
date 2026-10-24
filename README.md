@@ -203,6 +203,8 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
   search never changes it. It is your data: keep it when you clean up the `results`
   folder (deleting it removes all marks). Marks belong to the full path of a photo, so
   they no longer apply after you move or rename the photo folder.
+  Marks belong to the profile name: deleting a profile keeps its marks, and a new
+  profile with the same name takes them over.
 - One HTML gallery per search profile is written to `results/`; the thumbnails are
   stored in `results/thumbnails/`. Clicking a photo opens the original. (Versions
   before the English UI used `results/vorschaubilder/`; that folder is no longer
