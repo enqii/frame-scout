@@ -1596,12 +1596,15 @@ def _inside(path, folder):
         return False
 
 
-def copy_target(text, photo_folders):
+def copy_target(text, photo_folders, photos=()):
     """Return (target folder, None) for the text of the target field, or (None, why it is refused).
 
     Refused: an empty field, a path that is not complete (it would depend on the app's
     working directory), a file, and a folder in one of photo_folders (empty entries are
     ignored): the copies would be analyzed again by the next search and appear twice.
+    Likewise a folder in the folder of one of photos, the photos to copy: marked in an
+    earlier search, they may come from another photo folder (review; its root is unknown,
+    so only the photo's own folder is covered).
     """
     text = (text or '').strip()
     if not text:
@@ -1616,6 +1619,11 @@ def copy_target(text, photo_folders):
             return None, (f'{target} is inside the photo folder {folder}. FrameScout does not copy there: the next '
                           'search would analyze the copies again and show every photo twice. Choose a folder '
                           'outside the photo folder.')
+    for folder in sorted({str(Path(x).parent) for x in photos}):
+        if _inside(target, folder):
+            return None, (f'{target} is inside {folder}, which holds photos you marked. FrameScout does not copy '
+                          'there: a search of that folder would analyze the copies again and show every photo '
+                          'twice. Choose a folder outside your photo folders.')
     return target, None
 
 
@@ -1653,23 +1661,28 @@ def _copy_one(source, target):
         return 'copied' if index == 0 else 'renamed'
 
 
-def copy_photos(paths, target):
+def copy_photos(paths, target, progress=None):
     """Copy the photos paths flat into the folder target (created if needed) and return a summary.
 
     {'copied': n, 'already': n, 'renamed': n, 'failed': [(path, reason), ...]}. A copy keeps
     the file date (shutil.copy2). A file of the same name and content in target counts as
     already there (also one named "name (n).jpg" by an earlier copy); the same name with
     other content gets the next free "name (n).jpg". A photo that cannot be copied fails
-    on its own. Raises OSError if target cannot be created.
+    on its own. progress(done, total) is called after each photo (the app shows it, and a
+    rerun of the app stops the copy there, review). Raises OSError if target cannot be
+    created.
     """
     target = Path(target)
     target.mkdir(parents=True, exist_ok=True)
     summary = {'copied': 0, 'already': 0, 'renamed': 0, 'failed': []}
-    for path in paths:
+    paths = list(paths)
+    for done, path in enumerate(paths, 1):
         try:
             summary[_copy_one(Path(path), target)] += 1
         except OSError as exc:
             summary['failed'].append((str(path), exc.strerror or str(exc)))
+        if progress:
+            progress(done, len(paths))
     return summary
 
 

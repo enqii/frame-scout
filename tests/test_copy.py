@@ -249,3 +249,19 @@ def test_similar_names_are_not_taken_for_earlier_copies(tmp_path):
     photo(target / 'a (2).png', b'new')
     a = photo(tmp_path / 'photos' / 'a.jpg', b'new')
     assert copy_photos([str(a)], target)['copied'] == 1
+
+
+def test_a_target_in_the_folder_of_a_marked_photo_is_refused(tmp_path):
+    # review: matches marked in an earlier search may come from another photo folder
+    old = photo(tmp_path / 'old' / 'sub' / 'a.jpg')
+    target, problem = copy_target(str(tmp_path / 'old' / 'sub' / 'copies'), [str(tmp_path / 'photos')],
+                                  photos=[str(old)])
+    assert target is None and 'marked' in problem and 'twice' in problem
+    assert copy_target(str(tmp_path / 'copies'), [str(tmp_path / 'photos')], photos=[str(old)])[1] is None
+
+
+def test_copy_progress_is_reported_per_photo(tmp_path):
+    paths = [str(photo(tmp_path / 'photos' / f'{n}.jpg', bytes([n]))) for n in range(3)]
+    calls = []
+    copy_photos(paths, tmp_path / 'out', progress=lambda done, total: calls.append((done, total)))
+    assert calls == [(1, 3), (2, 3), (3, 3)]
