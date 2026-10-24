@@ -230,3 +230,22 @@ def test_a_dangling_link_with_the_photo_name_is_kept(tmp_path):
     a = photo(tmp_path / 'photos' / 'a.jpg')
     assert copy_photos([str(a)], target)['renamed'] == 1
     assert (target / 'a.jpg').is_symlink() and (target / 'a (2).jpg').is_file()
+
+
+def test_an_earlier_copy_behind_a_gap_is_already_there(tmp_path):
+    # review: a (2).jpg was deleted, a (3).jpg is this photo: no new copy as a (2).jpg
+    target = tmp_path / 'out'
+    photo(target / 'a.jpg', b'other')
+    photo(target / 'a (3).jpg', b'new')
+    a = photo(tmp_path / 'photos' / 'a.jpg', b'new')
+    assert copy_photos([str(a)], target)['already'] == 1
+    assert sorted(x.name for x in target.iterdir()) == ['a (3).jpg', 'a.jpg']
+
+
+def test_similar_names_are_not_taken_for_earlier_copies(tmp_path):
+    target = tmp_path / 'out'
+    photo(target / 'a (x).jpg', b'new')
+    photo(target / 'ab (2).jpg', b'new')
+    photo(target / 'a (2).png', b'new')
+    a = photo(tmp_path / 'photos' / 'a.jpg', b'new')
+    assert copy_photos([str(a)], target)['copied'] == 1
