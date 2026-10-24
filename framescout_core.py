@@ -1632,12 +1632,17 @@ def _copy_one(source, target):
     """Copy source into target; return 'copied', 'renamed' or 'already'. Raises OSError."""
     if not source.is_file():
         raise FileNotFoundError('the photo no longer exists')
+    # an earlier copy under any of its names, also behind a gap in the numbering (review)
+    flags = re.IGNORECASE if os.name == 'nt' else 0
+    names = re.compile(re.escape(source.stem) + r'(?: \([0-9]+\))?' + re.escape(source.suffix), flags)
+    with os.scandir(target) as entries:
+        earlier = [Path(e.path) for e in entries if names.fullmatch(e.name)]
+    if any(x.is_file() and filecmp.cmp(source, x, shallow=False) for x in earlier):
+        return 'already'
     for index, candidate in enumerate(_copy_candidates(source, target)):
         if index >= COPY_MAX_NAMES:
             raise FileExistsError(f'no free name for {source.name} in {target}')
         if os.path.lexists(candidate):  # also a dangling symbolic link
-            if candidate.is_file() and filecmp.cmp(source, candidate, shallow=False):
-                return 'already'
             continue  # another file or a folder of that name: the next name
         try:
             # a complete file under the final name or none; never replaces anything that
@@ -1653,7 +1658,7 @@ def copy_photos(paths, target):
 
     {'copied': n, 'already': n, 'renamed': n, 'failed': [(path, reason), ...]}. A copy keeps
     the file date (shutil.copy2). A file of the same name and content in target counts as
-    already there (also one named "name (2).jpg" by an earlier copy); the same name with
+    already there (also one named "name (n).jpg" by an earlier copy); the same name with
     other content gets the next free "name (n).jpg". A photo that cannot be copied fails
     on its own. Raises OSError if target cannot be created.
     """
