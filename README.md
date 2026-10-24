@@ -150,7 +150,7 @@ starts with the new example profiles.
    its results no longer fit it.
 6. **Mark and copy matches:** the results are candidates, not certain hits. Below each
    thumbnail, mark a photo you have checked as **Match** or **No match** (or leave it
-   **Open**; clicking the selected option again also makes it open). Marks are kept per
+   **Undecided**; clicking the selected option again also makes it undecided). Marks are kept per
    search profile and photo across later searches and in every tab, and a renamed profile
    keeps them; "Hide photos marked as no match" hides the rejected ones. Below the
    gallery, "Copy N marked photos" copies all photos marked as match for that profile into

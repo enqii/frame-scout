@@ -446,7 +446,8 @@ referenced in commits, pull requests and discussions.
         and saved per profile in `settings.json` (`copy_folders`). Layout: flat. A
         target inside the photo folder (of the shown search or the current setting) is
         refused with an explanation.
-      - UI: below each gallery card a three-state control (Open / Match / No match);
+      - UI: below each gallery card a three-state control (Undecided / Match / No match;
+        "Undecided" is the open state, so it does not read like the "Open" button, review);
         below the gallery "Marked: N photos of "<profile>"", "Copy to folder", "Copy N
         marked photos", "Open target folder" and the summary "20 copied · 2 already there
         · 1 renamed · 0 failed".
