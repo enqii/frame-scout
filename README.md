@@ -148,6 +148,21 @@ starts with the new example profiles.
    of the computer FrameScout runs on. The date of the search is shown, and a profile you
    changed (search texts or reference images), renamed or deleted since is marked, since
    its results no longer fit it.
+6. **Mark and copy matches:** the results are candidates, not certain hits. Below each
+   thumbnail, mark a photo you have checked as **Match** or **No match** (or leave it
+   **Open**; clicking the selected option again also makes it open). Marks are kept per
+   search profile and photo across later searches and in every tab, and a renamed profile
+   keeps them; "Hide photos marked as no match" hides the rejected ones. Below the
+   gallery, "Copy N marked photos" copies all photos marked as match for that profile into
+   the folder in "Copy to folder" (prefilled with `Pictures\FrameScout\red-car` for "Red car";
+   a folder you type is saved per profile). Copying never moves, changes or deletes the
+   originals and never overwrites a file in the target folder: all copies land directly
+   in that folder (no subfolders) with their file date; a file with the same name and
+   content counts as "already there", a different photo with the same name is saved as
+   `name (2).jpg`. A folder inside the photo folder is refused, since the next search
+   would analyze the copies again and show every photo twice. The summary reads e.g.
+   "20 copied · 2 already there · 1 renamed · 0 failed"; "Open target folder" opens the
+   folder.
 
 Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
 
@@ -184,6 +199,10 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
   search that finishes, so a stopped search keeps showing the previous results. Results
   folders of earlier versions have no such file: the app then lists their HTML files by
   name until the next search.
+- `results/marks.json` holds your marks (Match / No match per profile and photo); the
+  search never changes it. It is your data: keep it when you clean up the `results`
+  folder (deleting it removes all marks). Marks belong to the full path of a photo, so
+  they no longer apply after you move or rename the photo folder.
 - One HTML gallery per search profile is written to `results/`; the thumbnails are
   stored in `results/thumbnails/`. Clicking a photo opens the original. (Versions
   before the English UI used `results/vorschaubilder/`; that folder is no longer
@@ -254,7 +273,9 @@ it can be turned off for other motifs.
 ## Uninstalling
 
 1. Back up results, your search profiles (`profiles.json`, `references/`), your
-   settings (`settings.json`) and any photos you want to keep elsewhere.
+   settings (`settings.json`), your marks (`results/marks.json`) and any photos you want
+   to keep elsewhere. Copied matches are in `Pictures\FrameScout` (or the folders you
+   chose), outside the project folder, and stay.
 2. Close FrameScout and delete the project folder. This removes `.venv`, caches
    (`.cache`, `.tmp`), model weights (including `yolo11n.pt`) and results.
 
@@ -303,9 +324,9 @@ Commits, one pull request per roadmap item).
 
 | File / folder | Purpose |
 |---|---|
-| `app.py` | Streamlit user interface (profiles, photo source, settings, search run) |
+| `app.py` | Streamlit user interface (profiles, photo source, settings, search run, result gallery with marks and copying) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
-| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file, result file); standard library only |
+| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file, result file, marks and copying); standard library only |
 | `framescout_scoring.py` | Scoring of the engine: prompt ensemble, scaling and weighting of text and reference scores; numpy only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies (PyTorch pinned) |
