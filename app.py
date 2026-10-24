@@ -1,4 +1,6 @@
 """FrameScout: local Streamlit user interface for framescout_engine.py."""
+import functools
+import hashlib
 import os
 import platform
 import re
@@ -10,14 +12,17 @@ from pathlib import Path
 import psutil
 import streamlit as st
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EXT, FINAL_PHASES, GALLERY_PAGE_SIZE, PHASE_LABELS, RESULTS_FILE,
-                             RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTINGS_FILE, RunLock, StatusReporter,
-                             create_from_example, cuda_status, default_settings, device_choices, finish_reference_move,
-                             lock_held, open_command, openable_photo, page_cards, page_count, profile_fingerprints,
-                             profile_state, read_profiles, read_results, read_settings, read_status, reconcile_settings,
-                             reference_folder, reveal_command, run_active, save_profiles, save_settings,
-                             stage_reference_move, started_in_time, status_fraction, status_text, stopped_status,
-                             undo_reference_move, update_backup_references, write_new_file, write_status)
+from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EXT, FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH,
+                             MARK_NO_MATCH, MARK_OPEN, MARKS_FILE, PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
+                             SETTING_RANGES, SETTINGS_FILE, RunLock, StatusReporter, copy_photos, copy_summary_text,
+                             copy_target, create_from_example, cuda_status, default_copy_folder, default_settings,
+                             device_choices, finish_reference_move, lock_held, open_command, openable_photo, page_cards,
+                             page_count, profile_fingerprints, profile_state, read_copy_folders, read_marks,
+                             read_profiles, read_results, read_settings, read_status, reconcile_settings,
+                             reference_folder, rename_copy_folder, rename_marks, reveal_command, run_active,
+                             save_copy_folder, save_marks, save_profiles, save_settings, stage_reference_move,
+                             started_in_time, status_fraction, status_text, stopped_status, undo_reference_move,
+                             update_backup_references, write_new_file, write_status)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -32,6 +37,11 @@ STATUS = RESULTS / RUN_STATUS
 # what the galleries of the last search show (A12) and their thumbnails
 RESULTS_JSON = RESULTS / RESULTS_FILE
 THUMBS = RESULTS / 'thumbnails'
+# the user's marks of gallery photos (A17): user data, never deleted by FrameScout
+MARKS = RESULTS / MARKS_FILE
+# the three states of a mark, as the control on each gallery card shows them (A17)
+MARK_LABELS = {MARK_OPEN: 'Open', MARK_MATCH: 'Match', MARK_NO_MATCH: 'No match'}
+MARK_BY_LABEL = {label: state for state, label in MARK_LABELS.items()}
 GALLERY_COLUMNS = 4
 # Markdown characters, escaped in file names shown with st.markdown/st.caption
 MARKDOWN_CHARS = re.compile(r'([\\`*_{}\[\]()#+\-.!|<>~$])')
@@ -286,6 +296,106 @@ def open_gallery(name):
 def open_results_folder():
     gallery_action(open_path, RESULTS if RESULTS.is_dir() else None, f'The results folder {RESULTS}')
 
+@functools.lru_cache(maxsize=1)
+def pictures_folder():
+    """Return the user's Pictures folder (also when Windows has moved it, e.g. to OneDrive)."""
+    if os.name == 'nt':
+        import ctypes
+        import uuid
+        from ctypes import wintypes
+
+        class GUID(ctypes.Structure):
+            _fields_ = [('Data1', wintypes.DWORD), ('Data2', wintypes.WORD), ('Data3', wintypes.WORD),
+                        ('Data4', ctypes.c_ubyte * 8)]
+
+        # FOLDERID_Pictures
+        folder_id = GUID.from_buffer_copy(uuid.UUID('33E28130-4E1E-4676-835A-98395C3BC3BB').bytes_le)
+        found = ctypes.c_void_p()
+        shell32 = ctypes.windll.shell32
+        shell32.SHGetKnownFolderPath.argtypes = [ctypes.POINTER(GUID), wintypes.DWORD, wintypes.HANDLE,
+                                                 ctypes.POINTER(ctypes.c_void_p)]
+        ctypes.windll.ole32.CoTaskMemFree.argtypes = [ctypes.c_void_p]
+        try:
+            if shell32.SHGetKnownFolderPath(ctypes.byref(folder_id), 0, None, ctypes.byref(found)) == 0:
+                return Path(ctypes.wstring_at(found.value))
+        finally:
+            ctypes.windll.ole32.CoTaskMemFree(found)  # also on failure (documented), None is allowed
+    return Path.home() / 'Pictures'
+
+def widget_id(*parts):
+    """A short stable key part for widgets of a profile or photo (names and paths may hold any character)."""
+    return hashlib.sha256('\0'.join(parts).encode('utf-8')).hexdigest()[:16]
+
+def load_marks():
+    """Return (marks of all profiles, error or None) of results/marks.json (A17)."""
+    try:
+        return read_marks(MARKS), None
+    except (OSError, ValueError) as exc:
+        return {}, exc
+
+def set_mark(profile, photo, key):
+    """Save the mark the control key shows for photo of profile (on_change of the control)."""
+    # no selection (the selected option clicked again) is "open"
+    state = MARK_BY_LABEL.get(st.session_state.get(key), MARK_OPEN)
+    try:
+        save_marks(MARKS, profile, {photo: state})
+    except (OSError, ValueError) as exc:
+        # the next run shows the saved mark again
+        st.session_state.gallery_notice = f'The mark could not be saved: {exc}'
+
+def copy_folder_value(profile, default):
+    """Return the target folder of profile: typed but not saved in this session, saved, or the default."""
+    unsaved = st.session_state.get('copy_folders_unsaved', {})
+    if profile in unsaved:
+        return unsaved[profile]
+    try:
+        return read_copy_folders(SETTINGS).get(profile) or default
+    except (OSError, ValueError):
+        return default
+
+def set_copy_folder(profile, key, default):
+    """Save the target folder typed into the field key in settings.json (on_change of the field)."""
+    unsaved = st.session_state.setdefault('copy_folders_unsaved', {})
+    try:
+        save_copy_folder(SETTINGS, profile, st.session_state.get(key, ''), default)
+    except (OSError, ValueError) as exc:
+        unsaved[profile] = st.session_state.get(key, '')  # used in this session anyway
+        st.session_state.gallery_notice = f'The target folder is used, but could not be saved to {SETTINGS.name}: {exc}'
+    else:
+        unsaved.pop(profile, None)
+
+def copy_matches(profile, key, photo_folders):
+    """Copy the photos of profile marked as match into the folder typed into the field key (A17)."""
+    # the field as it is now: it may have been changed in the same click (review)
+    target, problem = copy_target(st.session_state.get(key, ''), photo_folders)
+    if problem:
+        st.session_state.gallery_notice = problem
+        return
+    try:
+        paths = [photo for photo, state in read_marks(MARKS).get(profile, {}).items() if state == MARK_MATCH]
+        summary = copy_photos(paths, target)
+    except (OSError, ValueError) as exc:
+        st.session_state.gallery_notice = f'Nothing was copied: {exc}'
+        return
+    st.session_state.copy_result = (profile, str(target), summary)
+
+def open_target_folder(key, photo_folders):
+    target, _ = copy_target(st.session_state.get(key, ''), photo_folders)
+    gallery_action(open_path, target if target is not None and target.is_dir() else None, f'The folder {target}')
+
+def carry_over(old, new):
+    """Give the marks and the saved target folder of the renamed profile old to its new name (A17)."""
+    problems = []
+    for what, action in (('marks', lambda: rename_marks(MARKS, old, new)),
+                         ('saved copy target folder', lambda: rename_copy_folder(SETTINGS, old, new))):
+        try:
+            action()
+        except (OSError, ValueError) as exc:
+            problems.append(f'its {what} ({exc})')
+    if problems:
+        note = f'The profile was renamed, but {" and ".join(problems)} still belong to the old name "{old}".'
+        st.session_state.notice = (st.session_state.notice + ' ' if 'notice' in st.session_state else 'Saved. ') + note
+
 @st.cache_data(show_spinner=False, max_entries=2)
 def cached_results(path, mtime_ns, size):
     """read_results, read again only when the file changes (mtime_ns and size are the cache key)."""
@@ -324,8 +434,12 @@ def run_date(results):
     return str(results.get('finished', '')).replace('T', ' ')[:16]
 
 @st.fragment
-def show_results(results):
-    """The galleries of the last search as a grid of thumbnails; its buttons rerun only this part (P4)."""
+def show_results(results, photo_folders):
+    """The galleries of the last search as a grid of thumbnails; its buttons rerun only this part (P4).
+
+    With a mark per photo and copying of the matches (A17); photo_folders: the folders a
+    copy target must not be in.
+    """
     entries = results['profiles']
     if not entries:
         st.caption('The last search wrote no galleries.')
@@ -352,7 +466,8 @@ def show_results(results):
                 'results may not fit it any more. Start the search again to update them.')
     elif states[name] == 'missing':
         st.info(f'"{plain(name)}" is no longer one of your search profiles (renamed or deleted). These are its '
-                f'results from the search of {run_date(results)}.')
+                f'results from the search of {run_date(results)}. Its photos cannot be marked here: a renamed '
+                "profile took its marks along, and they appear with the next search's results.")
     others = {state: [plain(n) for n in names if n != name and states[n] == state] for state in ('changed', 'missing')}
     if others['changed'] or others['missing']:
         st.caption(' · '.join(text + ', '.join(found) for text, found in (
@@ -371,7 +486,17 @@ def show_results(results):
         pass  # deleted or in use: the other buttons still work
     if st.session_state.get('gallery_notice'):
         st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
-    cards = entry['cards']
+    # read on every run of this part: another tab or session may have marked photos (A17)
+    all_marks, marks_error = load_marks()
+    if marks_error:
+        st.warning(f'{MARKS_FILE} cannot be read, so marks are not shown and cannot be changed; FrameScout does not '
+                   f'change the file. Fix or remove it in the results folder.\n\nDetails: {plain(str(marks_error))}')
+    marks = all_marks.get(name, {})
+    can_mark = marks_error is None and states[name] != 'missing'
+    hide = st.checkbox('Hide photos marked as no match', key='hide_rejected')
+    cards = [c for c in entry['cards'] if not (hide and marks.get(c['path']) == MARK_NO_MATCH)]
+    if hide and len(cards) < len(entry['cards']):
+        st.caption(f"{len(entry['cards']) - len(cards):,} photos marked as no match are hidden.")
     pages = page_count(len(cards), GALLERY_PAGE_SIZE)
     page = 1
     if pages > 1:
@@ -380,7 +505,14 @@ def show_results(results):
             st.session_state.pop(key, None)  # a page of a longer list of an earlier search
         page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key)
     shown = page_cards(cards, page, GALLERY_PAGE_SIZE)
-    st.caption('"Open" and "Folder" use the programs of the computer FrameScout runs on.')
+    st.caption('"Open" and "Folder" use the programs of the computer FrameScout runs on. Mark each photo you have '
+               'checked as Match or No match; marks are kept for this profile across searches.')
+    mark_keys = {}
+    for card in shown:
+        # the saved mark, set before the control is drawn (never as its default): the file
+        # is the truth, also for marks made in another tab
+        mark_keys[card['rank']] = key = 'mark_' + widget_id(name, card['path'])
+        st.session_state[key] = MARK_LABELS[marks.get(card['path'], MARK_OPEN)]
     # a new container for every profile, page and card count: in a fragment rerun with fewer
     # cards (the shorter last page) the rows of the previous page stayed in the browser
     # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
@@ -400,6 +532,45 @@ def show_results(results):
                               use_container_width=True, help='Opens the photo in your image viewer.')
                     b2.button('Folder', key=f"reveal_{card['rank']}", on_click=show_photo, args=(card['path'],),
                               use_container_width=True, help='Shows the photo in its folder.')
+                    key = mark_keys[card['rank']]
+                    st.segmented_control('Mark', list(MARK_LABELS.values()), key=key, on_change=set_mark,
+                                         args=(name, card['path'], key), disabled=not can_mark,
+                                         label_visibility='collapsed')
+    show_copy(name, entry, marks, photo_folders)
+
+def show_copy(name, entry, marks, photo_folders):
+    """Copying the photos of profile name marked as match to a folder, below its gallery (A17)."""
+    st.markdown('**Copy marked matches**')
+    matches = [photo for photo, state in marks.items() if state == MARK_MATCH]
+    rejected = sum(1 for state in marks.values() if state == MARK_NO_MATCH)
+    in_results = {card['path'] for card in entry['cards']}
+    elsewhere = sum(1 for photo in matches if photo not in in_results)
+    st.caption(f'Marked: {len(matches):,} photos of "{plain(name)}" as match · {rejected:,} as no match.'
+               + (f' {elsewhere:,} of the matches are not among the results of this search (marked earlier); they '
+                  'are copied too.' if elsewhere else ''))
+    default = str(default_copy_folder(pictures_folder(), Path(entry['gallery']).stem))
+    key = 'copy_folder_' + widget_id(name)
+    st.session_state[key] = copy_folder_value(name, default)
+    st.text_input('Copy to folder', key=key, on_change=set_copy_folder, args=(name, key, default),
+                  help='Copies only: the originals stay where they are. Files in this folder are never overwritten; '
+                       'a different photo with the same name is saved as "name (2)".')
+    target, problem = copy_target(st.session_state[key], photo_folders)
+    if problem:
+        st.warning(plain(problem))
+    c1, c2 = st.columns(2)
+    c1.button(f'Copy {len(matches):,} marked photos', on_click=copy_matches, args=(name, key, photo_folders),
+              disabled=not matches or target is None, use_container_width=True)
+    c2.button('Open target folder', on_click=open_target_folder, args=(key, photo_folders),
+              disabled=target is None or not target.is_dir(), use_container_width=True)
+    result = st.session_state.pop('copy_result', None)  # shown once, after the copy
+    if result and result[0] == name:
+        _, folder, summary = result
+        text = f'{copy_summary_text(summary)} (to {folder})'
+        if summary['failed']:
+            st.warning(plain(text + '. Not copied: ' + '; '.join(f'{p}: {why}' for p, why in summary['failed'][:10])
+                             + (' …' if len(summary['failed']) > 10 else '')))
+        else:
+            st.success(plain(text))
 
 def cache_env():
     env = os.environ.copy()
@@ -544,6 +715,8 @@ with p_tab:
                     keep = [] if clear_refs else p.get('reference_images', [])
                     # a renamed profile's reference folder follows the new name (A1)
                     if store(edited, refs_new or [], edit_name, others, keep, move=edit_name != p['name']):
+                        if edit_name != p['name']:
+                            carry_over(p['name'], edit_name)  # its marks and copy folder follow the name (A17)
                         st.rerun()
             # new lists instead of changing profiles in place: after a failed save the page
             # keeps showing (and the search uses) exactly what is in profiles.json
@@ -712,7 +885,8 @@ with run_tab:
         st.warning(f'{RESULTS_FILE} cannot be read, so the results of the last search are not shown here. Starting '
                    f'the search again writes it anew.\n\nDetails: {plain(str(results_error))}')
     if last_results:
-        show_results(last_results)
+        # a copy target must not be in the photo folder of this search or of the next one (A17)
+        show_results(last_results, [str(last_results.get('photo_folder') or ''), str(photo_folder)])
     elif RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
         # galleries of a search before results.json: listed by file name, since the
         # current profile list may no longer match them (A12)
