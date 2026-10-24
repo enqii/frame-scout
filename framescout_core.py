@@ -356,6 +356,91 @@ def feature_signature(person_detection, max_persons, person_confidence, yolo_mod
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
 
 
+# The feature cache in the output folder, and the engine's default person detector.
+CACHE_FILE = 'cache.sqlite3'
+DEFAULT_YOLO_MODEL = 'yolo11n.pt'
+
+
+def _signature_settings(person_detection, max_persons, person_confidence, yolo_model):
+    """The settings feature_signature hashes, as stored in the signatures table."""
+    if not person_detection:
+        return {'person_detection': False}
+    return {'person_detection': True, 'max_persons': max_persons, 'person_confidence': person_confidence,
+            'yolo_model': yolo_model}
+
+
+def prepare_cache(con, person_detection, max_persons, person_confidence, yolo_model):
+    """Create the tables of the feature cache (sqlite3 connection con) if needed; return this run's signature.
+
+    The features table holds the embeddings per photo path and signature. The signatures
+    table records which ENGINE and settings each signature stands for (E11): the signature
+    is a hash, so without it the cleanup could not tell rows of an older engine version from
+    rows of other settings. The features table is unchanged, so older versions keep reading
+    the same file and ignore the side table.
+    """
+    signature = feature_signature(person_detection, max_persons, person_confidence, yolo_model)
+    con.execute('''CREATE TABLE IF NOT EXISTS features (
+        path TEXT NOT NULL, signature TEXT NOT NULL, mtime_ns INTEGER NOT NULL,
+        size INTEGER NOT NULL, labels TEXT NOT NULL, vectors BLOB NOT NULL,
+        PRIMARY KEY(path, signature))''')
+    con.execute('''CREATE TABLE IF NOT EXISTS signatures (
+        signature TEXT PRIMARY KEY, engine TEXT NOT NULL, settings TEXT NOT NULL)''')
+    settings = _signature_settings(person_detection, max_persons, person_confidence, yolo_model)
+    con.execute('INSERT OR IGNORE INTO signatures VALUES (?,?,?)',
+                (signature, ENGINE, json.dumps(settings, sort_keys=True)))
+    con.commit()
+    return signature
+
+
+def _slider_values(name):
+    """The values the app's slider of setting name can return: exact steps and their float noise."""
+    low, high = SETTING_RANGES[name]
+    step = SETTING_STEPS[name]
+    values, n = set(), 0
+    while low + n * step <= high + 1e-9:
+        raw = low + n * step  # e.g. 0.1 + 4 * 0.05 = 0.30000000000000004
+        values.update({raw, round(raw, 4), round(raw, 2)})
+        n += 1
+    return values
+
+
+def known_signatures(yolo_model=DEFAULT_YOLO_MODEL):
+    """Return the signatures of the current ENGINE for every value of the app's widgets (E11).
+
+    For cached rows written before the signatures table existed: a row whose signature is
+    neither recorded there nor one of these is of an older engine version or of settings
+    only the CLI offers (e.g. another --yolo-model).
+    """
+    known = {feature_signature(False, 0, 0, yolo_model)}
+    low, high = SETTING_RANGES['max_persons']
+    confidences = _slider_values('person_confidence')
+    for max_persons in range(low, high + 1):
+        for confidence in confidences:
+            known.add(feature_signature(True, max_persons, confidence, yolo_model))
+    return known
+
+
+def classify_signatures(signatures, recorded, current, known=None):
+    """Return {signature: 'current' | 'other' | 'old'} for the signatures of cached rows (E11).
+
+    recorded: {signature: engine} of the signatures table; current: the signature of the
+    current settings; known: known_signatures() (computed if None). 'other' is a signature of
+    the current ENGINE with other settings, 'old' one of an older engine version or unknown.
+    """
+    result = {}
+    for signature in signatures:
+        if signature == current:
+            result[signature] = 'current'
+            continue
+        if signature in recorded:
+            result[signature] = 'other' if recorded[signature] == ENGINE else 'old'
+            continue
+        if known is None:
+            known = known_signatures()
+        result[signature] = 'other' if signature in known else 'old'
+    return result
+
+
 # PyTorch version the installer installs (I3), the version of the verified end-to-end run.
 # requirements.txt pins the same versions; a test keeps them in sync.
 TORCH_VERSION = '2.14.1'
@@ -1112,6 +1197,8 @@ DEVICES = ('auto', 'cpu', 'cuda')
 # bounds mark a float setting.
 SETTING_RANGES = {'batch_size': (1, 64), 'top': (1, 5000), 'max_persons': (1, 50),
                   'person_confidence': (0.1, 0.9), 'reference_weight': (0.0, 1.0)}
+# step of the app's sliders; known_signatures computes the cache signatures they lead to (E11)
+SETTING_STEPS = {'person_confidence': 0.05, 'reference_weight': 0.05}
 # default weight of the reference images: 0.35 before the scores were normalized (E5);
 # 0.3 did best on the local evaluation set (user decision in PR #11). A value saved in
 # settings.json is kept as it is, also the old default.

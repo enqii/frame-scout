@@ -1,0 +1,81 @@
+"""The signatures side table of the feature cache and the classification of cached rows (E11)."""
+import json
+import sqlite3
+
+from framescout_core import (DEFAULT_YOLO_MODEL, ENGINE, SETTING_RANGES, classify_signatures, feature_signature,
+                             known_signatures, prepare_cache)
+
+DEFAULTS = dict(person_detection=True, max_persons=12, person_confidence=.3, yolo_model=DEFAULT_YOLO_MODEL)
+
+
+def test_prepare_cache_creates_the_tables_and_records_the_signature(tmp_path):
+    con = sqlite3.connect(tmp_path / 'cache.sqlite3')
+    signature = prepare_cache(con, **DEFAULTS)
+    assert signature == feature_signature(**DEFAULTS)
+    # the features table keeps its schema (older versions read the same file)
+    columns = [row[1] for row in con.execute('PRAGMA table_info(features)')]
+    assert columns == ['path', 'signature', 'mtime_ns', 'size', 'labels', 'vectors']
+    [(stored, engine, settings)] = con.execute('SELECT signature, engine, settings FROM signatures').fetchall()
+    assert stored == signature and engine == ENGINE
+    assert json.loads(settings) == DEFAULTS
+    con.close()
+
+
+def test_prepare_cache_is_idempotent_and_keeps_other_signatures(tmp_path):
+    con = sqlite3.connect(tmp_path / 'cache.sqlite3')
+    prepare_cache(con, **DEFAULTS)
+    prepare_cache(con, **DEFAULTS)
+    other = prepare_cache(con, **{**DEFAULTS, 'person_detection': False})
+    rows = dict(con.execute('SELECT signature, settings FROM signatures').fetchall())
+    assert set(rows) == {feature_signature(**DEFAULTS), other}
+    # without person detection the detector settings do not belong to the signature
+    assert json.loads(rows[other]) == {'person_detection': False}
+    con.close()
+
+
+def test_prepare_cache_adds_the_side_table_to_an_existing_cache(tmp_path):
+    # a cache of an earlier version: rows, but no signatures table
+    path = tmp_path / 'cache.sqlite3'
+    con = sqlite3.connect(path)
+    con.execute('''CREATE TABLE features (
+        path TEXT NOT NULL, signature TEXT NOT NULL, mtime_ns INTEGER NOT NULL,
+        size INTEGER NOT NULL, labels TEXT NOT NULL, vectors BLOB NOT NULL,
+        PRIMARY KEY(path, signature))''')
+    con.execute('INSERT INTO features VALUES (?,?,?,?,?,?)', ('a.jpg', 'old', 1, 2, '[]', b''))
+    con.commit()
+    prepare_cache(con, **DEFAULTS)
+    assert con.execute('SELECT COUNT(*) FROM features').fetchone() == (1,)
+    con.close()
+
+
+def test_known_signatures_cover_every_value_of_the_app_widgets():
+    known = known_signatures()
+    assert feature_signature(**DEFAULTS) in known
+    assert feature_signature(False, 12, .3, DEFAULT_YOLO_MODEL) in known
+    low, high = SETTING_RANGES['max_persons']
+    for max_persons in (low, high):
+        for confidence in (0.1, 0.9, 0.55):
+            assert feature_signature(True, max_persons, confidence, DEFAULT_YOLO_MODEL) in known
+    # a slider returns e.g. 0.1 + 4 * 0.05 = 0.30000000000000004, which the app passes on as it is
+    assert feature_signature(True, 12, 0.1 + 4 * 0.05, DEFAULT_YOLO_MODEL) in known
+    # another detector model or a value no widget offers is not known
+    assert feature_signature(True, 12, .3, 'yolo11s.pt') not in known
+    assert feature_signature(True, 12, .33, DEFAULT_YOLO_MODEL) not in known
+    assert feature_signature(True, high + 1, .3, DEFAULT_YOLO_MODEL) not in known
+
+
+def test_classify_signatures():
+    current = feature_signature(**DEFAULTS)
+    other_known = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL)
+    cli = feature_signature(True, 12, .3, 'yolo11s.pt')
+    recorded_old = 'a' * 64
+    unknown = 'b' * 64
+    recorded = {cli: ENGINE, recorded_old: 'v4-something'}
+    result = classify_signatures([current, other_known, cli, recorded_old, unknown], recorded, current)
+    assert result == {current: 'current', other_known: 'other', cli: 'other', recorded_old: 'old', unknown: 'old'}
+
+
+def test_a_recorded_older_engine_wins_over_a_known_signature():
+    # cannot happen with a real hash, but the side table is the more precise source
+    sig = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL)
+    assert classify_signatures([sig], {sig: 'v4'}, 'x') == {sig: 'old'}

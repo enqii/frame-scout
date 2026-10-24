@@ -21,11 +21,12 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEVICES, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL,
-                             RESULTS_FILE, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, crop_label, cuda_hint, detection_options,
-                             draft_size, final_status, ensure_thumbnail, feature_signature, group_batches, load_profiles, prefetch,
-                             profile_slugs, progress_due, progress_line, result_card, results_document, search_fingerprint,
-                             store_group, write_results)
+from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
+                             DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RESULTS_FILE, RUN_LOCK, RUN_STATUS, RunLock,
+                             StatusReporter, crop_label, cuda_hint, detection_options, draft_size, final_status,
+                             ensure_thumbnail, group_batches, load_profiles, prefetch, prepare_cache, profile_slugs,
+                             progress_due, progress_line, result_card, results_document, search_fingerprint, store_group,
+                             write_results)
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
@@ -117,7 +118,7 @@ def main():
     parser.add_argument('--no-person-detection', action='store_true')
     parser.add_argument('--max-persons', type=int, default=12)
     parser.add_argument('--person-confidence', type=float, default=.3)
-    parser.add_argument('--yolo-model', default='yolo11n.pt')
+    parser.add_argument('--yolo-model', default=DEFAULT_YOLO_MODEL)
     parser.add_argument('--reference-weight', type=float, default=DEFAULT_REFERENCE_WEIGHT,
                         help='weight of the reference image score (0..1); profiles without reference images use text only')
     args = parser.parse_args()
@@ -224,14 +225,10 @@ def search(args, parser, root, output, status):
     if not args.no_person_detection:
         from ultralytics import YOLO
         detector = YOLO(args.yolo_model)
-    signature = feature_signature(not args.no_person_detection, args.max_persons, args.person_confidence,
-                                  args.yolo_model)
-    con = sqlite3.connect(output / 'cache.sqlite3')
-    con.execute('''CREATE TABLE IF NOT EXISTS features (
-        path TEXT NOT NULL, signature TEXT NOT NULL, mtime_ns INTEGER NOT NULL,
-        size INTEGER NOT NULL, labels TEXT NOT NULL, vectors BLOB NOT NULL,
-        PRIMARY KEY(path, signature))''')
-    con.commit()
+    con = sqlite3.connect(output / CACHE_FILE)
+    # also records which engine version and settings the signature stands for (E11)
+    signature = prepare_cache(con, not args.no_person_detection, args.max_persons, args.person_confidence,
+                              args.yolo_model)
     image_size = getattr(model.visual, 'image_size', 224)
     min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
                           detector is not None)
