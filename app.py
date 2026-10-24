@@ -326,10 +326,31 @@ def widget_id(*parts):
     """A short stable key part for widgets of a profile or photo (names and paths may hold any character)."""
     return hashlib.sha256('\0'.join(parts).encode('utf-8')).hexdigest()[:16]
 
+def version_key(path):
+    """(path, mtime_ns, size, file id) of path: the cache key of the files saved by replacing them.
+
+    With the file id, which changes with every atomic replace, so two saves of the same size
+    within the time resolution of the file system (2 s on FAT) still count as a change.
+    """
+    stat = Path(path).stat()
+    return str(path), stat.st_mtime_ns, stat.st_size, stat.st_ino
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_marks(path, mtime_ns, size, ino):
+    """read_marks, read again only when the file changes (review: not on every gallery click)."""
+    return read_marks(Path(path))
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_copy_folders(path, mtime_ns, size, ino):
+    """read_copy_folders, read again only when settings.json changes (review)."""
+    return read_copy_folders(Path(path))
+
 def load_marks():
     """Return (marks of all profiles, error or None) of results/marks.json (A17)."""
     try:
-        return read_marks(MARKS), None
+        return cached_marks(*version_key(MARKS)), None
+    except FileNotFoundError:
+        return {}, None
     except (OSError, ValueError) as exc:
         return {}, exc
 
@@ -349,8 +370,8 @@ def copy_folder_value(profile, default):
     if profile in unsaved:
         return unsaved[profile]
     try:
-        return read_copy_folders(SETTINGS).get(profile) or default
-    except (OSError, ValueError):
+        return cached_copy_folders(*version_key(SETTINGS)).get(profile) or default
+    except (OSError, ValueError):  # also FileNotFoundError: nothing saved
         return default
 
 def set_copy_folder(profile, key, default):
