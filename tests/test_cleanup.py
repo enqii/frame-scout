@@ -1,0 +1,427 @@
+"""Cleaning up the results folder, the feature cache and the reference images (E7, E11, E13, E23, A14)."""
+import json
+import os
+import sqlite3
+import tempfile
+from pathlib import Path
+
+import pytest
+
+from framescout_core import (CACHE_FILE, DEFAULT_YOLO_MODEL, ENGINE, MARKS_FILE, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
+                             RunLock, auto_cleanup, clean_up, cleanup_summary_text, feature_signature, prepare_cache,
+                             result_card, results_document, save_profiles, scan_cleanup, size_text, write_results)
+
+CURRENT = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL)
+OTHER = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL)
+OLD = 'f' * 64  # e.g. a row of ENGINE v4: neither recorded nor known
+T1, T2, T3, T4 = ('1' * 24 + '.jpg', '2' * 24 + '.jpg', '3' * 24 + '.jpg', '4' * 24 + '.jpg')
+
+
+def gallery(name, thumbs=(), folder='thumbnails'):
+    imgs = ''.join(f'<article><img loading="lazy" src="{folder}/{t}" alt="x"></article>' for t in thumbs)
+    return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+            f'<title>FrameScout – {name}</title><style></style><main>{imgs}</main></html>')
+
+
+def card(thumbnail, rank=1):
+    return result_card(rank, Path('/photos/a.jpg'), 'a.jpg', 'Full image', 1.0, 0.3, None, 'Score +1.00', 'text',
+                       thumbnail)
+
+
+class Project:
+    """A project folder: profiles.json, references/, photos/ and results/."""
+
+    def __init__(self, base):
+        self.base = base
+        self.results = base / 'results'
+        self.thumbs = self.results / 'thumbnails'
+        self.legacy = self.results / 'vorschaubilder'
+        self.refs = base / 'references'
+        self.photos = base / 'photos'
+        self.profiles = base / 'profiles.json'
+        for folder in (self.thumbs, self.refs, self.photos):
+            folder.mkdir(parents=True)
+        self.set_profiles([{'name': 'Red car', 'reference_images': []}])
+
+    def set_profiles(self, profiles):
+        self.profiles.write_text(json.dumps({'profiles': profiles}), encoding='utf-8')
+
+    def write_results(self, entries):
+        """entries: [(name, gallery, [thumbnails])]"""
+        profiles = [{'name': n, 'fingerprint': 'x', 'gallery': g, 'normalized': True,
+                     'cards': [card(t, i) for i, t in enumerate(ts, 1)]} for n, g, ts in entries]
+        write_results(self.results / RESULTS_FILE, results_document('s', 'f', self.photos, {}, 1, profiles))
+
+    def thumb(self, name, folder=None, data=b'jpg'):
+        path = (folder or self.thumbs) / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return path
+
+    def page(self, file_name, title, thumbs=(), folder='thumbnails'):
+        path = self.results / file_name
+        path.write_text(gallery(title, thumbs, folder), encoding='utf-8')
+        return path
+
+    def cache(self, rows, recorded=()):
+        """rows: [(path, signature)]; recorded: [(signature, engine)] in the signatures table."""
+        con = sqlite3.connect(self.results / CACHE_FILE)
+        prepare_cache(con, True, 12, .3, DEFAULT_YOLO_MODEL)
+        con.execute('DELETE FROM signatures')
+        for signature, engine in recorded:
+            con.execute('INSERT INTO signatures VALUES (?,?,?)', (signature, engine, '{}'))
+        for path, signature in rows:
+            con.execute('INSERT INTO features VALUES (?,?,?,?,?,?)',
+                        (str(path), signature, 1, 2, '["Full image"]', b'v' * 1000))
+        con.commit()
+        con.close()
+
+    def rows(self):
+        con = sqlite3.connect(self.results / CACHE_FILE)
+        try:
+            return sorted(con.execute('SELECT path, signature FROM features').fetchall())
+        finally:
+            con.close()
+
+    def photo(self, name):
+        path = self.photos / name
+        path.write_bytes(b'photo')
+        return path
+
+    def scan(self, photo_folder='default', current=CURRENT):
+        return scan_cleanup(self.results, self.profiles, self.refs,
+                            self.photos if photo_folder == 'default' else photo_folder, current)
+
+    def clean(self, scan, selected, vacuum=False, alive=lambda pid, status: False, current=CURRENT):
+        return clean_up(self.results, scan, selected, vacuum, alive, self.profiles, self.refs, self.photos, current)
+
+
+@pytest.fixture
+def project(tmp_path):
+    return Project(tmp_path)
+
+
+def temp_thumbnail(folder, name):
+    # the name ensure_thumbnail's temporary file gets (via tempfile.mkstemp)
+    fd, path = tempfile.mkstemp(dir=folder, prefix=name + '.', suffix='.jpg')
+    os.close(fd)
+    return Path(path)
+
+
+# temporary thumbnails (E13)
+
+def test_temporary_thumbnails_of_a_stopped_export_are_found(project):
+    tmp = temp_thumbnail(project.thumbs, T1)
+    project.thumb(T1)
+    (project.thumbs / 'notes.txt').write_text('mine')
+    scan = project.scan()
+    assert scan['temp_thumbnails']['items'] == [tmp]
+    assert scan['temp_thumbnails']['default'] is True
+
+
+# galleries and thumbnails (E7, E23)
+
+def test_orphaned_galleries_are_only_framescout_galleries_of_no_current_profile_or_result(project):
+    project.set_profiles([{'name': 'Red car'}, {'name': 'Bär'}])
+    project.write_results([('Old dog', 'old-dog.html', [])])
+    project.page('red-car.html', 'Red car')  # gallery of a current profile
+    project.page('baer.html', 'Bär')
+    project.page('old-dog.html', 'Old dog')  # listed in results.json (E23)
+    orphan = project.page('b-r.html', 'Bär')  # the old slug of "Bär" (A3)
+    deleted = project.page('cat.html', 'Cat')  # a deleted profile
+    (project.results / 'my-notes.html').write_text('<html><title>Notes</title></html>', encoding='utf-8')
+    scan = project.scan()
+    assert sorted(scan['galleries']['items']) == sorted([orphan, deleted])
+    assert scan['galleries']['names'] == ['b-r.html', 'cat.html']
+    assert scan['galleries']['size'] == orphan.stat().st_size + deleted.stat().st_size
+
+
+def test_thumbnails_linked_from_results_or_kept_galleries_are_kept(project):
+    project.write_results([('Red car', 'red-car.html', [T1])])
+    project.page('red-car.html', 'Red car', [T1])
+    project.page('blue-car.html', 'Blue car', [T2])  # orphaned gallery: its thumbnail goes with it
+    # not a FrameScout gallery (no FrameScout title): kept, and so is its thumbnail
+    (project.results / 'my-page.html').write_text(f'<html><img src="thumbnails/{T3}"></html>', encoding='utf-8')
+    for name in (T1, T2, T3, T4):
+        project.thumb(name)
+    legacy_linked = project.thumb(T1, project.legacy)
+    project.page('legacy.html', 'Red car', [T1], folder='vorschaubilder')  # orphaned, links the old folder
+    legacy_free = project.thumb(T4, project.legacy)
+    scan = project.scan()
+    assert scan['thumbnails']['items'] == [project.thumbs / T4, legacy_free]
+    assert sorted(scan['thumbnails']['extra']) == sorted([project.thumbs / T2, legacy_linked])
+    assert scan['thumbnails']['default'] is True
+
+
+def test_galleries_and_thumbnails_are_not_offered_if_results_json_cannot_be_read(project):
+    (project.results / RESULTS_FILE).write_text('{broken', encoding='utf-8')
+    project.page('cat.html', 'Cat')
+    project.thumb(T1)
+    scan = project.scan()
+    for key in ('galleries', 'thumbnails'):
+        assert scan[key]['items'] == [] and RESULTS_FILE in scan[key]['problem']
+
+
+@pytest.mark.parametrize('content', ['{broken', None])
+def test_galleries_and_thumbnails_are_not_offered_without_readable_profiles(project, content):
+    if content is None:
+        project.profiles.unlink()
+    else:
+        project.profiles.write_text(content, encoding='utf-8')
+    project.page('cat.html', 'Cat')
+    project.thumb(T1)
+    scan = project.scan()
+    for key in ('galleries', 'thumbnails', 'references'):
+        assert scan[key]['items'] == [] and 'profiles.json' in scan[key]['problem']
+
+
+# cache rows (E7, E11)
+
+def test_rows_of_deleted_photos_inside_the_photo_folder(project):
+    kept = project.photo('a.jpg')
+    gone = project.photos / 'sub' / 'b.jpg'
+    outside = project.base / 'elsewhere' / 'c.jpg'  # another photo folder: never looked at
+    project.cache([(kept, CURRENT), (gone, CURRENT), (gone, OLD), (outside, CURRENT)])
+    scan = project.scan()
+    assert sorted(scan['cache_missing']['items']) == sorted([(str(gone), CURRENT), (str(gone), OLD)])
+    assert scan['cache_missing']['rows'] == 2 and scan['cache_missing']['default'] is True
+
+
+def test_rows_of_deleted_photos_need_an_existing_photo_folder(project):
+    project.cache([(project.base / 'gone' / 'b.jpg', CURRENT)])
+    scan = project.scan(photo_folder=project.base / 'gone')  # e.g. a disconnected drive
+    assert scan['cache_missing']['items'] == [] and 'does not exist' in scan['cache_missing']['problem']
+    scan = project.scan(photo_folder=None)
+    assert scan['cache_missing']['items'] == [] and scan['cache_missing']['problem']
+
+
+def test_rows_of_old_engines_and_other_settings(project):
+    photo = project.photo('a.jpg')
+    cli = 'c' * 64  # e.g. another --yolo-model, recorded by the engine of this version
+    recorded_old = 'd' * 64
+    project.cache([(photo, CURRENT), (photo, OTHER), (photo, OLD), (photo, cli), (photo, recorded_old)],
+                  recorded=[(cli, ENGINE), (recorded_old, 'v4-old')])
+    scan = project.scan()
+    assert sorted(scan['cache_old']['items']) == sorted([OLD, recorded_old])
+    assert scan['cache_old']['rows'] == 2 and scan['cache_old']['default'] is True
+    assert sorted(scan['cache_other']['items']) == sorted([OTHER, cli])
+    assert scan['cache_other']['rows'] == 2 and scan['cache_other']['default'] is False
+    assert scan['cache_old']['size'] > 0
+
+
+def test_no_cache_means_nothing_to_clean(project):
+    scan = project.scan()
+    for key in ('cache_missing', 'cache_old', 'cache_other'):
+        assert scan[key]['items'] == [] and scan[key]['problem'] is None
+    assert not (project.results / CACHE_FILE).exists()  # the scan creates no cache
+
+
+def test_an_unreadable_cache_is_not_offered(project):
+    (project.results / CACHE_FILE).write_bytes(b'not a database' * 100)
+    scan = project.scan()
+    for key in ('cache_missing', 'cache_old', 'cache_other'):
+        assert scan[key]['items'] == [] and CACHE_FILE in scan[key]['problem']
+
+
+# reference images (A14)
+
+def test_reference_files_no_profile_or_backup_references(project):
+    used = project.refs / 'red-car' / 'reference-1.jpg'
+    backup = project.refs / 'red-car' / 'reference-2.jpg'
+    leftover = project.refs / 'cat' / 'reference-1.png'
+    for path in (used, backup, leftover):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'image')
+    (project.refs / 'cat' / 'desktop.ini').write_text('x')  # not an image: never offered
+    project.set_profiles([{'name': 'Red car', 'reference_images': ['references/red-car/reference-2.jpg']}])
+    save_profiles(project.profiles, [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}])
+    scan = project.scan()
+    assert scan['references']['items'] == [leftover]
+    assert scan['references']['names'] == [str(Path('cat') / 'reference-1.png')]
+    assert scan['references']['default'] is False
+
+
+def test_references_are_not_offered_if_the_backup_cannot_be_read(project):
+    (project.refs / 'x.jpg').write_bytes(b'image')
+    (project.base / 'profiles.json.bak').write_text('{broken', encoding='utf-8')
+    scan = project.scan()
+    assert scan['references']['items'] == [] and 'profiles.json.bak' in scan['references']['problem']
+
+
+# deleting
+
+def everything(scan):
+    return set(scan)
+
+
+def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
+    keep = {name: project.results / name for name in
+            (MARKS_FILE, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE)}
+    project.write_results([('Red car', 'red-car.html', [T1])])
+    (project.results / MARKS_FILE).write_text('{"format": 1, "profiles": {}}', encoding='utf-8')
+    for name in (MARKS_FILE + '.lock', RUN_LOCK):
+        (project.results / name).write_bytes(b'')
+    (project.results / RUN_STATUS).write_text('{"phase": "finished", "pid": 1}', encoding='utf-8')
+    (project.base / 'settings.json').write_text('{}', encoding='utf-8')
+    project.page('red-car.html', 'Red car', [T1])
+    project.page('cat.html', 'Cat', [T2])
+    project.thumb(T1)
+    project.thumb(T2)
+    project.thumb(T3, project.legacy)
+    temp_thumbnail(project.thumbs, T4)
+    photo = project.photo('a.jpg')
+    project.cache([(photo, CURRENT), (photo, OLD), (photo, OTHER), (project.photos / 'gone.jpg', CURRENT)])
+    (project.refs / 'old.jpg').write_bytes(b'image')
+    scan = project.scan()
+    summary = project.clean(scan, everything(scan), vacuum=True)
+    assert summary['refused'] is None and summary['failed'] == []
+    for path in keep.values():
+        assert path.exists(), path.name
+    assert (project.base / 'settings.json').exists() and project.profiles.exists()
+    assert sorted(p.name for p in project.results.iterdir()) == sorted(
+        [*keep, CACHE_FILE, 'red-car.html', 'thumbnails'])
+    assert [p.name for p in project.thumbs.iterdir()] == [T1]
+    assert not project.legacy.exists()  # emptied, and no kept gallery links it
+    assert project.rows() == [(str(photo), CURRENT)]
+    assert list(project.refs.iterdir()) == []
+    assert summary['files'] == 5 and summary['rows'] == 3
+    assert summary['freed'] > 0
+
+
+def test_only_selected_categories_are_deleted(project):
+    project.page('cat.html', 'Cat', [T2])
+    project.thumb(T1)
+    project.thumb(T2)
+    scan = project.scan()
+    summary = project.clean(scan, {'thumbnails'})
+    # the orphaned gallery stays, and with it its thumbnail
+    assert (project.results / 'cat.html').exists()
+    assert sorted(p.name for p in project.thumbs.iterdir()) == [T2]
+    assert summary['files'] == 1
+
+
+def test_only_what_the_scan_showed_is_deleted(project):
+    project.thumb(T1)
+    (project.refs / 'a.jpg').write_bytes(b'image')
+    scan = project.scan()
+    project.thumb(T2)  # appeared after the scan: the user has not seen it
+    project.page('cat.html', 'Cat')
+    (project.refs / 'b.jpg').write_bytes(b'image')
+    project.set_profiles([{'name': 'Red car', 'reference_images': ['references/a.jpg']}])  # now in use
+    project.clean(scan, everything(scan))
+    assert sorted(p.name for p in project.thumbs.iterdir()) == [T2]
+    assert (project.results / 'cat.html').exists()
+    # profiles.json is read again before deleting: a reference added since is kept
+    assert sorted(p.name for p in project.refs.iterdir()) == ['a.jpg', 'b.jpg']
+
+
+def test_a_thumbnail_a_kept_gallery_links_since_the_scan_is_kept(project):
+    project.thumb(T1)
+    scan = project.scan()
+    project.page('red-car.html', 'Red car', [T1])
+    project.clean(scan, {'thumbnails'})
+    assert (project.thumbs / T1).exists()
+
+
+def test_cache_rows_of_a_photo_that_is_back_are_kept(project):
+    gone = project.photos / 'b.jpg'
+    project.cache([(gone, CURRENT)])
+    scan = project.scan()
+    project.photo('b.jpg')
+    summary = project.clean(scan, {'cache_missing'})
+    assert project.rows() == [(str(gone), CURRENT)] and summary['rows'] == 0
+
+
+def test_vacuum_shrinks_the_cache_file(project):
+    photo = project.photo('a.jpg')
+    project.cache([(project.photos / f'{i}.jpg', OLD) for i in range(300)] + [(photo, CURRENT)])
+    before = (project.results / CACHE_FILE).stat().st_size
+    summary = project.clean(project.scan(), {'cache_old'}, vacuum=True)
+    assert summary['rows'] == 300
+    assert (project.results / CACHE_FILE).stat().st_size < before
+    assert summary['freed'] >= before - (project.results / CACHE_FILE).stat().st_size
+
+
+def test_the_cleanup_is_refused_while_a_search_runs(project):
+    project.thumb(T1)
+    scan = project.scan()
+    lock = RunLock(project.results / RUN_LOCK)
+    assert lock.acquire()
+    try:
+        summary = project.clean(scan, everything(scan))
+    finally:
+        lock.release()
+    assert summary['refused'] and (project.thumbs / T1).exists()
+
+
+def test_the_cleanup_is_refused_while_a_search_is_being_started(project):
+    project.thumb(T1)
+    (project.results / RUN_STATUS).write_text(json.dumps({'phase': 'starting', 'pid': 4242}), encoding='utf-8')
+    scan = project.scan()
+    summary = project.clean(scan, everything(scan), alive=lambda pid, status: pid == 4242)
+    assert summary['refused'] and (project.thumbs / T1).exists()
+
+
+def test_a_search_cannot_take_the_lock_during_the_cleanup(project, monkeypatch):
+    import framescout_core
+    project.thumb(T1)
+    scan = project.scan()
+    held = []
+    real = framescout_core._remove_file
+
+    def remove(path, summary):
+        held.append(not RunLock(project.results / RUN_LOCK).acquire())
+        return real(path, summary)
+
+    monkeypatch.setattr(framescout_core, '_remove_file', remove)
+    project.clean(scan, {'thumbnails'})
+    assert held == [True]
+    lock = RunLock(project.results / RUN_LOCK)
+    assert lock.acquire()  # released afterwards
+    lock.release()
+
+
+# the engine's automatic cleanup (E13, unreferenced thumbnails)
+
+def test_auto_cleanup_removes_temporary_and_unreferenced_thumbnails(project):
+    project.write_results([('Red car', 'red-car.html', [T1])])
+    project.page('red-car.html', 'Red car', [T1])
+    project.page('cat.html', 'Cat', [T2])  # every gallery counts as kept here
+    for name in (T1, T2, T3):
+        project.thumb(name)
+    temp_thumbnail(project.thumbs, T4)
+    project.thumb(T3, project.legacy)
+    (project.thumbs / 'notes.txt').write_text('mine')
+    removed = auto_cleanup(project.results)
+    assert sorted(p.name for p in project.thumbs.iterdir()) == sorted([T1, T2, 'notes.txt'])
+    assert not project.legacy.exists()
+    assert removed['files'] == 3
+    assert (project.results / 'cat.html').exists()
+
+
+def test_auto_cleanup_keeps_thumbnails_if_results_json_cannot_be_read(project):
+    (project.results / RESULTS_FILE).write_text('{broken', encoding='utf-8')
+    project.thumb(T1)
+    temp_thumbnail(project.thumbs, T2)
+    removed = auto_cleanup(project.results)
+    assert [p.name for p in project.thumbs.iterdir()] == [T1]
+    assert removed['files'] == 1 and removed['skipped']
+
+
+def test_auto_cleanup_without_thumbnail_folder(tmp_path):
+    assert auto_cleanup(tmp_path)['files'] == 0
+
+
+# texts
+
+def test_size_text():
+    assert size_text(0) == '0 B'
+    assert size_text(2048) == '2 KB'
+    assert size_text(5 * 1024 ** 2 + 300 * 1024) == '5.3 MB'
+    assert size_text(3 * 1024 ** 3) == '3.0 GB'
+
+
+def test_cleanup_summary_text():
+    text = cleanup_summary_text({'refused': None, 'files': 3, 'rows': 1200, 'freed': 2048,
+                                 'failed': [('a.jpg', 'in use')], 'skipped': []})
+    assert text == 'Deleted 3 files and 1,200 cache entries · 2 KB freed · 1 could not be deleted'
