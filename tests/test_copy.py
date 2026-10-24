@@ -200,3 +200,33 @@ def test_a_renamed_profile_keeps_its_target_folder(tmp_path):
     assert read_copy_folders(settings) == {'Blue car': 'D:/cars'}
     rename_copy_folder(settings, 'Nothing', 'Else')  # no folder saved: no change
     assert read_copy_folders(settings) == {'Blue car': 'D:/cars'}
+
+
+# --- review findings ------------------------------------------------------------------------
+
+def test_a_name_that_cannot_be_created_moves_on_to_the_next(tmp_path, monkeypatch):
+    # e.g. a dangling symbolic link: exists() is False, but the name is taken (review: no endless loop)
+    import framescout_core
+    publish = framescout_core._publish_new
+
+    def refuse_first(tmp, target):
+        if target.name == 'a.jpg':
+            raise FileExistsError(target)
+        publish(tmp, target)
+
+    monkeypatch.setattr(framescout_core, '_publish_new', refuse_first)
+    a = photo(tmp_path / 'photos' / 'a.jpg')
+    assert copy_photos([str(a)], tmp_path / 'out')['renamed'] == 1
+    assert (tmp_path / 'out' / 'a (2).jpg').is_file()
+
+
+def test_a_dangling_link_with_the_photo_name_is_kept(tmp_path):
+    target = tmp_path / 'out'
+    target.mkdir()
+    try:
+        os.symlink(tmp_path / 'nowhere.jpg', target / 'a.jpg')
+    except (OSError, NotImplementedError):
+        pytest.skip('symbolic links cannot be created here')
+    a = photo(tmp_path / 'photos' / 'a.jpg')
+    assert copy_photos([str(a)], target)['renamed'] == 1
+    assert (target / 'a.jpg').is_symlink() and (target / 'a (2).jpg').is_file()

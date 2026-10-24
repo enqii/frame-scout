@@ -1575,6 +1575,8 @@ def rename_marks(path, old, new, attempts=5, retry_delay=0.05, lock_timeout=MARK
 # original and never overwriting a file in the target folder; flat, one folder per profile.
 # The target folders the user typed are saved per profile in settings.json under this key.
 COPY_FOLDERS_KEY = 'copy_folders'
+# names tried for one copy (name.jpg, name (2).jpg, ...) before it fails
+COPY_MAX_NAMES = 10000
 
 
 def default_copy_folder(pictures, slug):
@@ -1631,18 +1633,19 @@ def _copy_one(source, target):
     if not source.is_file():
         raise FileNotFoundError('the photo no longer exists')
     for index, candidate in enumerate(_copy_candidates(source, target)):
-        while True:
-            if candidate.exists():
-                if candidate.is_file() and filecmp.cmp(source, candidate, shallow=False):
-                    return 'already'
-                break  # another file or a folder of that name: the next name
-            try:
-                # a complete file under the final name or none; never replaces a file that
-                # appeared meanwhile (FileExistsError: look at that file)
-                _publish_via_temp(candidate, lambda tmp: shutil.copy2(source, tmp), _publish_new)
-            except FileExistsError:
-                continue
-            return 'copied' if index == 0 else 'renamed'
+        if index >= COPY_MAX_NAMES:
+            raise FileExistsError(f'no free name for {source.name} in {target}')
+        if os.path.lexists(candidate):  # also a dangling symbolic link
+            if candidate.is_file() and filecmp.cmp(source, candidate, shallow=False):
+                return 'already'
+            continue  # another file or a folder of that name: the next name
+        try:
+            # a complete file under the final name or none; never replaces anything that
+            # took the name meanwhile, and every name is tried once (review: no endless loop)
+            _publish_via_temp(candidate, lambda tmp: shutil.copy2(source, tmp), _publish_new)
+        except FileExistsError:
+            continue
+        return 'copied' if index == 0 else 'renamed'
 
 
 def copy_photos(paths, target):
