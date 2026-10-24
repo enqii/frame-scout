@@ -365,19 +365,38 @@ def set_copy_folder(profile, key, default):
         unsaved.pop(profile, None)
 
 def copy_matches(profile, key, photo_folders):
-    """Copy the photos of profile marked as match into the folder typed into the field key (A17)."""
-    # the field as it is now: it may have been changed in the same click (review)
-    target, problem = copy_target(st.session_state.get(key, ''), photo_folders)
-    if problem:
-        st.session_state.gallery_notice = problem
-        return
+    """Copy the photos of profile marked as match into the folder typed into the field key (A17).
+
+    Runs in the page run (not in a callback) with a progress bar: a reload, closing the tab
+    or another click in the gallery stops it between two photos (review).
+    """
     try:
         paths = [photo for photo, state in read_marks(MARKS).get(profile, {}).items() if state == MARK_MATCH]
-        summary = copy_photos(paths, target)
     except (OSError, ValueError) as exc:
-        st.session_state.gallery_notice = f'Nothing was copied: {exc}'
+        st.warning(plain(f'Nothing was copied: {exc}'))
         return
-    st.session_state.copy_result = (profile, str(target), summary)
+    target, problem = copy_target(st.session_state.get(key, ''), photo_folders, paths)
+    if problem:
+        st.warning(plain(problem))
+        return
+    bar = st.progress(0.0, text=f'Copying {len(paths):,} photos …')
+
+    def progress(done, total):
+        bar.progress(done / total, text=f'Copied {done:,} of {total:,} photos …')
+
+    try:
+        summary = copy_photos(paths, target, progress)
+    except OSError as exc:
+        bar.empty()
+        st.warning(plain(f'Nothing was copied: {exc}'))
+        return
+    bar.empty()
+    text = f'{copy_summary_text(summary)} (to {target})'
+    if summary['failed']:
+        st.warning(plain(text + '. Not copied: ' + '; '.join(f'{p}: {why}' for p, why in summary['failed'][:10])
+                         + (' …' if len(summary['failed']) > 10 else '')))
+    else:
+        st.success(plain(text))
 
 def open_target_folder(key, photo_folders):
     target, _ = copy_target(st.session_state.get(key, ''), photo_folders)
@@ -554,23 +573,17 @@ def show_copy(name, entry, marks, photo_folders):
     st.text_input('Copy to folder', key=key, on_change=set_copy_folder, args=(name, key, default),
                   help='Copies only: the originals stay where they are. Files in this folder are never overwritten; '
                        'a different photo with the same name is saved as "name (2)".')
-    target, problem = copy_target(st.session_state[key], photo_folders)
+    # also not in the folder of a photo to copy, which may be from another photo folder (review)
+    target, problem = copy_target(st.session_state[key], photo_folders, matches)
     if problem:
         st.warning(plain(problem))
     c1, c2 = st.columns(2)
-    c1.button(f'Copy {len(matches):,} marked photos', on_click=copy_matches, args=(name, key, photo_folders),
-              disabled=not matches or target is None, use_container_width=True)
+    copy = c1.button(f'Copy {len(matches):,} marked photos', disabled=not matches or target is None,
+                     use_container_width=True)
     c2.button('Open target folder', on_click=open_target_folder, args=(key, photo_folders),
               disabled=target is None or not target.is_dir(), use_container_width=True)
-    result = st.session_state.pop('copy_result', None)  # shown once, after the copy
-    if result and result[0] == name:
-        _, folder, summary = result
-        text = f'{copy_summary_text(summary)} (to {folder})'
-        if summary['failed']:
-            st.warning(plain(text + '. Not copied: ' + '; '.join(f'{p}: {why}' for p, why in summary['failed'][:10])
-                             + (' …' if len(summary['failed']) > 10 else '')))
-        else:
-            st.success(plain(text))
+    if copy:
+        copy_matches(name, key, photo_folders)
 
 def cache_env():
     env = os.environ.copy()
