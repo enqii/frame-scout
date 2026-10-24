@@ -90,30 +90,47 @@ kinds, take the higher one. For the reviewer, check the actual diff first:
 `gh pr diff <n> --name-only` – if every file ends in `.md`, use `docs`; if the PR
 touches what the `code-risky` row names, use `code-risky`.
 
-**Implementer**
+**`model` and `effort` are mandatory on every `Agent` call.** You run on Sonnet
+(frontmatter above); a call without `model` makes the subagent inherit Sonnet, which
+silently downgrades `code` and `code-risky` implementers. Never omit them, never
+shorten them to "default". Before **every** spawn, print one line to the user, e.g.
+`Spawning implementer: kind=code-risky → model=opus effort=high`, so a wrong choice is
+visible before it runs. The values below are literal; copy them.
+
+**Implementer** – `model`/`effort` by kind:
+
+| Kind | `model` | `effort` |
+|---|---|---|
+| `docs` | `"sonnet"` | `"medium"` |
+| `code` | `"opus"` | `"medium"` |
+| `code-risky` | `"opus"` | `"high"` |
 
 ```
 Agent(
   description: "Implement roadmap <item id>",
   subagent_type: "general-purpose",
-  model: <implementer model of the kind>,
-  effort: <implementer effort of the kind>,
+  model: "<from table>",
+  effort: "<from table>",
   isolation: "worktree",
   prompt: <implementer-brief.md with placeholders filled in>
 )
 ```
 
-**Reviewer** – fresh context, no isolation needed (it does not change code):
+**Reviewer** – fresh context, no isolation needed (it does not change code); `effort`
+is always `"medium"`, `model` is `"opus"` for `code-risky` and `"sonnet"` otherwise:
 
 ```
 Agent(
   description: "Review PR #<n>",
   subagent_type: "general-purpose",
-  model: <reviewer model of the kind>,
+  model: "<opus for code-risky, else sonnet>",
   effort: "medium",
   prompt: <reviewer-brief.md with placeholders filled in>
 )
 ```
+
+If the spawned agent reports a different model than requested, tell the user and do
+not continue silently.
 
 Placeholders:
 - `{ITEM}` – the roadmap line verbatim (e.g. `(1) pytest scaffold + shared module … (A3, A9, part of I2)`).
