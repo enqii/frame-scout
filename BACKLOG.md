@@ -459,7 +459,10 @@ referenced in commits, pull requests and discussions.
       be copied. Checked with Streamlit's `AppTest`, not yet in a browser. Marks follow
       the absolute photo path: A21.)
 - [ ] **A18 – ZIP export (roadmap P4 (C)): open decision.** Asked in PR #14 and deferred to
-      P4 (C). Q6 – content: (a) the gallery HTML with its links rewritten to a
+      P4 (C). **Deferred by the user on 2026-10-25** ("skip this feature for now"): copying
+      of P4 (B) already collects the photos; a ZIP only matters for sharing or archiving an
+      overview. The Q6 decision below (content a/b/c, one vs. two buttons) is still pending
+      and must be asked again when this item is picked up. Q6 – content: (a) the gallery HTML with its links rewritten to a
       `thumbnails/` folder in the ZIP, plus those thumbnails, about 3 MB per 150 cards, as
       a browser download; the links to the originals stay `file://` and work only on
       this computer (recommended); (b) as (a) plus larger previews (~1200 px, ~250 KB
@@ -682,7 +685,8 @@ decision in PR #14):
       (done 2026-10-23; macOS/Linux untested: A19)
 - [x] (B) Mark matches and copy them to a folder (A17) (done 2026-10-25; marks in
       `results/marks.json`, three states; feedback into the search: A20)
-- [ ] (C) ZIP export with thumbnails (open decision: A18)
+- [~] (C) ZIP export with thumbnails (open decision: A18) – deferred by user decision
+      2026-10-25, skipped by `/roadmap`
 - [ ] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
       never delete `results/marks.json` (A17); optional HEIC/RAW support
 

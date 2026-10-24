@@ -42,7 +42,8 @@ Run these as separate, plain commands from the main checkout:
    (`^## Roadmap` in `BACKLOG.md`) and Read from that line. If step 2 could not
    fast-forward `main`, read `git show origin/main:BACKLOG.md` instead. The
    **next item** is the first unchecked `- [ ]` line, scanning all sections (P0 … P5,
-   including sub-sections such as P4b) top to bottom.
+   including sub-sections such as P4b) top to bottom. Lines marked `- [~]` are deferred by
+   user decision and are skipped.
 4. Open PRs: `gh pr list --state open --json number,title,headRefName,isDraft,labels,url`.
    A **roadmap PR** is an open PR with an `fs:*` label.
 5. Local worktrees: `git worktree list`. For every worktree under `.claude/worktrees/`:
