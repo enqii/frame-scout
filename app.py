@@ -413,7 +413,9 @@ def carry_over(old, new):
             problems.append(f'its {what} ({exc})')
     if problems:
         note = f'The profile was renamed, but {" and ".join(problems)} still belong to the old name "{old}".'
-        st.session_state.notice = (st.session_state.notice + ' ' if 'notice' in st.session_state else 'Saved. ') + note
+        # the name and the error texts (paths) are shown as Markdown: escaped (review)
+        st.session_state.notice = ((st.session_state.notice + ' ' if 'notice' in st.session_state else 'Saved. ')
+                                   + plain(note))
 
 @st.cache_data(show_spinner=False, max_entries=2)
 def cached_results(path, mtime_ns, size):
