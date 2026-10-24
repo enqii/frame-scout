@@ -4,6 +4,7 @@ This module uses only the Python standard library, so it can be imported and tes
 without torch, Streamlit or any model download.
 """
 import collections
+import filecmp
 import hashlib
 import json
 import os
@@ -1150,6 +1151,14 @@ def _read_settings_file(filename, attempts=5, retry_delay=0.05):
     On Windows, reading fails for a moment while another session replaces the file, so an
     OSError is retried up to attempts times, retry_delay seconds apart (review).
     """
+    return _read_json_object(filename, 'settings file', attempts, retry_delay)
+
+
+def _read_json_object(filename, what, attempts=5, retry_delay=0.05):
+    """Return the JSON object of the file filename ({} if it is missing), see _read_settings_file.
+
+    what names the file in the error for a file that is not a JSON object.
+    """
     for attempt in range(max(attempts, 1)):
         try:
             text = Path(filename).read_text(encoding='utf-8-sig')
@@ -1162,7 +1171,7 @@ def _read_settings_file(filename, attempts=5, retry_delay=0.05):
             time.sleep(retry_delay)
     data = json.loads(text)
     if not isinstance(data, dict):
-        raise ValueError('The settings file must be a JSON object.')
+        raise ValueError(f'The {what} must be a JSON object.')
     return data
 
 
@@ -1212,24 +1221,44 @@ def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05, loc
         if allowed is None:
             raise ValueError(f'{key}: {value!r} is not allowed')
         normalized[key] = allowed
-    lock = RunLock(filename.with_name(filename.name + '.lock'))
-    if not lock.acquire(timeout=lock_timeout, poll=0.01):
-        raise OSError(f'{filename.name} is being saved by another session')
-    try:
+
+    def update(current):
         document = {}
-        for key, value in {**_read_settings_file(filename, attempts, retry_delay), **normalized}.items():
+        for key, value in {**current, **normalized}.items():
             if key in defaults:
                 # after normalizing, a known setting has the type of its default (no True == 1)
                 value = _setting_value(key, value)
                 if value is None or value == defaults[key]:
                     continue
             document[key] = value
-        if document or filename.exists():
+        return document if document or filename.exists() else None
+
+    _update_locked(filename, lambda: _read_settings_file(filename, attempts, retry_delay), update,
+                   attempts, retry_delay, lock_timeout)
+    return normalized
+
+
+def _update_locked(filename, read, update, attempts, retry_delay, lock_timeout):
+    """Read, change and replace the JSON file filename under a RunLock on <filename>.lock.
+
+    read() returns the current content, update(content) the new one, or None to leave the
+    file as it is. App sessions are threads of one process, and two RunLocks conflict there
+    too, so two sessions saving at the same moment cannot lose a change; the lock file stays
+    (empty). The file is replaced atomically, tried up to attempts times. Raises OSError if
+    the lock is not free within lock_timeout seconds; errors of read() and update() (e.g.
+    ValueError for an unreadable file, which is then never replaced) are passed on.
+    """
+    filename = Path(filename)
+    lock = RunLock(filename.with_name(filename.name + '.lock'))
+    if not lock.acquire(timeout=lock_timeout, poll=0.01):
+        raise OSError(f'{filename.name} is being saved by another session')
+    try:
+        document = update(read())
+        if document is not None:
             data = (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
             _replace_with_retry(filename, data, attempts, retry_delay)
     finally:
         lock.release()
-    return normalized
 
 
 def reconcile_settings(widgets, seen, shown, saved, defaults):
@@ -1436,3 +1465,270 @@ def reveal_command(path, system):
     if system == 'Darwin':
         return ['open', '-R', str(path)]
     return ['xdg-open', str(Path(path).parent)]
+
+
+# Marks (A17, P4 (B)): FrameScout ranks candidates, not certain hits; a mark records what the
+# user decided about a photo of a profile's gallery: a match, no match, or still open. Kept
+# in MARKS_FILE in the results folder (user decision), per profile name and photo path,
+# across later searches; "open" is the absence of a mark. The file is user data: the engine
+# never writes it, and a cleanup of the results folder (E7) must never delete it.
+MARKS_FILE = 'marks.json'
+MARKS_FORMAT = 1
+MARK_OPEN, MARK_MATCH, MARK_NO_MATCH = 'open', 'match', 'no-match'
+MARK_STATES = (MARK_OPEN, MARK_MATCH, MARK_NO_MATCH)
+# seconds save_marks and rename_marks wait for the lock around their read-change-write
+MARKS_LOCK_TIMEOUT = 5.0
+
+
+def _read_marks_document(path, attempts=5, retry_delay=0.05):
+    """Return the checked JSON object of the marks file ({'format': ..., 'profiles': {}} if missing)."""
+    data = _read_json_object(path, 'marks file', attempts, retry_delay)
+    if not data:
+        return {'format': MARKS_FORMAT, 'profiles': {}}
+    if data.get('format') != MARKS_FORMAT:
+        raise ValueError(f'{Path(path).name} is not a FrameScout marks file of format {MARKS_FORMAT}')
+    profiles = data.get('profiles')
+    if not isinstance(profiles, dict):
+        raise ValueError('"profiles" must be a JSON object')
+    for name, marks in profiles.items():
+        if not isinstance(marks, dict) or any(
+                not isinstance(photo, str) or state not in (MARK_MATCH, MARK_NO_MATCH) for photo, state in marks.items()):
+            raise ValueError(f'invalid marks of {name!r}: {marks!r}'[:300])
+    return data
+
+
+def read_marks(path, attempts=5, retry_delay=0.05):
+    """Return {profile name: {photo path: MARK_MATCH or MARK_NO_MATCH}} of the marks file.
+
+    {} if the file is missing. Raises ValueError for a file that is not a marks file of
+    this format or holds an unknown state (such a file is never replaced), and OSError if
+    it still cannot be read after attempts tries.
+    """
+    return _read_marks_document(path, attempts, retry_delay)['profiles']
+
+
+def save_marks(path, profile, changes, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
+    """Apply changes ({photo path: state of MARK_STATES}) to the marks of profile; return its marks now.
+
+    MARK_OPEN removes a mark, and a profile without marks is removed from the file. The
+    changes are merged into the file as it is now (another tab or session may have marked
+    other photos), under a lock like save_settings; the file is replaced atomically and its
+    folder is created if needed. Nothing is written if nothing changes. Raises ValueError
+    for an unknown state and for an unreadable file (never replaced), OSError if the lock
+    is not free within lock_timeout seconds or writing keeps failing.
+    """
+    for photo, state in changes.items():
+        if not isinstance(photo, str) or state not in MARK_STATES:
+            raise ValueError(f'{photo!r}: {state!r} is not a mark')
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)  # for the lock file
+    result = {}
+
+    def update(document):
+        profiles = document['profiles']
+        marks = dict(profiles.get(profile, {}))
+        for photo, state in changes.items():
+            if state == MARK_OPEN:
+                marks.pop(photo, None)
+            else:
+                marks[photo] = state
+        result.update(marks)
+        if marks == profiles.get(profile, {}):
+            return None
+        if marks:
+            profiles[profile] = marks
+        else:
+            profiles.pop(profile, None)
+        return document
+
+    _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
+                   attempts, retry_delay, lock_timeout)
+    return result
+
+
+def rename_marks(path, old, new, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
+    """Give the marks of the profile old to its new name new; return True if the file changed.
+
+    Marks the name new already has (e.g. of a deleted profile of that name) are kept unless
+    old has a mark for the same photo, which wins. Nothing happens without a marks file.
+    Raises like save_marks.
+    """
+    path = Path(path)
+    if not path.parent.is_dir():
+        return False
+    changed = []
+
+    def update(document):
+        profiles = document['profiles']
+        if old == new or old not in profiles:
+            return None
+        profiles[new] = {**profiles.get(new, {}), **profiles.pop(old)}
+        changed.append(True)
+        return document
+
+    _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
+                   attempts, retry_delay, lock_timeout)
+    return bool(changed)
+
+
+# Copying the photos marked as matches (A17): copies only, never moving or deleting an
+# original and never overwriting a file in the target folder; flat, one folder per profile.
+# The target folders the user typed are saved per profile in settings.json under this key.
+COPY_FOLDERS_KEY = 'copy_folders'
+
+
+def default_copy_folder(pictures, slug):
+    """Return the target folder offered for a profile: <Pictures>/FrameScout/<slug>.
+
+    Outside the project folder, so removing FrameScout never removes the copies.
+    """
+    return Path(pictures) / 'FrameScout' / slug
+
+
+def _inside(path, folder):
+    """Return True if path is folder or inside it (resolved, case-insensitive where the OS is)."""
+    a, b = _path_key(Path(path)), _path_key(Path(folder))
+    try:
+        return os.path.commonpath([a, b]) == b
+    except ValueError:  # e.g. different drives
+        return False
+
+
+def copy_target(text, photo_folders):
+    """Return (target folder, None) for the text of the target field, or (None, why it is refused).
+
+    Refused: an empty field, a path that is not complete (it would depend on the app's
+    working directory), a file, and a folder in one of photo_folders (empty entries are
+    ignored): the copies would be analyzed again by the next search and appear twice.
+    """
+    text = (text or '').strip()
+    if not text:
+        return None, 'Enter a target folder.'
+    target = Path(text).expanduser()
+    if not target.is_absolute():
+        return None, f'Enter a complete path for the target folder, e.g. {Path.home() / "Pictures"}.'
+    if target.exists() and not target.is_dir():
+        return None, f'{target} is a file, not a folder.'
+    for folder in photo_folders:
+        if folder and _inside(target, Path(folder).expanduser()):
+            return None, (f'{target} is inside the photo folder {folder}. FrameScout does not copy there: the next '
+                          'search would analyze the copies again and show every photo twice. Choose a folder '
+                          'outside the photo folder.')
+    return target, None
+
+
+def _copy_candidates(source, target):
+    """The names a copy of source may get in target: name.jpg, name (2).jpg, name (3).jpg, ..."""
+    yield target / source.name
+    n = 2
+    while True:
+        yield target / f'{source.stem} ({n}){source.suffix}'
+        n += 1
+
+
+def _copy_one(source, target):
+    """Copy source into target; return 'copied', 'renamed' or 'already'. Raises OSError."""
+    if not source.is_file():
+        raise FileNotFoundError('the photo no longer exists')
+    for index, candidate in enumerate(_copy_candidates(source, target)):
+        while True:
+            if candidate.exists():
+                if candidate.is_file() and filecmp.cmp(source, candidate, shallow=False):
+                    return 'already'
+                break  # another file or a folder of that name: the next name
+            try:
+                # a complete file under the final name or none; never replaces a file that
+                # appeared meanwhile (FileExistsError: look at that file)
+                _publish_via_temp(candidate, lambda tmp: shutil.copy2(source, tmp), _publish_new)
+            except FileExistsError:
+                continue
+            return 'copied' if index == 0 else 'renamed'
+
+
+def copy_photos(paths, target):
+    """Copy the photos paths flat into the folder target (created if needed) and return a summary.
+
+    {'copied': n, 'already': n, 'renamed': n, 'failed': [(path, reason), ...]}. A copy keeps
+    the file date (shutil.copy2). A file of the same name and content in target counts as
+    already there (also one named "name (2).jpg" by an earlier copy); the same name with
+    other content gets the next free "name (n).jpg". A photo that cannot be copied fails
+    on its own. Raises OSError if target cannot be created.
+    """
+    target = Path(target)
+    target.mkdir(parents=True, exist_ok=True)
+    summary = {'copied': 0, 'already': 0, 'renamed': 0, 'failed': []}
+    for path in paths:
+        try:
+            summary[_copy_one(Path(path), target)] += 1
+        except OSError as exc:
+            summary['failed'].append((str(path), exc.strerror or str(exc)))
+    return summary
+
+
+def copy_summary_text(summary):
+    """Return e.g. "20 copied · 2 already there · 1 renamed · 0 failed" for a copy_photos summary."""
+    return (f"{summary['copied']} copied · {summary['already']} already there · {summary['renamed']} renamed · "
+            f"{len(summary['failed'])} failed")
+
+
+def _copy_folders(data):
+    folders = data.get(COPY_FOLDERS_KEY)
+    if not isinstance(folders, dict):
+        return {}
+    return {k: v for k, v in folders.items() if isinstance(k, str) and isinstance(v, str) and v.strip()}
+
+
+def read_copy_folders(filename, attempts=5, retry_delay=0.05):
+    """Return {profile name: target folder} saved in the app's settings file ({} if none).
+
+    Invalid entries are ignored; raises like read_settings for an unreadable file.
+    """
+    return _copy_folders(_read_settings_file(filename, attempts, retry_delay))
+
+
+def _update_copy_folders(filename, change, attempts, retry_delay, lock_timeout):
+    """Change the saved target folders with change(folders) under the settings lock (see save_settings)."""
+    filename = Path(filename)
+
+    def update(document):
+        before = _copy_folders(document)
+        folders = change(dict(before))
+        if folders == before and document.get(COPY_FOLDERS_KEY, {}) == before:
+            return None
+        if folders:
+            document[COPY_FOLDERS_KEY] = folders
+        else:
+            document.pop(COPY_FOLDERS_KEY, None)
+        return document if document or filename.exists() else None
+
+    _update_locked(filename, lambda: _read_settings_file(filename, attempts, retry_delay), update,
+                   attempts, retry_delay, lock_timeout)
+
+
+def save_copy_folder(filename, profile, folder, default, attempts=5, retry_delay=0.05,
+                     lock_timeout=SETTINGS_LOCK_TIMEOUT):
+    """Save the target folder of profile in the app's settings file; the default folder is not stored.
+
+    Merged into the file as it is now, like save_settings; the other settings are kept.
+    Raises ValueError for an unreadable file (never replaced) and OSError like save_settings.
+    """
+    folder = str(folder).strip()
+
+    def change(folders):
+        if not folder or folder == str(default):
+            folders.pop(profile, None)
+        else:
+            folders[profile] = folder
+        return folders
+
+    _update_copy_folders(filename, change, attempts, retry_delay, lock_timeout)
+
+
+def rename_copy_folder(filename, old, new, attempts=5, retry_delay=0.05, lock_timeout=SETTINGS_LOCK_TIMEOUT):
+    """Give the saved target folder of the profile old to its new name new (nothing if none is saved)."""
+    def change(folders):
+        if old != new and old in folders:
+            folders[new] = folders.pop(old)
+        return folders
+
+    _update_copy_folders(filename, change, attempts, retry_delay, lock_timeout)
