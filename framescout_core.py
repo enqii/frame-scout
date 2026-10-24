@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import tempfile
 import time
 import unicodedata
@@ -1840,3 +1841,451 @@ def rename_copy_folder(filename, old, new, attempts=5, retry_delay=0.05, lock_ti
         return folders
 
     _update_copy_folders(filename, change, attempts, retry_delay, lock_timeout)
+
+
+# Cleanup (E7, E11, E13, E23, A14; user decisions at the PR #18 hold point): the app's
+# "Clean up storage" lists what FrameScout no longer needs per category and deletes the
+# selected categories permanently after a confirmation, holding the run lock of the
+# results folder; at the end of every search the engine itself removes the harmless part
+# (temporary and unreferenced thumbnails, auto_cleanup). Never deleted: the user's marks,
+# the run, status and result files, the cache file itself, settings and profiles.
+THUMBNAILS_DIR = 'thumbnails'
+# the thumbnail folder of versions before I7: no longer written, still linked by their galleries
+LEGACY_THUMBNAILS_DIR = 'vorschaubilder'
+# every gallery the engine has written (also v1.1) has this title
+GALLERY_MARKER = '<title>FrameScout – '
+CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missing', 'cache_old', 'cache_other',
+                      'references')
+# selected when a scan is shown; reference images and rows of other current settings are not
+CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': True,
+                    'cache_old': True, 'cache_other': False, 'references': False}
+NEVER_DELETED = frozenset({MARKS_FILE, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE, CACHE_FILE,
+                           SETTINGS_FILE, SETTINGS_FILE + '.lock', 'profiles.json', 'profiles.json.bak'})
+# seconds clean_up waits for the run lock of the results folder
+CLEANUP_LOCK_TIMEOUT = 1.0
+# the temporary file of ensure_thumbnail (tempfile.mkstemp: <name>.<random>.jpg); a stop
+# during the export can leave it (E13)
+_TEMP_THUMBNAIL = re.compile(r'[0-9a-f]{24}\.jpg\.[a-z0-9_]+\.jpg')
+_GALLERY_LINK = re.compile(r'\b(' + THUMBNAILS_DIR + '|' + LEGACY_THUMBNAILS_DIR + r')/([0-9a-f]{24}\.jpg)')
+
+
+def _category(key, items=(), size=0, problem=None, **more):
+    return {'key': key, 'items': list(items), 'size': size, 'default': CLEANUP_DEFAULTS[key], 'problem': problem,
+            'names': [], **more}
+
+
+def _file_size(path):
+    try:
+        return Path(path).stat().st_size
+    except OSError:
+        return 0
+
+
+def _files(folder, pattern):
+    """The files directly in folder whose name matches pattern (a compiled regex), sorted by name."""
+    try:
+        return sorted(p for p in Path(folder).iterdir() if pattern.fullmatch(p.name) and p.is_file())
+    except (FileNotFoundError, NotADirectoryError):
+        return []
+
+
+def _temp_thumbnails(results):
+    return _files(results / THUMBNAILS_DIR, _TEMP_THUMBNAIL)
+
+
+def _html_files(results):
+    try:
+        return sorted(p for p in results.glob('*.html') if p.is_file())
+    except OSError:
+        return []
+
+
+def _result_names(results):
+    """Return (thumbnail names, lowercase gallery names) results.json lists; ValueError if it cannot be read."""
+    try:
+        data = read_results(results / RESULTS_FILE)
+    except (OSError, ValueError) as exc:
+        raise ValueError(f'{RESULTS_FILE} cannot be read ({exc})') from None
+    if data is None:  # a results folder of a version before A12
+        return set(), set()
+    return ({card['thumbnail'] for entry in data['profiles'] for card in entry['cards']},
+            {entry['gallery'].lower() for entry in data['profiles']})
+
+
+def _read_gallery(path):
+    try:
+        return path.read_text(encoding='utf-8', errors='replace')
+    except OSError as exc:
+        raise ValueError(f'{path.name} cannot be read ({exc})') from None
+
+
+def _unlinked_thumbnails(results, kept, listed):
+    """The thumbnails (both folders) that neither results.json (listed) nor a gallery text in kept links."""
+    links = {match.groups() for text in kept for match in _GALLERY_LINK.finditer(text)}
+    free = []
+    for folder in (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR):
+        for path in _files(results / folder, _THUMBNAIL_NAME):
+            if (folder, path.name) in links or (folder == THUMBNAILS_DIR and path.name in listed):
+                continue
+            free.append(path)
+    return free
+
+
+def _current_galleries(profiles_file):
+    """The gallery file names (lowercase) of the profiles in profiles_file; ValueError if it cannot be read."""
+    profiles_file = Path(profiles_file)
+    if not profiles_file.is_file():
+        raise ValueError(f'{profiles_file.name} does not exist')
+    try:
+        profiles = read_profiles(profiles_file)
+    except (OSError, ValueError) as exc:
+        raise ValueError(f'{profiles_file.name} cannot be read ({exc})') from None
+    return {slug + '.html' for slug in profile_slugs([p['name'].strip() for p in profiles])}
+
+
+def _gallery_state(results, profiles_file):
+    """Return (orphaned, kept, listed thumbnails); orphaned/kept are {path: text}. ValueError if unknown.
+
+    Orphaned: a FrameScout gallery (GALLERY_MARKER) that results.json does not list and that
+    is not the gallery of a current profile, e.g. of a renamed or deleted profile or under an
+    old slug (A3). Every other HTML file is kept.
+    """
+    listed, listed_galleries = _result_names(results)
+    current = _current_galleries(profiles_file)
+    orphaned, kept = {}, {}
+    for path in _html_files(results):
+        text = _read_gallery(path)
+        name = path.name.lower()
+        if GALLERY_MARKER in text[:4096] and name not in listed_galleries and name not in current:
+            orphaned[path] = text
+        else:
+            kept[path] = text
+    return orphaned, kept, listed
+
+
+def _missing(path):
+    """True only if path certainly does not exist (an error such as no permission counts as existing)."""
+    try:
+        os.stat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return True
+    except (OSError, ValueError):
+        return False
+    return False
+
+
+def _read_cache(cache):
+    """Return ([(path, signature, bytes)], {signature: engine}) of the cache file, read-only; None if missing."""
+    if not cache.is_file():
+        return None
+    try:
+        con = sqlite3.connect(cache.resolve().as_uri() + '?mode=ro', uri=True, timeout=5)
+        try:
+            tables = {row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            rows = (con.execute('SELECT path, signature, length(labels) + length(vectors) FROM features').fetchall()
+                    if 'features' in tables else [])
+            recorded = dict(con.execute('SELECT signature, engine FROM signatures').fetchall()
+                            if 'signatures' in tables else [])
+        finally:
+            con.close()
+    except sqlite3.Error as exc:
+        raise ValueError(f'{cache.name} cannot be read ({exc})') from None
+    return rows, recorded
+
+
+def _cache_categories(results, photo_folder, current):
+    """The categories cache_missing, cache_old and cache_other of the cache in results."""
+    keys = ('cache_missing', 'cache_old', 'cache_other')
+    try:
+        read = _read_cache(results / CACHE_FILE)
+    except ValueError as exc:
+        return {key: _category(key, problem=f'Not offered: {exc}.', rows=0) for key in keys}
+    rows, recorded = read if read else ([], {})
+    found = {}
+    classes = classify_signatures({signature for _, signature, _ in rows}, recorded, current) if rows else {}
+    for key, wanted in (('cache_old', 'old'), ('cache_other', 'other')):
+        chosen = {signature for signature, kind in classes.items() if kind == wanted}
+        sizes = [size or 0 for _, signature, size in rows if signature in chosen]
+        found[key] = _category(key, sorted(chosen), sum(sizes), rows=len(sizes))
+    if photo_folder is None or not str(photo_folder).strip():
+        found['cache_missing'] = _category('cache_missing', problem='No photo folder is set.', rows=0)
+    elif not Path(photo_folder).is_dir():
+        found['cache_missing'] = _category(
+            'cache_missing', rows=0, problem=f'The photo folder {photo_folder} does not exist (e.g. a disconnected '
+                                             'drive), so cache entries of deleted photos are not looked for.')
+    else:
+        # only inside the current photo folder (user decision): rows of other folders may
+        # belong to a drive that is not connected now
+        folder = os.path.normcase(str(Path(photo_folder).resolve()))
+        prefix = folder if folder.endswith(os.sep) else folder + os.sep
+        dead = [(path, signature, size or 0) for path, signature, size in rows
+                if os.path.normcase(path).startswith(prefix) and _missing(path)]
+        found['cache_missing'] = _category('cache_missing', sorted((p, s) for p, s, _ in dead),
+                                           sum(size for *_, size in dead), rows=len(dead))
+    return {key: found[key] for key in keys}
+
+
+def _referenced_files(profiles_file):
+    """The _path_key of every reference image of profiles_file and of its .bak; ValueError if unknown."""
+    profiles_file = Path(profiles_file)
+    if not profiles_file.is_file():
+        raise ValueError(f'{profiles_file.name} does not exist')
+    try:
+        refs = [ref for p in read_profiles(profiles_file) for ref in p.get('reference_images', [])]
+    except (OSError, ValueError) as exc:
+        raise ValueError(f'{profiles_file.name} cannot be read ({exc})') from None
+    backup = _backup_path(profiles_file)
+    try:
+        entries = _read_entries(backup)
+    except FileNotFoundError:
+        entries = []
+    except (OSError, ValueError) as exc:
+        raise ValueError(f'{backup.name} cannot be read ({exc})') from None
+    for entry in entries:
+        images = entry.get('reference_images') if isinstance(entry, dict) else None
+        if isinstance(images, list):
+            refs += [ref for ref in images if isinstance(ref, str)]
+    base = profiles_file.resolve().parent
+    return {_path_key(base / ref) for ref in refs}
+
+
+def _unreferenced_references(refs_root, profiles_file):
+    """The image files in refs_root that neither profiles_file nor its .bak references (A14)."""
+    used = _referenced_files(profiles_file)
+    refs_root = Path(refs_root)
+    if not refs_root.is_dir():
+        return []
+    return sorted(p for p in refs_root.rglob('*')
+                  if p.suffix.lower() in EXT and p.is_file() and _path_key(p) not in used)
+
+
+def scan_cleanup(results, profiles_file, refs_root, photo_folder, current_signature):
+    """Return {category: dict} of what the cleanup can delete; nothing is changed (E7).
+
+    results: the results folder; profiles_file: the app's profiles.json; refs_root: the
+    references folder; photo_folder: the current photo folder (None if not set);
+    current_signature: the cache signature of the current settings (never offered).
+    Each category of CLEANUP_CATEGORIES has items (paths; (path, signature) rows for
+    cache_missing; the signatures for cache_old/cache_other), size (bytes), default,
+    problem (why it is not offered, else None) and names (file names to show); the cache
+    categories have rows; thumbnails has extra/extra_size: the thumbnails only orphaned
+    galleries link, deleted only together with them.
+    """
+    results, refs_root = Path(results), Path(refs_root)
+    temps = _temp_thumbnails(results)
+    found = {'temp_thumbnails': _category('temp_thumbnails', temps, sum(_file_size(p) for p in temps))}
+    try:
+        orphaned, kept, listed = _gallery_state(results, profiles_file)
+    except ValueError as exc:
+        problem = f'Not offered: {exc}.'
+        found['galleries'] = _category('galleries', problem=problem)
+        found['thumbnails'] = _category('thumbnails', problem=problem, extra=[], extra_size=0)
+    else:
+        found['galleries'] = _category('galleries', sorted(orphaned), sum(_file_size(p) for p in orphaned))
+        found['galleries']['names'] = [p.name for p in found['galleries']['items']]
+        free = _unlinked_thumbnails(results, [*orphaned.values(), *kept.values()], listed)
+        free_set = set(free)
+        extra = [p for p in _unlinked_thumbnails(results, kept.values(), listed) if p not in free_set]
+        found['thumbnails'] = _category('thumbnails', free, sum(_file_size(p) for p in free), extra=extra,
+                                        extra_size=sum(_file_size(p) for p in extra))
+    found.update(_cache_categories(results, photo_folder, current_signature))
+    try:
+        refs = _unreferenced_references(refs_root, profiles_file)
+    except ValueError as exc:
+        found['references'] = _category('references', problem=f'Not offered: {exc}.')
+    else:
+        found['references'] = _category('references', refs, sum(_file_size(p) for p in refs))
+        found['references']['names'] = [str(p.relative_to(refs_root)) for p in refs]
+    return {key: found[key] for key in CLEANUP_CATEGORIES}
+
+
+def _remove_file(path, summary):
+    """Delete the file path permanently and count it in summary; return True if deleted."""
+    if path.name in NEVER_DELETED:  # no category holds such a name; a guard for the user's files
+        summary['failed'].append((str(path), 'never deleted'))
+        return False
+    try:
+        size = path.stat().st_size
+        path.unlink()
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        summary['failed'].append((str(path), str(exc)))
+        return False
+    summary['files'] += 1
+    summary['freed'] += size
+    return True
+
+
+def _remove_empty_folders(folder, stop):
+    """Remove folder and its emptied parents below stop (stop itself stays); only empty folders."""
+    folder, stop_key = Path(folder), _path_key(Path(stop))
+    while _path_key(folder) != stop_key and stop_key in {_path_key(p) for p in folder.parents}:
+        try:
+            folder.rmdir()  # fails for a folder that is not empty
+        except OSError:
+            return
+        folder = folder.parent
+
+
+def _new_summary():
+    return {'refused': None, 'files': 0, 'rows': 0, 'freed': 0, 'failed': [], 'skipped': []}
+
+
+def _delete_thumbnails(results, allowed, summary):
+    """Delete the thumbnails of allowed that no HTML file in results and no results.json links now."""
+    try:
+        listed, _ = _result_names(results)
+        kept = [_read_gallery(p) for p in _html_files(results)]
+    except ValueError as exc:
+        summary['skipped'].append(f'Thumbnails were kept: {exc}.')
+        return
+    allowed = set(allowed)
+    for path in _unlinked_thumbnails(results, kept, listed):
+        if path in allowed:
+            _remove_file(path, summary)
+    # the old folder goes once nothing in it is linked any more
+    _remove_empty_folders(results / LEGACY_THUMBNAILS_DIR, results)
+
+
+def _delete_rows(results, shown, selected, photo_folder, current, vacuum, summary):
+    """Delete the selected cache rows that the scan shown listed and that still qualify now."""
+    fresh = _cache_categories(results, photo_folder, current)
+    rows, signatures = [], []
+    for key in ('cache_missing', 'cache_old', 'cache_other'):
+        if key not in selected:
+            continue
+        if fresh[key]['problem']:
+            summary['skipped'].append(fresh[key]['problem'])
+            continue
+        still = set(fresh[key]['items'])
+        if key == 'cache_missing':
+            rows += [tuple(item) for item in shown[key]['items'] if tuple(item) in still]
+        else:
+            signatures += [item for item in shown[key]['items'] if item in still]
+    if not rows and not signatures:
+        return
+    cache = results / CACHE_FILE
+    before = _file_size(cache)
+    try:
+        con = sqlite3.connect(cache, timeout=5)
+        try:
+            deleted = 0
+            with con:  # one transaction: all rows or none
+                for signature in signatures:
+                    deleted += con.execute('DELETE FROM features WHERE signature=?', (signature,)).rowcount
+                for path, signature in rows:
+                    deleted += con.execute('DELETE FROM features WHERE path=? AND signature=?',
+                                           (path, signature)).rowcount
+            summary['rows'] += deleted
+            if vacuum and deleted:
+                try:
+                    con.execute('VACUUM')  # the file shrinks only now
+                except sqlite3.Error as exc:
+                    summary['failed'].append((cache.name, f'not compacted: {exc}'))
+        finally:
+            con.close()
+    except sqlite3.Error as exc:
+        summary['failed'].append((cache.name, str(exc)))
+        return
+    summary['freed'] += max(0, before - _file_size(cache))
+
+
+def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, photo_folder, current_signature,
+             lock_timeout=CLEANUP_LOCK_TIMEOUT):
+    """Delete the selected categories of the scan shown (scan_cleanup) permanently; return a summary (E7).
+
+    Holds the run lock of results, so it is refused while a search runs (also one being
+    started: alive(pid, status) tells whether the process of a "starting" status runs) and
+    no search can start meanwhile. Under the lock everything is looked at again, and only
+    what the scan showed and still qualifies now is deleted: e.g. a reference image a profile
+    uses since the scan stays (profiles.json and its .bak are read again), and so does a
+    thumbnail a gallery links since. The thumbnails only orphaned galleries link go only
+    together with those galleries. vacuum compacts the cache file after rows were deleted.
+    The summary has refused (why nothing was done, else None), files, rows, freed (bytes),
+    failed [(name, error)] and skipped (categories that could not be checked again).
+    """
+    results = Path(results)
+    summary = _new_summary()
+    selected = set(selected) & set(CLEANUP_CATEGORIES)
+    results.mkdir(parents=True, exist_ok=True)  # for the lock file
+    lock = RunLock(results / RUN_LOCK)
+    if not lock.acquire(timeout=lock_timeout):
+        summary['refused'] = 'A search is running. Clean up after it has finished.'
+        return summary
+    try:
+        status = read_status(results / RUN_STATUS)
+        if run_active(status, False, lambda pid: alive(pid, status)):
+            summary['refused'] = 'A search is being started. Clean up after it has finished.'
+            return summary
+        if 'temp_thumbnails' in selected:
+            allowed = set(shown['temp_thumbnails']['items'])
+            for path in _temp_thumbnails(results):
+                if path in allowed:
+                    _remove_file(path, summary)
+        if 'galleries' in selected:
+            try:
+                orphaned, _, _ = _gallery_state(results, profiles_file)
+            except ValueError as exc:
+                summary['skipped'].append(f'Galleries were kept: {exc}.')
+            else:
+                allowed = set(shown['galleries']['items'])
+                for path in sorted(orphaned):
+                    if path in allowed:
+                        _remove_file(path, summary)
+        if 'thumbnails' in selected:
+            allowed = list(shown['thumbnails']['items'])
+            if 'galleries' in selected:
+                allowed += shown['thumbnails'].get('extra', [])
+            _delete_thumbnails(results, allowed, summary)
+        _delete_rows(results, shown, selected, photo_folder, current_signature, vacuum, summary)
+        if 'references' in selected:
+            try:
+                now = _unreferenced_references(refs_root, profiles_file)  # profiles.json read again
+            except ValueError as exc:
+                summary['skipped'].append(f'Reference images were kept: {exc}.')
+            else:
+                allowed = set(shown['references']['items'])
+                for path in now:
+                    if path in allowed and _remove_file(path, summary):
+                        _remove_empty_folders(path.parent, refs_root)
+    finally:
+        lock.release()
+    return summary
+
+
+def auto_cleanup(results):
+    """Remove the temporary thumbnails (E13) and the thumbnails nothing links; return a summary.
+
+    For the engine at the end of a search, with the run lock held. Every HTML file in results
+    counts as kept here, so a thumbnail one of them or results.json links stays; if one of
+    them or results.json cannot be read, every thumbnail stays. An emptied legacy thumbnail
+    folder is removed.
+    """
+    results = Path(results)
+    summary = _new_summary()
+    for path in _temp_thumbnails(results):
+        _remove_file(path, summary)
+    _delete_thumbnails(results, [*_files(results / THUMBNAILS_DIR, _THUMBNAIL_NAME),
+                                 *_files(results / LEGACY_THUMBNAILS_DIR, _THUMBNAIL_NAME)], summary)
+    return summary
+
+
+def size_text(size):
+    """Return a byte count for people: 0 B, 12 KB, 3.4 MB, 1.2 GB."""
+    if size < 1024:
+        return f'{size} B'
+    if size < 1024 ** 2:
+        return f'{size / 1024:.0f} KB'
+    if size < 1024 ** 3:
+        return f'{size / 1024 ** 2:.1f} MB'
+    return f'{size / 1024 ** 3:.1f} GB'
+
+
+def cleanup_summary_text(summary):
+    """Return the line the app shows after a cleanup, e.g. "Deleted 3 files and 1,200 cache entries · 2 KB freed"."""
+    text = (f"Deleted {summary['files']:,} files and {summary['rows']:,} cache entries · "
+            f"{size_text(summary['freed'])} freed")
+    if summary['failed']:
+        text += f" · {len(summary['failed']):,} could not be deleted"
+    return text
