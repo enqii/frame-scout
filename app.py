@@ -40,7 +40,7 @@ THUMBS = RESULTS / 'thumbnails'
 # the user's marks of gallery photos (A17): user data, never deleted by FrameScout
 MARKS = RESULTS / MARKS_FILE
 # the three states of a mark, as the control on each gallery card shows them (A17)
-MARK_LABELS = {MARK_OPEN: 'Open', MARK_MATCH: 'Match', MARK_NO_MATCH: 'No match'}
+MARK_LABELS = {MARK_OPEN: 'Undecided', MARK_MATCH: 'Match', MARK_NO_MATCH: 'No match'}
 MARK_BY_LABEL = {label: state for state, label in MARK_LABELS.items()}
 GALLERY_COLUMNS = 4
 # Markdown characters, escaped in file names shown with st.markdown/st.caption
