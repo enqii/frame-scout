@@ -425,3 +425,5 @@ def test_cleanup_summary_text():
     text = cleanup_summary_text({'refused': None, 'files': 3, 'rows': 1200, 'freed': 2048,
                                  'failed': [('a.jpg', 'in use')], 'skipped': []})
     assert text == 'Deleted 3 files and 1,200 cache entries · 2 KB freed · 1 could not be deleted'
+    assert cleanup_summary_text({'refused': None, 'files': 1, 'rows': 1, 'freed': 0, 'failed': [], 'skipped': []}) == (
+        'Deleted 1 file and 1 cache entry · 0 B freed')

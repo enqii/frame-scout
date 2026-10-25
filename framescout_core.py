@@ -2282,10 +2282,15 @@ def size_text(size):
     return f'{size / 1024 ** 3:.1f} GB'
 
 
+def count_text(count, one, many):
+    """Return e.g. "1 file" or "1,200 files"."""
+    return f'{count:,} {one if count == 1 else many}'
+
+
 def cleanup_summary_text(summary):
     """Return the line the app shows after a cleanup, e.g. "Deleted 3 files and 1,200 cache entries · 2 KB freed"."""
-    text = (f"Deleted {summary['files']:,} files and {summary['rows']:,} cache entries · "
-            f"{size_text(summary['freed'])} freed")
+    text = (f"Deleted {count_text(summary['files'], 'file', 'files')} and "
+            f"{count_text(summary['rows'], 'cache entry', 'cache entries')} · {size_text(summary['freed'])} freed")
     if summary['failed']:
         text += f" · {len(summary['failed']):,} could not be deleted"
     return text
