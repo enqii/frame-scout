@@ -2256,8 +2256,9 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     thumbnail a gallery links since. Deleting the orphaned galleries also deletes the
     thumbnails only they linked. vacuum compacts the cache file after rows were deleted.
     The summary has refused (why nothing was done, else None), files, rows, freed (bytes),
-    compacted (VACUUM done), failed [(name, error)] and skipped (notes on categories that
-    could not be checked again).
+    compacted (VACUUM done), failed [(name, error)] and skipped (steps that could not be
+    done). An error in one step (e.g. a folder that cannot be listed) ends only that step and
+    is listed in skipped, so the summary always tells what was deleted (review).
     """
     results = Path(results)
     summary = _new_summary()
@@ -2272,24 +2273,39 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
         if run_active(status, False, lambda pid: alive(pid, status)):
             summary['refused'] = 'A search is being started. Clean up after it has finished.'
             return summary
-        if 'temp_thumbnails' in selected:
+
+        def temporary():
             allowed = set(shown['temp_thumbnails']['items'])
             for path in _temp_thumbnails(results):
                 if path in allowed:
                     _remove_file(path, summary)
-        if {'galleries', 'thumbnails'} & selected:
-            _galleries_and_thumbnails(results, shown, selected, profiles_file, summary)
-        _delete_rows(results, shown, selected, photo_folder, current_signature, vacuum, summary)
-        if 'references' in selected:
+
+        def references():
             try:
                 now = _unreferenced_references(refs_root, profiles_file)  # profiles.json read again
             except ValueError as exc:
                 summary['skipped'].append(f'Reference images were kept: {exc}.')
-            else:
-                allowed = set(shown['references']['items'])
-                for path in now:
-                    if path in allowed and _remove_file(path, summary):
-                        _remove_empty_folders(path.parent, refs_root)
+                return
+            allowed = set(shown['references']['items'])
+            for path in now:
+                if path in allowed and _remove_file(path, summary):
+                    _remove_empty_folders(path.parent, refs_root)
+
+        steps = [('Temporary thumbnails', 'temp_thumbnails' in selected, temporary),
+                 ('Galleries and thumbnails', bool({'galleries', 'thumbnails'} & selected),
+                  lambda: _galleries_and_thumbnails(results, shown, selected, profiles_file, summary)),
+                 ('Cache entries', True,
+                  lambda: _delete_rows(results, shown, selected, photo_folder, current_signature, vacuum, summary)),
+                 ('Reference images', 'references' in selected, references)]
+        for name, wanted, step in steps:
+            if not wanted:
+                continue
+            try:
+                step()
+            except (OSError, ValueError, sqlite3.Error) as exc:
+                # e.g. a folder that cannot be listed: this step ends, the others still run,
+                # and the summary keeps what was already deleted (review)
+                summary['skipped'].append(f'{name}: stopped ({exc}).')
     finally:
         lock.release()
     return summary
