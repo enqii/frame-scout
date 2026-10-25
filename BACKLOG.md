@@ -611,6 +611,23 @@ referenced in commits, pull requests and discussions.
       already refuses a missing folder, but only for one); overlapping or nested folders
       must be deduplicated by resolved path; the same file reachable by two paths would
       be analyzed twice.
+- [ ] **A26 – No way back to the default AI settings:** user request on 2026-10-25. Once a
+      value of the AI settings tab is changed (compute device, batch size, maximum matches,
+      person detection, maximum persons, minimum confidence, reference weight), nothing
+      shows what the default was or restores it; only the saved device has "Use auto from
+      now on". The defaults live in `framescout_core.default_settings` and are not shown
+      anywhere except the reference weight's help text. Fix idea: a "Reset to defaults"
+      button (disabled while a search runs) that sets the widgets' `setting_<name>` session
+      state to `DEFAULT_SETTINGS` for these settings only, not the photo folder, which is
+      the user's data location and sits in the other tab (user decision whether it
+      belongs in). `save_settings` already writes only values that differ from the
+      defaults, so the next save drops them from `settings.json`. The values are set before
+      the widgets are drawn, never as `value=` (CLAUDE.md gotcha, PR #10), and
+      `reconcile_settings` must treat the reset as a change made in this session, so
+      another session's saved values do not win. Also show the default next to each
+      setting (e.g. in its help text, built from `DEFAULT_SETTINGS` so it cannot drift) and
+      mark a changed value. Not a search-quality change, since the defaults stay as they
+      are.
 
 ### Installation / project
 
