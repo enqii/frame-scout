@@ -587,6 +587,30 @@ referenced in commits, pull requests and discussions.
       `[data-testid="stBaseButton-segmented_controlActive"]` (Streamlit 1.66.1 internals,
       so check it after upgrades; keep contrast in the dark theme). The marks and
       `marks.json` stay unchanged. Found after PR #16.
+- [ ] **A25 – Only one photo folder per search:** user question on 2026-10-25. The app and
+      the engine take a single folder (`settings.json` key `photo_folder`, one positional
+      engine argument, `root.rglob('*')`); photos on several drives or in several event
+      folders need one parent folder or shortcuts/junctions inside the folder (not
+      checked whether `rglob` follows them). Changing the folder works: the next search
+      scans only the new folder and analyzes its photos from scratch; the old folder's
+      rows stay in `cache.sqlite3` and are reused when it is chosen again (E8); the last
+      results stay shown until the next search replaces `results.json`; marks stay in
+      `marks.json` but are not shown for other photos (A21); the cleanup never offers
+      cache rows of photos outside the current folder (E7), so they only grow. Idea: a
+      list of folders. The cache and marks are keyed by absolute path and the engine
+      already works on a list of paths, so neither needs a format change. Work needed:
+      `photo_folders` in `settings.json` (the old `photo_folder` is read as a list of one;
+      validated like the other settings); several folders as engine arguments; a list
+      editor in the app with the per-folder photo count (A6: counting on every rerun is
+      already slow); `results.json` records the folders (today `photo_folder`; the app
+      must still read format 1); the copy-target check and the cleanup of cache rows
+      treat every listed folder as a source. Questions for the user (hold point, new
+      `results.json` and CLI format): whether to keep `photo_folder` in the CLI/JSON
+      for compatibility; what the gallery shows to tell sources apart (relative path
+      today). Risks: a disconnected drive must not count as deleted photos (the cleanup
+      already refuses a missing folder, but only for one); overlapping or nested folders
+      must be deduplicated by resolved path; the same file reachable by two paths would
+      be analyzed twice.
 
 ### Installation / project
 
@@ -819,6 +843,7 @@ decision in PR #14):
       never delete `results/marks.json` (A17) (done 2026-10-25; also E13, E23; HEIC/RAW
       split out into the next item by user decision)
 - [ ] Optional HEIC/RAW support (E25; new dependencies: a hold point)
+- [ ] Several photo folders per search (A25; changes `results.json` and the CLI: a hold point)
 
 ### P4b – Search models (evaluate at home first)
 - [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note (E22;
