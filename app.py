@@ -60,10 +60,10 @@ CLEANUP_LABELS = {
                         'Left behind by a search that was stopped while it wrote the galleries; never used again.'),
     'galleries': ('Galleries of renamed or deleted profiles',
                   'FrameScout HTML galleries in the results folder that belong neither to a current search profile '
-                  'nor to the last search.'),
+                  'nor to the last search, with the thumbnails only they show.'),
     'thumbnails': ('Thumbnails no gallery shows',
-                   'Thumbnails that neither the last search nor a kept HTML gallery shows, also in the old '
-                   '"vorschaubilder" folder.'),
+                   'Thumbnails that neither the last search nor any HTML gallery in the results folder shows, '
+                   'also in the old "vorschaubilder" folder.'),
     'cache_missing': ('Cache entries of deleted photos',
                       'Analyses of photos inside the current photo folder that no longer exist there.'),
     'cache_old': ('Cache entries of older versions or unknown settings',
@@ -644,7 +644,7 @@ def cleanup_photo_folder():
     return photo_folder if str(settings['photo_folder']).strip() else None
 
 def cleanup_offered(category):
-    return not category['problem'] and bool(category['items'] or category.get('extra'))
+    return not category['problem'] and bool(category['items'])
 
 def scan_storage():
     """Look for what the cleanup can delete and select the default categories (E7)."""
@@ -706,10 +706,10 @@ def show_cleanup():
         else:
             amount = f"{count_text(len(category['items']), 'file', 'files')} · {size_text(category['size'])}"
         st.checkbox(f'{label} – {amount}', key='cleanup_' + key, help=explanation, disabled=active)
-        if category.get('extra'):
-            st.caption(f"Another {count_text(len(category['extra']), 'thumbnail', 'thumbnails')} "
-                       f"({size_text(category['extra_size'])}) only the galleries of renamed or deleted profiles "
-                       'show: deleted only together with those galleries.')
+        if category.get('thumbnails'):
+            # the thumbnails only these galleries show go with them (review)
+            st.caption(f"Together with {count_text(len(category['thumbnails']), 'thumbnail', 'thumbnails')} "
+                       f"({size_text(category['thumbnails_size'])}) that only these galleries show.")
         if category['names']:
             names = category['names'][:CLEANUP_NAMES_SHOWN]
             more = len(category['names']) - len(names)

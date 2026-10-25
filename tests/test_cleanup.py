@@ -149,8 +149,33 @@ def test_thumbnails_linked_from_results_or_kept_galleries_are_kept(project):
     legacy_free = project.thumb(T4, project.legacy)
     scan = project.scan()
     assert scan['thumbnails']['items'] == [project.thumbs / T4, legacy_free]
-    assert sorted(scan['thumbnails']['extra']) == sorted([project.thumbs / T2, legacy_linked])
+    # the thumbnails only orphaned galleries link belong to the galleries category (review)
+    assert sorted(scan['galleries']['thumbnails']) == sorted([project.thumbs / T2, legacy_linked])
+    assert scan['galleries']['thumbnails_size'] == 2 * len(b'jpg')
     assert scan['thumbnails']['default'] is True
+
+
+def test_thumbnails_only_orphaned_galleries_link_are_not_a_thumbnail_item(project):
+    # nothing to delete on its own: the category must not offer "0 files" (review)
+    project.page('cat.html', 'Cat', [T2])
+    project.thumb(T2)
+    scan = project.scan()
+    assert scan['thumbnails']['items'] == [] and scan['galleries']['thumbnails'] == [project.thumbs / T2]
+
+
+def test_deleting_the_galleries_deletes_the_thumbnails_only_they_showed(project):
+    project.page('cat.html', 'Cat', [T2])
+    project.page('dog.html', 'Dog', [T3])
+    project.thumb(T1)  # linked by nothing: a thumbnail item, not selected here
+    project.thumb(T2)
+    project.thumb(T3)
+    scan = project.scan()
+    shown = {**scan, 'galleries': {**scan['galleries'], 'items': [project.results / 'cat.html']}}  # dog.html unseen
+    summary = project.clean(shown, {'galleries'})
+    assert sorted(p.name for p in project.results.glob('*.html')) == ['dog.html']
+    # dog.html stays, so its thumbnail stays although the scan listed it with the galleries
+    assert sorted(p.name for p in project.thumbs.iterdir()) == [T1, T3]
+    assert summary['files'] == 2
 
 
 def test_galleries_and_thumbnails_are_not_offered_if_results_json_cannot_be_read(project):
@@ -489,3 +514,17 @@ def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, mo
     monkeypatch.setattr(framescout_core, '_missing', lambda path: calls.append(path) or real(path))
     assert project.scan()['cache_missing']['rows'] == 3
     assert calls == [str(gone)]
+
+
+def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):
+    # review: profiles.json was parsed twice and every gallery scanned twice per scan
+    import framescout_core
+    project.page('cat.html', 'Cat', [T2])
+    project.page('red-car.html', 'Red car', [T1])
+    calls = []
+    for name in ('read_profiles', '_gallery_links'):
+        real = getattr(framescout_core, name)
+        monkeypatch.setattr(framescout_core, name,
+                            lambda *args, real=real, name=name: calls.append(name) or real(*args))
+    project.scan()
+    assert sorted(calls) == ['_gallery_links', '_gallery_links', 'read_profiles']
