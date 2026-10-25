@@ -12,17 +12,19 @@ from pathlib import Path
 import psutil
 import streamlit as st
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EXT, FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH,
-                             MARK_NO_MATCH, MARK_OPEN, MARKS_FILE, PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
-                             SETTING_RANGES, SETTINGS_FILE, RunLock, StatusReporter, copy_photos, copy_summary_text,
-                             copy_target, create_from_example, cuda_status, default_copy_folder, default_settings,
-                             device_choices, finish_reference_move, lock_held, open_command, openable_photo, page_cards,
-                             page_count, profile_fingerprints, profile_state, read_copy_folders, read_marks,
-                             read_profiles, read_results, read_settings, read_status, reconcile_settings,
-                             reference_folder, rename_copy_folder, rename_marks, reveal_command, run_active,
-                             save_copy_folder, save_marks, save_profiles, save_settings, stage_reference_move,
-                             started_in_time, status_fraction, status_text, stopped_status, undo_reference_move,
-                             update_backup_references, write_new_file, write_status)
+from framescout_core import (CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EXT,
+                             FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_FILE,
+                             PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
+                             SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_summary_text, copy_photos,
+                             copy_summary_text, copy_target, count_text, create_from_example, cuda_status,
+                             default_copy_folder, default_settings, device_choices, feature_signature, finish_reference_move, lock_held,
+                             open_command, openable_photo, page_cards, page_count, profile_fingerprints, profile_state,
+                             read_copy_folders, read_marks, read_profiles, read_results, read_settings, read_status,
+                             reconcile_settings, reference_folder, rename_copy_folder, rename_marks, reveal_command,
+                             run_active, save_copy_folder, save_marks, save_profiles, save_settings, scan_cleanup,
+                             size_text, stage_reference_move, started_in_time, status_fraction, status_text,
+                             stopped_status, undo_reference_move, update_backup_references, write_new_file,
+                             write_status)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -52,6 +54,30 @@ LABEL_NAME = 'Search motif (in English)'
 LABEL_CONTEXT = 'Context / origin (optional, in English)'
 LABEL_FEATURES = 'Distinctive features (optional, in English)'
 LABEL_PROMPTS = 'Custom search texts (optional, in English; one per line)'
+# the categories of "Clean up storage" (E7): (label, explanation)
+CLEANUP_LABELS = {
+    'temp_thumbnails': ('Temporary thumbnail files',
+                        'Left behind by a search that was stopped while it wrote the galleries; never used again.'),
+    'galleries': ('Galleries of renamed or deleted profiles',
+                  'FrameScout HTML galleries in the results folder that belong neither to a current search profile '
+                  'nor to the last search.'),
+    'thumbnails': ('Thumbnails no gallery shows',
+                   'Thumbnails that neither the last search nor a kept HTML gallery shows, also in the old '
+                   '"vorschaubilder" folder.'),
+    'cache_missing': ('Cache entries of deleted photos',
+                      'Analyses of photos inside the current photo folder that no longer exist there.'),
+    'cache_old': ('Cache entries of older versions or unknown settings',
+                  'Analyses made by an earlier FrameScout version, which are never used again, or with settings '
+                  'only the command line offers (e.g. another --yolo-model), which are analyzed again when such a '
+                  'search runs.'),
+    'cache_other': ('Cache entries of other AI settings',
+                    'Analyses with other person detection settings of this version. They are used again when you '
+                    'switch back to those settings; after deleting them, those photos are analyzed again then.'),
+    'references': ('Reference images no profile uses',
+                   'Image files in the references folder that neither profiles.json nor its backup '
+                   'profiles.json.bak names, e.g. removed from a profile or of a deleted profile.'),
+}
+CLEANUP_NAMES_SHOWN = 20
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
@@ -146,7 +172,7 @@ def start_run(cmd):
     lock = RunLock(LOCK)
     # with a timeout: every open tab checks the lock for a moment every two seconds (review)
     if not lock.acquire(timeout=1):
-        return 'A search is already running.'
+        return 'A search is already running, or the storage is being cleaned up.'
     try:
         current = read_status(STATUS)
         if run_active(current, False, lambda pid: engine_alive(pid, current)):
@@ -608,6 +634,109 @@ def show_copy(name, entry, marks, photo_folders):
     if copy:
         copy_matches(name, key, photo_folders)
 
+def cleanup_signature():
+    """The cache signature of the current settings: its entries are never offered for deletion (E11)."""
+    return feature_signature(settings['person_detection'], settings['max_persons'], settings['person_confidence'],
+                             DEFAULT_YOLO_MODEL)
+
+def cleanup_photo_folder():
+    """The photo folder whose deleted photos' cache entries the cleanup looks for, None if the field is empty."""
+    return photo_folder if str(settings['photo_folder']).strip() else None
+
+def cleanup_offered(category):
+    return not category['problem'] and bool(category['items'] or category.get('extra'))
+
+def scan_storage():
+    """Look for what the cleanup can delete and select the default categories (E7)."""
+    try:
+        scan = scan_cleanup(RESULTS, PROFILES, REFS, cleanup_photo_folder(), cleanup_signature())
+    except OSError as exc:
+        st.session_state.cleanup_notice = ('warning', f'The storage could not be scanned: {exc}')
+        return
+    st.session_state.cleanup_scan = scan
+    st.session_state.cleanup_confirm = False
+    for key, category in scan.items():
+        # set before the checkboxes are drawn, never as their value= (they have keys)
+        st.session_state['cleanup_' + key] = bool(category['default'] and cleanup_offered(category))
+    st.session_state.cleanup_vacuum = True
+
+def delete_storage(scan, selected):
+    """Delete the selected categories of scan after the confirmation; the summary is shown next run (E7)."""
+    with st.spinner('Cleaning up …'):
+        summary = clean_up(RESULTS, scan, selected, st.session_state.get('cleanup_vacuum', False), engine_alive,
+                           PROFILES, REFS, cleanup_photo_folder(), cleanup_signature())
+    if summary['refused']:
+        st.session_state.cleanup_notice = ('warning', summary['refused'] + ' Nothing was deleted.')
+        return
+    text = cleanup_summary_text(summary) + '.'
+    problems = [f'{name}: {why}' for name, why in summary['failed'][:10]]
+    if len(summary['failed']) > 10:
+        problems.append('…')
+    if problems:
+        text += ' Not deleted: ' + '; '.join(problems) + '.'
+    if summary['skipped']:
+        text += ' ' + ' '.join(summary['skipped'])
+    st.session_state.cleanup_notice = ('warning' if problems or summary['skipped'] else 'success', text)
+    st.session_state.pop('cleanup_scan', None)
+
+def show_cleanup():
+    """The expander "Clean up storage": scan, choose categories, delete permanently after a confirmation (E7)."""
+    st.caption('Lists files and cache entries FrameScout no longer needs. Your photos, your marks (marks.json), '
+               'the results of the last search, your profiles and settings are never deleted. Deleting is '
+               'permanent: nothing goes to the Recycle Bin.')
+    if st.button('Scan', disabled=active, help='Only looks; nothing is deleted yet.'):
+        scan_storage()
+    if 'cleanup_notice' in st.session_state:
+        kind, text = st.session_state.pop('cleanup_notice')
+        (st.success if kind == 'success' else st.warning)(plain(text))
+    scan = st.session_state.get('cleanup_scan')
+    if not scan:
+        return
+    for key in CLEANUP_CATEGORIES:
+        category = scan[key]
+        label, explanation = CLEANUP_LABELS[key]
+        if category['problem']:
+            st.caption(f"{label}: {plain(category['problem'])}")
+            continue
+        if not cleanup_offered(category):
+            st.caption(f'{label}: nothing to clean up.')
+            continue
+        if key.startswith('cache_'):
+            amount = f"{count_text(category['rows'], 'entry', 'entries')} · about {size_text(category['size'])}"
+        else:
+            amount = f"{count_text(len(category['items']), 'file', 'files')} · {size_text(category['size'])}"
+        st.checkbox(f'{label} – {amount}', key='cleanup_' + key, help=explanation, disabled=active)
+        if category.get('extra'):
+            st.caption(f"Another {count_text(len(category['extra']), 'thumbnail', 'thumbnails')} "
+                       f"({size_text(category['extra_size'])}) only the galleries of renamed or deleted profiles "
+                       'show: deleted only together with those galleries.')
+        if category['names']:
+            names = category['names'][:CLEANUP_NAMES_SHOWN]
+            more = len(category['names']) - len(names)
+            st.caption(plain(', '.join(names)) + (f' and {more:,} more' if more else ''))
+    if any(cleanup_offered(scan[key]) for key in ('cache_missing', 'cache_old', 'cache_other')):
+        st.checkbox(f'Compact {CACHE_FILE} afterwards', key='cleanup_vacuum',
+                    help='Without compacting, the file keeps its size and reuses the space for new analyses. '
+                         'Compacting can take a while for a large cache.', disabled=active)
+    selected = [key for key in CLEANUP_CATEGORIES
+                if cleanup_offered(scan[key]) and st.session_state.get('cleanup_' + key)]
+    if not st.session_state.get('cleanup_confirm'):
+        if st.button('Delete selected', disabled=active or not selected):
+            st.session_state.cleanup_confirm = True
+            st.rerun()
+        return
+    st.warning('Delete the selected items permanently? They do not go to the Recycle Bin, and this cannot be '
+               'undone. Only what this scan listed and is still unused now is deleted.')
+    c1, c2 = st.columns(2)
+    yes = c1.button('Yes, delete permanently', type='primary', disabled=active or not selected)
+    if c2.button('Cancel'):
+        st.session_state.cleanup_confirm = False
+        st.rerun()
+    if yes:
+        st.session_state.cleanup_confirm = False
+        delete_storage(scan, selected)
+        st.rerun()
+
 def cache_env():
     env = os.environ.copy()
     paths = {'TORCH_HOME': BASE/'.cache'/'torch', 'HF_HOME': BASE/'.cache'/'huggingface',
@@ -826,8 +955,8 @@ with settings_tab:
     st.number_input('Maximum matches per search profile', **number_range('top'), step=25, key=setting_key('top'), disabled=active)
     st.checkbox('Also detect individual persons in group photos (YOLO)', key=setting_key('person_detection'), disabled=active)
     st.number_input('Maximum detected persons per photo', **number_range('max_persons'), key=setting_key('max_persons'), disabled=active)
-    st.slider('Minimum confidence of the person detection', **number_range('person_confidence'), step=.05, key=setting_key('person_confidence'), disabled=active)
-    st.slider('Weight of reference images (if any)', **number_range('reference_weight'), step=.05, key=setting_key('reference_weight'), disabled=active, help=f'0 = text only; {DEFAULT_REFERENCE_WEIGHT:g} (default) = {DEFAULT_REFERENCE_WEIGHT:.0%} reference images '
+    st.slider('Minimum confidence of the person detection', **number_range('person_confidence'), step=SETTING_STEPS['person_confidence'], key=setting_key('person_confidence'), disabled=active)
+    st.slider('Weight of reference images (if any)', **number_range('reference_weight'), step=SETTING_STEPS['reference_weight'], key=setting_key('reference_weight'), disabled=active, help=f'0 = text only; {DEFAULT_REFERENCE_WEIGHT:g} (default) = {DEFAULT_REFERENCE_WEIGHT:.0%} reference images '
               f'and {1 - DEFAULT_REFERENCE_WEIGHT:.0%} text. Text and reference scores are scaled to the photos of '
               'the search before they are weighted.')
     if info:
@@ -860,6 +989,7 @@ with run_tab:
             '--reference-weight',str(settings['reference_weight'])]
         if not settings['person_detection']:
             cmd.append('--no-person-detection')
+        st.session_state.pop('cleanup_scan', None)  # the search changes what a cleanup finds (E7)
         try:
             problem = start_run(cmd)
         except Exception as exc:
@@ -939,3 +1069,5 @@ with run_tab:
         st.caption('After the first search run, its results appear here.')
     st.caption('The HTML galleries in the results folder link to the local thumbnails and original photos; keep '
                'the results folder together for the complete gallery.')
+    with st.expander('Clean up storage'):
+        show_cleanup()
