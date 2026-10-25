@@ -21,10 +21,10 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
-                             DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RESULTS_FILE, RUN_LOCK, RUN_STATUS, RunLock,
-                             StatusReporter, auto_cleanup, crop_label, cuda_hint, detection_options, draft_size, final_status,
-                             ensure_thumbnail, group_batches, load_profiles, prefetch, prepare_cache, profile_slugs,
+from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
+                             DEVICES, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
+                             RunLock, StatusReporter, auto_cleanup, crop_label, cuda_hint, detection_options,
+                             draft_size, final_status, ensure_thumbnail, group_batches, load_profiles, prefetch, prepare_cache, profile_slugs,
                              progress_due, progress_line, result_card, results_document, search_fingerprint, size_text,
                              store_group, write_results)
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
