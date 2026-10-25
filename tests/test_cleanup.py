@@ -427,3 +427,41 @@ def test_cleanup_summary_text():
     assert text == 'Deleted 3 files and 1,200 cache entries · 2 KB freed · 1 could not be deleted'
     assert cleanup_summary_text({'refused': None, 'files': 1, 'rows': 1, 'freed': 0, 'failed': [], 'skipped': []}) == (
         'Deleted 1 file and 1 cache entry · 0 B freed')
+
+
+# the read-only cache URI (review)
+
+def make_db(path):
+    con = sqlite3.connect(path)
+    con.execute('CREATE TABLE t (x)')
+    con.commit()
+    con.close()
+
+
+def test_the_read_only_uri_opens_a_path_with_special_characters(tmp_path):
+    from framescout_core import _read_only_uri
+    path = tmp_path / 'a b#%?.sqlite3' if os.name != 'nt' else tmp_path / 'a b#%;.sqlite3'
+    make_db(path)
+    con = sqlite3.connect(_read_only_uri(path), uri=True)
+    try:
+        assert con.execute('SELECT COUNT(*) FROM t').fetchone() == (0,)
+        with pytest.raises(sqlite3.OperationalError):
+            con.execute('INSERT INTO t VALUES (1)')  # read-only
+    finally:
+        con.close()
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='UNC paths are a Windows feature')
+def test_the_read_only_uri_opens_a_unc_path(tmp_path):
+    # FrameScout run from a network share: Path.as_uri() would give the URI a host authority
+    from framescout_core import _read_only_uri
+    path = tmp_path.resolve() / 'cache.sqlite3'
+    make_db(path)
+    unc = Path('//localhost/' + str(path)[0] + '$' + str(path)[2:])  # \\localhost\C$\...
+    if not unc.is_file():
+        pytest.skip('the administrative share of drive C on localhost is not available here')
+    con = sqlite3.connect(_read_only_uri(unc), uri=True)
+    try:
+        assert con.execute('SELECT COUNT(*) FROM t').fetchone() == (0,)
+    finally:
+        con.close()

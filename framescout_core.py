@@ -16,6 +16,7 @@ import time
 import unicodedata
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 if os.name == 'nt':
     import msvcrt
@@ -1974,12 +1975,25 @@ def _missing(path):
     return False
 
 
+def _read_only_uri(path):
+    """Return the SQLite URI that opens the existing file path read-only (never creating it).
+
+    Path.as_uri() gives a UNC path (\\\\server\\share\\...) a host authority, which SQLite
+    rejects; an empty authority with the server in the path works for both a drive and a
+    UNC path (checked on Windows with \\\\localhost\\C$, review).
+    """
+    posix = Path(path).resolve().as_posix()
+    if not posix.startswith('/'):
+        posix = '/' + posix  # C:/... -> /C:/...
+    return 'file://' + quote(posix, safe='/:') + '?mode=ro'
+
+
 def _read_cache(cache):
     """Return ([(path, signature, bytes)], {signature: engine}) of the cache file, read-only; None if missing."""
     if not cache.is_file():
         return None
     try:
-        con = sqlite3.connect(cache.resolve().as_uri() + '?mode=ro', uri=True, timeout=5)
+        con = sqlite3.connect(_read_only_uri(cache), uri=True, timeout=5)
         try:
             tables = {row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             rows = (con.execute('SELECT path, signature, length(labels) + length(vectors) FROM features').fetchall()
