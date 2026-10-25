@@ -263,8 +263,9 @@ offered while `results.json` or `profiles.json` cannot be read, reference images
 while `profiles.json` or `profiles.json.bak` cannot be read. Never deleted:
 `results/marks.json` (your marks), `results.json`, `run.lock`, `run-status.json`, the
 cache file itself, `settings.json`, `profiles.json` and `profiles.json.bak`, and of
-course your photos. While the cleanup deletes, another open tab briefly shows a search
-as running.
+course your photos. While the cleanup deletes, another open tab says so and cannot
+start a search. If a step fails (e.g. a folder that cannot be read), the summary names
+it and still counts what was deleted.
 
 ### What the numbers in a gallery mean
 

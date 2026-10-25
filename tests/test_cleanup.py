@@ -549,3 +549,22 @@ def test_an_error_in_one_step_keeps_the_summary_of_what_was_deleted(project, mon
     lock = RunLock(project.results / RUN_LOCK)
     assert lock.acquire()  # released
     lock.release()
+
+
+def test_cleanup_running_while_clean_up_holds_the_lock(project, monkeypatch):
+    # other tabs (threads of the same process) tell the cleanup from a search by it (review)
+    import framescout_core
+    project.thumb(T1)
+    scan = project.scan()
+    seen = []
+    real = framescout_core._remove_file
+
+    def remove(path, summary):
+        seen.append(framescout_core.cleanup_running(project.results))
+        return real(path, summary)
+
+    monkeypatch.setattr(framescout_core, '_remove_file', remove)
+    assert not framescout_core.cleanup_running(project.results)
+    project.clean(scan, {'thumbnails'})
+    assert seen == [True]
+    assert not framescout_core.cleanup_running(project.results)

@@ -556,13 +556,18 @@ referenced in commits, pull requests and discussions.
       a profile's marks when it is deleted (asking in the app first), or give profiles a
       stable id in `profiles.json` (schema change, hold point). Found in the review of
       PR #16.
-- [ ] **A23 – Other tabs show a cleanup as a running search:** "Clean up storage" (E7)
+- [x] **A23 – Other tabs show a cleanup as a running search:** "Clean up storage" (E7)
       holds `results/run.lock` while it deletes, and the app derives "a search is running"
       from that lock, so another open tab shows "Search running" and disables its controls
       for that moment (a Start there is refused with "A search is already running, or the
       storage is being cleaned up."). Harmless and short, except for a `VACUUM` of a large
       cache. Fix idea: a cleanup status the app can tell apart, e.g. a phase "cleaning" in
       a separate status file. Found in PR #18.
+      (done 2026-10-25 in the review of PR #18: `clean_up` registers its results folder in
+      the process (`framescout_core.cleanup_running`; app sessions are threads of one
+      process), so another tab shows "The storage is being cleaned up" instead of a running
+      search and disables "Stop search"; Start stays disabled until the lock is free. A
+      cleanup in another process, e.g. a second app instance, still looks like a search.)
 
 ### Installation / project
 
