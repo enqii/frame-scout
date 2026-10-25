@@ -1,5 +1,6 @@
 """The signatures side table of the feature cache and the classification of cached rows (E11)."""
 import json
+import math
 import sqlite3
 
 from framescout_core import (DEFAULT_YOLO_MODEL, ENGINE, SETTING_RANGES, classify_signatures, feature_signature,
@@ -58,6 +59,16 @@ def test_known_signatures_cover_every_value_of_the_app_widgets():
             assert feature_signature(True, max_persons, confidence, DEFAULT_YOLO_MODEL) in known
     # a slider returns e.g. 0.1 + 4 * 0.05 = 0.30000000000000004, which the app passes on as it is
     assert feature_signature(True, 12, 0.1 + 4 * 0.05, DEFAULT_YOLO_MODEL) in known
+    # noise from other arithmetic paths, e.g. accumulated steps or n * step + low (review)
+    accumulated = 0.1
+    for n in range(1, 17):
+        accumulated += 0.05
+        assert feature_signature(True, 12, accumulated, DEFAULT_YOLO_MODEL) in known, accumulated
+        for value in (n * 0.05 + 0.1, 0.1 + 0.05 * n, (0.1 * 20 + n) / 20,
+                      math.nextafter(round(0.1 + n * 0.05, 2), 0)):
+            assert feature_signature(True, 12, value, DEFAULT_YOLO_MODEL) in known, value
+    for value in (0.15000000000000002, 0.35000000000000003):
+        assert feature_signature(True, 12, value, DEFAULT_YOLO_MODEL) in known, value
     # another detector model or a value no widget offers is not known
     assert feature_signature(True, 12, .3, 'yolo11s.pt') not in known
     assert feature_signature(True, 12, .33, DEFAULT_YOLO_MODEL) not in known

@@ -7,6 +7,7 @@ import collections
 import filecmp
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -394,14 +395,24 @@ def prepare_cache(con, person_detection, max_persons, person_confidence, yolo_mo
     return signature
 
 
+# float neighbors (units in the last place) of each slider step known_signatures also counts:
+# a slider value can carry rounding noise from any arithmetic path (e.g. 0.1 + 4 * 0.05 =
+# 0.30000000000000004, one ULP above 0.3); several ULPs cover every such path (review)
+SLIDER_NOISE_ULPS = 8
+
+
 def _slider_values(name):
-    """The values the app's slider of setting name can return: exact steps and their float noise."""
+    """The values the app's slider of setting name can return: each step and its float noise."""
     low, high = SETTING_RANGES[name]
     step = SETTING_STEPS[name]
     values, n = set(), 0
     while low + n * step <= high + 1e-9:
-        raw = low + n * step  # e.g. 0.1 + 4 * 0.05 = 0.30000000000000004
-        values.update({raw, round(raw, 4), round(raw, 2)})
+        exact = round(low + n * step, 4)
+        for start, toward in ((exact, math.inf), (exact, -math.inf)):
+            value = start
+            for _ in range(SLIDER_NOISE_ULPS + 1):
+                values.add(value)
+                value = math.nextafter(value, toward)
         n += 1
     return values
 
