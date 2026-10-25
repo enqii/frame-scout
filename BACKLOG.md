@@ -701,6 +701,42 @@ referenced in commits, pull requests and discussions.
       sets the cache variables). Long smoke or evaluation runs in the PR workflow should be
       started detached (and the agent should wait for their end) — document it in the
       implementer brief or `CLAUDE.md`.
+- [ ] **I14 – `docs/ARCHITECTURE.md` cannot be searched cheaply:** the file has 35 KB in
+      68 lines; whole paragraphs are single lines of up to 3,747 characters, so a Grep hit
+      returns about as much text as a section, and the implementer brief's rule "Grep for
+      the files, functions and IDs you touch and read those sections" saves little agent
+      context. Fix: wrap the text at about 90 characters like the other docs and split the
+      long sections ("Files and responsibilities", "Current UI / runtime details", "Test
+      coverage and known quirks") into `###` sub-sections per file or topic, so a Grep hit
+      or a Read of one sub-section returns only what an item needs. Content unchanged
+      (Markdown only). Also update the stale size note "47 KB" for `BACKLOG.md` (now about
+      62 KB) in the `/roadmap` skill and the implementer brief. Found on 2026-10-25 while
+      checking whether splitting the code saves agent context.
+- [ ] **I15 – `framescout_core.py` is too large to read for one change:** 2,375 lines /
+      111 KB (roughly 30k tokens) covering about ten unrelated areas: slugs and reference
+      moves, atomic file writes, the PyTorch build and devices, run lock and status,
+      batching, profiles, settings, results and gallery helpers, marks, copying, cleanup.
+      An agent that reads it whole for a focused change keeps all of it in its context for
+      every later turn (implementer and reviewer alike). Fix: turn it into a package
+      `framescout_core/` with one module per area and a shared internal module for the
+      helpers several areas use (`_publish_via_temp`, `_publish_new`,
+      `_replace_with_retry`, the JSON and lock helpers); `framescout_core/__init__.py`
+      re-exports the names, so `import framescout_core` and `framescout_core.<name>` in
+      `app.py`, the engine, `install_torch.py` and the tests keep working. Constraints:
+      standard library only in every module (CI); behavior unchanged and no cache
+      signature change (`ENGINE` and the golden values in `tests/test_signature.py`
+      untouched). About a dozen tests patch private helpers on the package
+      (`monkeypatch.setattr(framescout_core, '_publish_new' | '_remove_file' | '_missing'
+      | '_copy_new' | '_unreferenced_references', …)`); after a re-export such a patch no
+      longer reaches the module that calls the helper, so the test silently stops testing
+      the failure path: patch the defining module instead and check that each such test
+      still fails when the guarded code is broken. (Patches of `framescout_core.os`,
+      `.shutil` and `.Path` change the shared module or class and keep working.) Update
+      the module map in `docs/ARCHITECTURE.md` and "Where things are" in `CLAUDE.md`;
+      `git blame` of the moved functions then points at the move commit (note it in the
+      PR). Not part of this item: splitting `app.py` (1,085 lines, e.g. one module per
+      tab), since the tabs share `st.session_state` keys and the `setting_<name>` rule, so
+      the gain is smaller and the risk larger; reconsider after I15. Do I14 first.
 
 ## Roadmap (priority)
 
@@ -740,6 +776,13 @@ Each unchecked item is implemented in its own pull request, strictly one after a
 
 Stronger and multilingual models moved to P4b (user decision in PR #13: evaluate them
 on the user's home PC first).
+
+### P3b – Agent context (before further features)
+Smaller files to read per change, so implementer and reviewer agents keep less context
+(added 2026-10-25 at the user's request, placed before the remaining P4 items).
+- [ ] Reflow `docs/ARCHITECTURE.md` into short lines and sub-sections (I14)
+- [ ] Split `framescout_core.py` into a package of modules per area, re-exporting the
+      names; no behavior change (I15)
 
 ### P4 – UX
 The item "Result gallery in the app, mark matches/copy them to a folder, "open folder",
