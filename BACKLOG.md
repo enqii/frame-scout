@@ -568,6 +568,25 @@ referenced in commits, pull requests and discussions.
       process), so another tab shows "The storage is being cleaned up" instead of a running
       search and disables "Stop search"; Start stays disabled until the lock is free. A
       cleanup in another process, e.g. a second app instance, still looks like a search.)
+- [ ] **A24 – "Hide photos marked as no match" reflows the pages; mark buttons look
+      alike:** user report on 2026-10-25 after A17. Marking the photos of page 1 and then
+      ticking the checkbox shows undecided photos of the following pages on page 1.
+      Cause (`app.py`, the result gallery): the cards are filtered first and paginated
+      afterwards (`cards` → `page_count` → `page_cards`), so hiding the rejects of page 1
+      pulls the next undecided photos up into it, and every page after it shifts too. The
+      page selector then no longer matches the ranks the user just worked through. Fix
+      idea: paginate the full ranked list and hide the no-match photos only within the
+      shown page (caption "N photos of this page marked as no match are hidden"); the
+      drawback is a page that is empty when everything on it was rejected. Alternative
+      (user decision): a filter "Show: all / undecided only / matches" over the whole list
+      with its own pages, which also serves "what is left to check". Second request: a
+      different color per state. `st.segmented_control` has no per-option colors; idea
+      (not run in a browser): wrap the control in a container with a key naming the state
+      (`markstate_match`, `markstate_nomatch`, `markstate_open`) and color the selected
+      segment from the global `<style>` block through `.st-key-markstate_…` and
+      `[data-testid="stBaseButton-segmented_controlActive"]` (Streamlit 1.66.1 internals,
+      so check it after upgrades; keep contrast in the dark theme). The marks and
+      `marks.json` stay unchanged. Found after PR #16.
 
 ### Installation / project
 
