@@ -465,3 +465,14 @@ def test_the_read_only_uri_opens_a_unc_path(tmp_path):
         assert con.execute('SELECT COUNT(*) FROM t').fetchone() == (0,)
     finally:
         con.close()
+
+
+def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, monkeypatch):
+    import framescout_core
+    gone = project.photos / 'b.jpg'
+    project.cache([(gone, CURRENT), (gone, OTHER), (gone, OLD)])
+    calls = []
+    real = framescout_core._missing
+    monkeypatch.setattr(framescout_core, '_missing', lambda path: calls.append(path) or real(path))
+    assert project.scan()['cache_missing']['rows'] == 3
+    assert calls == [str(gone)]
