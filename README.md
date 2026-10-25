@@ -108,7 +108,8 @@ starts with the new example profiles.
    empty. The paths in `profiles.json.bak` are updated to the new folder as well, so
    restoring the backup after a rename still finds the images (if that update fails, the
    images also keep their old names and the app shows a note). Removing reference
-   images from a profile or deleting a profile does not delete the files.
+   images from a profile or deleting a profile does not delete the files; "Clean up
+   storage" can list and delete them (see [Cleaning up storage](#cleaning-up-storage)).
 3. **Photo source:** choose a local image folder (default: `photos` in the
    project folder). Subfolders are searched as well. Download and extract archives and
    online albums yourself beforehand – FrameScout does not download images from the
@@ -164,7 +165,8 @@ starts with the new example profiles.
    "20 copied · 2 already there · 1 renamed · 0 failed"; "Open target folder" opens the
    folder.
 
-Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF.
+Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF. HEIC and camera RAW files are
+not supported yet and are skipped ([BACKLOG.md](BACKLOG.md), E25).
 
 ### Search terms in English
 
@@ -200,16 +202,19 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
   folders of earlier versions have no such file: the app then lists their HTML files by
   name until the next search.
 - `results/marks.json` holds your marks (Match / No match per profile and photo); the
-  search never changes it. It is your data: keep it when you clean up the `results`
-  folder (deleting it removes all marks). Marks belong to the full path of a photo, so
+  search never changes it, and "Clean up storage" never deletes it. It is your data:
+  keep it when you clean up the `results` folder by hand (deleting it removes all marks). Marks belong to the full path of a photo, so
   they no longer apply after you move or rename the photo folder.
   Marks belong to the profile name: deleting a profile keeps its marks, and a new
   profile with the same name takes them over.
 - One HTML gallery per search profile is written to `results/`; the thumbnails are
   stored in `results/thumbnails/`. Clicking a photo opens the original. (Versions
   before the English UI used `results/vorschaubilder/`; that folder is no longer
-  written; galleries created before still link it, so delete it only when you no longer
-  need those older galleries.)
+  written; galleries created before still link it. The cleanup removes its files once no
+  kept gallery links them.)
+- At the end of every finished search FrameScout removes, by itself, the thumbnails that
+  neither the last search nor any HTML file in `results/` shows (e.g. of photos that
+  dropped out of the results) and temporary thumbnail files a stopped search left behind.
 - The gallery file is named after the profile in plain ASCII, e.g. "Red car" →
   `red-car.html`, "Bär" → `baer.html`; names that would collide get `-2`, `-3`, … in
   profile order, and names without Latin letters or digits (e.g. "猫") get a short hash.
@@ -226,10 +231,40 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
   analyzed at the moment of the stop are analyzed again), and new search profiles reuse
   existing analyses. Updates that change the image analysis (e.g. the CLIP fix in
   2026-10) analyze every photo once more; the older entries stay in the file, which therefore
-  grows (roughly doubles) until a cleanup function exists. The faster decoding without
-  person detection (2026-10) is such a change for searches **without** person detection:
-  the first such search after the update analyzes every photo once more; searches with
-  person detection keep using their existing analyses.
+  grows (roughly doubles) until you delete them with "Clean up storage". The faster
+  decoding without person detection (2026-10) is such a change for searches **without**
+  person detection: the first such search after the update analyzes every photo once
+  more; searches with person detection keep using their existing analyses.
+
+### Cleaning up storage
+
+Galleries of renamed or deleted profiles, thumbnails, old cache entries and reference
+images you removed from profiles are never deleted silently. **Search & results →
+Clean up storage** lists them: click **Scan** (it only looks), check the categories
+you want to delete, click **Delete selected** and confirm. Deleting is **permanent**:
+nothing goes to the Recycle Bin. Scanning and deleting are not possible while a search
+runs, and no search can start while the cleanup deletes.
+
+| Category | Selected after a scan | What it is |
+|---|---|---|
+| Temporary thumbnail files | yes | Left by a search stopped while it wrote the galleries |
+| Galleries of renamed or deleted profiles | yes | FrameScout HTML galleries in `results/` that belong neither to a current profile nor to the last search (the file names are listed) |
+| Thumbnails no gallery shows | yes | Thumbnails neither the last search nor a kept gallery shows, also in the old `vorschaubilder/` folder; those only the galleries above show go together with them |
+| Cache entries of deleted photos | yes | Analyses of photos inside the **current** photo folder that no longer exist; only if that folder exists, so a disconnected drive is never cleaned |
+| Cache entries of older versions or unknown settings | yes | Analyses of an earlier FrameScout version (never used again) or of settings only the command line offers (e.g. another `--yolo-model`) |
+| Cache entries of other AI settings | no | Analyses with other person detection settings; they are used again when you switch back, so deleting them means analyzing those photos again then |
+| Reference images no profile uses | no | Image files in `references/` that neither `profiles.json` nor `profiles.json.bak` names (the file names are listed) |
+
+"Compact cache.sqlite3 afterwards" (on by default) shrinks the cache file after
+entries were deleted; without it the file keeps its size and reuses the space. Only
+what the scan listed and is still unused at the moment of deleting is deleted: e.g. a
+reference image a profile uses since the scan stays. Galleries and thumbnails are not
+offered while `results.json` or `profiles.json` cannot be read, reference images not
+while `profiles.json` or `profiles.json.bak` cannot be read. Never deleted:
+`results/marks.json` (your marks), `results.json`, `run.lock`, `run-status.json`, the
+cache file itself, `settings.json`, `profiles.json` and `profiles.json.bak`, and of
+course your photos. While the cleanup deletes, another open tab briefly shows a search
+as running.
 
 ### What the numbers in a gallery mean
 
@@ -328,7 +363,7 @@ Commits, one pull request per roadmap item).
 |---|---|
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run, result gallery with marks and copying) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
-| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file, result file, marks and copying); standard library only |
+| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file, result file, marks and copying, cleanup); standard library only |
 | `framescout_scoring.py` | Scoring of the engine: prompt ensemble, scaling and weighting of text and reference scores; numpy only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies (PyTorch pinned) |
