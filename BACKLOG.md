@@ -67,19 +67,39 @@ referenced in commits, pull requests and discussions.
       meantime aborts the entire HTML export.
       (done 2026-10-21: `framescout_core.ensure_thumbnail` logs "Thumbnail not possible"
       and the photo is skipped; thumbnail names are unchanged. Rank gaps: E12.)
-- [ ] **E7 – No cleanup:** `thumbnails/`, `cache.sqlite3` (deleted files, old
+- [x] **E7 – No cleanup:** `thumbnails/`, `cache.sqlite3` (deleted files, old
       signatures) and HTML files of renamed/deleted profiles grow without bound. Since
       I7 the thumbnail folder of older versions, `vorschaubilder/`, is no longer written
       but stays in `results/` (galleries of profiles that were not regenerated still
       link it). A cleanup must never delete `results/marks.json` (the user's marks, A17)
       or `marks.json.lock`.
+      (done 2026-10-25, user decisions at the PR #18 hold point: "Clean up storage" in the
+      "Search & results" tab scans and lists per category count, size and a checkbox, and
+      deletes the selected categories permanently (no Recycle Bin) after a confirmation,
+      holding `results/run.lock` (refused while a search runs; no search starts during
+      it); under the lock everything is checked again and only what the scan showed and
+      still qualifies is deleted. Categories: temporary thumbnails (E13), orphaned
+      galleries (`*.html` in `results/` with the `<title>FrameScout – ` marker, neither in
+      `results.json` nor the gallery of a current profile), thumbnails neither
+      `results.json` nor a kept gallery links (both thumbnail folders; an emptied
+      `vorschaubilder/` goes too; thumbnails only orphaned galleries link go only together
+      with them), cache rows of deleted photos inside the current photo folder (only if it
+      exists), cache rows of older engine versions or unknown settings and of other
+      settings of this version (E11, the latter unselected), compacting (`VACUUM`), and
+      unreferenced reference images (A14, unselected). Galleries and thumbnails are not
+      offered if `results.json` or `profiles.json` cannot be read. At the end of every
+      finished search the engine removes temporary and unreferenced thumbnails itself
+      (every HTML file counts as kept there). Never deleted: `marks.json(.lock)`,
+      `run.lock`, `run-status.json`, `results.json`, the cache file, `settings.json`,
+      `profiles.json(.bak)`. Cache rows of photos outside the current photo folder are
+      never offered. Other temporary files: E26; other tabs during a cleanup: A23.)
 - [ ] **E8 – Cache key = absolute path:** moving the photo folder forces a complete
       recomputation.
 - [ ] **E9 – `yolo11n.pt` ends up in the project root** instead of `.cache/`; not documented.
 - [x] **E10 – Duplicate check before `strip()`:** "Joker" and " Joker" are not recognized as
       equal. (done 2026-10-21 in `framescout_core.load_profiles`; such a hand-edited
       `profiles.json` is now rejected instead of merging both profiles into one gallery.)
-- [ ] **E11 – Dead cache rows after an `ENGINE` bump:** after E1 (v4 → v5) every v4 row
+- [x] **E11 – Dead cache rows after an `ENGINE` bump:** after E1 (v4 → v5) every v4 row
       (GELU embeddings) stays in `results/cache.sqlite3` and can never be reused, so the
       file roughly doubles on the first run after the update and never shrinks. The
       `signature` column is a hash, so rows of old engine versions can only be found for
@@ -87,6 +107,14 @@ referenced in commits, pull requests and discussions.
       store `ENGINE` in its own column, then delete rows of other engine versions and
       `VACUUM` – only with the user's consent (the cache is user data). Part of the
       cleanup in E7.
+      (done 2026-10-25: a side table `signatures(signature PK, engine, settings)` that the
+      engine fills on every run (`framescout_core.prepare_cache`); the features table is
+      unchanged and `ENGINE` was not bumped, so older versions keep reading the cache.
+      Rows written before are classified by `known_signatures` (the current signatures for
+      every value of the app's widgets with the default YOLO model); a row matching none
+      is offered as "older version or unknown settings (e.g. CLI)". Deleting needs the
+      user's selection and confirmation in "Clean up storage" (E7), `VACUUM` is optional.
+      Other models of E22: see there.)
 - [ ] **E12 – Skipped photos leave gaps in the gallery:** a photo whose thumbnail fails
       (deleted since scoring, unreadable) is skipped after the top-N cut, so the gallery
       shows e.g. #2, #3, #4 and fewer than `--top` cards although lower-ranked photos
@@ -94,7 +122,7 @@ referenced in commits, pull requests and discussions.
       Also: `ensure_thumbnail` repeats the `stat()` done during scoring; the mtime could
       be kept with the score (PR #6 review). Since P4 (A) the app's result gallery shows
       the same gaps: `results.json` keeps the ranks of the HTML gallery.
-- [ ] **E13 – Interrupted thumbnail writes leave temporary files:** since PR #6 a
+- [x] **E13 – Interrupted thumbnail writes leave temporary files:** since PR #6 a
       thumbnail is written as `thumbnails/<hash>.jpg.<random>.jpg` and renamed when
       complete. The app's Stop button ends the engine with `terminate()`/`kill()`, which
       on Windows skips the `finally` that removes the temporary file, so each stop
@@ -102,6 +130,9 @@ referenced in commits, pull requests and discussions.
       thumbnail), only clutter. Fix idea: a recognizable `.tmp` name that the next run
       (or the cleanup of E7) removes. Since A4 only one engine at a time uses an output
       folder (`run.lock`), so a run holding the lock can remove such files safely.
+      (done 2026-10-25: the existing temporary name `<hash>.jpg.<random>.jpg` is
+      recognizable, so the name is unchanged; the engine removes such files at the end of
+      every finished search, and "Clean up storage" (E7) offers them too.)
 - [x] **E14 – YOLO runs on the CPU, one photo at a time:** `crops_for` passes
       `device='cpu'` to the detector, even when CLIP runs on CUDA, and since E2 the decoding
       threads share one detector under a lock, so detection is serialized. With person
@@ -231,8 +262,10 @@ referenced in commits, pull requests and discussions.
       settings key `model` (validated like `device`); a selectbox in the AI settings tab
       whose labels show the CPU factor and the first-use download size, and a caption
       that a new model analyzes every photo once while the cache keeps the rows of each
-      model side by side (never deleted, E11; ~10–15 MB per model for 5,000 photos,
-      depending on the embedding size, 512 or 768); the
+      model side by side (~10–15 MB per model for 5,000 photos, depending on the
+      embedding size, 512 or 768; since PR #18 the cleanup's `classify_signatures` counts
+      every engine other than `ENGINE` as "older version", default selected, so rows of
+      the other registered models need a category of their own there, unselected); the
       model name in the log line and the gallery note; the QuickGELU config check of
       `test_signature.py` for every registry entry. Input size: the engine passes
       `getattr(model.visual, 'image_size', 224)` to `draft_size` and silently falls back
@@ -250,11 +283,14 @@ referenced in commits, pull requests and discussions.
       second, non-cosplay collection (E20). On another PC, the labels, the photos and
       the tooling have to be brought along or made anew.
 
-- [ ] **E23 – Cleanup must keep what `results.json` references:** since P4 (A) the app
+- [x] **E23 – Cleanup must keep what `results.json` references:** since P4 (A) the app
       shows the last search from `results/results.json`, whose cards name thumbnails in
       `results/thumbnails/` and the galleries' HTML files. The cleanup of E7 must not
       delete thumbnails or galleries still listed there (nor those linked by HTML
       galleries that are kept), or the app shows "No thumbnail".
+      (done 2026-10-25 with E7: galleries and thumbnails listed in `results.json` or
+      linked by a kept HTML file are never deleted, and neither category is offered if
+      `results.json` cannot be read.)
 - [ ] **E24 – An interrupted export leaves galleries newer than `results.json`:** the
       engine writes `results.json` only after all galleries, so a search stopped while it
       writes the galleries has already replaced some HTML files, while the app still shows
@@ -262,6 +298,20 @@ referenced in commits, pull requests and discussions.
       run did not finish). Opening such a gallery from the app shows the newer, partial
       result. Fix idea: write the galleries under temporary names and publish them
       together with `results.json` at the end. Found in PR #14.
+- [ ] **E25 – No HEIC/HEIF or camera RAW photos:** the engine reads only `EXT` (JPG, PNG,
+      WebP, BMP, TIFF), so photos from many phones (HEIC) and cameras (CR2/CR3, NEF, ARW,
+      DNG, …) are skipped without a note. Supporting them needs new dependencies (e.g.
+      `pillow-heif`; `rawpy` for RAW, which decodes slowly and may need the embedded
+      preview instead), and so is a hold point; the cache, thumbnails and "Open" (an
+      `EXT` check) would follow the new extensions. Split out of the cleanup roadmap item
+      (user decision at the PR #18 hold point).
+- [ ] **E26 – Other temporary files of a stopped run stay in `results/`:** the atomic
+      writes of `run-status.json` and `results.json` (and of `marks.json` by the app) go
+      through `<name>.<random>.tmp`; `terminate()`/`kill()` during such a write leaves that
+      file behind, like the thumbnails of E13. They are small and rare, and the cleanup
+      of E7 does not remove them (an app session may be writing `marks.json` at that
+      moment). Fix idea: remove `run-status.json.*.tmp` and `results.json.*.tmp` older than
+      a minute in `auto_cleanup`. Found in PR #18.
 
 ### App (`app.py`)
 
@@ -407,11 +457,15 @@ referenced in commits, pull requests and discussions.
       was read (mtime/hash), otherwise reload and ask. More than one backup generation
       (rotating `.bak` files, a one-time copy before the v3 conversion) also belongs
       here; for now the user chose a single `profiles.json.bak` (PR #6 review).
-- [ ] **A14 – Unreferenced reference files accumulate:** removing reference images from a
+- [x] **A14 – Unreferenced reference files accumulate:** removing reference images from a
       profile, deleting a profile or a failed save of `profiles.json` after the upload
       leaves the files in `references/` (deliberately – nothing is deleted silently).
       Fix idea: list files no profile references and offer to delete them, with the
       user's consent; part of the cleanup in P4.
+      (done 2026-10-25 with E7: "Clean up storage" lists the image files in `references/`
+      that neither `profiles.json` nor `profiles.json.bak` names, by name and unselected;
+      `profiles.json` is read again just before deleting, emptied folders are removed, and
+      the category is not offered if either file cannot be read.)
 - [ ] **A15 – Reference folder and gallery file can get different suffixes:**
       `reference_folder` adds `-2`, `-3`, … when another profile's references occupy the
       folder, `profile_slugs` adds them by profile order. The same profile can therefore
@@ -502,6 +556,13 @@ referenced in commits, pull requests and discussions.
       a profile's marks when it is deleted (asking in the app first), or give profiles a
       stable id in `profiles.json` (schema change, hold point). Found in the review of
       PR #16.
+- [ ] **A23 – Other tabs show a cleanup as a running search:** "Clean up storage" (E7)
+      holds `results/run.lock` while it deletes, and the app derives "a search is running"
+      from that lock, so another open tab shows "Search running" and disables its controls
+      for that moment (a Start there is refused with "A search is already running, or the
+      storage is being cleaned up."). Harmless and short, except for a `VACUUM` of a large
+      cache. Fix idea: a cleanup status the app can tell apart, e.g. a phase "cleaning" in
+      a separate status file. Found in PR #18.
 
 ### Installation / project
 
@@ -687,8 +748,10 @@ decision in PR #14):
       `results/marks.json`, three states; feedback into the search: A20)
 - [~] (C) ZIP export with thumbnails (open decision: A18) – deferred by user decision
       2026-10-25, skipped by `/roadmap`
-- [ ] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
-      never delete `results/marks.json` (A17); optional HEIC/RAW support
+- [x] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
+      never delete `results/marks.json` (A17) (done 2026-10-25; also E13, E23; HEIC/RAW
+      split out into the next item by user decision)
+- [ ] Optional HEIC/RAW support (E25; new dependencies: a hold point)
 
 ### P4b – Search models (evaluate at home first)
 - [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note (E22;
