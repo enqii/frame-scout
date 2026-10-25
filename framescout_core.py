@@ -2156,7 +2156,7 @@ def _remove_empty_folders(folder, stop):
 
 
 def _new_summary():
-    return {'refused': None, 'files': 0, 'rows': 0, 'freed': 0, 'failed': [], 'skipped': []}
+    return {'refused': None, 'files': 0, 'rows': 0, 'freed': 0, 'compacted': False, 'failed': [], 'skipped': []}
 
 
 def _delete_thumbnails(results, allowed, summary):
@@ -2208,6 +2208,7 @@ def _delete_rows(results, shown, selected, photo_folder, current, vacuum, summar
             if vacuum and deleted:
                 try:
                     con.execute('VACUUM')  # the file shrinks only now
+                    summary['compacted'] = True
                 except sqlite3.Error as exc:
                     summary['failed'].append((cache.name, f'not compacted: {exc}'))
         finally:
@@ -2230,7 +2231,7 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     thumbnail a gallery links since. The thumbnails only orphaned galleries link go only
     together with those galleries. vacuum compacts the cache file after rows were deleted.
     The summary has refused (why nothing was done, else None), files, rows, freed (bytes),
-    failed [(name, error)] and skipped (categories that could not be checked again).
+    compacted (VACUUM done), failed [(name, error)] and skipped (categories that could not be checked again).
     """
     results = Path(results)
     summary = _new_summary()
@@ -2318,6 +2319,9 @@ def cleanup_summary_text(summary):
     """Return the line the app shows after a cleanup, e.g. "Deleted 3 files and 1,200 cache entries · 2 KB freed"."""
     text = (f"Deleted {count_text(summary['files'], 'file', 'files')} and "
             f"{count_text(summary['rows'], 'cache entry', 'cache entries')} · {size_text(summary['freed'])} freed")
+    if summary['rows'] and not summary.get('compacted'):
+        # SQLite keeps the file size until VACUUM, so the rows freed nothing on disk (review)
+        text += f'; {CACHE_FILE} was not compacted, so it keeps its size and reuses the space for new analyses'
     if summary['failed']:
         text += f" · {len(summary['failed']):,} could not be deleted"
     return text

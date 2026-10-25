@@ -422,11 +422,24 @@ def test_size_text():
 
 
 def test_cleanup_summary_text():
-    text = cleanup_summary_text({'refused': None, 'files': 3, 'rows': 1200, 'freed': 2048,
+    text = cleanup_summary_text({'refused': None, 'files': 3, 'rows': 1200, 'freed': 2048, 'compacted': True,
                                  'failed': [('a.jpg', 'in use')], 'skipped': []})
     assert text == 'Deleted 3 files and 1,200 cache entries · 2 KB freed · 1 could not be deleted'
-    assert cleanup_summary_text({'refused': None, 'files': 1, 'rows': 1, 'freed': 0, 'failed': [], 'skipped': []}) == (
-        'Deleted 1 file and 1 cache entry · 0 B freed')
+    assert cleanup_summary_text({'refused': None, 'files': 1, 'rows': 0, 'freed': 0, 'compacted': False,
+                                 'failed': [], 'skipped': []}) == 'Deleted 1 file and 0 cache entries · 0 B freed'
+    # without compacting, deleted rows free nothing on disk: said instead of a bare "0 B freed" (review)
+    assert cleanup_summary_text({'refused': None, 'files': 0, 'rows': 1, 'freed': 0, 'compacted': False,
+                                 'failed': [], 'skipped': []}) == (
+        'Deleted 0 files and 1 cache entry · 0 B freed; cache.sqlite3 was not compacted, so it keeps its size and '
+        'reuses the space for new analyses')
+
+
+def test_rows_deleted_without_compacting_are_reported_as_not_compacted(project):
+    project.cache([(project.photos / 'gone.jpg', OLD)])
+    summary = project.clean(project.scan(), {'cache_old'}, vacuum=False)
+    assert summary['rows'] == 1 and summary['compacted'] is False and summary['freed'] == 0
+    summary = project.clean(project.scan(), {'cache_old'}, vacuum=True)
+    assert summary['rows'] == 0 and summary['compacted'] is False  # nothing left to delete: no VACUUM
 
 
 # the read-only cache URI (review)
