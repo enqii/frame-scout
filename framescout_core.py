@@ -2032,8 +2032,10 @@ def _cache_categories(results, photo_folder, current):
         # belong to a drive that is not connected now
         folder = os.path.normcase(str(Path(photo_folder).resolve()))
         prefix = folder if folder.endswith(os.sep) else folder + os.sep
-        dead = [(path, signature, size or 0) for path, signature, size in rows
-                if os.path.normcase(path).startswith(prefix) and _missing(path)]
+        # each photo is looked at once, however many signatures it has (review)
+        inside = {path for path, _, _ in rows if os.path.normcase(path).startswith(prefix)}
+        gone = {path for path in inside if _missing(path)}
+        dead = [(path, signature, size or 0) for path, signature, size in rows if path in gone]
         found['cache_missing'] = _category('cache_missing', sorted((p, s) for p, s, _ in dead),
                                            sum(size for *_, size in dead), rows=len(dead))
     return {key: found[key] for key in keys}
