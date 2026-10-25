@@ -662,9 +662,16 @@ def scan_storage():
 
 def delete_storage(scan, selected):
     """Delete the selected categories of scan after the confirmation; the summary is shown next run (E7)."""
-    with st.spinner('Cleaning up …'):
-        summary = clean_up(RESULTS, scan, selected, st.session_state.get('cleanup_vacuum', False), engine_alive,
-                           PROFILES, REFS, cleanup_photo_folder(), cleanup_signature())
+    try:
+        with st.spinner('Cleaning up …'):
+            summary = clean_up(RESULTS, scan, selected, st.session_state.get('cleanup_vacuum', False), engine_alive,
+                               PROFILES, REFS, cleanup_photo_folder(), cleanup_signature())
+    except Exception as exc:
+        # clean_up reports the errors of its steps in the summary; this is e.g. the lock file
+        # that cannot be opened. The scan is dropped: some files may be gone (review)
+        st.session_state.cleanup_notice = ('warning', f'The cleanup stopped: {exc}. Scan again to see what is left.')
+        st.session_state.pop('cleanup_scan', None)
+        return
     if summary['refused']:
         st.session_state.cleanup_notice = ('warning', summary['refused'] + ' Nothing was deleted.')
         return

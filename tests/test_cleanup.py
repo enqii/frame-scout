@@ -528,3 +528,24 @@ def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):
                             lambda *args, real=real, name=name: calls.append(name) or real(*args))
     project.scan()
     assert sorted(calls) == ['_gallery_links', '_gallery_links', 'read_profiles']
+
+
+def test_an_error_in_one_step_keeps_the_summary_of_what_was_deleted(project, monkeypatch):
+    # review: a PermissionError while listing a folder must not lose the count of what is gone
+    import framescout_core
+    project.thumb(T1)
+    (project.refs / 'old.jpg').write_bytes(b'image')
+    project.cache([(project.photos / 'gone.jpg', OLD)])
+    scan = project.scan()
+
+    def broken(*args, **kwargs):
+        raise PermissionError('access denied')
+
+    monkeypatch.setattr(framescout_core, '_unreferenced_references', broken)
+    summary = project.clean(scan, everything(scan))
+    assert summary['files'] == 1 and summary['rows'] == 1
+    assert summary['skipped'] == ['Reference images: stopped (access denied).']
+    assert (project.refs / 'old.jpg').exists()
+    lock = RunLock(project.results / RUN_LOCK)
+    assert lock.acquire()  # released
+    lock.release()
