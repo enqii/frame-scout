@@ -16,15 +16,15 @@ from framescout_core import (CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_W
                              EXT, FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_FILE,
                              PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
                              SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_running, cleanup_summary_text,
-                             copy_photos, copy_summary_text, copy_target, count_text, create_from_example, cuda_status,
-                             default_copy_folder, default_settings, device_choices, feature_signature,
-                             finish_reference_move, lock_held, open_command, openable_photo, page_cards, page_count, profile_fingerprints, profile_state,
-                             read_copy_folders, read_marks, read_profiles, read_results, read_settings, read_status,
-                             reconcile_settings, reference_folder, rename_copy_folder, rename_marks, reveal_command,
-                             run_active, save_copy_folder, save_marks, save_profiles, save_settings, scan_cleanup,
-                             size_text, stage_reference_move, started_in_time, status_fraction, status_text,
-                             stopped_status, undo_reference_move, update_backup_references, write_new_file,
-                             write_status)
+                             copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
+                             cuda_status, default_copy_folder, default_settings, device_choices, feature_signature,
+                             finish_reference_move, lock_held, open_command, openable_photo, page_cards, page_count,
+                             profile_fingerprints, profile_state, read_copy_folders, read_marks, read_profiles,
+                             read_results, read_settings, read_status, reconcile_settings, reference_folder,
+                             rename_copy_folder, rename_marks, reveal_command, run_active, save_copy_folder,
+                             save_marks, save_profiles, save_settings, scan_cleanup, size_text, stage_reference_move,
+                             started_in_time, status_fraction, status_text, stopped_status, undo_reference_move,
+                             update_backup_references, write_new_file, write_status)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
