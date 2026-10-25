@@ -2223,6 +2223,16 @@ def _delete_rows(results, shown, selected, photo_folder, current, vacuum, summar
     summary['freed'] += max(0, before - _file_size(cache))
 
 
+# results folders a clean_up of this process works on now: the app's sessions are threads of
+# one process, so another tab can tell a cleanup holding the run lock from a search (review)
+_CLEANING = set()
+
+
+def cleanup_running(results):
+    """Return True if a clean_up of this process holds the run lock of the results folder now."""
+    return _path_key(Path(results)) in _CLEANING
+
+
 def _galleries_and_thumbnails(results, shown, selected, profiles_file, summary):
     """The gallery and thumbnail steps of clean_up: read the galleries once, delete, then the thumbnails."""
     try:
@@ -2268,6 +2278,8 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     if not lock.acquire(timeout=lock_timeout):
         summary['refused'] = 'A search is running. Clean up after it has finished.'
         return summary
+    key = _path_key(results)
+    _CLEANING.add(key)
     try:
         status = read_status(results / RUN_STATUS)
         if run_active(status, False, lambda pid: alive(pid, status)):
@@ -2307,6 +2319,7 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                 # and the summary keeps what was already deleted (review)
                 summary['skipped'].append(f'{name}: stopped ({exc}).')
     finally:
+        _CLEANING.discard(key)
         lock.release()
     return summary
 

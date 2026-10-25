@@ -15,8 +15,8 @@ import streamlit as st
 from framescout_core import (CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
                              EXT, FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_FILE,
                              PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
-                             SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_summary_text, copy_photos,
-                             copy_summary_text, copy_target, count_text, create_from_example, cuda_status,
+                             SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_running, cleanup_summary_text,
+                             copy_photos, copy_summary_text, copy_target, count_text, create_from_example, cuda_status,
                              default_copy_folder, default_settings, device_choices, feature_signature,
                              finish_reference_move, lock_held, open_command, openable_photo, page_cards, page_count, profile_fingerprints, profile_state,
                              read_copy_folders, read_marks, read_profiles, read_results, read_settings, read_status,
@@ -980,7 +980,8 @@ with run_tab:
     with c1:
         start = st.button('▶ Start search', type='primary', disabled=active or not profiles or not photo_folder.is_dir(), use_container_width=True)
     with c2:
-        stop = st.button('■ Stop search', disabled=not active, use_container_width=True)
+        # a cleanup holding the run lock is no search to stop (review)
+        stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), use_container_width=True)
     if start and settings_taken_over:
         # the page showed other values until this click: never start with settings the
         # user has not seen (review)
@@ -1019,7 +1020,11 @@ with run_tab:
         now_active, status = fresh if fresh else run_state()
         if now_active != active:
             st.rerun()  # a search started or ended, also in another tab: update the whole page
-        if now_active:
+        if now_active and cleanup_running(RESULTS):
+            # "Clean up storage" of another tab holds the run lock, no search runs (review)
+            st.info('The storage is being cleaned up in another tab or window. You can start a search again '
+                    'when it is done.')
+        elif now_active:
             st.info('Search running. You can reload this page or close the tab: the search continues and '
                     'is shown again when you come back. Photos that are already analyzed are kept in the cache.')
         elif status:
