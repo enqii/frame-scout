@@ -34,7 +34,7 @@ matching photos as an HTML gallery.
    (alternatively download the ZIP and extract it)
 2. Double-click `Install-FrameScout.bat`. The installer looks for Python 3.14, 3.13 or
    3.12 (in that order), creates an isolated `.venv` in the project folder and installs
-   the dependencies.
+   the dependencies in the tested versions pinned in `constraints.txt`.
 
 If package installation fails with one Python version: delete `.venv`, install another
 supported Python version and run the installer again.
@@ -423,6 +423,10 @@ Tests (they need neither torch nor a model download; `requirements-dev.txt` adds
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+If you install the packages by hand instead of with `Install-FrameScout.bat`, use
+`pip install -r requirements.txt -c constraints.txt` to get the tested versions; without
+`-c constraints.txt` pip takes the newest releases.
+
 The same tests run automatically on GitHub (Windows, Python 3.12, 3.13 and 3.14) for
 every pull request and every push to `main` – see `.github/workflows/tests.yml`.
 
@@ -480,7 +484,8 @@ for the formats. Status: not yet run with real models (E34).
 | `framescout_scoring.py` | Scoring of the engine: prompt ensemble, scaling and weighting of text and reference scores; numpy only |
 | `framescout_eval.py`, `framescout_eval_page.html` | Development tool to evaluate the search models on your own labelled photos (see above); not used by the app |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
-| `requirements.txt` | Python dependencies (PyTorch pinned) |
+| `requirements.txt` | Python dependencies (ranges; PyTorch pinned) |
+| `constraints.txt` | Exact tested versions of all packages; used by `Install-FrameScout.bat` |
 | `install_torch.py` | Installs the CPU or CUDA build of PyTorch; called by `Install-FrameScout.bat` |
 | `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
 | `.github/` | CI workflow (`workflows/tests.yml`) and pull request template |

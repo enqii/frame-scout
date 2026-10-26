@@ -950,11 +950,31 @@ referenced in commits, pull requests and discussions.
       installer re-run, `cu126`, other GPUs and several GPUs, a run without person
       detection, real photos and scores compared on them, the app's device choice in the
       browser, and the speed on a large folder (also for E18).)
-- [ ] **I12 – Fresh installs can get untested major versions:** `requirements.txt` sets only
+- [x] **I12 – Fresh installs can get untested major versions:** `requirements.txt` sets only
       minimum versions apart from torch/torchvision (user decision in PR #8), so a fresh
-      install takes the newest release, e.g. Pillow 13.0.0 is on PyPI while the verified
-      venv has 12.3.0 (PR #8 review). Upper bounds on the major version (`<13`) or a lock
-      file would keep installs on tested versions; part of the pinned dependencies of P5.
+      install takes the newest release, e.g. Pillow 13.0.0 was on PyPI while the venv of
+      PR #8 had 12.3.0 (PR #8 review; the venv has 13.0.0 now, and the smoke runs of E25,
+      E22 and I11 used it). Upper bounds on the major version (`<13`) or a lock file would
+      keep installs on tested versions; part of the pinned dependencies of P5.
+      (done 2026-10-26, part A of P5: new `constraints.txt` pins all 84 packages of the
+      dependency closure of `requirements.txt` exactly (`name==version`, no hashes; torch
+      and torchvision without a local label, so `+cpu`, `+cu126` and `+cu130` match);
+      `Install-FrameScout.bat` runs `pip install -r requirements.txt -c constraints.txt`.
+      `requirements.txt` keeps its ranges without upper bounds (I3 decision); a plain
+      `pip install -r requirements.txt` still takes the newest releases. Refreshing the
+      pins is manual in a PR of its own (no Dependabot; procedure in the header of
+      `constraints.txt`). `tests/test_constraints.py` checks the pins against
+      `requirements.txt`, `TORCH_VERSION`/`TORCHVISION_VERSION` and the installer line;
+      transitive completeness is only checked by the dry-run at refresh time. Verified:
+      metadata-only dry-run for Python 3.12, 3.13 and 3.14 (win_amd64, wheels only), a CPU
+      engine run on 22 photos (incl. 2 HEIC) with the pinned versions. Not run:
+      `Install-FrameScout.bat` on a fresh clone, the CUDA installer variant, a real install
+      on 3.12/3.13, a camera RAW photo, the `+cpu` torch build.)
+- [ ] **I18 – `install_torch.py` ignores `constraints.txt`:** it installs torch with its
+      dependencies from PyPI in their newest versions, and the next installer step moves
+      them to the pins (an extra download and reinstall of e.g. numpy, Pillow, sympy on a
+      fresh install). Passing `-c constraints.txt` to its pip command would avoid that; left
+      out of I12 because `install_torch.py` stayed unchanged by decision. Small and optional.
 - [ ] **I13 – Background runs die with the agent session:** a long engine run that an
       agent starts as a background command of Claude Code ends when that agent session
       ends; the first evaluation run of PR #11 stopped at 1,110 of 4,997 photos (stale
@@ -1130,4 +1150,6 @@ decision in PR #14):
       choice of E22 (E21)
 
 ### P5 – Distribution
-- [ ] Pinned dependencies (I12), portable Python variant, uninstall script
+- [ ] Pinned dependencies (I12), portable Python variant, uninstall script (three PRs:
+      A pinned dependencies done 2026-10-26 (I12); B uninstall script and C portable
+      Python variant open; keep this line unchecked until both are done)
