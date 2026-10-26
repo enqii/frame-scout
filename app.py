@@ -1067,9 +1067,10 @@ with run_tab:
     c1,c2 = st.columns([1,1])
     with c1:
         # at least one listed folder must exist (as sorted out in the Photo source tab, without
-        # asking the file system again, review); the engine leaves out the others with a note (A25)
+        # asking the file system again, review); the engine leaves out the others with a note (A25).
+        # A search model without its package would only fail in the engine (E22 review)
         start = st.button('▶ Start search', type='primary', use_container_width=True,
-                          disabled=active or not profiles or not folder_scans)
+                          disabled=active or not profiles or not folder_scans or bool(model_missing))
     with c2:
         # a cleanup holding the run lock is no search to stop (review)
         stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), use_container_width=True)
@@ -1104,6 +1105,8 @@ with run_tab:
         st.rerun()
     if st.session_state.get('run_notice'):
         st.warning(st.session_state.pop('run_notice'))
+    if model_missing and not active:
+        st.warning(model_missing)  # why Start is not available
     @st.fragment(run_every='2s')
     def show_status():
         # the state of this page run, read once at its top; fragment-only reruns read it again (review)
