@@ -25,11 +25,12 @@ from PIL import Image, ImageOps, ImageFile
 from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
                              DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, RAW_EXT, RESULTS_FILE, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
-                             cuda_hint, detection_options, draft_size, final_status, ensure_thumbnail, group_batches,
-                             import_detector_class,
-                             load_profiles, missing_decoder, prefetch, prepare_cache, profile_slugs, progress_due,
+                             cuda_hint, detection_options, distinct_folders, draft_size, final_status,
+                             ensure_thumbnail, folder_labels, group_batches, import_detector_class,
+                             load_profiles, missing_decoder, missing_folders_message, photo_name, prefetch,
+                             prepare_cache, profile_slugs, progress_due,
                              progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
-                             scan_photos, search_fingerprint, size_text, skipped_lines, store_group,
+                             scan_folders, search_fingerprint, size_text, skipped_lines, store_group,
                              supported_extensions, write_results)
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
 
@@ -181,7 +182,8 @@ def unpack(blob):
 
 def main():
     parser = Parser(description='FrameScout: local image search by name, reference images and optional features.')
-    parser.add_argument('folder', type=Path, help='photo folder (subfolders are searched recursively)')
+    parser.add_argument('folder', type=Path, nargs='+',
+                        help='one or more photo folders (subfolders are searched recursively)')
     parser.add_argument('--profiles', type=Path, help='JSON file with search profiles, texts in English (see profiles.example.json)')
     parser.add_argument('--character', action='append', default=[], metavar='NAME|CONTEXT|FEATURES',
                         help='inline search profile in English, can be repeated; e.g. "Red car|Vehicles|red paint, black roof"')
@@ -198,15 +200,17 @@ def main():
     args = parser.parse_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):
         parser.error('Invalid value for batch-size, top, max-persons, person-confidence or reference-weight.')
-    root = args.folder.resolve()
+    listed = [folder.resolve() for folder in args.folder]
     output = args.output.resolve()
-    if output == root:
-        parser.error('The output folder must not be the photo folder.')
-    if not root.is_dir() and not output.is_dir():
+    if output in listed:
+        parser.error('The output folder must not be a photo folder.')
+    # a folder listed twice or inside another listed folder is searched once (A25)
+    roots, dropped = distinct_folders(listed)
+    if not any(root.is_dir() for root in roots) and not output.is_dir():
         # nothing to report to: do not create an output folder (and its lock and status
         # files) for a mistyped call; an existing output folder, like the app's results
         # folder, gets the error in its status file (review)
-        parser.error(f'Photo folder does not exist: {root}')
+        parser.error(missing_folders_message(roots))
     output.mkdir(parents=True, exist_ok=True)
     # one search per output folder: two would share cache.sqlite3 ("database is locked")
     # and the app's run.log (A4)
@@ -218,7 +222,7 @@ def main():
     status = StatusReporter(output / RUN_STATUS, os.getpid())
     try:
         status.update('scanning')
-        code = search(args, parser, root, output, status)
+        code = search(args, parser, roots, dropped, output, status)
     except SystemExit as exc:  # parser.error
         status.finish('failed', exc.code if isinstance(exc.code, int) else 1, parser.error_message)
         raise
@@ -238,12 +242,23 @@ def main():
         lock.release()
 
 
-def search(args, parser, root, output, status):
-    """Run the search with the run lock of output held; report the phases to status (A5)."""
-    # checked here, not before the lock, so the app's status names the error: the folder
-    # can disappear between the click on Start and the engine start
-    if not root.is_dir():
-        parser.error(f'Photo folder does not exist: {root}')
+def search(args, parser, roots, dropped, output, status):
+    """Run the search with the run lock of output held; report the phases to status (A5).
+
+    roots: the photo folders to search (distinct_folders' kept list); dropped: the listed
+    folders left out, with the reason, for the log.
+    """
+    for _, note in dropped:
+        print(note, flush=True)
+    # checked here, not before the lock, so the app's status names the error: a folder
+    # can disappear between the click on Start and the engine start. A missing folder of
+    # several (e.g. on a disconnected drive) is left out with a note (A25).
+    missing = [root for root in roots if not root.is_dir()]
+    if len(missing) == len(roots):
+        parser.error(missing_folders_message(roots))
+    for root in missing:
+        print(f'Photo folder not found, searched without it (e.g. a disconnected drive): {root}', flush=True)
+    roots = [root for root in roots if root not in missing]
     try:
         profiles = load_profiles(args.profiles.resolve() if args.profiles else None, args.character)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -252,7 +267,7 @@ def search(args, parser, root, output, status):
         for ref in p['refs']:
             if not ref.is_file():
                 parser.error(f'Reference image not found: {ref}')
-    scan = scan_photos(root, supported_extensions(DECODERS), exclude=output)
+    scan = scan_folders(roots, supported_extensions(DECODERS), exclude=output)
     paths = scan.paths
     # files that are not analyzed are named, not skipped without a note (E25); a missing
     # decoder is named only if the folder has files of it (review)
@@ -456,6 +471,8 @@ def search(args, parser, root, output, status):
 
     names = [p['name'] for p in profiles]
     slugs = dict(zip(names, profile_slugs(names)))
+    # with several photo folders, a card names the photo's folder before its path in it (A25)
+    labels = folder_labels(roots)
     # the folder the reference paths of profiles.json are relative to, as for the app (review)
     profiles_base = args.profiles.resolve().parent if args.profiles else Path.cwd()
     nav = '<nav>' + ' · '.join(f'<a href="{quote(slugs[p["name"]] + ".html")}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
@@ -481,7 +498,7 @@ def search(args, parser, root, output, status):
             if thumb_name is None:
                 continue
             uri = html.escape(path.as_uri(), quote=True)
-            relative = str(path.relative_to(root))  # once, for the HTML card and results.json (review)
+            relative = photo_name(path, roots, labels)  # once, for the HTML card and results.json (review)
             rel = html.escape(relative)
             score, detail = score_caption(match, normalized[name])
             label = crop_label(label)
@@ -504,7 +521,7 @@ def search(args, parser, root, output, status):
                 'person_detection': not args.no_person_detection, 'max_persons': args.max_persons,
                 'person_confidence': args.person_confidence, 'reference_weight': args.reference_weight}
     write_results(output / RESULTS_FILE, results_document(status.state['started'],
-                  datetime.now().astimezone().isoformat(timespec='seconds'), root, settings, len(paths), results))
+                  datetime.now().astimezone().isoformat(timespec='seconds'), roots, settings, len(paths), results))
     # the harmless part of the cleanup (E7, E13): temporary thumbnails of a stopped export
     # and thumbnails neither results.json nor any HTML file in the output folder links;
     # the run lock is still held, so no other search writes thumbnails meanwhile

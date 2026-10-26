@@ -1,12 +1,14 @@
 """The photos of a search: supported extensions, RAW+JPEG pairs, skipped files and RAW previews (E25)."""
 import collections
+import os
 from pathlib import Path
 
 import pytest
 
 from framescout_core import (ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
-                             RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, available_decoders, missing_decoder,
-                             raw_preview_transpose, raw_preview_usable, scan_photos, skipped_lines,
+                             RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, available_decoders, distinct_folders,
+                             folder_labels, missing_decoder, missing_folders_message, photo_name,
+                             raw_preview_transpose, raw_preview_usable, scan_folders, scan_photos, skipped_lines,
                              supported_extensions)
 
 NO_HEIF = Decoders(avif=True, heif=False, raw=True)
@@ -173,6 +175,108 @@ def test_scan_ignores_a_heic_partner_that_cannot_be_read(tmp_path):
 
 def test_scan_of_an_empty_folder(tmp_path):
     assert scan_photos(tmp_path) == PhotoScan([], [], collections.Counter())
+
+
+# --- several photo folders (A25) ---
+
+def test_distinct_folders_keep_the_order_of_the_list(tmp_path):
+    a, b = tmp_path / 'b-event', tmp_path / 'a-event'
+    assert distinct_folders([a, b]) == ([a, b], [])
+
+
+def test_distinct_folders_drop_a_folder_listed_twice(tmp_path):
+    a, b = tmp_path / 'a', tmp_path / 'b'
+    kept, dropped = distinct_folders([a, b, a])
+    assert kept == [a, b]
+    assert len(dropped) == 1 and dropped[0][0] == a and 'twice' in dropped[0][1]
+
+
+def test_distinct_folders_ignore_case_where_the_file_system_does(tmp_path):
+    a = tmp_path / 'Event'
+    kept, dropped = distinct_folders([a, tmp_path / 'EVENT'])
+    if os.path.normcase('A') == os.path.normcase('a'):  # Windows
+        assert kept == [a] and len(dropped) == 1
+    else:
+        assert len(kept) == 2 and dropped == []
+
+
+@pytest.mark.parametrize('parent_first', [True, False])
+def test_distinct_folders_drop_a_folder_inside_another_listed_folder(tmp_path, parent_first):
+    parent, child, other = tmp_path / 'all', tmp_path / 'all' / 'event', tmp_path / 'other'
+    listed = [parent, child, other] if parent_first else [child, parent, other]
+    kept, dropped = distinct_folders(listed)
+    assert kept == [parent, other]
+    assert len(dropped) == 1 and dropped[0][0] == child
+    assert 'inside' in dropped[0][1] and str(parent) in dropped[0][1]
+
+
+def test_distinct_folders_keep_a_sibling_with_a_common_name_prefix(tmp_path):
+    # "event-2" is not inside "event", although its path starts with that text
+    a, b = tmp_path / 'event', tmp_path / 'event-2'
+    assert distinct_folders([a, b]) == ([a, b], [])
+
+
+def test_distinct_folders_handle_a_drive_root():
+    root = Path(Path.cwd().anchor)
+    child = root / 'photos'
+    kept, dropped = distinct_folders([child, root])
+    assert kept == [root] and [d[0] for d in dropped] == [child]
+
+
+def test_missing_folders_message():
+    one = Path('D:/gone')
+    assert missing_folders_message([one]) == f'Photo folder does not exist: {one}'
+    two = Path('E:/gone')
+    text = missing_folders_message([one, two])
+    assert text.startswith('None of the photo folders exists:') and str(one) in text and str(two) in text
+
+
+def test_one_folder_has_no_label(tmp_path):
+    # the gallery of a single folder shows the paths as before (user decision on A25)
+    assert folder_labels([tmp_path / 'event']) == ['']
+    assert folder_labels([]) == []
+
+
+def test_several_folders_are_labeled_by_their_names(tmp_path):
+    assert folder_labels([tmp_path / 'Event2024', tmp_path / 'other' / 'Holiday']) == ['Event2024', 'Holiday']
+
+
+def test_folders_of_the_same_name_get_more_of_their_path(tmp_path):
+    a, b, c = tmp_path / 'x' / '2024' / 'raw', tmp_path / 'y' / '2024' / 'raw', tmp_path / 'z' / 'Raw'
+    labels = folder_labels([a, b, c, tmp_path / 'other'])
+    assert labels == [os.sep.join(['x', '2024', 'raw']), os.sep.join(['y', '2024', 'raw']), os.sep.join(['z', 'Raw']),
+                      'other']
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='drive letters are Windows paths')
+def test_a_drive_root_is_labeled_by_its_drive():
+    labels = folder_labels([Path('D:/'), Path('E:/photos')])
+    assert labels == ['D:', 'photos']
+    # the name of a photo on the drive root is then its full path
+    assert photo_name(Path('D:/sub/img.jpg'), [Path('D:/'), Path('E:/photos')], labels) == r'D:\sub\img.jpg'
+    # a network share is labeled by its server and share
+    labels = folder_labels([Path('//server/share/'), Path('E:/photos')])
+    assert labels == [r'\\server\share', 'photos']
+
+
+def test_photo_name_is_the_path_in_its_folder_with_the_label(tmp_path):
+    a, b = tmp_path / 'Event2024', tmp_path / 'Holiday'
+    photo = a / 'sub' / 'img.jpg'
+    assert photo_name(photo, [a], ['']) == os.path.join('sub', 'img.jpg')
+    assert photo_name(photo, [b, a], ['Holiday', 'Event2024']) == os.path.join('Event2024', 'sub', 'img.jpg')
+    assert photo_name(b / 'x.jpg', [a, b], ['Event2024', 'Holiday']) == os.path.join('Holiday', 'x.jpg')
+
+
+def test_scan_folders_joins_the_scans_of_several_folders(tmp_path):
+    a = touch(tmp_path / 'one' / 'a.jpg')
+    raw = touch(tmp_path / 'one' / 'a.nef')
+    b = touch(tmp_path / 'two' / 'sub' / 'b.png')
+    touch(tmp_path / 'one' / 'clip.mov'); touch(tmp_path / 'two' / 'clip.mov')
+    touch(tmp_path / 'two' / 'results' / 'thumb.jpg')
+    scan = scan_folders([tmp_path / 'two', tmp_path / 'one'], exclude=tmp_path / 'two' / 'results')
+    assert scan.paths == sorted([a, b]) and scan.raw_pairs == [raw]
+    assert scan.unsupported == collections.Counter({'.mov': 2})
+    assert scan_folders([]) == PhotoScan([], [], collections.Counter())
 
 
 # --- skipped_lines ---

@@ -15,7 +15,9 @@ from .profiles import load_profiles, read_profiles
 # file names from the current profile list. Written once at the end of the export: an
 # interrupted export leaves the file of the previous complete search.
 RESULTS_FILE = 'results.json'
-RESULTS_FORMAT = 1
+# format 2 lists the photo folders of the search ("photo_folders", A25); format 1 had one
+# ("photo_folder") and is still read. App versions before A25 reject format 2.
+RESULTS_FORMAT = 2
 # the app's gallery: cards per page
 GALLERY_PAGE_SIZE = 48
 # names the app joins to the results folder: plain file names only, never a path
@@ -67,24 +69,26 @@ def profile_state(entry, fingerprints):
 def result_card(rank, path, relative, label, score, text, visual, caption, detail, thumbnail):
     """Return the result file's entry of one gallery card.
 
-    path: the photo; relative: its path in the photo folder as the HTML gallery shows it
-    (computed once by the engine for both, review).
+    path: the photo; relative: its name as the HTML gallery shows it, its path in its photo
+    folder, after the folder's label if the search had several (photo_name; computed once
+    by the engine for both, review).
     """
     return {'rank': rank, 'path': str(path), 'relative': relative, 'label': label,
             'score': score, 'text': text, 'visual': visual, 'caption': caption, 'detail': detail,
             'thumbnail': thumbnail}
 
 
-def results_document(started, finished, root, settings, photos, profiles):
+def results_document(started, finished, folders, settings, photos, profiles):
     """Return the content of the result file.
 
-    started/finished: ISO timestamps of the run; root: the photo folder; settings: the
-    search options; photos: how many photos were found; profiles: per profile a dict with
-    name, fingerprint (search_fingerprint), gallery (HTML file name), normalized and cards
-    (result_card, in gallery order).
+    started/finished: ISO timestamps of the run; folders: the photo folders searched;
+    settings: the search options; photos: how many photos were found; profiles: per profile
+    a dict with name, fingerprint (search_fingerprint), gallery (HTML file name),
+    normalized and cards (result_card, in gallery order).
     """
-    return {'format': RESULTS_FORMAT, 'started': started, 'finished': finished, 'photo_folder': str(root),
-            'settings': settings, 'photos': photos, 'profiles': profiles}
+    return {'format': RESULTS_FORMAT, 'started': started, 'finished': finished,
+            'photo_folders': [str(f) for f in folders], 'settings': settings, 'photos': photos,
+            'profiles': profiles}
 
 
 def write_results(path, document):
@@ -110,16 +114,24 @@ def _check_card(card):
 def read_results(path):
     """Return the result file path as written by the engine, or None if it does not exist.
 
-    Raises ValueError for a file of another format or with invalid entries, in particular a
-    gallery or thumbnail name that is not a plain file name (the app opens them in the
-    results folder), and OSError if it cannot be read.
+    A file of format 1 (before A25) is returned like one of format 2: its "photo_folder" as
+    the list "photo_folders" (empty if it had none). Raises ValueError for a file of
+    another format or with invalid entries, in particular a gallery or thumbnail name that
+    is not a plain file name (the app opens them in the results folder), and OSError if it
+    cannot be read.
     """
     try:
         data = json.loads(Path(path).read_text(encoding='utf-8'))
     except FileNotFoundError:
         return None
-    if not isinstance(data, dict) or data.get('format') != RESULTS_FORMAT:
-        raise ValueError(f'{Path(path).name} is not a FrameScout result file of format {RESULTS_FORMAT}')
+    if not isinstance(data, dict) or data.get('format') not in (1, RESULTS_FORMAT):
+        raise ValueError(f'{Path(path).name} is not a FrameScout result file of format 1 or {RESULTS_FORMAT}')
+    if data['format'] == 1:
+        folder = data.pop('photo_folder', None)
+        data['photo_folders'] = [folder] if isinstance(folder, str) and folder else []
+    folders = data.get('photo_folders')
+    if not isinstance(folders, list) or not all(isinstance(f, str) for f in folders):
+        raise ValueError('"photo_folders" must be a list of folder names')
     profiles = data.get('profiles')
     if not isinstance(profiles, list):
         raise ValueError('"profiles" must be a list')

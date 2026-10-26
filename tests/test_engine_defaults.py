@@ -14,6 +14,20 @@ def option_default_node(option):
     raise AssertionError(f'{option} not found in {ENGINE.name}')
 
 
+def add_argument_call(option):
+    for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8'))):
+        if (isinstance(node, ast.Call) and getattr(node.func, 'attr', None) == 'add_argument'
+                and node.args and isinstance(node.args[0], ast.Constant) and node.args[0].value == option):
+            return node
+    raise AssertionError(f'{option} not found in {ENGINE.name}')
+
+
+def test_the_engine_takes_one_or_more_photo_folders():
+    # A25: "framescout_engine.py D:\a E:\b --profiles ..."; a call with one folder works as before
+    keywords = {k.arg: k.value for k in add_argument_call('folder').keywords}
+    assert isinstance(keywords.get('nargs'), ast.Constant) and keywords['nargs'].value == '+'
+
+
 def test_the_engine_uses_the_shared_default_reference_weight():
     default = option_default_node('--reference-weight')
     assert isinstance(default, ast.Name) and default.id == 'DEFAULT_REFERENCE_WEIGHT', \

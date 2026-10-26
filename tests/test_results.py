@@ -19,7 +19,7 @@ def card(rank=1, **changes):
 def document(cards=None, **profile):
     entry = {'name': 'Red car', 'fingerprint': 'abc', 'gallery': 'red-car.html', 'normalized': True,
              'cards': [card()] if cards is None else cards, **profile}
-    return results_document('2026-10-23T14:00:00+02:00', '2026-10-23T14:02:00+02:00', Path(r'C:\photos'),
+    return results_document('2026-10-23T14:00:00+02:00', '2026-10-23T14:02:00+02:00', [Path(r'C:\photos')],
                             {'top': 150}, 200, [entry])
 
 
@@ -41,11 +41,45 @@ def test_a_card_holds_what_the_app_shows_and_opens():
 
 def test_the_document_names_the_run_and_its_profiles():
     data = document()
-    assert data['format'] == RESULTS_FORMAT
+    assert data['format'] == RESULTS_FORMAT == 2
     assert data['started'] == '2026-10-23T14:00:00+02:00' and data['finished'] == '2026-10-23T14:02:00+02:00'
-    assert data['photo_folder'] == str(Path(r'C:\photos')) and data['settings'] == {'top': 150}
+    # format 2 lists the photo folders (A25); "photo_folder" of format 1 is gone
+    assert data['photo_folders'] == [str(Path(r'C:\photos'))] and 'photo_folder' not in data
+    assert data['settings'] == {'top': 150}
     assert data['photos'] == 200
     assert [p['name'] for p in data['profiles']] == ['Red car']
+
+
+def test_the_document_lists_several_photo_folders():
+    data = results_document('s', 'f', [Path(r'D:\a'), Path(r'E:\b')], {}, 3, [])
+    assert data['photo_folders'] == [str(Path(r'D:\a')), str(Path(r'E:\b'))]
+
+
+@pytest.mark.parametrize('folder, expected', [(r'C:\photos', [r'C:\photos']), ('', []), (None, [])])
+def test_a_format_1_file_is_read_with_its_folder_as_a_list(tmp_path, folder, expected):
+    # written by FrameScout before A25: the app shows it until the next search replaces it
+    data = {**document(), 'format': 1, 'photo_folder': folder}
+    del data['photo_folders']
+    if folder is None:
+        del data['photo_folder']
+    path = tmp_path / RESULTS_FILE
+    path.write_text(json.dumps(data), encoding='utf-8')
+    read = read_results(path)
+    assert read['photo_folders'] == expected and 'photo_folder' not in read
+    assert read['profiles'] == document()['profiles']
+
+
+@pytest.mark.parametrize('folders', [None, r'C:\photos', [r'C:\photos', 5]])
+def test_format_2_needs_a_list_of_photo_folders(tmp_path, folders):
+    data = document()
+    if folders is None:
+        del data['photo_folders']
+    else:
+        data['photo_folders'] = folders
+    path = tmp_path / RESULTS_FILE
+    path.write_text(json.dumps(data), encoding='utf-8')
+    with pytest.raises(ValueError):
+        read_results(path)
 
 
 def test_results_round_trip(tmp_path):
@@ -63,7 +97,7 @@ def test_a_missing_result_file_is_none(tmp_path):
 @pytest.mark.parametrize('content', [
     'not json',
     '[]',
-    '{"format": 2, "profiles": []}',
+    '{"format": 3, "profiles": [], "photo_folders": []}',
     '{"format": 1}',
     '{"format": 1, "profiles": {}}',
 ])

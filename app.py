@@ -537,7 +537,9 @@ def show_results(results, photo_folders):
     name = st.selectbox('Search profile', names, key='results_profile')
     entry = entries[names.index(name)]
     settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
-    st.caption(f"Search from {run_date(results)} · photo folder {plain(str(results.get('photo_folder', '')))} · "
+    folders = results['photo_folders']  # also for a format 1 file (A25)
+    st.caption(f"Search from {run_date(results)} · photo folder{'s' if len(folders) > 1 else ''} "
+               f"{plain('; '.join(folders))} · "
                f"{len(entry['cards']):,} photos (at most {settings.get('top', '?')}), best first. "
                'A ranking by similarity, not a guaranteed identification.')
     if states[name] == 'changed':
@@ -1080,8 +1082,8 @@ with run_tab:
         st.warning(f'{RESULTS_FILE} cannot be read, so the results of the last search are not shown here. Starting '
                    f'the search again writes it anew.\n\nDetails: {plain(str(results_error))}')
     if last_results:
-        # a copy target must not be in the photo folder of this search or of the next one (A17)
-        show_results(last_results, [str(last_results.get('photo_folder') or ''), str(photo_folder)])
+        # a copy target must not be in a photo folder of this search or of the next one (A17, A25)
+        show_results(last_results, [*last_results['photo_folders'], str(photo_folder)])
     elif RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
         # galleries of a search before results.json: listed by file name, since the
         # current profile list may no longer match them (A12)
