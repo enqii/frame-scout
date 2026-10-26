@@ -49,8 +49,13 @@ so callers write `import framescout_core` or `from framescout_core import <name>
 logic here when both sides need it or it should be unit-tested without models; add it to
 the module of its area and to the re-exports in `__init__.py`.
 
-- `names.py`: `EXT` (supported image extensions), `slugify`, `profile_slugs` (unique
-  gallery file names, used by the engine).
+- `names.py`: `EXT` (supported image extensions, including `HEIF_EXT` and `RAW_EXT`,
+  E25), `slugify`, `profile_slugs` (unique gallery file names, used by the engine).
+- `photos.py` (E25): `supported_extensions` (`EXT` without the HEIF/RAW extensions whose
+  package is missing), `missing_decoder_lines`, `scan_photos` (the photos of a search as a
+  `PhotoScan`; app and engine use it), `skipped_lines` (the log lines about skipped files),
+  `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
+  (the engine's RAW decoding; see "Photo formats").
 - `references.py`: `reference_folder` (one reference folder per profile, A1),
   `stage_reference_move`/`update_backup_references`/`finish_reference_move`/`undo_reference_move`
   (a renamed profile's references follow its name, A1), `write_new_file` (reference
@@ -147,7 +152,9 @@ saved over (A2). Back it up before overwriting user changes.
 `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, checked by a test; change them
 together); Streamlit `>=1.40` (A10); numpy, Pillow, open_clip_torch, ultralytics and
 psutil with the versions of the verified runs as minimum, no upper bounds (user decision;
-untested newer majors: I12). Full locking is P5.
+untested newer majors: I12). `pillow-heif` and `rawpy` (E25, required by user decision;
+optional extras: E29) have the releases current when they were added as minimum, not yet
+versions of a verified run. Full locking is P5.
 
 ### `Install-FrameScout.bat`
 
@@ -229,6 +236,32 @@ section "Search terms in English". Hint text only: do not add a language check, 
 translation without a new user decision. A multilingual model is E21
 (`xlm-roberta-base-ViT-B-32`: about 1.47 GB, `transformers`, re-analysis of every photo; a
 hold point).
+
+### Photo formats
+
+The engine reads the files of the photo folder whose extension is in `EXT`
+(`framescout_core.scan_photos`, also used for the app's photo count), leaving out the
+output folder. Pillow reads JPEG, PNG, WebP, BMP, TIFF and AVIF; `pillow-heif` adds
+HEIC/HEIF (`register_heif_opener` at engine start) and `rawpy` camera RAW (`RAW_EXT`,
+E25). Without one of the packages (an installation from before E25) its extensions are
+left out (`supported_extensions`) and the log and the app say so (`missing_decoder_lines`).
+
+- **RAW decoding** (`open_raw` in the engine, user decision at the E25 hold point): the
+  embedded JPEG or bitmap preview (`extract_thumb`) if its longer edge has at least
+  `RAW_PREVIEW_MIN_EDGE` (1024) pixels – a JPEG preview is drafted like any JPEG – else the
+  sensor data at half size (`postprocess(half_size=True, use_camera_wb=True)`, which LibRaw
+  turns upright). A preview is turned upright by its own EXIF orientation if it has one
+  (2..8), else by LibRaw's `sizes.flip` (`raw_preview_transpose`), never by both.
+- **RAW+JPEG pairs:** a RAW file is skipped if a supported `.jpg`/`.jpeg`/`.heic`/`.heif`
+  file of the same name (ignoring case) is in the same folder (`RAW_PARTNER_EXT`).
+- **Skipped files:** the log names the RAW files skipped for a partner and the files of
+  other extensions by extension (`skipped_lines`); the app's "Photo folder" tab shows the
+  same lines.
+- **Cache:** the new extensions only add rows, so the cache signature and `ENGINE` did not
+  change. A change of the RAW decoding (e.g. `RAW_PREVIEW_MIN_EDGE`) changes the embeddings
+  of RAW photos and needs an `ENGINE` bump.
+- Browsers cannot show HEIC/RAW files: the gallery thumbnails are JPEG, but the photo link
+  of such a card downloads the file or hands it to the OS.
 
 ### Person detection
 
@@ -540,11 +573,12 @@ the app's `profiles.json` and `settings.json`, reference folders, prompt generat
 handling, progress lines (A11), the run lock and status file (A4/A5), thumbnails of the
 export (E6), the cache signature, the pipeline helpers for batching/prefetching (E2), the
 scoring (E4/E5) the result file with the gallery helpers (A12) the marks, copying and copy
-target folders (A17) and the cleanup with the cache side table (E7, E11,
-`test_cleanup.py`, `test_cache_signatures.py`, with real SQLite files) are covered by
-`tests/` (via `framescout_core` and `framescout_scoring`); still missing: cache reuse and
-the engine's decoding itself (`open_image` with `Image.draft` needs Pillow, which CI does
-not install). Add a small integration smoke test for real models when feasible.
+target folders (A17), the cleanup with the cache side table (E7, E11,
+`test_cleanup.py`, `test_cache_signatures.py`, with real SQLite files) and the photo scan
+with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`) are
+covered by `tests/` (via `framescout_core` and `framescout_scoring`); still missing: cache
+reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
+and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
 
 ### Known quirks
 

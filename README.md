@@ -165,8 +165,24 @@ starts with the new example profiles.
    "20 copied · 2 already there · 1 renamed · 0 failed"; "Open target folder" opens the
    folder.
 
-Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF. HEIC and camera RAW files are
-not supported yet and are skipped ([BACKLOG.md](BACKLOG.md), E25).
+Supported formats: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF, AVIF, HEIC/HEIF (e.g. from
+phones) and camera RAW files (DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW). Notes:
+
+- For a RAW file FrameScout uses the JPEG preview the camera stored in it, if it is at
+  least 1024 pixels long; otherwise it decodes the RAW data at half size. Its colors are
+  those of the camera's preview (or of a neutral RAW conversion), not of your own RAW
+  development.
+- If a JPEG or HEIC file of the same name is in the same folder as a RAW file (e.g.
+  `IMG_0001.CR2` and `IMG_0001.JPG`, as cameras write them in "RAW+JPEG" mode), only the
+  JPEG/HEIC file is searched, so the same shot does not appear twice.
+- The search log names how many files were skipped and their extensions (e.g. videos or
+  `.xmp` sidecar files); the "Photo folder" tab shows the same.
+- Browsers cannot show HEIC or RAW files: in the HTML gallery the thumbnail works, but a
+  click on the photo downloads it or opens it in another program. "Open" in the app opens
+  it with the program Windows uses for that format.
+- HEIC/HEIF needs the package `pillow-heif` and RAW the package `rawpy`; both are installed
+  by `Install-FrameScout.bat`. An installation from before these formats skips them and
+  says so: run `Install-FrameScout.bat` again.
 
 ### Search terms in English
 
