@@ -5,6 +5,7 @@ environment, downloaded model weights, temporary and compiled files) and never t
 user's data: photos, reference images, results, profiles and settings stay, and so does
 everything outside the project folder (it is only listed).
 """
+import errno
 import os
 import shutil
 import stat
@@ -50,6 +51,8 @@ UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe')}
 # programs of the environment that run while the app or a search runs: Windows does not let
 # anyone open them for writing then, which tells that FrameScout still runs
 ENVIRONMENT_PROGRAMS = tuple(f'.venv/{name}' for name in UNINSTALL_FIRST['.venv'])
+# Windows error of removing a folder that is not empty
+ERROR_DIR_NOT_EMPTY = 145
 
 
 @dataclass(frozen=True)
@@ -86,17 +89,20 @@ def _kept(entry, folder, keep):
     return False
 
 
+def _entries(folder, keep=()):
+    """Return the directory entries of folder that are not in keep; raises OSError."""
+    with os.scandir(folder) as listing:
+        return [entry for entry in listing if not _kept(entry, folder, keep)]
+
+
 def _tree_size(path, keep=()):
     """Bytes of the files below path; links and junctions are not followed, keep is skipped."""
     total = 0
     try:
-        with os.scandir(path) as listing:
-            entries = list(listing)
+        entries = _entries(path, keep)
     except OSError:
         return 0
     for entry in entries:
-        if _kept(entry, path, keep):
-            continue
         try:
             if entry.is_symlink() or entry.is_junction():
                 continue
@@ -164,8 +170,14 @@ def uninstall_plan(root, protected):
         if around:
             skipped.append((path, f'is inside the folder {around[0]} of your settings'))
             continue
-        if keep and path.is_dir() and all(_kept(entry, path, keep) for entry in os.scandir(path)):
-            continue  # only kept entries: nothing to delete
+        if keep and path.is_dir():
+            try:
+                rest = _entries(path, keep)
+            except OSError as exc:  # what it holds besides the kept entries is unknown (review)
+                skipped.append((path, f'cannot be listed ({exc})'))
+                continue
+            if not rest:
+                continue  # only kept entries: nothing to delete
         if not link:
             inside = [folder for folder in protected if _inside(folder, path)
                       and not any(_inside(folder, path / name) for name in keep)]
@@ -233,32 +245,59 @@ def programs_in_use(root):
     return busy
 
 
+def _read_only(path):
+    try:
+        return not os.lstat(path).st_mode & stat.S_IWRITE
+    except OSError:
+        return False
+
+
+def _retry_writable(function, path, exc):
+    """Run function(path) again after clearing the read-only attribute if exc came from that
+    attribute; return the error that remains (None if it worked or path is gone)."""
+    if isinstance(exc, FileNotFoundError):
+        return None
+    if not isinstance(exc, PermissionError) or not _read_only(path):
+        return exc  # e.g. a file in use: a second try fails the same way (review)
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        function(path)
+    except FileNotFoundError:
+        return None
+    except OSError as again:
+        return again
+    return None
+
+
+def _not_empty(exc):
+    return exc.errno == errno.ENOTEMPTY or getattr(exc, 'winerror', None) == ERROR_DIR_NOT_EMPTY
+
+
 def _remove_file(path, failures):
     try:
         os.remove(path)
-    except FileNotFoundError:
-        pass
-    except PermissionError:
-        try:  # a read-only file
-            os.chmod(path, stat.S_IWRITE)
-            os.remove(path)
-        except OSError as exc:
-            failures.append((Path(path), exc))
     except OSError as exc:
-        failures.append((Path(path), exc))
+        error = _retry_writable(os.remove, path, exc)
+        if error is not None:
+            failures.append((Path(path), error))
 
 
 def _remove_tree(path, failures):
-    def retry(function, name, exc):
-        if isinstance(exc, FileNotFoundError):
+    start = len(failures)
+
+    def handle(function, name, exc):
+        if function in (os.unlink, os.remove, os.rmdir):
+            exc = _retry_writable(function, name, exc)
+        elif isinstance(exc, FileNotFoundError):
+            exc = None
+        if exc is None:
             return
-        try:  # a read-only file or folder
-            os.chmod(name, stat.S_IWRITE)
-            function(name)
-        except OSError as again:
-            failures.append((Path(name), again))
+        if function is os.rmdir and _not_empty(exc) and any(
+                Path(name) in failed.parents for failed, _ in failures[start:]):
+            return  # what is left inside it failed and is reported already (review)
+        failures.append((Path(name), exc))
     # shutil.rmtree removes links and junctions inside the tree without following them
-    shutil.rmtree(path, onexc=retry)
+    shutil.rmtree(path, onexc=handle)
 
 
 def _remove_link(path, failures):
@@ -284,12 +323,21 @@ def remove_items(items):
         elif not path.is_dir():
             _remove_file(path, failures)
         elif item.keep:
-            for entry in list(os.scandir(path)):
-                if _kept(entry, path, item.keep):
+            try:
+                entries = _entries(path, item.keep)
+            except OSError as exc:  # the other items are still deleted (review)
+                failures.append((path, exc))
+                continue
+            for entry in entries:
+                try:
+                    link = entry.is_symlink() or entry.is_junction()
+                    folder = not link and entry.is_dir(follow_symlinks=False)
+                except OSError as exc:
+                    failures.append((Path(entry.path), exc))
                     continue
-                if entry.is_symlink() or entry.is_junction():
+                if link:
                     _remove_link(entry.path, failures)
-                elif entry.is_dir(follow_symlinks=False):
+                elif folder:
                     _remove_tree(entry.path, failures)
                 else:
                     _remove_file(entry.path, failures)
