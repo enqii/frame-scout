@@ -134,6 +134,18 @@ def test_run_without_folders_or_profiles_for_a_new_collection_fails(tmp_path, se
     assert 'photo folder' in capsys.readouterr().err
 
 
+@pytest.mark.parametrize('content', [{'format': 1}, {'format': 1, 'folders': 'x', 'profiles': 'p.json'},
+                                     {'format': 1, 'folders': ['x']}])
+def test_an_incomplete_collection_file_is_an_error_not_a_traceback(tmp_path, setup, capsys, content):
+    photos, profiles, calls = setup
+    collection = ev.Collection(tmp_path / 'e', 'c')
+    collection.root.mkdir(parents=True)
+    collection.config_file.write_text(json.dumps(content), encoding='utf-8')
+    assert ev.main(['run', 'c', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'e')]) == 2
+    assert 'collection file' in capsys.readouterr().err and calls == []
+    assert json.loads(collection.config_file.read_text(encoding='utf-8')) == content
+
+
 def test_run_refuses_unknown_models_and_missing_folders(tmp_path, setup, capsys):
     photos, profiles, calls = setup
     assert ev.main(['run', 'c', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'e'),
