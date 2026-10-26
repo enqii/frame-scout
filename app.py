@@ -17,6 +17,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
                              SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_running, cleanup_summary_text,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
+                             DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem,
                              cuda_status, default_copy_folder, default_settings, device_choices, feature_signature,
                              finish_reference_move, lock_held, open_command, openable_photo, page_cards, page_count,
                              profile_fingerprints, profile_state, read_copy_folders, read_marks, read_profiles,
@@ -543,8 +544,12 @@ def show_results(results, photo_folders):
     entry = entries[names.index(name)]
     settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
     folders = results['photo_folders']  # also for a format 1 file (A25)
+    # a search before E22 used the default model and does not name it
+    model_key = settings.get('model', DEFAULT_MODEL)
+    result_model = MODELS.get(model_key) if isinstance(model_key, str) else None
     st.caption(f"Search from {run_date(results)} · photo folder{'s' if len(folders) > 1 else ''} "
                f"{plain('; '.join(folders))} · "
+               + (f'search model {plain(result_model.label)} · ' if result_model else '') +
                f"{len(entry['cards']):,} photos (at most {settings.get('top', '?')}), best first. "
                'A ranking by similarity, not a guaranteed identification.')
     if states[name] == 'changed':
@@ -655,7 +660,7 @@ def show_copy(name, entry, marks, photo_folders):
 def cleanup_signature():
     """The cache signature of the current settings: its entries are never offered for deletion (E11)."""
     return feature_signature(settings['person_detection'], settings['max_persons'], settings['person_confidence'],
-                             DEFAULT_YOLO_MODEL)
+                             DEFAULT_YOLO_MODEL, model=settings['model'])
 
 def cleanup_offered(category):
     return not category['problem'] and bool(category['items'])
@@ -663,7 +668,9 @@ def cleanup_offered(category):
 def scan_storage():
     """Look for what the cleanup can delete and select the default categories (E7)."""
     try:
-        scan = scan_cleanup(RESULTS, PROFILES, REFS, search_folders, cleanup_signature())
+        # rows of the other search models are a category of their own, kept by default (E22)
+        scan = scan_cleanup(RESULTS, PROFILES, REFS, search_folders, cleanup_signature(),
+                            current_model=settings['model'])
     except OSError as exc:
         st.session_state.cleanup_notice = ('warning', f'The storage could not be scanned: {exc}')
         return
@@ -679,7 +686,7 @@ def delete_storage(scan, selected):
     try:
         with st.spinner('Cleaning up …'):
             summary = clean_up(RESULTS, scan, selected, st.session_state.get('cleanup_vacuum', False), engine_alive,
-                               PROFILES, REFS, search_folders, cleanup_signature())
+                               PROFILES, REFS, search_folders, cleanup_signature(), current_model=settings['model'])
     except Exception as exc:
         # clean_up reports the errors of its steps in the summary; this is e.g. the lock file
         # that cannot be opened. The scan is dropped: some files may be gone (review)
@@ -996,6 +1003,25 @@ with settings_tab:
         info, info_error = system_info(), None
     except Exception as exc:
         info, info_error = None, exc
+    # E22: the registry keys, the default first; the labels name the CPU factor, the download
+    # and whether the model is evaluated
+    st.selectbox('Search model', MODEL_KEYS, format_func=model_label, key=setting_key('model'), disabled=active,
+                 help='The AI model that compares your search texts and reference images with the photos.')
+    chosen_model = MODELS[settings['model']]
+    if settings['model'] == DEFAULT_MODEL:
+        st.caption("The default search model: the fastest one, and the one FrameScout's settings were tuned for.")
+    else:
+        st.caption(f'{chosen_model.label} takes about {chosen_model.cpu_factor.lstrip("~")} as long as the default '
+                   'to analyze a photo on a CPU (not measured on a GPU) and downloads '
+                   f'{chosen_model.download} the first time it is used. '
+                   + ('' if chosen_model.evaluated else
+                      "It is not evaluated on FrameScout's searches yet: its results may be better or worse than "
+                      "the default's, and the default weight of reference images was tuned for the default."))
+    st.caption('A new search model analyzes every photo once more. The cache keeps the analyses of each model '
+               'side by side (about 10–15 MB per model for 5,000 photos), so switching back needs no new analysis.')
+    model_missing = model_problem(settings['model'])
+    if model_missing:
+        st.warning(model_missing)
     # "cuda" only if PyTorch can use it (A7); if detection failed, the engine still checks
     devices = device_choices(info['cuda']) if info else list(DEVICES)
     if st.session_state[setting_key('device')] not in devices:
@@ -1056,7 +1082,7 @@ with run_tab:
             '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',st.session_state[setting_key('device')],
             '--batch-size',str(settings['batch_size']),'--top',str(settings['top']),
             '--max-persons',str(settings['max_persons']),'--person-confidence',str(settings['person_confidence']),
-            '--reference-weight',str(settings['reference_weight'])]
+            '--reference-weight',str(settings['reference_weight']),'--model',settings['model']]
         if not settings['person_detection']:
             cmd.append('--no-person-detection')
         st.session_state.pop('cleanup_scan', None)  # the search changes what a cleanup finds (E7)
