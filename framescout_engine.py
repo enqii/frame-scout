@@ -22,12 +22,14 @@ import torch
 import open_clip
 from PIL import Image, ImageOps, ImageFile
 
-from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
-                             DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, RAW_EXT, RESULTS_FILE, RUN_LOCK,
+from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
+                             DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RAW_EXT, RESULTS_FILE,
+                             RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, detection_options, distinct_folders, draft_size, final_status,
                              ensure_thumbnail, folder_labels, group_batches, import_detector_class,
-                             load_profiles, missing_decoder, missing_folders_message, output_folder_problem, photo_name,
+                             load_profiles, missing_decoder, missing_folders_message, model_problem,
+                             output_folder_problem, photo_name,
                              prefetch,
                              prepare_cache, profile_slugs, progress_due,
                              progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
@@ -196,6 +198,11 @@ def main():
     parser.add_argument('--max-persons', type=int, default=12)
     parser.add_argument('--person-confidence', type=float, default=.3)
     parser.add_argument('--yolo-model', default=DEFAULT_YOLO_MODEL)
+    # E22: the default is the evaluated one; another model analyzes every photo once more and
+    # keeps its own cache entries
+    parser.add_argument('--model', choices=MODEL_KEYS, default=DEFAULT_MODEL,
+                        help='search model (CLIP); models other than the default are slower on a CPU, download '
+                             'their weights on first use and are not evaluated yet')
     parser.add_argument('--reference-weight', type=float, default=DEFAULT_REFERENCE_WEIGHT,
                         help='weight of the reference image score (0..1); profiles without reference images use text only')
     # the folders may come before, between or after the options, as one folder could (review)
@@ -271,6 +278,11 @@ def search(args, parser, roots, dropped, output, status):
         for ref in p['refs']:
             if not ref.is_file():
                 parser.error(f'Reference image not found: {ref}')
+    # e.g. SigLIP without transformers: say so before the photos are scanned (E22)
+    problem = model_problem(args.model)
+    if problem:
+        parser.error(problem)
+    search_model = MODELS[args.model]
     scan = scan_folders(roots, supported_extensions(DECODERS), exclude=output)
     paths = scan.paths
     # files that are not analyzed are named, not skipped without a note (E25); a missing
@@ -284,12 +296,14 @@ def search(args, parser, roots, dropped, output, status):
         parser.error(f'CUDA is not available; use --device cpu. {cuda_hint(torch.version.cuda)}')
     torch.set_num_threads(min(12, max(1, torch.get_num_threads())))
     status.update('loading')
-    print(f'{len(paths)} photos; {len(profiles)} search profiles; CLIP: {device}; '
+    print(f'{len(paths)} photos; {len(profiles)} search profiles; search model: {search_model.label} '
+          f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
           f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
-    print('Model weights are downloaded on the first start.', flush=True)
-    model, _, preprocess = open_clip.create_model_and_transforms(CLIP_MODEL, pretrained=CLIP_PRETRAINED, device=device)
+    print('Model weights are downloaded the first time a model is used.', flush=True)
+    model, _, preprocess = open_clip.create_model_and_transforms(search_model.name, pretrained=search_model.pretrained,
+                                                                 device=device)
     model.eval()
-    tokenizer = open_clip.get_tokenizer(CLIP_MODEL)
+    tokenizer = open_clip.get_tokenizer(search_model.name)
 
     def embed_pixels(pixels):
         """Embed preprocessed images (one tensor, first dimension = images), batch_size at a time."""
@@ -327,8 +341,9 @@ def search(args, parser, roots, dropped, output, status):
     con = sqlite3.connect(output / CACHE_FILE)
     # also records which engine version and settings the signature stands for (E11)
     signature = prepare_cache(con, not args.no_person_detection, args.max_persons, args.person_confidence,
-                              args.yolo_model)
-    image_size = getattr(model.visual, 'image_size', 224)
+                              args.yolo_model, model=args.model)
+    # the registry's input size (tested against the OpenCLIP config) if the model does not name it
+    image_size = getattr(model.visual, 'image_size', search_model.image_size)
     min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
                           detector is not None)
     detect_lock = threading.Lock()
@@ -515,7 +530,8 @@ def search(args, parser, roots, dropped, output, status):
                 f'<title>FrameScout – {html.escape(name)}</title><style>{style}</style>' + nav +
                 f'<h1>{html.escape(name)} – Top {len(cards)}</h1><p>Automatically generated ranking, not a guaranteed identification. '
                 + (SCORE_NOTE if normalized[name] else RAW_NOTE) +
-                ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original.</p><main>' + ''.join(cards) + '</main></html>')
+                ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original. '
+                f'Search model: {html.escape(search_model.label)}.</p><main>' + ''.join(cards) + '</main></html>')
         target = output / (slugs[name] + '.html'); target.write_text(page, encoding='utf-8')
         print(f'{name}: {target}', flush=True)
         results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': target.name,
@@ -523,7 +539,8 @@ def search(args, parser, roots, dropped, output, status):
     # after all galleries, so the file always describes a complete export (A12)
     settings = {'device': device, 'batch_size': args.batch_size, 'top': args.top,
                 'person_detection': not args.no_person_detection, 'max_persons': args.max_persons,
-                'person_confidence': args.person_confidence, 'reference_weight': args.reference_weight}
+                'person_confidence': args.person_confidence, 'reference_weight': args.reference_weight,
+                'model': args.model}
     write_results(output / RESULTS_FILE, results_document(status.state['started'],
                   datetime.now().astimezone().isoformat(timespec='seconds'), roots, settings, len(paths), results))
     # the harmless part of the cleanup (E7, E13): temporary thumbnails of a stopped export
