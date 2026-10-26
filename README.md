@@ -110,8 +110,15 @@ starts with the new example profiles.
    images also keep their old names and the app shows a note). Removing reference
    images from a profile or deleting a profile does not delete the files; "Clean up
    storage" can list and delete them (see [Cleaning up storage](#cleaning-up-storage)).
-3. **Photo source:** choose a local image folder (default: `photos` in the
-   project folder). Subfolders are searched as well. Download and extract archives and
+3. **Photo source:** enter one or more local image folders, one per line (default:
+   `photos` in the project folder). Subfolders are searched as well, and one search
+   covers all listed folders, e.g. event folders on several drives. The tab shows the
+   number of photos per folder. A folder listed twice, or inside another listed folder,
+   is searched once as part of it. A listed folder that does not exist (e.g. on a
+   disconnected drive) is left out with a note; the search starts as long as one listed
+   folder exists. FrameScout compares the folders by their path only: the same folder
+   reached by another path (another drive letter for the same network share, a junction
+   or a link inside a listed folder) would be searched twice. Download and extract archives and
    online albums yourself beforehand – FrameScout does not download images from the
    internet. FrameScout turns off the anonymous usage analytics and the automatic
    package installs of Ultralytics (the person detection library) for every search, also
@@ -127,9 +134,12 @@ starts with the new example profiles.
    makes the analysis noticeably faster; with person detection they keep their full
    resolution, so that small persons, e.g. in group photos, keep their detail.
 
-   The photo folder and the AI settings are saved in `settings.json` in the project
+   The photo folders and the AI settings are saved in `settings.json` in the project
    folder as soon as you change them, so they are kept after a reload or a restart and
-   apply in every tab. Only values that differ from the defaults are stored; delete the
+   apply in every tab. (A `settings.json` of an older version with a single photo folder
+   is read as a list of one; the next saved change stores it as the list
+   `photo_folders`. Older versions then no longer find it and use the default
+   `photos` folder.) Only values that differ from the defaults are stored; delete the
    file to return to the defaults. If it cannot be read (e.g. after editing it by hand),
    the app keeps the settings it shows (the defaults when the page is new) and leaves
    the file unchanged; a value that is not allowed is replaced by its default with a
@@ -164,7 +174,7 @@ starts with the new example profiles.
    originals and never overwrites a file in the target folder: all copies land directly
    in that folder (no subfolders) with their file date; a file with the same name and
    content counts as "already there", a different photo with the same name is saved as
-   `name (2).jpg`. A folder inside the photo folder is refused, since the next search
+   `name (2).jpg`. A folder inside a photo folder is refused, since the next search
    would analyze the copies again and show every photo twice. The summary reads e.g.
    "20 copied · 2 already there · 1 renamed · 0 failed"; "Open target folder" opens the
    folder.
@@ -182,7 +192,7 @@ phones) and camera RAW files (DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW).
   names only: if that JPEG is damaged, the log shows an `ERROR` for it and the shot is
   missing from the search; rename or move the JPEG to search the RAW file instead.
 - The search log names how many files were skipped and why (e.g. RAW files with a JPEG,
-  videos or `.xmp` sidecar files); the "Photo folder" tab shows the same.
+  videos or `.xmp` sidecar files); the "Photo source" tab shows the same.
 - Browsers cannot show HEIC or RAW files: in the HTML gallery the thumbnail works, but a
   click on the photo downloads it or opens it in another program. "Open" in the app opens
   it with the program Windows uses for that format.
@@ -219,15 +229,21 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
 ## Results
 
 - `results/results.json` lists what the galleries of the last finished search show
-  (date, photo folder, settings and, per profile, the ranked photos with their scores and
+  (date, photo folders, settings and, per profile, the ranked photos with their scores and
   thumbnails); the app reads it to show the results. It is replaced at the end of every
   search that finishes, so a stopped search keeps showing the previous results. Results
   folders of earlier versions have no such file: the app then lists their HTML files by
-  name until the next search.
+  name until the next search. Since several photo folders per search, the file has
+  format 2 (`photo_folders`, a list, instead of `photo_folder`); the app still reads
+  format 1 files, but an older app version cannot read a format 2 file and shows no
+  results until a search runs with it again.
+- With several photo folders, the galleries name each photo by its folder's name and
+  its path in that folder, e.g. `Event2024\sub\img.jpg`; folders with the same name get
+  more of their path. A search of one folder shows only the path in that folder.
 - `results/marks.json` holds your marks (Match / No match per profile and photo); the
   search never changes it, and "Clean up storage" never deletes it. It is your data:
   keep it when you clean up the `results` folder by hand (deleting it removes all marks). Marks belong to the full path of a photo, so
-  they no longer apply after you move or rename the photo folder.
+  they no longer apply after you move or rename a photo folder.
   Marks belong to the profile name: deleting a profile keeps its marks, and a new
   profile with the same name takes them over.
 - One HTML gallery per search profile is written to `results/`; the thumbnails are
@@ -273,7 +289,7 @@ runs, and no search can start while the cleanup deletes.
 | Temporary thumbnail files | yes | Left by a search stopped while it wrote the galleries |
 | Galleries of renamed or deleted profiles | yes | FrameScout HTML galleries in `results/` that belong neither to a current profile nor to the last search (the file names are listed) |
 | Thumbnails no gallery shows | yes | Thumbnails neither the last search nor a kept gallery shows, also in the old `vorschaubilder/` folder; those only the galleries above show go together with them |
-| Cache entries of deleted photos | yes | Analyses of photos inside the **current** photo folder that no longer exist; only if that folder exists, so a disconnected drive is never cleaned |
+| Cache entries of deleted photos | yes | Analyses of photos inside the **current** photo folders that no longer exist; only in listed folders that exist, so a disconnected drive is never cleaned (it is named in a note) |
 | Cache entries of older versions or unknown settings | yes | Analyses of an earlier FrameScout version (never used again) or of settings only the command line offers (e.g. another `--yolo-model`) |
 | Cache entries of other AI settings | no | Analyses with other person detection settings; they are used again when you switch back, so deleting them means analyzing those photos again then |
 | Reference images no profile uses | no | Image files in `references/` that neither `profiles.json` nor `profiles.json.bak` names (the file names are listed) |
@@ -359,6 +375,12 @@ Manual start after installation:
 
 `profiles.json` exists once the app has been started; on a fresh clone use
 `--profiles .\profiles.example.json` instead.
+
+The engine takes one or more photo folders, e.g.
+`framescout_engine.py D:\Event2024 E:\Holiday --profiles .\profiles.json --output .\results`.
+A folder listed twice or inside another listed one is searched once, a missing folder of
+several is left out with a note (an error only if none exists), and the output folder must
+not be one of the listed folders.
 
 Only one search at a time can use an output folder: the engine holds a lock on
 `<output>\run.lock` while it runs and writes its progress to `<output>\run-status.json`.

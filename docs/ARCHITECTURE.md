@@ -36,7 +36,8 @@ matches to a folder (A17); below it the expander "Clean up storage" (E7).
 
 ### `framescout_engine.py`
 
-`framescout_engine.py`: standalone CLI. Parses arguments, loads models, embeds images,
+`framescout_engine.py`: standalone CLI. Takes one or more photo folders (positional
+`folder`, `nargs='+'`, A25). Parses arguments, loads models, embeds images,
 optionally detects persons, caches embeddings, ranks and exports HTML galleries, then
 removes temporary and unreferenced thumbnails (`auto_cleanup`, E7/E13).
 
@@ -55,6 +56,8 @@ the module of its area and to the re-exports in `__init__.py`.
   can be read here), `supported_extensions` (`EXT` without the extensions of a missing
   decoder), `missing_decoder`, `scan_photos` (the photos of a search as a `PhotoScan`; app
   and engine use it), `skipped_lines` (the log lines about skipped files),
+  `distinct_folders`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
+  (several photo folders per search, A25; see "Several photo folders"),
   `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
   (the engine's RAW decoding; see "Photo formats").
 - `references.py`: `reference_folder` (one reference folder per profile, A1),
@@ -92,7 +95,7 @@ the module of its area and to the re-exports in `__init__.py`.
   (the cache tables with the `signatures` side table, and which engine version and
   settings a cached row belongs to, E11).
 - `settings.py`:
-  `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`DEVICES`/`default_settings`/`read_settings`/`save_settings`/`reconcile_settings`
+  `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`DEVICES`/`LEGACY_PHOTO_FOLDER`/`default_settings`/`folder_lines`/`read_settings`/`save_settings`/`reconcile_settings`
   (the app's `settings.json`, the ranges of its widgets, the engine's `--device` choices,
   and the sync of the widgets with the file, A8).
 - `results.py`:
@@ -240,11 +243,44 @@ translation without a new user decision. A multilingual model is E21
 (`xlm-roberta-base-ViT-B-32`: about 1.47 GB, `transformers`, re-analysis of every photo; a
 hold point).
 
+### Several photo folders
+
+A search covers a list of photo folders (A25, user decisions at the hold point of PR #28).
+The engine resolves the positional folders; an output folder equal to one of them is an
+error. `distinct_folders` drops a folder listed twice and one inside another listed
+folder (compared by `os.path.normcase` of the resolved path; the notes go to the log).
+Missing folders are left out with a log line ("Photo folder not found, searched without
+it"); only if none exists is it an error (`missing_folders_message`, before the lock as
+for one folder, see "Run lock and status"). `scan_folders` joins the `scan_photos` of the
+folders. The gallery and `results.json` name a photo by `photo_name`: its path in its
+folder, after the folder's label (`folder_labels`: none for one folder, so a one-folder
+gallery is unchanged; otherwise the folder name, with more trailing path parts for
+folders of the same name, compared case-insensitively; a drive root is labeled by its
+drive, e.g. `D:`). Cache rows and marks stay keyed by absolute path, so neither the cache
+signature (`ENGINE`) nor `marks.json` changes. Not recognized: the same folder by another
+path (hard links, another drive letter or UNC path for the same share, A28) and junctions
+inside a listed folder, which `Path.rglob` follows on Python 3.14 (checked on Windows
+11: files under a junction are listed by their path through it, A29).
+
+The app: the "Photo source" tab has a text area (`setting_photo_folders`, one folder per
+line). `settings.json` stores the list `photo_folders`; `setting_of_widget` /
+`widget_of_setting` in `app.py` convert between the text and the list (`folder_lines`:
+the non-empty lines, stripped), so `reconcile_settings` and `save_settings` work on
+lists. The tab shows the count per existing folder (each scanned once per page run, as
+before: A6), the notes of `distinct_folders` and a warning per missing folder. "Start
+search" needs one existing folder and passes all distinct folders. The copy target check
+takes the folders of `results.json` and the current list; the cleanup takes the current
+list (see "Storage cleanup"). Checked in PR #28 with one CPU engine smoke run on
+synthetic photos under `.tmp/` (two folders of the same name, a nested and a missing
+one; one folder; none existing; output equal to a folder) and the app with Streamlit's
+`AppTest` (old `settings.json`, format 1 `results.json`, editing the list), not in a
+browser.
+
 ### Photo formats
 
-The engine reads the files of the photo folder whose extension is in `EXT`
-(`framescout_core.scan_photos`, also used for the app's photo count), leaving out the
-output folder. Pillow reads JPEG, PNG, WebP, BMP, TIFF and AVIF (if built with libavif,
+The engine reads the files of the photo folders whose extension is in `EXT`
+(`framescout_core.scan_photos` per folder, also used for the app's photo count), leaving
+out the output folder. Pillow reads JPEG, PNG, WebP, BMP, TIFF and AVIF (if built with libavif,
 as its wheels are); `pillow-heif` adds HEIC/HEIF (`register_heif_opener` at engine start)
 and `rawpy` camera RAW (`RAW_EXT`, E25). `available_decoders` checks all three by
 importing them (a package that is installed but cannot be loaded counts as missing); the
@@ -364,12 +400,16 @@ is logged and never fails the run. Local paths may not work on another computer.
 ### Result file
 
 After the galleries the engine writes `results/results.json`
-(`framescout_core.write_results`, format 1): run start and end, photo folder, settings,
-number of photos and per profile its name, `search_fingerprint` (hash of its search texts
-and reference paths, relative to the profiles file's folder when inside it, so a moved
-project folder changes nothing), gallery file name, `normalized` and the cards (rank,
-path, relative path, crop label, score, raw text/visual similarity, the two caption lines,
-thumbnail name) in gallery order. Written only when the export completes, so a stopped
+(`framescout_core.write_results`, format 2 since A25): run start and end, the searched
+photo folders (`photo_folders`, a list), settings, number of photos and per profile its
+name, `search_fingerprint` (hash of its search texts and reference paths, relative to the
+profiles file's folder when inside it, so a moved project folder changes nothing),
+gallery file name, `normalized` and the cards (rank, path, `relative` (the `photo_name`
+the gallery shows), crop label, score, raw text/visual similarity, the two caption lines,
+thumbnail name) in gallery order. `read_results` also reads format 1 (`photo_folder`, a
+string) and returns it with `photo_folders` as a list of one (none for an empty value);
+app versions before A25 reject format 2 ("not a FrameScout result file of format 1") and
+show no results until they run a search themselves. Written only when the export completes, so a stopped
 search leaves the previous file (galleries already rewritten: E24). The app reads it
 (cached by mtime and size) instead of deriving file names from the current profile list
 (A12). The gallery's "Open" uses `os.startfile` and only for an existing file with an
@@ -436,7 +476,9 @@ runs in the AI settings tab, so the profile tab is drawn first. A read that stil
 with an `OSError` (file in use) gets a different message than a corrupt file
 (`ValueError`). Only values that differ from the defaults are written, so the default
 photo folder follows a moved project folder; unknown keys are kept. Keys follow the CLI
-options; defaults (`default_settings`): `photo_folder` `BASE/photos`, `device`
+options; defaults (`default_settings`): `photo_folders` `[BASE/photos]` (a list of
+strings, saved without empty or blank entries; an empty list is allowed and disables
+the Start button; A25), `device`
 `auto|cpu|cuda` ("cuda" is offered only if `torch.cuda.is_available()`, A7; a saved device
 PyTorch cannot use is shown and used as "auto" but stays saved until another one or "Use
 auto from now on" is chosen), `batch_size` 8, `top` 150, `person_detection` on,
@@ -446,6 +488,11 @@ auto from now on" is chosen), `batch_size` 8, `top` 150, `person_detection` on,
 back to its default with a warning, `save_settings` removes it with the next save; floats
 are rounded, as sliders return values like 0.30000000000000004); an unreadable file is
 never replaced (like `profiles.json`, A2) and the page keeps the settings it shows. The
+single `photo_folder` (`LEGACY_PHOTO_FOLDER`) of versions before A25 is read as
+`photo_folders`, a list of one (`photo_folders` wins if both are saved; a value that is not
+a string is reported like an invalid value), and every save replaces it by
+`photo_folders` (dropped if equal to the default); it is never written again. Older app
+versions ignore `photo_folders` as an unknown key and use their default folder. The
 copy target folders of A17 are kept in the same file under `copy_folders` ({profile name:
 folder}, only folders that differ from the default), saved with `save_copy_folder` under
 the same lock (`_update_locked`, shared with `save_settings`) and ignored by
@@ -472,8 +519,8 @@ size and file id (`version_key`). Copying (`copy_photos`): flat into the target,
 the same name and content under any `name (n).ext` counts as already there (`filecmp`),
 otherwise the next free name (a taken name, also a dangling link, is skipped; at most
 `COPY_MAX_NAMES`); `copy_target` refuses an empty or relative path, a file, and a folder
-inside the photo folder of the shown search, the current setting or the folder of a photo
-to copy. The copy runs in the page run (not a callback) with a progress bar, so a reload
+inside a photo folder of the shown search, of the current setting or the folder of a
+photo to copy. The copy runs in the page run (not a callback) with a progress bar, so a reload
 or another click stops it between photos. The default target is
 `<Pictures>\FrameScout\<gallery slug>` (Pictures from `SHGetKnownFolderPath`, `~/Pictures`
 elsewhere). Using marks as search feedback: A20.
@@ -482,7 +529,7 @@ elsewhere). Using marks as search feedback: A20.
 
 Cleanup (E7, E11, E13, E23, A14; user decisions at the PR #18 hold point): the expander
 "Clean up storage" at the end of the "Search & results" tab. "Scan" (disabled while a
-search runs) calls `scan_cleanup(RESULTS, PROFILES, REFS, photo folder or None, signature
+search runs) calls `scan_cleanup(RESULTS, PROFILES, REFS, photo folders (a list), signature
 of the current settings)` and keeps the result in the session; each category of
 `CLEANUP_CATEGORIES` is a checkbox (key `cleanup_<category>`, set from `CLEANUP_DEFAULTS`
 at the scan, no `value=`) with count and size, or a caption with the reason it is not
@@ -491,8 +538,10 @@ offered. Categories: `temp_thumbnails`; `galleries` (`*.html` in `results/` with
 of the current profiles; other HTML files are kept; its `thumbnails` are the thumbnails
 only orphaned galleries link, deleted with them); `thumbnails` (linked by neither
 `results.json` nor any HTML file, both thumbnail folders); `cache_missing` (rows whose
-path is inside the current photo folder, compared normcased, and certainly does not exist,
-each path checked once; not offered without an existing photo folder); `cache_old` and
+path is inside one of the current photo folders that exist, compared normcased, and
+certainly does not exist, each path checked once; a listed folder that does not exist is
+left out with a note in the category's `notes`, shown as a caption, and its rows are never
+offered (A25); not offered without an existing photo folder); `cache_old` and
 `cache_other` (`classify_signatures`: the side table decides, otherwise
 `known_signatures`, i.e. the current-`ENGINE` signatures of every `max_persons` and every
 slider value of `person_confidence` (each step and its float neighbors up to
@@ -533,9 +582,10 @@ when the process ends in any way, also after `kill()`) and writes
 `finished`/`failed`/`interrupted`, done/total of the phase, new/cached/errors, exit code,
 message; atomic, at most one write a second, best effort). It takes the lock after the
 cheap argument checks (after `import torch`), waiting up to five seconds; if another
-search holds it, it exits with code 3 (`EXIT_BUSY`). A missing photo folder is an error
-before the lock only if the output folder does not exist yet (no folder is created for a
-mistyped call); otherwise it is reported in the status file. The final phase comes from
+search holds it, it exits with code 3 (`EXIT_BUSY`). Photo folders none of which exists
+are an error before the lock only if the output folder does not exist yet (no folder is
+created for a mistyped call); otherwise it is reported in the status file. A missing
+folder of several is left out with a log line (A25). The final phase comes from
 the exit code (`final_status`: 0 finished, 130 interrupted, others failed).
 
 ### Starting a search from the app
@@ -630,7 +680,9 @@ export (E6), the cache signature, the pipeline helpers for batching/prefetching 
 scoring (E4/E5) the result file with the gallery helpers (A12) the marks, copying and copy
 target folders (A17), the cleanup with the cache side table (E7, E11,
 `test_cleanup.py`, `test_cache_signatures.py`, with real SQLite files) and the photo scan
-with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`) are
+with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
+the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
+read from its syntax tree, settings migration, results format 1/2, cleanup per folder) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`); still missing: cache
 reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
@@ -641,8 +693,8 @@ Potential current quirks to investigate rather than assume solved (most are trac
 `BACKLOG.md`): "Clean up storage" was checked with `AppTest` only (not in a browser), and
 `auto_cleanup` in one CPU smoke run with synthetic photos under `.tmp/`; marks follow the
 absolute photo path (A21); the app saves its whole profile list, so edits by another
-session in between are overwritten (A13); an empty photo folder field counts as the app's
-working directory (A16); result file downloads do not contain thumbnails (ZIP export: P4
+session in between are overwritten (A13); the engine still takes an empty folder
+argument as its working directory (the app no longer passes one, A16); result file downloads do not contain thumbnails (ZIP export: P4
 (C), A18); `app.py` itself has no automated tests (A4/A5 were checked once with
 Streamlit's `AppTest` and real engine runs, and manually in a browser: start, reload,
 second tab, Stop – successful, user report 2026-10-21; closing the `Start-FrameScout.bat`
