@@ -152,6 +152,38 @@ def test_run_skips_a_model_whose_package_is_missing_and_reports_failures(tmp_pat
     assert 'needs transformers' in capsys.readouterr().out
 
 
+def test_a_skipped_or_failed_model_keeps_no_scores_of_an_older_run(tmp_path, setup, monkeypatch):
+    photos, profiles, calls = setup
+    collection = ev.Collection(tmp_path / 'e', 'c')
+    for model in MODEL_KEYS[:3]:
+        write_model_scores(collection, model, [0.1] * 5)
+
+    class Failed:
+        returncode = 1
+
+    def fake_run(command, env=None, **kwargs):
+        calls.append((command, env))
+        model = option(command, '--model')
+        write_model_scores(collection, model, [0.2] * 5)  # a failure after the scores file was written
+        return Failed() if model == MODEL_KEYS[1] else type('Done', (), {'returncode': 0})()
+
+    monkeypatch.setattr(ev.subprocess, 'run', fake_run)
+    monkeypatch.setattr(ev, 'model_problem', lambda key: 'needs transformers' if key == MODEL_KEYS[2] else None)
+    assert ev.main(['run', 'c', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'e'),
+                    '--models', ','.join(MODEL_KEYS[:3])]) == 1
+    assert list(collection.scores()) == [MODEL_KEYS[0]]
+    assert collection.scores()[MODEL_KEYS[0]]['profiles'][0]['text'][0] == [0.2]
+
+
+def test_a_photo_changed_between_the_model_runs_is_warned_about(collection):
+    write_model_scores(collection, MODEL_KEYS[0], [0.1] * 5)
+    document = write_model_scores(collection, MODEL_KEYS[1], [0.1] * 5)
+    document['photos'][0]['mtime_ns'] = 8
+    write_scores(collection.scores_file(MODEL_KEYS[1]), document)
+    [warning] = ev.run_warnings(collection.scores())
+    assert 'different photos' in warning
+
+
 # --- pool ---
 
 def test_pool_holds_the_union_of_every_models_top_photos(collection, tmp_path):

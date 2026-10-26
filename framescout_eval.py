@@ -135,11 +135,13 @@ def run_warnings(scores):
     """Warnings about model runs that do not compare the same: changed profiles, other photos."""
     warnings = [f'The profile {name} has changed between the model runs; run the models again.'
                 for name in changed_profiles(profile_entries(scores))]
-    photo_sets = {model: {photo['path'] for photo in document['photos']} for model, document in scores.items()}
+    # a photo changed since another model's run has a new mtime_ns (review)
+    photo_sets = {model: {(photo['path'], photo['mtime_ns']) for photo in document['photos']}
+                  for model, document in scores.items()}
     if len({frozenset(photos) for photos in photo_sets.values()}) > 1:
         counts = ', '.join(f'{model} {len(photos)}' for model, photos in photo_sets.items())
         warnings.append(f'The models scored different photos ({counts}): photos that failed in one run, or the '
-                        'photo folders changed; run the models again if the numbers differ much.')
+                        'photo folders or photos changed; run the models again if the numbers differ much.')
     return warnings
 
 
@@ -190,6 +192,9 @@ def command_run(args):
     env = engine_env(args.cache_dir)
     failed = []
     for model in models:
+        # a model's scores are those of its latest run: a skipped or failed run leaves none,
+        # so pool and metrics never compare an older run with the fresh ones (review)
+        collection.scores_file(model).unlink(missing_ok=True)
         problem = model_problem(model)
         if problem:
             print(f'Skipped {model}: {problem}', flush=True)
@@ -200,6 +205,7 @@ def command_run(args):
         done = subprocess.run(engine_command(collection, model, folders, profiles, args), env=env, check=False)
         if done.returncode != 0:
             print(f'The search with {model} failed (exit code {done.returncode}).', flush=True)
+            collection.scores_file(model).unlink(missing_ok=True)
             failed.append(model)
     if failed:
         print(f'\nNot scored: {", ".join(failed)}.', flush=True)
