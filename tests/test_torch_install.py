@@ -128,10 +128,12 @@ def test_torch_index_url():
         torch_index_url('cu999')
 
 
-def test_requirements_pin_the_same_versions():
+@pytest.mark.parametrize('path', ['requirements.txt', 'constraints.txt'])
+def test_requirements_pin_the_same_versions(path):
     # requirements.txt is installed after the build from the PyTorch index; the same pins
-    # (without a local label) keep pip from replacing that build with another version
-    lines = (ROOT / 'requirements.txt').read_text(encoding='utf-8').splitlines()
+    # (without a local label) keep pip from replacing that build with another version, and
+    # match the +cpu and CUDA builds (constraints.txt applies to both pip calls, I12/I18)
+    lines = (ROOT / path).read_text(encoding='utf-8').splitlines()
     assert f'torch=={TORCH_VERSION}' in lines
     assert f'torchvision=={TORCHVISION_VERSION}' in lines
 
