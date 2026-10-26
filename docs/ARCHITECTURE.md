@@ -51,9 +51,10 @@ the module of its area and to the re-exports in `__init__.py`.
 
 - `names.py`: `EXT` (supported image extensions, including `HEIF_EXT` and `RAW_EXT`,
   E25), `slugify`, `profile_slugs` (unique gallery file names, used by the engine).
-- `photos.py` (E25): `supported_extensions` (`EXT` without the HEIF/RAW extensions whose
-  package is missing), `missing_decoder_lines`, `scan_photos` (the photos of a search as a
-  `PhotoScan`; app and engine use it), `skipped_lines` (the log lines about skipped files),
+- `photos.py` (E25): `available_decoders` (`Decoders`: whether AVIF, HEIC/HEIF and RAW
+  can be read here), `supported_extensions` (`EXT` without the extensions of a missing
+  decoder), `missing_decoder`, `scan_photos` (the photos of a search as a `PhotoScan`; app
+  and engine use it), `skipped_lines` (the log lines about skipped files),
   `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
   (the engine's RAW decoding; see "Photo formats").
 - `references.py`: `reference_folder` (one reference folder per profile, A1),
@@ -241,22 +242,31 @@ hold point).
 
 The engine reads the files of the photo folder whose extension is in `EXT`
 (`framescout_core.scan_photos`, also used for the app's photo count), leaving out the
-output folder. Pillow reads JPEG, PNG, WebP, BMP, TIFF and AVIF; `pillow-heif` adds
-HEIC/HEIF (`register_heif_opener` at engine start) and `rawpy` camera RAW (`RAW_EXT`,
-E25). Without one of the packages (an installation from before E25) its extensions are
-left out (`supported_extensions`) and the log and the app say so (`missing_decoder_lines`).
+output folder. Pillow reads JPEG, PNG, WebP, BMP, TIFF and AVIF (if built with libavif,
+as its wheels are); `pillow-heif` adds HEIC/HEIF (`register_heif_opener` at engine start)
+and `rawpy` camera RAW (`RAW_EXT`, E25). `available_decoders` checks all three by
+importing them (a package that is installed but cannot be loaded counts as missing); the
+engine and the app (`st.cache_resource`, once per app process) call it, so both agree
+(review). The extensions of a missing decoder are left out (`supported_extensions`); a
+reference image of such a format fails with the reason (`missing_decoder`).
 
-- **RAW decoding** (`open_raw` in the engine, user decision at the E25 hold point): the
-  embedded JPEG or bitmap preview (`extract_thumb`) if its longer edge has at least
-  `RAW_PREVIEW_MIN_EDGE` (1024) pixels – a JPEG preview is drafted like any JPEG – else the
-  sensor data at half size (`postprocess(half_size=True, use_camera_wb=True)`, which LibRaw
-  turns upright). A preview is turned upright by its own EXIF orientation if it has one
-  (2..8), else by LibRaw's `sizes.flip` (`raw_preview_transpose`), never by both.
+- **RAW decoding** (`open_raw`/`raw_preview` in the engine, user decision at the E25 hold
+  point): the embedded JPEG or bitmap preview (`extract_thumb`) if its longer edge has at
+  least `RAW_PREVIEW_MIN_EDGE` (1024) pixels – a JPEG preview is drafted like any JPEG –
+  else the sensor data at half size (`postprocess(half_size=True, use_camera_wb=True)`,
+  which LibRaw turns upright). A preview LibRaw cannot extract or Pillow cannot read also
+  leads to the half-size decode (review). A preview is turned upright by its own EXIF
+  orientation if it has one (2..8), else by LibRaw's `sizes.flip`
+  (`raw_preview_transpose`), never by both.
 - **RAW+JPEG pairs:** a RAW file is skipped if a supported `.jpg`/`.jpeg`/`.heic`/`.heif`
-  file of the same name (ignoring case) is in the same folder (`RAW_PARTNER_EXT`).
-- **Skipped files:** the log names the RAW files skipped for a partner and the files of
-  other extensions by extension (`skipped_lines`); the app's "Photo folder" tab shows the
-  same lines.
+  file of the same name (ignoring case) is in the same folder (`RAW_PARTNER_EXT`). The
+  rule looks at names only: if that JPEG/HEIC cannot be decoded, the engine logs it as an
+  `ERROR` and the shot is missing from the search (falling back to the RAW file: E30).
+- **Skipped files:** the log names the RAW files skipped for a partner (count and one
+  example), the files of a missing decoder with the reason (only if the folder has such
+  files), and the files of other extensions by extension (`skipped_lines`); the app's
+  "Photo folder" tab shows the same lines. The app scans the folder on every rerun, as
+  it counted the photos before E25 (A27).
 - **Cache:** the new extensions only add rows, so the cache signature and `ENGINE` did not
   change. A change of the RAW decoding (e.g. `RAW_PREVIEW_MIN_EDGE`) changes the embeddings
   of RAW photos and needs an `ENGINE` bump.
@@ -267,8 +277,11 @@ left out (`supported_extensions`) and the log and the app say so (`missing_decod
   JPEG preview, 1616 px to full size; the forced half-size decode took 0.1–0.7 s each),
   two HEIC files made with pillow-heif (one stored sideways with EXIF orientation 6, decoded
   upright by libheif), a HEIC reference image, a RAW+JPEG pair and a `.mov`; a rerun took
-  every photo from the cache. Not verified: a RAW file with a rotated `flip` or without a
-  usable preview (the fallback was only forced), HEIC from a real phone, other cameras.
+  every photo from the cache. After the review: the fallback for a simulated broken preview
+  (LibRaw error, unreadable JPEG, small bitmap), and engine runs with pillow-heif, rawpy and
+  Pillow's AVIF support blocked (skipped-file lines, HEIC reference error). Not verified: a
+  RAW file with a rotated `flip` or without a usable preview of its own (the fallback was
+  only forced), HEIC from a real phone, other cameras.
 
 ### Person detection
 
