@@ -380,7 +380,8 @@ The engine takes one or more photo folders, e.g.
 `framescout_engine.py D:\Event2024 E:\Holiday --profiles .\profiles.json --output .\results`.
 A folder listed twice or inside another listed one is searched once, a missing folder of
 several is left out with a note (an error only if none exists), and the output folder must
-not be one of the listed folders.
+neither be one of the listed folders nor contain one. The folders may also stand between
+or after the options.
 
 Only one search at a time can use an output folder: the engine holds a lock on
 `<output>\run.lock` while it runs and writes its progress to `<output>\run-status.json`.
