@@ -323,6 +323,17 @@ referenced in commits, pull requests and discussions.
         appear twice in the results. Browsers cannot show HEIC/RAW files, so the HTML
         gallery link of such a photo downloads it or hands it to the OS instead of
         showing it (the thumbnails are JPEG and work).
+      User decisions (PR #26 hold point): `pillow-heif`; `rawpy` with the embedded JPEG
+      preview and a half-size decode as fallback; extensions `.dng .cr2 .cr3 .nef .arw
+      .orf .rw2 .raf .pef .srw`; both packages required in `requirements.txt` (optional
+      extras later: E29); a RAW file with a JPEG/HEIC of the same name in its folder is
+      skipped; `.avif` added; the log names the skipped files. Ultralytics' analytics and
+      auto-install (E27, E28) get their own PR after this one.
+      (Implemented 2026-10-26 in PR #26: `framescout_core.scan_photos`, `open_raw` in the
+      engine, the app's photo count. Also uses the preview only if its longer edge has at
+      least 1024 pixels, else the half-size decode. An installation without the packages
+      skips those formats with a note. AVIF and that note were checked in a CPU smoke run;
+      decoding real HEIC/RAW files is not runtime-tested yet.)
 - [ ] **E26 – Other temporary files of a stopped run stay in `results/`:** the atomic
       writes of `run-status.json` and `results.json` (and of `marks.json` by the app) go
       through `<name>.<random>.tmp`; `terminate()`/`kill()` during such a write leaves that
@@ -352,6 +363,11 @@ referenced in commits, pull requests and discussions.
       idea: set `YOLO_AUTOINSTALL=false` in the `.bat` files and the app's engine
       environment (and say in the README how to set it for manual runs, like I10).
       Found in the E25 PR.
+- [ ] **E29 – HEIC/RAW support as optional extras:** E25 made `pillow-heif` and `rawpy`
+      required in `requirements.txt` (user decision at the PR #26 hold point; the user may
+      want them optional later). Idea: a separate requirements file, a question in
+      `Install-FrameScout.bat`, and the engine's existing fallback (formats without their
+      package are skipped with a note). Roadmap candidate, not scheduled.
 
 ### App (`app.py`)
 
@@ -921,7 +937,10 @@ decision in PR #14):
 - [x] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
       never delete `results/marks.json` (A17) (done 2026-10-25; also E13, E23; HEIC/RAW
       split out into the next item by user decision)
-- [ ] Optional HEIC/RAW support (E25; new dependencies: a hold point)
+- [ ] Optional HEIC/RAW support (E25; new dependencies: a hold point) (in PR #26;
+      packages required by user decision, optional extras: E29)
+- [ ] Turn off Ultralytics' usage analytics and run-time package installs (E27, E28; own
+      PR after E25, user decision at the PR #26 hold point)
 - [ ] Several photo folders per search (A25; changes `results.json` and the CLI: a hold point)
 
 ### P4b – Search models (evaluate at home first)
