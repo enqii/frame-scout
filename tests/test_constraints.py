@@ -1,4 +1,4 @@
-"""constraints.txt pins every installed package to a tested version (I12).
+"""constraints.txt pins every installed package to the version of the verified runs (I12).
 
 Install-FrameScout.bat runs pip install -r requirements.txt -c constraints.txt: requirements.txt
 names the direct dependencies with ranges, constraints.txt pins them and all their dependencies
