@@ -12,7 +12,8 @@ used by the cleanup: patch framescout_core.cleanup.read_profiles.
 from .names import (AVIF_EXT, HEIF_EXT, RAW_EXT, EXT, SLUG_MAX_LENGTH, slugify, profile_slugs)
 from .photos import (RAW_PARTNER_EXT, RAW_PREVIEW_MIN_EDGE, RAW_FLIP_TRANSPOSE, SKIPPED_EXTENSIONS_SHOWN,
     PhotoScan, Decoders, ALL_DECODERS, available_decoders, supported_extensions, missing_decoder, scan_photos,
-    distinct_folders, missing_folders_message, folder_labels, photo_name, scan_folders, join_scans,
+    distinct_folders, output_folder_problem, missing_folders_message, folder_labels, photo_name, scan_folders,
+    join_scans,
     skipped_lines, raw_preview_usable, raw_preview_transpose)
 from .locks import (RunLock, lock_held)
 from .references import (reference_folder, stage_reference_move, finish_reference_move,
