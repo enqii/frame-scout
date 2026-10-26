@@ -52,12 +52,12 @@ UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe')}
 # anyone open them for writing then, which tells that FrameScout still runs
 ENVIRONMENT_PROGRAMS = tuple(f'.venv/{name}' for name in UNINSTALL_FIRST['.venv'])
 # Windows error of removing a folder that is not empty
-ERROR_DIR_NOT_EMPTY = 145
+_ERROR_DIR_NOT_EMPTY = 145
 # Windows: the access right to write a file's data, all sharing modes, and the error of opening
 # a file that a running program (or another handle without write sharing) holds
-FILE_WRITE_DATA = 0x2
-FILE_SHARE_ALL = 0x7
-ERROR_SHARING_VIOLATION = 32
+_FILE_WRITE_DATA = 0x2
+_FILE_SHARE_ALL = 0x7
+_ERROR_SHARING_VIOLATION = 32
 
 
 @dataclass(frozen=True)
@@ -248,11 +248,11 @@ def _held_open(path):
         return False
     import _winapi
     try:
-        handle = _winapi.CreateFile(str(path), FILE_WRITE_DATA, FILE_SHARE_ALL, 0, _winapi.OPEN_EXISTING, 0, 0)
+        handle = _winapi.CreateFile(str(path), _FILE_WRITE_DATA, _FILE_SHARE_ALL, 0, _winapi.OPEN_EXISTING, 0, 0)
     except OSError as exc:
         # only a sharing violation tells that it runs: a read-only file or missing rights give
         # "access denied", which open() reports alike (review)
-        return getattr(exc, 'winerror', None) == ERROR_SHARING_VIOLATION
+        return getattr(exc, 'winerror', None) == _ERROR_SHARING_VIOLATION
     _winapi.CloseHandle(handle)
     return False
 
@@ -305,7 +305,7 @@ def _retry_writable(function, path, exc):
 
 
 def _not_empty(exc):
-    return exc.errno == errno.ENOTEMPTY or getattr(exc, 'winerror', None) == ERROR_DIR_NOT_EMPTY
+    return exc.errno == errno.ENOTEMPTY or getattr(exc, 'winerror', None) == _ERROR_DIR_NOT_EMPTY
 
 
 def _remove_file(path, failures):
