@@ -17,7 +17,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
                              SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_running, cleanup_summary_text,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
-                             DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem,
+                             DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              cuda_status, default_copy_folder, default_settings, device_choices, feature_signature,
                              finish_reference_move, lock_held, open_command, openable_photo, page_cards, page_count,
                              profile_fingerprints, profile_state, read_copy_folders, read_marks, read_profiles,
@@ -542,16 +542,21 @@ def show_results(results, photo_folders):
     # to the first profile whenever a profile is edited (review); the notes are shown below
     name = st.selectbox('Search profile', names, key='results_profile')
     entry = entries[names.index(name)]
-    settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
+    # the settings of that search, not the app's settings
+    run_settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
     folders = results['photo_folders']  # also for a format 1 file (A25)
-    # a search before E22 used the default model and does not name it
-    model_key = settings.get('model', DEFAULT_MODEL)
-    result_model = MODELS.get(model_key) if isinstance(model_key, str) else None
+    model_key = results_model(run_settings)  # the default for a search before E22
+    result_model = MODELS.get(model_key) if model_key else None
     st.caption(f"Search from {run_date(results)} · photo folder{'s' if len(folders) > 1 else ''} "
                f"{plain('; '.join(folders))} · "
                + (f'search model {plain(result_model.label)} · ' if result_model else '') +
-               f"{len(entry['cards']):,} photos (at most {settings.get('top', '?')}), best first. "
+               f"{len(entry['cards']):,} photos (at most {run_settings.get('top', '?')}), best first. "
                'A ranking by similarity, not a guaranteed identification.')
+    if model_key != settings['model']:
+        # E22 review: the gallery must not look like one of the model chosen now
+        made_with = f'the search model {plain(result_model.label)}' if result_model else 'another search model'
+        st.info(f'These results were made with {made_with}; the AI settings now choose '
+                f"{plain(MODELS[settings['model']].label)}. Start the search again for its results.")
     if states[name] == 'changed':
         st.info(f'"{plain(name)}" was changed after this search (search texts or reference images), so these '
                 'results may not fit it any more. Start the search again to update them.')
