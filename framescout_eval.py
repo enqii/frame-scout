@@ -593,6 +593,9 @@ def main(argv=None):
     except (UsageError, ValueError) as exc:
         print(f'framescout_eval.py: error: {exc}', file=sys.stderr, flush=True)
         return 2
+    except KeyboardInterrupt:  # e.g. Ctrl+C during a model run: the cache keeps what was analyzed
+        print('\nInterrupted. Run the same command again to continue.', file=sys.stderr, flush=True)
+        return 130
 
 
 if __name__ == '__main__':
