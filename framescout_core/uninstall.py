@@ -11,10 +11,11 @@ import stat
 from dataclasses import dataclass
 from pathlib import Path
 
-from .copying import _inside, read_copy_folders
+from .copying import COPY_FOLDERS_KEY, _inside
 from .locks import lock_held
 from .run_status import RUN_LOCK
-from .settings import SETTINGS_FILE, default_settings, read_settings
+from .settings import (LEGACY_PHOTO_FOLDER, SETTINGS_FILE, _read_settings_file, _setting_value, _with_folder_list,
+                       default_settings)
 from .signature import DEFAULT_YOLO_MODEL
 
 
@@ -68,15 +69,33 @@ def _is_link(path):
     return os.path.islink(path) or os.path.isjunction(path)
 
 
+def _kept(entry, folder, keep):
+    """Return True if the directory entry of folder is one of the names in keep.
+
+    Case-insensitive where the file system is (review): a kept name must match the same
+    entries as _inside, which decides whether a protected folder is inside a kept entry.
+    """
+    for name in keep:
+        if os.path.normcase(entry.name) == os.path.normcase(name):
+            return True
+        try:
+            if os.path.samefile(entry.path, os.path.join(folder, name)):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def _tree_size(path, keep=()):
     """Bytes of the files below path; links and junctions are not followed, keep is skipped."""
     total = 0
     try:
-        entries = list(os.scandir(path))
+        with os.scandir(path) as listing:
+            entries = list(listing)
     except OSError:
         return 0
     for entry in entries:
-        if entry.name in keep:
+        if _kept(entry, path, keep):
             continue
         try:
             if entry.is_symlink() or entry.is_junction():
@@ -102,22 +121,36 @@ def _size(path, keep=()):
 
 
 def protected_folders(root):
-    """Return the folders the uninstall must never delete or delete into: the photo folders
-    and the copy target folders of settings.json (the default photo folder without one).
+    """Return the folders the uninstall must never delete, delete into or delete from: the
+    photo folders and the copy target folders of settings.json (the default photo folder
+    without one). Relative ones count from root.
 
-    Raises ValueError or OSError like read_settings if settings.json cannot be read: the
-    photo folders are unknown then, so nothing may be deleted.
+    The file is read once, so both lists come from the same version of it (review). Raises
+    ValueError or OSError like read_settings if settings.json cannot be read, and ValueError
+    if its photo or copy folders are not allowed values (the app would use the default photo
+    folder instead, review): the folders are unknown then, so nothing may be deleted.
     """
     root = Path(root)
-    settings, _ = read_settings(root / SETTINGS_FILE, default_settings(root))
-    folders = [Path(x).expanduser() for x in settings['photo_folders']]
-    folders += [Path(x).expanduser() for x in read_copy_folders(root / SETTINGS_FILE).values()]
+    data = _with_folder_list(_read_settings_file(root / SETTINGS_FILE))
+    if LEGACY_PHOTO_FOLDER in data:  # not a string
+        raise ValueError(f'"{LEGACY_PHOTO_FOLDER}" is not a folder: {data[LEGACY_PHOTO_FOLDER]!r}')
+    photo_folders = default_settings(root)['photo_folders']
+    if 'photo_folders' in data:
+        photo_folders = _setting_value('photo_folders', data['photo_folders'])
+        if photo_folders is None:
+            raise ValueError(f'"photo_folders" is not a list of folders: {data["photo_folders"]!r}')
+    copy_folders = data.get(COPY_FOLDERS_KEY, {})
+    if not isinstance(copy_folders, dict) or not all(isinstance(x, str) for x in copy_folders.values()):
+        raise ValueError(f'"{COPY_FOLDERS_KEY}" is not a list of folders per profile: {copy_folders!r}')
+    folders = [Path(x).expanduser() for x in photo_folders]
+    folders += [Path(x.strip()).expanduser() for x in copy_folders.values() if x.strip()]
     return [root / x if not x.is_absolute() else x for x in folders]
 
 
 def uninstall_plan(root, protected):
     """Return (items, skipped): the UninstallItems that exist below root, and (path, reason)
-    for each that is not deleted because one of the protected folders is inside it."""
+    for each that is not deleted because one of the protected folders is inside it (outside
+    its kept entries) or holds it (e.g. a photo folder that is root or a folder above it)."""
     root = Path(root)
     items, skipped = [], []
     for relative, label in UNINSTALL_ITEMS:
@@ -126,7 +159,12 @@ def uninstall_plan(root, protected):
             continue
         link = _is_link(path)
         keep = () if link else UNINSTALL_KEEP.get(relative, ())
-        if keep and path.is_dir() and all(entry.name in keep for entry in os.scandir(path)):
+        # the folder the item is in: for a link, never what it points to
+        around = [folder for folder in protected if _inside(path.parent, folder)]
+        if around:
+            skipped.append((path, f'is inside the folder {around[0]} of your settings'))
+            continue
+        if keep and path.is_dir() and all(_kept(entry, path, keep) for entry in os.scandir(path)):
             continue  # only kept entries: nothing to delete
         if not link:
             inside = [folder for folder in protected if _inside(folder, path)
@@ -247,7 +285,7 @@ def remove_items(items):
             _remove_file(path, failures)
         elif item.keep:
             for entry in list(os.scandir(path)):
-                if entry.name in item.keep:
+                if _kept(entry, path, item.keep):
                     continue
                 if entry.is_symlink() or entry.is_junction():
                     _remove_link(entry.path, failures)

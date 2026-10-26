@@ -78,10 +78,15 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
         out('Deleted (a new installation downloads or creates them again):')
         _rows([(item.path, item.label, item.size) for item in items], root, out)
         out(f'  Total: {size_text(sum(item.size for item in items))}')
-    else:
+    elif not skipped:
         out('Nothing to delete: the environment, model weights and temporary files are gone already.')
     for path, reason in skipped:
         out(f'Not deleted: {_name(path, root)} {reason}.')
+    if skipped:
+        out('The uninstall never deletes a folder that holds one of your photo or copy folders, nor anything '
+            'inside one. To delete these '
+            'items, remove that folder from the photo folders (or the copy folder of the profile) in the app, or '
+            'delete the items yourself.')
     out('')
     kept = user_data(root)
     out('Kept (your data, never deleted by the uninstall):')
@@ -98,7 +103,7 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
     out('')
     if not items:
         out(f'To remove FrameScout completely, back up the data you want to keep and delete the folder {root}.')
-        return 0
+        return 1 if skipped else 0
     if args.dry_run:
         out('Dry run: nothing was deleted.')
         return 0
