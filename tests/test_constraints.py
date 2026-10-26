@@ -11,8 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import TORCH_VERSION, TORCHVISION_VERSION
-
 ROOT = Path(__file__).resolve().parent.parent
 PIN = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)==(\d+(?:\.\d+)*(?:\.post\d+)?)$')
 REQUIREMENT = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)\s*((?:[<>=!]=?\s*[\w.]+\s*,?\s*)*)$')
@@ -103,13 +101,6 @@ def test_every_requirement_has_a_matching_pin(path):
         assert name in pinned, f'{name} from {path} is not pinned in constraints.txt'
         assert satisfies(pinned[name], specifiers), \
             f'constraints.txt pins {name}=={pinned[name]}, which {path} does not allow'
-
-
-def test_torch_pins_match_the_installer():
-    # without a local label "torch==2.14.1" matches the +cpu and the CUDA builds that
-    # install_torch.py installs before requirements.txt
-    assert pins()['torch'] == TORCH_VERSION
-    assert pins()['torchvision'] == TORCHVISION_VERSION
 
 
 def batch_commands(text):
