@@ -125,8 +125,9 @@ def main(argv=None):
     else:
         print(f'Installing PyTorch with CUDA support ({build}). This is a large download.', flush=True)
     # torch and torchvision with their local label (+cpu, +cu130) exist only on the PyTorch
-    # index; their dependencies (numpy, pillow, ...) are taken from PyPI too, where they are
-    # newer, so requirements.txt does not replace them right away (review)
+    # index; their dependencies (numpy, pillow, ...) are taken from PyPI too, where the
+    # versions of constraints.txt exist (Install-FrameScout.bat sets PIP_CONSTRAINT, I18), so
+    # requirements.txt does not replace them right away (review)
     command = [sys.executable, '-m', 'pip', 'install', '--no-cache-dir', *torch_requirements(build),
                '--index-url', torch_index_url(build), '--extra-index-url', PYPI_INDEX]
     if args.dry_run:
