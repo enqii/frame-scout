@@ -777,6 +777,9 @@ def cache_env():
     for k,p in paths.items():
         p.mkdir(parents=True, exist_ok=True)
         env[k] = str(p)
+    # run.log is written and read as UTF-8; without this the engine writes the ANSI code
+    # page of Windows, which garbles e.g. "·" or "ä" in the log (E22 review)
+    env['PYTHONIOENCODING'] = 'utf-8'
     return env
 
 st.title('🔎 FrameScout')
