@@ -157,10 +157,13 @@ function show() {
   $('badge').className = 'badge ' + cls(value);
   $('badge').textContent = value === true ? 'match' : value === false ? 'no match' : 'not labelled';
   $('name').textContent = photo.name;
-  $('folder').textContent = photo.folder;
   $('original').href = `original/${p}/${i}`;
   if (done === labels.length) status(`All ${labels.length} photos of this profile labelled. PageDown: next profile.`);
-  for (let ahead = 1; ahead <= 3 && i + ahead < labels.length; ahead++) new Image().src = `photo/${p}/${i + ahead}`;
+  $('folder').textContent = photo.folder + (photo.thumb ? '' : ' · original file (no gallery thumbnail)');
+  // only thumbnails are prefetched: an original can be a large file
+  for (let ahead = 1; ahead <= 3 && i + ahead < labels.length; ahead++) {
+    if (prof.photos[i + ahead].thumb) new Image().src = `photo/${p}/${i + ahead}`;
+  }
   remember();
 }
 
