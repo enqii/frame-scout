@@ -115,7 +115,9 @@ starts with the new example profiles.
    online albums yourself beforehand – FrameScout does not download images from the
    internet. FrameScout turns off the anonymous usage analytics and the automatic
    package installs of Ultralytics (the person detection library) for every search, also
-   from a manual command line.
+   from a manual command line (the search sets `YOLO_OFFLINE=true` and
+   `YOLO_AUTOINSTALL=false` for itself, overriding values you set; the person detection
+   model is still downloaded on first use).
 4. **AI settings:** with "auto", CUDA is used if PyTorch detects a
    compatible NVIDIA GPU, otherwise the CPU; "cuda" is offered only if PyTorch was
    installed with GPU support (see "GPU support" above). The batch size is the number of image
