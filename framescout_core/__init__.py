@@ -20,6 +20,8 @@ from .references import (reference_folder, stage_reference_move, finish_referenc
     undo_reference_move, update_backup_references, write_new_file)
 from .profiles import (create_from_example, generic_prompts, load_profiles, read_profiles,
     save_profiles)
+from .models import (SearchModel, MODELS, DEFAULT_MODEL, MODEL_KEYS, model_label, missing_packages,
+    model_problem)
 from .signature import (CLIP_MODEL, CLIP_PRETRAINED, ENGINE, feature_signature, CACHE_FILE,
     DEFAULT_YOLO_MODEL, prepare_cache, SLIDER_NOISE_ULPS, known_signatures, classify_signatures)
 from .torch_build import (TORCH_VERSION, TORCHVISION_VERSION, TORCH_INDEX, CUDA_BUILDS,
