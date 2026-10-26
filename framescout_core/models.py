@@ -64,6 +64,16 @@ def model_label(key):
     return f'{model.label} ({model.cpu_factor} slower on a CPU; {model.download} download{note})'
 
 
+def results_model(settings):
+    """Return the search model key of a search from its results.json settings (a dict).
+
+    A search before E22 used the default model and does not name it. Anything other than a
+    string (a damaged file) is returned as None.
+    """
+    key = settings.get('model', DEFAULT_MODEL) if isinstance(settings, dict) else DEFAULT_MODEL
+    return key if isinstance(key, str) else None
+
+
 def missing_packages(key, find_spec=importlib.util.find_spec):
     """Return the packages the search model key needs that are not installed (find_spec(name) is None)."""
     return [name for name in _model(key).requires if find_spec(name) is None]

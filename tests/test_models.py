@@ -4,7 +4,7 @@ import re
 import pytest
 
 from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, MODELS, SearchModel, missing_packages, model_label,
-                             model_problem)
+                             model_problem, results_model)
 
 
 def test_the_default_is_openai_clip_vit_b_32_with_quickgelu():
@@ -74,6 +74,15 @@ def test_missing_packages_and_problem():
     assert 'transformers' in problem and 'Install-FrameScout.bat' in problem
     assert model_problem('vit-b-16-siglip', all_installed) is None
     assert model_problem(DEFAULT_MODEL, none_installed) is None
+
+
+def test_the_model_of_a_search_comes_from_its_results_settings():
+    # E22 review: the app notes results of another model than the chosen one
+    assert results_model({'model': 'vit-b-16-siglip', 'top': 150}) == 'vit-b-16-siglip'
+    assert results_model({'top': 150}) == DEFAULT_MODEL  # a search before E22
+    assert results_model({}) == DEFAULT_MODEL and results_model(None) == DEFAULT_MODEL
+    assert results_model({'model': 'removed-later'}) == 'removed-later'  # e.g. trimmed from the list (E32)
+    assert results_model({'model': ['x']}) is None and results_model({'model': None}) is None
 
 
 def test_unknown_model_keys_are_refused():

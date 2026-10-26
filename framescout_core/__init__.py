@@ -21,7 +21,7 @@ from .references import (reference_folder, stage_reference_move, finish_referenc
 from .profiles import (create_from_example, generic_prompts, load_profiles, read_profiles,
     save_profiles)
 from .models import (SearchModel, MODELS, DEFAULT_MODEL, MODEL_KEYS, model_label, missing_packages,
-    model_problem)
+    model_problem, results_model)
 from .signature import (CLIP_MODEL, CLIP_PRETRAINED, ENGINE_TEMPLATE, engine_id, ENGINE, MODEL_ENGINES,
     feature_signature, CACHE_FILE,
     DEFAULT_YOLO_MODEL, prepare_cache, SLIDER_NOISE_ULPS, known_signatures, classify_signatures)
