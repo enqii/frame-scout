@@ -32,7 +32,7 @@ def test_registry_entries_are_consistent():
         # a stable key for the command line and settings.json: lowercase, no spaces
         assert re.fullmatch(r'[a-z0-9]+(-[a-z0-9]+)*', key), key
         assert model.label and model.download and model.cpu_factor
-        assert model.image_size > 0 and model.embedding_size > 0
+        assert model.image_size > 0
     assert len({(m.name, m.pretrained) for m in MODELS.values()}) == len(MODELS)
 
 
@@ -119,7 +119,7 @@ def test_model_config_matches_the_activation_of_the_weights(key):
 
 
 @pytest.mark.parametrize('key', MODEL_KEYS)
-def test_input_and_embedding_size_match_the_open_clip_config(key):
+def test_input_size_matches_the_open_clip_config(key):
     # the engine drafts JPEGs with the input size (draft_size): a 256/384 px model must
     # never be drafted for 224 px
     open_clip = open_clip_or_skip()
@@ -127,7 +127,6 @@ def test_input_and_embedding_size_match_the_open_clip_config(key):
     config = open_clip.get_model_config(model.name)
     size = config['vision_cfg'].get('image_size', 224)
     assert (max(size) if isinstance(size, (tuple, list)) else size) == model.image_size
-    assert config['embed_dim'] == model.embedding_size
 
 
 @pytest.mark.parametrize('key', MODEL_KEYS)

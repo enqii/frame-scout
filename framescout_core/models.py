@@ -11,8 +11,8 @@ class SearchModel:
     model and weights; label: the name shown in the app, the log and the galleries;
     download: the size of the first-use download; cpu_factor: the CPU time per photo part
     relative to the default (measured in PR #13, see BACKLOG.md E22); image_size: the input
-    edge in pixels and embedding_size the length of a cached vector (both tested against the
-    OpenCLIP config); requires: Python packages (import names) the model needs beyond
+    edge in pixels (tested against the OpenCLIP config; the engine's fallback for the draft
+    size); requires: Python packages (import names) the model needs beyond
     requirements.txt of v1.1; multilingual: understands search terms in other languages
     than English (none yet, E21); evaluated: its search quality was measured (E20).
     """
@@ -23,7 +23,6 @@ class SearchModel:
     download: str
     cpu_factor: str
     image_size: int
-    embedding_size: int
     requires: tuple = ()
     multilingual: bool = False
     evaluated: bool = False
@@ -35,13 +34,13 @@ class SearchModel:
 # trained with QuickGELU, so the "-quickgelu" config (E1).
 MODELS = {model.key: model for model in (
     SearchModel('vit-b-32-openai', 'ViT-B-32-quickgelu', 'openai', 'ViT-B/32 · OpenAI CLIP', '605 MB', '1×',
-                224, 512, evaluated=True),
+                224, evaluated=True),
     SearchModel('vit-b-16-datacomp', 'ViT-B-16', 'datacomp_xl_s13b_b90k', 'ViT-B/16 · DataComp-XL', '599 MB', '~4×',
-                224, 512),
+                224),
     SearchModel('vit-l-14-datacomp', 'ViT-L-14', 'datacomp_xl_s13b_b90k', 'ViT-L/14 · DataComp-XL', '1.71 GB', '~18×',
-                224, 768),
+                224),
     SearchModel('vit-b-16-siglip', 'ViT-B-16-SigLIP', 'webli', 'ViT-B/16 · SigLIP WebLI', '813 MB', '~4×',
-                224, 768, requires=('transformers',)),
+                224, requires=('transformers',)),
 )}
 DEFAULT_MODEL = 'vit-b-32-openai'
 # the choices of --model and of the app's selectbox, the default first
