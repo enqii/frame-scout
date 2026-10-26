@@ -52,6 +52,22 @@ def test_the_engine_imports_ultralytics_only_through_import_detector_class():
     assert ast.unparse(calls[0].args[0]) == 'os.environ'
 
 
+def test_the_engine_offers_the_registered_search_models():
+    # E22: --model takes the registry keys (no free-text names), with the app's default
+    keywords = {k.arg: k.value for k in add_argument_call('--model').keywords}
+    assert isinstance(keywords.get('default'), ast.Name) and keywords['default'].id == 'DEFAULT_MODEL'
+    assert isinstance(keywords.get('choices'), ast.Name) and keywords['choices'].id == 'MODEL_KEYS'
+
+
+def test_the_engine_loads_and_caches_the_chosen_model():
+    # the default model's names alone would load the default whatever --model says
+    nodes = list(ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8'))))
+    names = {node.id for node in nodes if isinstance(node, ast.Name)}
+    assert not {'CLIP_MODEL', 'CLIP_PRETRAINED'} & names
+    [prepare] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'prepare_cache']
+    assert any(k.arg == 'model' and ast.unparse(k.value) == 'args.model' for k in prepare.keywords)
+
+
 def test_the_engine_uses_the_shared_default_yolo_model():
     # known_signatures computes the cache signatures of the app's settings with it (E11)
     default = option_default_node('--yolo-model')
