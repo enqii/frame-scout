@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, SETTING_RANGES, SETTINGS_FILE, default_settings,
-                             folder_lines, read_settings, reconcile_settings, save_settings)
+from framescout_core import (DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEVICES, MODEL_KEYS, SETTING_RANGES,
+                             SETTINGS_FILE, default_settings, folder_lines, read_settings, reconcile_settings, save_settings)
 
 
 @pytest.fixture
@@ -28,7 +28,22 @@ def test_the_defaults_are_the_previous_session_defaults(tmp_path):
     assert SETTINGS_FILE == 'settings.json'
     assert default_settings(tmp_path) == {
         'photo_folders': [str(tmp_path / 'photos')], 'device': 'auto', 'batch_size': 8, 'top': 150,
-        'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.3}
+        'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.3,
+        'model': DEFAULT_MODEL}
+
+
+def test_the_search_model_is_a_registry_key(tmp_path, defaults):
+    # E22: a key of framescout_core.MODELS, like the engine's --model; an older settings.json
+    # without it uses the default model
+    assert defaults['model'] == DEFAULT_MODEL
+    path = write(tmp_path / 'settings.json', {'model': 'vit-l-14-datacomp'})
+    assert read_settings(path, defaults) == ({**defaults, 'model': 'vit-l-14-datacomp'}, [])
+    for key in MODEL_KEYS:
+        assert save_settings(path, {'model': key}, defaults) == {'model': key}
+        # the default is not written, like any other default value
+        assert stored(path).get('model', DEFAULT_MODEL) == key
+    save_settings(path, {'model': DEFAULT_MODEL}, defaults)
+    assert 'model' not in stored(path)
 
 
 def test_the_default_reference_weight_is_the_evaluated_one():
@@ -67,6 +82,8 @@ def test_a_byte_order_mark_is_accepted(tmp_path, defaults):
     ('top', 5001), ('max_persons', 51), ('person_detection', 1), ('person_detection', 'yes'),
     ('person_confidence', 0.05), ('person_confidence', 0.95), ('person_confidence', True),
     ('reference_weight', -0.1), ('reference_weight', 1.5), ('reference_weight', float('nan')),
+    # a free-text OpenCLIP name or a model no longer offered (E22)
+    ('model', 'ViT-B-32'), ('model', 'removed-model'), ('model', None), ('model', ['vit-b-16-datacomp']),
 ])
 def test_an_invalid_value_falls_back_to_its_default_and_is_reported(tmp_path, defaults, key, value):
     # the widgets raise for values outside their range, so these must never reach them
