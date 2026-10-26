@@ -3,8 +3,8 @@ import json
 import math
 import sqlite3
 
-from framescout_core import (DEFAULT_YOLO_MODEL, ENGINE, SETTING_RANGES, classify_signatures, feature_signature,
-                             known_signatures, prepare_cache)
+from framescout_core import (DEFAULT_YOLO_MODEL, ENGINE, SETTING_RANGES, classify_signatures, engine_id,
+                             feature_signature, known_signatures, prepare_cache)
 
 DEFAULTS = dict(person_detection=True, max_persons=12, person_confidence=.3, yolo_model=DEFAULT_YOLO_MODEL)
 
@@ -90,3 +90,39 @@ def test_a_recorded_older_engine_wins_over_a_known_signature():
     # cannot happen with a real hash, but the side table is the more precise source
     sig = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL)
     assert classify_signatures([sig], {sig: 'v4'}, 'x') == {sig: 'old'}
+
+
+# --- search models (E22) ---
+
+def test_prepare_cache_records_the_engine_of_the_model(tmp_path):
+    con = sqlite3.connect(tmp_path / 'cache.sqlite3')
+    signature = prepare_cache(con, **DEFAULTS, model='vit-b-16-siglip')
+    assert signature == feature_signature(**DEFAULTS, model='vit-b-16-siglip')
+    [(stored, engine, settings)] = con.execute('SELECT signature, engine, settings FROM signatures').fetchall()
+    assert stored == signature and engine == engine_id('vit-b-16-siglip')
+    # the model is named by the engine column, the settings stay as before
+    assert json.loads(settings) == DEFAULTS
+    con.close()
+
+
+def test_rows_of_other_registered_models_have_a_category_of_their_own():
+    current = feature_signature(**DEFAULTS)
+    b16 = feature_signature(**DEFAULTS, model='vit-b-16-datacomp')
+    l14_other = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL, model='vit-l-14-datacomp')
+    recorded = {b16: engine_id('vit-b-16-datacomp'), l14_other: engine_id('vit-l-14-datacomp')}
+    result = classify_signatures([current, b16, l14_other], recorded, current)
+    assert result == {current: 'current', b16: 'model', l14_other: 'model'}
+
+
+def test_with_another_current_model_the_default_rows_count_as_another_model():
+    current = feature_signature(**DEFAULTS, model='vit-b-16-datacomp')
+    other_settings = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL, model='vit-b-16-datacomp')
+    default_recorded = feature_signature(**DEFAULTS)
+    # a row of the default model written before the side table existed (known_signatures)
+    default_unrecorded = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL)
+    recorded = {current: engine_id('vit-b-16-datacomp'), other_settings: engine_id('vit-b-16-datacomp'),
+                default_recorded: ENGINE, 'a' * 64: 'v4-something'}
+    result = classify_signatures([current, other_settings, default_recorded, default_unrecorded, 'a' * 64,
+                                  'b' * 64], recorded, current, current_engine=engine_id('vit-b-16-datacomp'))
+    assert result == {current: 'current', other_settings: 'other', default_recorded: 'model',
+                      default_unrecorded: 'model', 'a' * 64: 'old', 'b' * 64: 'old'}
