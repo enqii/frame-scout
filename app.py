@@ -1,6 +1,7 @@
 """FrameScout: local Streamlit user interface for framescout_engine.py."""
 import functools
 import hashlib
+import importlib.util
 import os
 import platform
 import re
@@ -13,7 +14,7 @@ import psutil
 import streamlit as st
 
 from framescout_core import (CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
-                             EXT, FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_FILE,
+                             FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_FILE,
                              PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
                              SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_running, cleanup_summary_text,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
@@ -22,8 +23,9 @@ from framescout_core import (CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_W
                              profile_fingerprints, profile_state, read_copy_folders, read_marks, read_profiles,
                              read_results, read_settings, read_status, reconcile_settings, reference_folder,
                              rename_copy_folder, rename_marks, reveal_command, run_active, save_copy_folder,
-                             save_marks, save_profiles, save_settings, scan_cleanup, size_text, stage_reference_move,
-                             started_in_time, status_fraction, status_text, stopped_status, undo_reference_move,
+                             missing_decoder_lines, save_marks, save_profiles, save_settings, scan_cleanup, scan_photos,
+                             size_text, skipped_lines, stage_reference_move, started_in_time, status_fraction,
+                             status_text, stopped_status, supported_extensions, undo_reference_move,
                              update_backup_references, write_new_file, write_status)
 
 BASE = Path(__file__).resolve().parent
@@ -47,7 +49,12 @@ MARK_BY_LABEL = {label: state for state, label in MARK_LABELS.items()}
 GALLERY_COLUMNS = 4
 # Markdown characters, escaped in file names shown with st.markdown/st.caption
 MARKDOWN_CHARS = re.compile(r'([\\`*_{}\[\]()#+\-.!|<>~$])')
-UPLOAD_TYPES = sorted(x.lstrip('.') for x in EXT)
+# the engine runs in the same Python environment, so it reads the same formats: HEIC/HEIF
+# and camera RAW only with pillow-heif and rawpy installed (E25); find_spec does not import them
+HEIF = importlib.util.find_spec('pillow_heif') is not None
+RAW = importlib.util.find_spec('rawpy') is not None
+SUPPORTED = supported_extensions(HEIF, RAW)
+UPLOAD_TYPES = sorted(x.lstrip('.') for x in SUPPORTED)
 # labels of the profile fields, shared by the edit and the new-profile form (review);
 # search terms are English only (E3)
 LABEL_NAME = 'Search motif (in English)'
@@ -105,7 +112,7 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
             # write_new_file never overwrites leftover files in the folder
             for f in uploads:
                 suffix = Path(f.name).suffix.lower()
-                if suffix in EXT:
+                if suffix in SUPPORTED:
                     written.append(write_new_file(folder, 'reference', suffix, f.getvalue()))
         # keeps the previous file as profiles.json.bak (A2)
         save_profiles(PROFILES, build(refs + [x.relative_to(BASE).as_posix() for x in written]))
@@ -924,11 +931,18 @@ with f_tab:
     st.subheader('Photo collection')
     st.text_input('Local photo folder (including subfolders)', key=setting_key('photo_folder'), disabled=active)
     if photo_folder.is_dir():
-        count = sum(1 for x in photo_folder.rglob('*') if x.is_file() and x.suffix.lower() in EXT and RESULTS not in x.parents)
-        st.success(f'{count:,} supported image files found.')
+        # the same scan as the engine's (E25), so the numbers match its log
+        photo_scan = scan_photos(photo_folder, SUPPORTED, exclude=RESULTS)
+        st.success(f'{len(photo_scan.paths):,} supported image files found.')
+        for line in skipped_lines(photo_scan):
+            st.caption(line)
     else:
         st.warning('The folder does not exist yet. Create it or choose an existing image folder.')
-    st.caption('Supports JPG, PNG, WebP, BMP and TIFF. FrameScout searches local files and does not download images from online services.')
+    for line in missing_decoder_lines(HEIF, RAW):
+        st.warning(line)
+    st.caption('Supports JPG, PNG, WebP, BMP, TIFF, AVIF, HEIC/HEIF and camera RAW (DNG, CR2, CR3, NEF, ARW, ORF, '
+               'RW2, RAF, PEF, SRW; a RAW file next to a JPEG or HEIC of the same name is skipped). '
+               'FrameScout searches local files and does not download images from online services.')
 
 with settings_tab:
     st.subheader('AI processing')
