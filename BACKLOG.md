@@ -558,13 +558,16 @@ referenced in commits, pull requests and discussions.
       `profile_slugs` with a fallback for occupied folders – note that the order-based
       slugs change when profiles are deleted or reordered, which would then move folders
       (design decision, PR #6 review).
-- [ ] **A16 – An empty photo folder searches the app's working directory:** `Path('')`
+- [x] **A16 – An empty photo folder searches the app's working directory:** `Path('')`
       is `.`, so with the folder field emptied, "Start search" is enabled and the engine
       gets the folder the app was started in – with `Start-FrameScout.bat` the project
       folder, including `.venv/` (whose packages ship PNG files) and `references/`.
       Older than A8, but since A8 an empty field is also saved in `settings.json` and comes
       back after a restart. Fix: treat an empty or whitespace-only folder as missing in the
       app (and possibly reject it in the engine). Found in PR #10.
+      (done 2026-10-26 in PR #28 (A25) for the app: empty or blank lines of the folder
+      field are no folders, an empty list shows "Enter a photo folder" and disables Start.
+      The engine still takes an empty argument typed on the command line as `.`.)
 
 - [x] **A17 – Marks and copying (roadmap P4 (B)): decided.** Asked in PR #14, deferred to
       P4 (B) and answered by the user on 2026-10-25 (user decision). FrameScout ranks
@@ -671,7 +674,7 @@ referenced in commits, pull requests and discussions.
       `[data-testid="stBaseButton-segmented_controlActive"]` (Streamlit 1.66.1 internals,
       so check it after upgrades; keep contrast in the dark theme). The marks and
       `marks.json` stay unchanged. Found after PR #16.
-- [ ] **A25 – Only one photo folder per search:** user question on 2026-10-25. The app and
+- [x] **A25 – Only one photo folder per search:** user question on 2026-10-25. The app and
       the engine take a single folder (`settings.json` key `photo_folder`, one positional
       engine argument, `root.rglob('*')`); photos on several drives or in several event
       folders need one parent folder or shortcuts/junctions inside the folder (not
@@ -695,6 +698,17 @@ referenced in commits, pull requests and discussions.
       already refuses a missing folder, but only for one); overlapping or nested folders
       must be deduplicated by resolved path; the same file reachable by two paths would
       be analyzed twice.
+      (done 2026-10-26 in PR #28, user decisions at its hold point: the engine takes
+      `folder` with `nargs='+'`, drops folders listed twice or nested in another listed
+      folder, leaves out missing folders with a note (an error only if none exists) and
+      refuses an output folder equal to a listed one; `results.json` format 2 with
+      `photo_folders` (format 1 still read, older apps reject format 2: a breaking change);
+      `settings.json` key `photo_folders`, the old `photo_folder` read as a list of one and
+      replaced on the next save; the app's text area has one folder per line with the
+      photo count per folder; gallery names get the folder name as prefix with several
+      folders; copy target check and cleanup use every listed folder, missing folders are
+      skipped with a note. No cache signature, `ENGINE` or marks change. Same folder by
+      another path: A28; junctions: A29.)
 - [ ] **A26 – No way back to the default AI settings:** user request on 2026-10-25. Once a
       value of the AI settings tab is changed (compute device, batch size, maximum matches,
       person detection, maximum persons, minimum confidence, reference weight), nothing
@@ -719,6 +733,25 @@ referenced in commits, pull requests and discussions.
       cache the scan (e.g. `st.cache_data` keyed on folder, extensions and the results
       folder, with a short TTL and a "Rescan" button), or scan only when the folder setting
       changes; how stale a count may be is a UX decision. Found in the PR #26 review.
+      Since A25 (PR #28) every listed folder is scanned once per rerun.
+- [ ] **A28 – The same photo folder by another path is searched twice:** A25 drops
+      folders listed twice or nested in another listed folder by comparing the resolved
+      paths (`os.path.normcase`) only (user decision on A25). The same folder reached by
+      another path – a mapped drive letter and the UNC path of the same share, two drive
+      letters for one share, a `subst` drive – is not recognized, and neither is the same
+      file through a hard link: such photos are analyzed, cached and ranked twice under
+      both paths (and their marks belong to each path, A21). Fix idea: compare
+      `os.stat` identities (`st_dev`, `st_ino`) of the folders, and of files if hard links
+      matter; costs a stat per file on network drives. Found in PR #28.
+- [ ] **A29 – Junctions and links inside a photo folder are followed:** `Path.rglob('*')`
+      follows directory junctions on Python 3.14 (checked on Windows 11 in PR #28: files
+      under a junction are listed by their path through it; `is_junction()` is true,
+      `is_symlink()` false). A junction pointing into another listed folder, or into the
+      same folder (a loop), therefore finds photos twice or walks a cycle; the folder
+      dedup of A25 does not cover it. Symbolic links to folders were not checked. Fix
+      idea: skip junctions and folder links in `scan_photos` (or resolve and dedupe the
+      found files), or document it; a user who links event folders into one parent may
+      rely on it today, so a user decision. Found in PR #28.
 
 ### Installation / project
 
@@ -977,7 +1010,8 @@ decision in PR #14):
 - [x] Turn off Ultralytics' usage analytics and run-time package installs (E27, E28; own
       PR after E25, user decision at the PR #26 hold point) (done 2026-10-26; Hugging Face
       Hub requests per search: E31)
-- [ ] Several photo folders per search (A25; changes `results.json` and the CLI: a hold point)
+- [x] Several photo folders per search (A25; changes `results.json` and the CLI: a hold point)
+      (done 2026-10-26 in PR #28; same folder by another path: A28, junctions: A29)
 
 ### P4b – Search models (evaluate at home first)
 - [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note (E22;
