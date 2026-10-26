@@ -38,9 +38,11 @@ def _name(path, root):
 
 
 def _rows(rows, root, out):
+    """Print (path, label, size) rows; size None leaves the size column out."""
     width = max(len(_name(path, root)) for path, _, _ in rows)
     for path, label, size in rows:
-        out(f'  {_name(path, root):<{width}}  {size_text(size):>8}  {label}')
+        size = '' if size is None else f'{size_text(size):>8}  '
+        out(f'  {_name(path, root):<{width}}  {size}{label}')
 
 
 def _blocked(root, out, confirmed=False):
@@ -94,7 +96,7 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
     kept = user_data(root)
     out('Kept (your data, never deleted by the uninstall):')
     if kept:
-        _rows(kept, root, out)
+        _rows([(path, label, None) for path, label in kept], root, out)
     out('  Also kept: the program files of this folder, your photo folders and copy folders anywhere else.')
     leftovers = outside_leftovers(root, environ, home)
     if leftovers:
