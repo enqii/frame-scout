@@ -50,7 +50,7 @@ class Project:
         """entries: [(name, gallery, [thumbnails])]"""
         profiles = [{'name': n, 'fingerprint': 'x', 'gallery': g, 'normalized': True,
                      'cards': [card(t, i) for i, t in enumerate(ts, 1)]} for n, g, ts in entries]
-        write_results(self.results / RESULTS_FILE, results_document('s', 'f', self.photos, {}, 1, profiles))
+        write_results(self.results / RESULTS_FILE, results_document('s', 'f', [self.photos], {}, 1, profiles))
 
     def thumb(self, name, folder=None, data=b'jpg'):
         path = (folder or self.thumbs) / name

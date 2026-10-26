@@ -1,6 +1,7 @@
 """The photos of a search (E25): which files are read, which are skipped, and RAW previews."""
 import collections
 import importlib
+import os
 
 from .names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
 
@@ -101,6 +102,109 @@ def scan_photos(root, extensions=EXT, exclude=None):
         paired = p.suffix.lower() in RAW_EXT and (p.parent, p.stem.casefold()) in partners
         (pairs if paired else photos).append(p)
     return PhotoScan(sorted(photos), sorted(pairs), unsupported)
+
+
+def _folder_key(folder):
+    """The text a folder is compared by: case-insensitive where the file system is (Windows)."""
+    return os.path.normcase(str(folder))
+
+
+def _inside_key(key, parent):
+    """True if the folder of key is inside (below) the folder of parent; both are _folder_key texts."""
+    prefix = parent if parent.endswith(os.sep) else parent + os.sep
+    return key != parent and key.startswith(prefix)
+
+
+def distinct_folders(folders):
+    """Return (kept, dropped) of the listed photo folders of a search (A25).
+
+    folders: resolved paths in the order listed. A folder listed twice is searched once, and
+    a folder inside another listed folder is searched as part of it, so no photo is found
+    twice through the list. kept: the folders to search, in list order; dropped: (folder,
+    why) of the others. Only the paths are compared (resolved by the caller); the same
+    folder reachable through two paths, e.g. a junction or another drive letter, is not
+    recognized.
+    """
+    unique, dropped, seen = [], [], set()
+    for folder in folders:
+        key = _folder_key(folder)
+        if key in seen:
+            dropped.append((folder, f'The photo folder {folder} is listed twice; it is searched once.'))
+            continue
+        seen.add(key)
+        unique.append(folder)
+    keys = [_folder_key(f) for f in unique]
+    kept = []
+    for folder, key in zip(unique, keys):
+        parent = next((f for f, k in zip(unique, keys) if _inside_key(key, k)), None)
+        if parent is None:
+            kept.append(folder)
+        else:
+            dropped.append((folder, f'The photo folder {folder} is inside the listed folder {parent}; '
+                                    'it is searched as part of it.'))
+    return kept, dropped
+
+
+def missing_folders_message(folders):
+    """Return the error for a search none of whose photo folders exists."""
+    if len(folders) == 1:
+        return f'Photo folder does not exist: {folders[0]}'
+    return 'None of the photo folders exists: ' + '; '.join(str(f) for f in folders)
+
+
+def _label_parts(folder):
+    anchor = folder.anchor.rstrip('\\/')
+    parts = list(folder.parts[1:]) if folder.anchor else list(folder.parts)
+    return ([anchor] if anchor else []) + parts or [str(folder)]
+
+
+def folder_labels(folders):
+    """Return the label of each photo folder that the gallery puts before a photo's path (A25).
+
+    One folder has no label (''), so the gallery of a single folder is unchanged. Several
+    are labeled by their names; folders of the same name (ignoring case) get as many of
+    their last path parts as tell them apart, a drive root its drive (e.g. "D:").
+    """
+    if len(folders) < 2:
+        return [''] * len(folders)
+    parts = [_label_parts(f) for f in folders]
+    depth = [1] * len(folders)
+    while True:
+        labels = [os.sep.join(p[-d:]) for p, d in zip(parts, depth)]
+        counts = collections.Counter(label.casefold() for label in labels)
+        clashing = [i for i, label in enumerate(labels) if counts[label.casefold()] > 1 and depth[i] < len(parts[i])]
+        if not clashing:
+            return labels
+        for i in clashing:
+            depth[i] += 1
+
+
+def photo_name(path, folders, labels):
+    """Return the name the gallery shows for the photo path: its path in its folder, after the folder's label.
+
+    folders and labels as for folder_labels; a photo outside all folders keeps its full path.
+    """
+    for folder, label in zip(folders, labels):
+        try:
+            relative = str(path.relative_to(folder))
+        except ValueError:
+            continue
+        return label + os.sep + relative if label else relative
+    return str(path)
+
+
+def scan_folders(folders, extensions=EXT, exclude=None):
+    """Return the PhotoScan of several photo folders together (scan_photos of each, joined; A25).
+
+    folders should be distinct_folders' kept list, so no file is found twice.
+    """
+    paths, pairs, unsupported = [], [], collections.Counter()
+    for folder in folders:
+        scan = scan_photos(folder, extensions, exclude)
+        paths += scan.paths
+        pairs += scan.raw_pairs
+        unsupported.update(scan.unsupported)
+    return PhotoScan(sorted(paths), sorted(pairs), unsupported)
 
 
 def _files(count, kind=''):
