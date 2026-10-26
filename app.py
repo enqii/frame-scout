@@ -76,7 +76,8 @@ CLEANUP_LABELS = {
                    'Thumbnails that neither the last search nor any HTML gallery in the results folder shows, '
                    'also in the old "vorschaubilder" folder.'),
     'cache_missing': ('Cache entries of deleted photos',
-                      'Analyses of photos inside the current photo folder that no longer exist there.'),
+                      'Analyses of photos inside the current photo folders that no longer exist there. A listed '
+                      'folder that does not exist (e.g. on a disconnected drive) is left out.'),
     'cache_old': ('Cache entries of older versions or unknown settings',
                   'Analyses made by an earlier FrameScout version, which are never used again, or with settings '
                   'only the command line offers (e.g. another --yolo-model), which are analyzed again when such a '
@@ -652,9 +653,9 @@ def cleanup_signature():
     return feature_signature(settings['person_detection'], settings['max_persons'], settings['person_confidence'],
                              DEFAULT_YOLO_MODEL)
 
-def cleanup_photo_folder():
-    """The photo folder whose deleted photos' cache entries the cleanup looks for, None if the field is empty."""
-    return photo_folder if str(settings['photo_folder']).strip() else None
+def cleanup_photo_folders():
+    """The photo folders whose deleted photos' cache entries the cleanup looks for (none if the field is empty)."""
+    return [photo_folder] if str(settings['photo_folder']).strip() else []
 
 def cleanup_offered(category):
     return not category['problem'] and bool(category['items'])
@@ -662,7 +663,7 @@ def cleanup_offered(category):
 def scan_storage():
     """Look for what the cleanup can delete and select the default categories (E7)."""
     try:
-        scan = scan_cleanup(RESULTS, PROFILES, REFS, cleanup_photo_folder(), cleanup_signature())
+        scan = scan_cleanup(RESULTS, PROFILES, REFS, cleanup_photo_folders(), cleanup_signature())
     except OSError as exc:
         st.session_state.cleanup_notice = ('warning', f'The storage could not be scanned: {exc}')
         return
@@ -678,7 +679,7 @@ def delete_storage(scan, selected):
     try:
         with st.spinner('Cleaning up …'):
             summary = clean_up(RESULTS, scan, selected, st.session_state.get('cleanup_vacuum', False), engine_alive,
-                               PROFILES, REFS, cleanup_photo_folder(), cleanup_signature())
+                               PROFILES, REFS, cleanup_photo_folders(), cleanup_signature())
     except Exception as exc:
         # clean_up reports the errors of its steps in the summary; this is e.g. the lock file
         # that cannot be opened. The scan is dropped: some files may be gone (review)
@@ -718,14 +719,18 @@ def show_cleanup():
         if category['problem']:
             st.caption(f"{label}: {plain(category['problem'])}")
             continue
+        # e.g. a listed photo folder on a disconnected drive, left out (A25)
+        notes = ' '.join(category.get('notes', []))
         if not cleanup_offered(category):
-            st.caption(f'{label}: nothing to clean up.')
+            st.caption(f'{label}: nothing to clean up.' + (f' {plain(notes)}' if notes else ''))
             continue
         if key.startswith('cache_'):
             amount = f"{count_text(category['rows'], 'entry', 'entries')} · about {size_text(category['size'])}"
         else:
             amount = f"{count_text(len(category['items']), 'file', 'files')} · {size_text(category['size'])}"
         st.checkbox(f'{label} – {amount}', key='cleanup_' + key, help=explanation, disabled=active)
+        if notes:
+            st.caption(plain(notes))
         if category.get('thumbnails'):
             # the thumbnails only these galleries show go with them (review)
             st.caption(f"Together with {count_text(len(category['thumbnails']), 'thumbnail', 'thumbnails')} "
