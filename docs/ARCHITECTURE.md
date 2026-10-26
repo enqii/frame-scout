@@ -80,7 +80,9 @@ the module of its area and to the re-exports in `__init__.py`.
   (one search per output folder, its phase and progress, A4/A5).
 - `devices.py`: `detection_options` (YOLO arguments on the CLIP device, E14),
   `device_choices`/`cuda_status`/`cuda_hint` (the app's device choice, CUDA status and the
-  way to GPU support, A7).
+  way to GPU support, A7), `ULTRALYTICS_ENV`/`import_detector_class` (the engine's only
+  import of Ultralytics, without its analytics and run-time installs, E27/E28; see
+  "Environment variables and caches").
 - `torch_build.py`:
   `TORCH_VERSION`/`TORCHVISION_VERSION`/`CUDA_BUILDS`/`parse_gpu_query`/`cuda_build`/`unsupported_gpus`/`installed_build_matches`/`installed_cuda_build`/`torch_requirements`/`torch_index_url`
   (which PyTorch build the installer installs, A7/I3).
@@ -583,6 +585,32 @@ The Windows batch scripts set cache/temp environment variables under the project
 easy cleanup. Some dependencies may still leave user-level caches (e.g. Ultralytics writes
 `%APPDATA%\Ultralytics\settings.json` when imported without `YOLO_CONFIG_DIR`, I10); do
 not promise perfect portability or no residual files.
+
+**Ultralytics without analytics and run-time installs (E27, E28):** the engine imports
+Ultralytics only through `framescout_core.import_detector_class` (a test checks there is
+no direct import in `framescout_engine.py`), which first sets `ULTRALYTICS_ENV` in
+`os.environ`, overriding values a user set, because Ultralytics reads them on import:
+- `YOLO_OFFLINE=true` makes its `ONLINE` flag false, which turns off its usage analytics
+  (`ultralytics/utils/events.py`: an anonymous event per prediction to Google Analytics
+  while its setting `sync` is on, the default), its Sentry reports and PyPI update checks.
+  Model downloads (`yolo11n.pt` on first use) do not check the flag and still work. The
+  setting `sync` itself stays as it is: changing it would write Ultralytics' settings
+  file, which is `%APPDATA%\Ultralytics\settings.json` for a manual run without
+  `YOLO_CONFIG_DIR` and may be shared with other Ultralytics uses.
+- `YOLO_AUTOINSTALL=false` stops `check_requirements` from pip-installing missing
+  packages into the venv.
+- Importing Ultralytics replaces `PIL.Image.open` for the whole process
+  (`ultralytics/utils/patches.py`) with a version that installs and registers `pi-heif`
+  for the first file Pillow cannot identify. `import_detector_class` puts the original
+  back (also when the import fails): the engine hands the detector decoded images and
+  registers `pillow-heif` itself, and a broken photo now fails with Pillow's own error
+  with and without person detection.
+
+Checked with Ultralytics 8.4.183 (a probe: `ONLINE`/`AUTOINSTALL` false, analytics
+`events.enabled` false, `Image.open` restored, a broken `.jpg` raises
+`UnidentifiedImageError` without importing `pi_heif`; plus a CPU smoke run with person
+detection). A later Ultralytics version may rename these switches; check them when
+raising its minimum version.
 
 ## Test coverage and known quirks
 
