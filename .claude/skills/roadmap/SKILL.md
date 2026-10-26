@@ -38,7 +38,7 @@ Run these as separate, plain commands from the main checkout:
 2. If the main checkout is on `main` and clean: `git merge --ff-only origin/main`.
    Otherwise do not touch it; mention it to the user.
 3. Roadmap: read only the section "## Roadmap (priority)" of `BACKLOG.md` (the last
-   section, about 60 lines), not the whole 47 KB file: find its line with the Grep tool
+   section, about 60 lines), not the whole 70 KB file: find its line with the Grep tool
    (`^## Roadmap` in `BACKLOG.md`) and Read from that line. If step 2 could not
    fast-forward `main`, read `git show origin/main:BACKLOG.md` instead. The
    **next item** is the first unchecked `- [ ]` line, scanning all sections (P0 … P5,
