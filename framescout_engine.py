@@ -184,6 +184,12 @@ def unpack(blob):
 
 
 def main():
+    # a character the encoding of a redirected stdout cannot hold (the ANSI code page on
+    # Windows, e.g. cp932 for "·" in a model label, or a profile name) is escaped instead of
+    # ending the search; the app starts the engine with UTF-8 output (E22 review)
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(errors='backslashreplace')
     parser = Parser(description='FrameScout: local image search by name, reference images and optional features.')
     parser.add_argument('folder', type=Path, nargs='+',
                         help='one or more photo folders (subfolders are searched recursively)')

@@ -3,6 +3,7 @@ import ast
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent.parent / 'framescout_engine.py'
+APP = ENGINE.with_name('app.py')
 
 
 def option_default_node(option):
@@ -66,6 +67,28 @@ def test_the_engine_loads_and_caches_the_chosen_model():
     assert not {'CLIP_MODEL', 'CLIP_PRETRAINED'} & names
     [prepare] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'prepare_cache']
     assert any(k.arg == 'model' and ast.unparse(k.value) == 'args.model' for k in prepare.keywords)
+
+
+def test_the_engine_output_never_fails_on_a_character_of_another_code_page():
+    # E22 review: the model labels, profile names and paths can hold characters that the
+    # ANSI code page of a redirected stdout (e.g. cp932) cannot encode
+    [main] = [node for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
+              if isinstance(node, ast.FunctionDef) and node.name == 'main']
+    calls = [node for node in ast.walk(main) if isinstance(node, ast.Call)
+             and getattr(node.func, 'attr', None) == 'reconfigure']
+    assert calls, 'main() must reconfigure sys.stdout and sys.stderr'
+    assert all(any(k.arg == 'errors' and ast.unparse(k.value) == "'backslashreplace'" for k in call.keywords)
+               for call in calls)
+    assert 'sys.stdout, sys.stderr' in ast.unparse(main)
+
+
+def test_the_app_starts_the_engine_with_utf8_output():
+    # E22 review: the app writes the engine's output to run.log and reads it as UTF-8
+    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    [cache_env] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'cache_env']
+    assigned = {ast.unparse(node.targets[0]): ast.unparse(node.value) for node in ast.walk(cache_env)
+                if isinstance(node, ast.Assign) and len(node.targets) == 1}
+    assert assigned.get("env['PYTHONIOENCODING']") == "'utf-8'"
 
 
 def test_the_engine_uses_the_shared_default_yolo_model():
