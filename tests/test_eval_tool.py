@@ -286,6 +286,20 @@ def test_metrics_sweep_the_reference_weight_per_model(collection):
     assert result['sweep_profiles'] == ['Dog']
 
 
+def test_labels_no_model_run_scored_are_warned_about(collection, capsys):
+    write_model_scores(collection, DEFAULT_MODEL, [0.9, 0.8, 0.1, 0.2, 0.0])
+    labelled(collection, 'Car', a=True)
+    assert ev.label_warnings(collection.scores(), read_labels(collection.labels_file)) == []
+    labels = read_labels(collection.labels_file)
+    labels['Car']['photos/b.jpg'] = True  # a relative path never matches a scored photo
+    labels['Bike'] = {photo(collection, 'a.jpg'): True}
+    save_labels(collection.labels_file, labels)
+    warnings = ev.label_warnings(collection.scores(), labels)
+    assert len(warnings) == 2 and 'photos/b.jpg' in warnings[0] and 'Bike' in warnings[1]
+    assert ev.main(['metrics', 'cosplay', '--dir', str(collection.root.parent)]) == 0
+    assert 'photos/b.jpg' in capsys.readouterr().out
+
+
 def test_a_profile_without_hits_has_no_ap(collection):
     write_model_scores(collection, DEFAULT_MODEL, [0.9, 0.8, 0.1, 0.2, 0.0])
     labelled(collection, 'Car', a=False)

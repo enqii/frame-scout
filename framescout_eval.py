@@ -154,6 +154,23 @@ def run_warnings(scores):
     return warnings
 
 
+def label_warnings(scores, labels):
+    """Warnings about labels no model run scored: another profile name, or photo paths that
+    match no scored photo (moved photos, a hand-edited or relative path)."""
+    entries = profile_entries(scores)
+    scored = {photo['path'] for document in scores.values() for photo in document['photos']}
+    warnings = []
+    for name, marks in labels.items():
+        if name not in entries:
+            warnings.append(f'{len(marks)} label(s) of the profile {name} are not used: no model run scored it.')
+            continue
+        lost = [path for path in marks if path not in scored]
+        if lost:
+            warnings.append(f'{len(lost)} label(s) of {name} name photos no model run scored (e.g. {lost[0]}); '
+                            'a match among them counts as missed by every model.')
+    return warnings
+
+
 # --- run ---
 
 def engine_env(cache_dir, environ=os.environ):
@@ -399,9 +416,10 @@ def command_metrics(args):
         scores = collection.scores()
         if not scores:
             raise UsageError(f'No scores in {collection.root}.')
-        for warning in run_warnings(scores):
+        labels = read_labels(collection.labels_file)
+        for warning in run_warnings(scores) + label_warnings(scores, labels):
             print(f'Warning: {name}: {warning}', flush=True)
-        results[name] = evaluate(scores, read_labels(collection.labels_file), args.k, args.weight, weights)
+        results[name] = evaluate(scores, labels, args.k, args.weight, weights)
         models += [model for model in scores if model not in models]
     for name, result in results.items():
         print(report(name, result, args.k, args.weight, models) + '\n', flush=True)
