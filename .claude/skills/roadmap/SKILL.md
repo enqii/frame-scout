@@ -53,7 +53,7 @@ Run these as separate, plain commands from the main checkout:
    (`git branch --list "worktree-agent-*"` without a worktree, merged PR branches) and
    offer to clean them up as in step 6 of "Merge".
 6. For a PR labeled `fs:in-progress`, check for the docs handoff marker:
-   `gh pr view <n> --json comments --jq '.comments[-1].body | startswith("Docs pending")'`
+   `gh pr view <n> --json comments --jq '(.comments[-1].body // "") | startswith("Docs pending")'`
    (`true` = the last comment is the implementer's "Docs pending:" handoff).
 7. If you spawned a subagent in this session that is still running, its notification
    has not arrived yet: **wait**, do not spawn a second agent for the same PR.
