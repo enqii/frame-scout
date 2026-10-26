@@ -43,7 +43,9 @@ rem argument install_torch.py keeps an installed CUDA build, otherwise it asks i
 rem an NVIDIA driver.
 ".venv\Scripts\python.exe" install_torch.py %TORCH_VARIANT%
 if errorlevel 1 (echo Installing PyTorch failed. See the error message above. & pause & exit /b 1)
-".venv\Scripts\python.exe" -m pip install --no-cache-dir -r requirements.txt
+rem constraints.txt pins every package, including the dependencies of the dependencies, to
+rem the tested version (I12); requirements.txt names the direct dependencies.
+".venv\Scripts\python.exe" -m pip install --no-cache-dir -r requirements.txt -c constraints.txt
 if errorlevel 1 (echo Installation failed. See the error message above. & pause & exit /b 1)
 ".venv\Scripts\python.exe" -c "import torch,open_clip,ultralytics,streamlit,pillow_heif,rawpy;print('FrameScout: import test OK');print('PyTorch', torch.__version__, '- CUDA available:', torch.cuda.is_available())"
 if errorlevel 1 (echo The import test failed. See the error message above. & pause & exit /b 1)

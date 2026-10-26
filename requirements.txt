@@ -5,8 +5,9 @@
 torch==2.14.1
 torchvision==0.29.1
 # Minimum versions only: the versions of the project venv of the verified runs (Python 3.14,
-# CPU). A fresh install takes the newest release, which may be a newer, untested major
-# version (I12); full locking is part of P5. Streamlit keeps its older floor until A10.
+# CPU). Install-FrameScout.bat installs with -c constraints.txt, which pins these and all
+# their dependencies to the tested versions (I12); a pip install without it takes the newest
+# releases. Streamlit keeps its older floor until A10.
 streamlit>=1.40
 numpy>=2.5.4
 pillow>=12.3.0
