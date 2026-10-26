@@ -153,8 +153,8 @@ saved over (A2). Back it up before overwriting user changes.
 together); Streamlit `>=1.40` (A10); numpy, Pillow, open_clip_torch, ultralytics and
 psutil with the versions of the verified runs as minimum, no upper bounds (user decision;
 untested newer majors: I12). `pillow-heif` and `rawpy` (E25, required by user decision;
-optional extras: E29) have the releases current when they were added as minimum, not yet
-versions of a verified run. Full locking is P5.
+optional extras: E29) have the versions of the venv's smoke runs (PR #26) as minimum. Full
+locking is P5.
 
 ### `Install-FrameScout.bat`
 
@@ -262,6 +262,13 @@ left out (`supported_extensions`) and the log and the app say so (`missing_decod
   of RAW photos and needs an `ENGINE` bump.
 - Browsers cannot show HEIC/RAW files: the gallery thumbnails are JPEG, but the photo link
   of such a card downloads the file or hands it to the OS.
+- **Verified (PR #26):** CPU smoke runs with and without person detection on five CC0
+  samples from raw.pixls.us (Canon CR2 and CR3, Nikon NEF, Sony ARW, Pentax DNG; all with a
+  JPEG preview, 1616 px to full size; the forced half-size decode took 0.1–0.7 s each),
+  two HEIC files made with pillow-heif (one stored sideways with EXIF orientation 6, decoded
+  upright by libheif), a HEIC reference image, a RAW+JPEG pair and a `.mov`; a rerun took
+  every photo from the cache. Not verified: a RAW file with a rotated `flip` or without a
+  usable preview (the fallback was only forced), HEIC from a real phone, other cameras.
 
 ### Person detection
 
