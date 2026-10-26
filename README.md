@@ -139,7 +139,9 @@ starts with the new example profiles.
    are not comparable (SigLIP's raw similarities are lower; the gallery's relative
    scores absorb this), and the reference weight below is tuned for the default model.
    SigLIP needs the extra Python package `transformers`; on an older installation run
-   `Install-FrameScout.bat` again. All offered models understand English search terms only.
+   `Install-FrameScout.bat` again (until then Start is disabled while SigLIP is chosen).
+   After switching the model, the results of the last search say which model made them.
+   All offered models understand English search terms only.
    The same choice on the command line is `--model` (`vit-b-32-openai`,
    `vit-b-16-datacomp`, `vit-l-14-datacomp`, `vit-b-16-siglip`).
 
@@ -314,7 +316,11 @@ runs, and no search can start while the cleanup deletes.
 | Reference images no profile uses | no | Image files in `references/` that neither `profiles.json` nor `profiles.json.bak` names (the file names are listed) |
 
 "Compact cache.sqlite3 afterwards" (on by default) shrinks the cache file after
-entries were deleted; without it the file keeps its size and reuses the space. Only
+entries were deleted; without it the file keeps its size and reuses the space. After
+changing the AI settings or photo folders, scan again. Caution with an older FrameScout
+version (before the search model choice) on the same `results/` folder, e.g. an older copy
+on another PC: its cleanup counts the analyses of the optional search models as "older
+versions" and selects them, so clear that box there if you want to keep them. Only
 what the scan listed and is still unused at the moment of deleting is deleted: e.g. a
 reference image a profile uses since the scan stays. Galleries and thumbnails are not
 offered while `results.json` or `profiles.json` cannot be read, reference images not

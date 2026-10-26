@@ -98,12 +98,14 @@ the module of its area and to the re-exports in `__init__.py`.
   `TORCH_VERSION`/`TORCHVISION_VERSION`/`CUDA_BUILDS`/`parse_gpu_query`/`cuda_build`/`unsupported_gpus`/`installed_build_matches`/`installed_cuda_build`/`torch_requirements`/`torch_index_url`
   (which PyTorch build the installer installs, A7/I3).
 - `models.py`:
-  `SearchModel`/`MODELS`/`DEFAULT_MODEL`/`MODEL_KEYS`/`model_label`/`missing_packages`/`model_problem`
+  `SearchModel`/`MODELS`/`DEFAULT_MODEL`/`MODEL_KEYS`/`model_label`/`results_model`/`missing_packages`/`model_problem`
   (the registry of the search models the engine's `--model` and the app's selectbox offer,
   E22; no imports beyond the standard library; fields: key, OpenCLIP name and pretrained
-  weights, label, download size, CPU factor, image size, embedding size, `requires`,
-  `multilingual`, `evaluated`).
-- `signature.py`: `CLIP_MODEL`/`CLIP_PRETRAINED` (the default model's, from the registry)/`ENGINE_TEMPLATE`/`engine_id`/`ENGINE`/`MODEL_ENGINES`/`feature_signature`
+  weights, label, download size, CPU factor, image size, `requires`, `multilingual`
+  (for E21; none is), `evaluated`; `results_model` reads the model key of a search from
+  its `results.json` settings). The only place of the models' OpenCLIP names, the
+  default's too.
+- `signature.py`: `ENGINE_TEMPLATE`/`engine_id`/`ENGINE`/`MODEL_ENGINES`/`feature_signature`
   (the engine id per search model and the feature cache signature, E1/E22),
   `CACHE_FILE`/`DEFAULT_YOLO_MODEL`/`prepare_cache`/`known_signatures`/`SLIDER_NOISE_ULPS`/`classify_signatures`
   (the cache tables with the `signatures` side table, and which engine version and
@@ -153,11 +155,10 @@ z-scores and their combination, E5) and `score_caption` (the numbers on a galler
 
 `tests/`, `pytest.ini`, `requirements-dev.txt`: pytest suite for `framescout_core/`,
 `framescout_scoring` and `install_torch.py` (no torch, no model download); dev
-dependencies `pytest` and `numpy` (for `framescout_scoring`, user decision in PR #11). One
-test (`test_signature.py`, QuickGELU config check, E1) also reads open_clip's config
-tables where open_clip is installed and is skipped in CI; `test_models.py` (E22) tests the
-registry, and its checks of every model's open_clip config (image size, embedding size,
-QuickGELU) run only where open_clip is installed.
+dependencies `pytest` and `numpy` (for `framescout_scoring`, user decision in PR #11).
+`test_models.py` (E22) tests the registry, and its checks of every model's open_clip
+config (weights known, image size, QuickGELU of the weights, E1; Hugging Face tokenizer)
+read open_clip's config tables only where open_clip is installed and are skipped in CI.
 
 ### `profiles.example.json` and `profiles.json`
 
@@ -246,14 +247,16 @@ and never deleted by the cleanup, E7), `profiles.json`, `run.log`, `.cache/`, `.
 
 The search model is chosen from the registry `framescout_core.MODELS` (E22; engine option
 `--model <key>`, settings key `model`). The default `vit-b-32-openai` is OpenCLIP
-`ViT-B-32-quickgelu`, `pretrained='openai'` (`framescout_core.CLIP_MODEL`; the OpenAI
+`ViT-B-32-quickgelu`, `pretrained='openai'` (`MODELS[DEFAULT_MODEL]`; the OpenAI
 weights need QuickGELU, plain `ViT-B-32` would run them with GELU, E1). Optional and **not
 evaluated** (E32): `vit-b-16-datacomp` (`ViT-B-16`, `datacomp_xl_s13b_b90k`),
 `vit-l-14-datacomp` (`ViT-L-14`, same weights) and `vit-b-16-siglip` (`ViT-B-16-SigLIP`,
 `webli`; needs `transformers` for its tokenizer, `SearchModel.requires`). The engine
 checks `model_problem` before the scan (`parser.error`), loads the model and the tokenizer
 of that name, takes the draft size from `model.visual.image_size` (falling back to the
-registry's `image_size`) and logs `search model: <label> (<name>/<pretrained>)`. The
+registry's `image_size`) and logs `search model: <label> (<name>/<pretrained>)`. Its
+stdout/stderr escape characters they cannot encode (`errors='backslashreplace'`, e.g. the
+"·" of a label on a redirected cp932 stdout; E22 review). The
 embeddings are normalized text and image embeddings. The reference weight (E5) and all
 other defaults are tuned for the default model; scores of different models are not
 comparable (SigLIP's raw cosines are lower; the z-scores absorb this). No LLM is required. Four generic English prompt
@@ -439,8 +442,9 @@ is logged and never fails the run. Local paths may not work on another computer.
 After the galleries the engine writes `results/results.json`
 (`framescout_core.write_results`, format 2 since A25): run start and end, the searched
 photo folders (`photo_folders`, a list), settings (including `model`, the search model key
-since E22; results without it count as the default, which the app's results caption
-shows as "search model <label>"), number of photos and per profile its
+since E22; results without it count as the default, `results_model`, which the app's
+results caption shows as "search model <label>"; results of another model than the one
+chosen now get a note), number of photos and per profile its
 name, `search_fingerprint` (hash of its search texts and reference paths, relative to the
 profiles file's folder when inside it, so a moved project folder changes nothing),
 gallery file name, `normalized` and the cards (rank, path, `relative` (the `photo_name`
@@ -592,8 +596,10 @@ with `DEFAULT_YOLO_MODEL`, plus the no-detection signature; the current signatur
 offered). `cache_models` ("Cache entries of other search models", default off, E22) holds
 rows whose recorded engine is that of another registered model, and unrecorded
 `known_signatures` rows when another model is current (those can only be the default's);
-`scan_cleanup` and `clean_up` take `current_model`, `CACHE_CATEGORIES` lists the cache
-categories. Before E22 rows of any other engine counted as `cache_old` (selected);
+`scan_cleanup` and `clean_up` require `current_model` (keyword-only: the signature, a
+hash, does not tell the model), `CACHE_CATEGORIES` lists the cache categories. Before E22
+rows of any other engine counted as `cache_old` (selected), and an older FrameScout still
+does so with the rows of the optional models (documented in the README);
 `references` (`EXT` files in `references/` that neither `profiles.json` nor
 `profiles.json.bak` names). `galleries`/`thumbnails` are not offered if `results.json` (a
 missing one counts as empty) or `profiles.json` (also missing) cannot be read,
@@ -613,7 +619,9 @@ an emptied `vorschaubilder/` is removed. `_remove_file` refuses every name of
 `OSError`/`ValueError`/`sqlite3.Error`, which goes to `skipped`, so the summary always
 counts what was deleted; `delete_storage` also catches what `clean_up` raises. The summary
 (`cleanup_summary_text`: files, cache entries, freed bytes, a note when rows were deleted
-without `VACUUM`, failures, skipped steps) is shown after a rerun; a Start drops the scan.
+without `VACUUM`, failures, skipped steps) is shown after a rerun; a Start drops the scan,
+and so does a change of what it was classified for (`cleanup_inputs`: the current
+signature, the search model and the photo folders), with the note "Scan again".
 While `clean_up` holds the lock it registers the results folder in the process
 (`cleanup_running`; app sessions are threads of one process), so other tabs show "The
 storage is being cleaned up" instead of a running search and disable Stop (A23); other
@@ -638,9 +646,11 @@ the exit code (`final_status`: 0 finished, 130 interrupted, others failed).
 ### Starting a search from the app
 
 The frontend spawns the engine via `subprocess.Popen` and redirects stdout/stderr to
-`run.log`; it passes `--model` from the setting `model` (the AI settings tab starts with
+`run.log`, with `PYTHONIOENCODING=utf-8` (`cache_env`), as it reads `run.log` as UTF-8;
+it passes `--model` from the setting `model` (the AI settings tab starts with
 the "Search model" selectbox, key `setting_model`, `format_func=model_label`, with a
-caption per model and a warning from `model_problem`, E22). `start_run` takes the run lock (1 s timeout: every open tab probes it every two
+caption per model and a warning from `model_problem`, E22; with such a problem Start is
+disabled and the run tab shows the same warning). `start_run` takes the run lock (1 s timeout: every open tab probes it every two
 seconds), truncates `run.log`, spawns the engine and writes the status `starting` with the
 child's pid, then releases the lock to the engine; if that status cannot be written it
 ends the child again. A start while the lock is held, or while a `starting` status names a
@@ -734,7 +744,10 @@ the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of 
 read from its syntax tree, settings migration, results format 1/2, cleanup per folder) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search
 model registry, the per-model signatures and cleanup category and the `model` setting
-(E22, `test_models.py`; the engine's `--model` and the app's selectbox are not unit-tested);
+(E22, `test_models.py`; the engine's `--model`, its `stdout.reconfigure` and the app's
+`PYTHONIOENCODING` only from their syntax trees, `test_engine_defaults.py`; the app's
+selectbox, its disabled Start, the results note and the dropped cleanup scan are not
+unit-tested);
 still missing: cache
 reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
