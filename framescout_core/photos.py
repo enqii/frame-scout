@@ -1,7 +1,8 @@
 """The photos of a search (E25): which files are read, which are skipped, and RAW previews."""
 import collections
+import importlib
 
-from .names import EXT, HEIF_EXT, RAW_EXT
+from .names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
 
 
 # A RAW file is skipped when a photo of the same name with one of these extensions is in
@@ -19,27 +20,63 @@ RAW_FLIP_TRANSPOSE = {3: 'ROTATE_180', 5: 'ROTATE_90', 6: 'ROTATE_270'}
 # how many extensions the log line about skipped files names
 SKIPPED_EXTENSIONS_SHOWN = 5
 
-# paths: the photos to analyze, sorted; raw_pairs: number of RAW files skipped for a
-# partner of the same name; unsupported: Counter {extension: files} of the other files
-# ('' for files without an extension)
+# paths: the photos to analyze, sorted; raw_pairs: the RAW files skipped for a partner of
+# the same name, sorted; unsupported: Counter {extension: files} of the other files ('' for
+# files without an extension)
 PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported')
 
+# Whether this Python environment can read AVIF (Pillow built with libavif), HEIC/HEIF
+# (pillow-heif) and camera RAW (rawpy) files.
+Decoders = collections.namedtuple('Decoders', 'avif heif raw')
+ALL_DECODERS = Decoders(True, True, True)
+# per decoder: its extensions, the name of its files in the log, why they are skipped and
+# what helps
+_INSTALL_HINT = 'Run Install-FrameScout.bat again to install it.'
+_DECODER_FORMATS = (
+    ('avif', AVIF_EXT, 'AVIF', 'this Pillow build cannot read AVIF',
+     'The Pillow wheels from PyPI (version 11.3 or later) can.'),
+    ('heif', HEIF_EXT, 'HEIC/HEIF', 'pillow-heif is not installed or cannot be loaded', _INSTALL_HINT),
+    ('raw', RAW_EXT, 'RAW', 'rawpy is not installed or cannot be loaded', _INSTALL_HINT),
+)
 
-def supported_extensions(heif=True, raw=True):
-    """Return the extensions the engine can read: EXT without HEIF_EXT/RAW_EXT if pillow-heif/rawpy is missing."""
-    return EXT - (frozenset() if heif else HEIF_EXT) - (frozenset() if raw else RAW_EXT)
+
+def available_decoders(import_module=importlib.import_module):
+    """Return the Decoders of this Python environment.
+
+    The packages are imported, not only looked up, so that a package that is installed but
+    cannot be loaded (e.g. a blocked DLL) counts as missing in the app as in the engine
+    (review). Any exception of an import counts as missing.
+    """
+    def loads(name):
+        try:
+            return import_module(name)
+        except Exception:
+            return None
+
+    features = loads('PIL.features')
+    try:
+        avif = bool(features is not None and features.check('avif'))
+    except Exception:
+        avif = False
+    return Decoders(avif, loads('pillow_heif') is not None, loads('rawpy') is not None)
 
 
-def missing_decoder_lines(heif, raw):
-    """Return the log lines that say which photo formats are skipped because their package is missing."""
-    lines = []
-    if not heif:
-        lines.append('pillow-heif is not installed: HEIC/HEIF photos are skipped. '
-                     'Run Install-FrameScout.bat again to install it.')
-    if not raw:
-        lines.append('rawpy is not installed: camera RAW photos are skipped. '
-                     'Run Install-FrameScout.bat again to install it.')
-    return lines
+def supported_extensions(decoders=ALL_DECODERS):
+    """Return the extensions that can be read with decoders: EXT without those of a missing decoder."""
+    extensions = EXT
+    for field, formats, *_ in _DECODER_FORMATS:
+        if not getattr(decoders, field):
+            extensions -= formats
+    return extensions
+
+
+def missing_decoder(suffix, decoders):
+    """Return why a file with this extension cannot be read with decoders, or None if that is not the reason."""
+    suffix = suffix.lower()
+    for field, formats, name, reason, hint in _DECODER_FORMATS:
+        if suffix in formats and not getattr(decoders, field):
+            return f'{reason}, so {name} files cannot be read. {hint}'
+    return None
 
 
 def scan_photos(root, extensions=EXT, exclude=None):
@@ -59,28 +96,45 @@ def scan_photos(root, extensions=EXT, exclude=None):
         else:
             unsupported[suffix] += 1
     partners = {(p.parent, p.stem.casefold()) for p in paths if p.suffix.lower() in RAW_PARTNER_EXT}
-    photos = [p for p in paths if p.suffix.lower() not in RAW_EXT or (p.parent, p.stem.casefold()) not in partners]
-    return PhotoScan(sorted(photos), len(paths) - len(photos), unsupported)
+    photos, pairs = [], []
+    for p in paths:
+        paired = p.suffix.lower() in RAW_EXT and (p.parent, p.stem.casefold()) in partners
+        (pairs if paired else photos).append(p)
+    return PhotoScan(sorted(photos), sorted(pairs), unsupported)
 
 
-def _files(count):
-    return f'{count} file' if count == 1 else f'{count} files'
+def _files(count, kind=''):
+    noun = 'file' if count == 1 else 'files'
+    return f'{count} {kind} {noun}' if kind else f'{count} {noun}'
 
 
-def skipped_lines(scan):
-    """Return the log lines about the files of scan (a PhotoScan) that are not analyzed."""
+def skipped_lines(scan, decoders=ALL_DECODERS):
+    """Return the log lines about the files of scan (a PhotoScan) that are not analyzed.
+
+    Files of a missing decoder (see decoders) get one line with the reason, and only if the
+    folder has such files; they are not named again as an unsupported extension (review).
+    """
     lines = []
     if scan.raw_pairs:
-        what = '1 RAW file' if scan.raw_pairs == 1 else f'{scan.raw_pairs} RAW files'
-        lines.append(f'{what} skipped: a JPEG or HEIC photo of the same name is in the same folder.')
-    if scan.unsupported:
-        ranked = sorted(scan.unsupported.items(), key=lambda item: (-item[1], item[0]))
+        example = scan.raw_pairs[0].name
+        example = f'e.g. {example}' if len(scan.raw_pairs) > 1 else example
+        lines.append(f'{_files(len(scan.raw_pairs), "RAW")} skipped: a JPEG or HEIC photo of the same name is in '
+                     f'the same folder ({example}).')
+    other = collections.Counter(scan.unsupported)
+    for field, formats, name, reason, hint in _DECODER_FORMATS:
+        if getattr(decoders, field):
+            continue
+        count = sum(other.pop(suffix, 0) for suffix in formats)
+        if count:
+            lines.append(f'{_files(count, name)} skipped: {reason}. {hint}')
+    other = +other  # drops zero counts
+    if other:
+        ranked = sorted(other.items(), key=lambda item: (-item[1], item[0]))
         shown = [f'{suffix or "no extension"} {count}' for suffix, count in ranked[:SKIPPED_EXTENSIONS_SHOWN]]
         more = len(ranked) - SKIPPED_EXTENSIONS_SHOWN
         if more > 0:
             shown.append(f'{more} more extension' + ('' if more == 1 else 's'))
-        lines.append(f'{_files(sum(scan.unsupported.values()))} skipped (unsupported extension): '
-                     + ', '.join(shown) + '.')
+        lines.append(f'{_files(sum(other.values()))} skipped (unsupported extension): ' + ', '.join(shown) + '.')
     return lines
 
 

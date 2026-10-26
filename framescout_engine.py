@@ -22,29 +22,24 @@ import open_clip
 from PIL import Image, ImageOps, ImageFile
 
 from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
-                             DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, HEIF_EXT, RAW_EXT, RESULTS_FILE, RUN_LOCK,
-                             RUN_STATUS,
-                             RunLock, StatusReporter, auto_cleanup, crop_label, cuda_hint, detection_options,
-                             draft_size, final_status, ensure_thumbnail, group_batches, load_profiles,
-                             missing_decoder_lines, prefetch, prepare_cache, profile_slugs, progress_due, progress_line,
-                             raw_preview_transpose, raw_preview_usable, result_card, results_document, scan_photos,
-                             search_fingerprint, size_text, skipped_lines, store_group, supported_extensions,
-                             write_results)
+                             DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, RAW_EXT, RESULTS_FILE, RUN_LOCK,
+                             RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
+                             cuda_hint, detection_options, draft_size, final_status, ensure_thumbnail, group_batches,
+                             load_profiles, missing_decoder, prefetch, prepare_cache, profile_slugs, progress_due,
+                             progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
+                             scan_photos, search_fingerprint, size_text, skipped_lines, store_group,
+                             supported_extensions, write_results)
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
 
-# HEIC/HEIF and camera RAW photos (E25). Both packages are in requirements.txt; an older
-# installation without them still runs and skips those photos with a note.
-try:
+# AVIF, HEIC/HEIF and camera RAW photos (E25). pillow-heif and rawpy are in
+# requirements.txt; an older installation without them still runs and skips those photos
+# with a note. The app checks the same way (available_decoders), so both agree (review).
+DECODERS = available_decoders()
+if DECODERS.heif:
     from pillow_heif import register_heif_opener
-except ImportError:
-    HEIF = False
-else:
     register_heif_opener()
-    HEIF = True
-try:
+if DECODERS.raw:
     import rawpy
-except ImportError:
-    rawpy = None
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -91,11 +86,11 @@ def open_image(path, min_size=None):
     RAW file is read with open_raw (E25).
     """
     suffix = Path(path).suffix.lower()
-    missing = missing_decoder_lines(HEIF or suffix not in HEIF_EXT, rawpy is not None or suffix not in RAW_EXT)
-    if missing:
-        # e.g. a HEIC reference image without pillow-heif: say why instead of a decoder error;
-        # other extensions are left to Pillow, as before (a reference image can be any format)
-        raise OSError(missing[0])
+    # e.g. a HEIC reference image without pillow-heif: say why instead of a decoder error;
+    # other extensions are left to Pillow, as before (a reference image can be any format)
+    reason = missing_decoder(suffix, DECODERS)
+    if reason:
+        raise OSError(reason)
     if suffix in RAW_EXT:
         return open_raw(path, min_size)
     with Image.open(path) as image:
@@ -239,12 +234,11 @@ def search(args, parser, root, output, status):
         for ref in p['refs']:
             if not ref.is_file():
                 parser.error(f'Reference image not found: {ref}')
-    for line in missing_decoder_lines(HEIF, rawpy is not None):
-        print(line, flush=True)
-    scan = scan_photos(root, supported_extensions(HEIF, rawpy is not None), exclude=output)
+    scan = scan_photos(root, supported_extensions(DECODERS), exclude=output)
     paths = scan.paths
-    # files that are not analyzed are named, not skipped without a note (E25)
-    for line in skipped_lines(scan):
+    # files that are not analyzed are named, not skipped without a note (E25); a missing
+    # decoder is named only if the folder has files of it (review)
+    for line in skipped_lines(scan, DECODERS):
         print(line, flush=True)
     if not paths:
         parser.error('No supported images found. Please check the local photo folder.')
