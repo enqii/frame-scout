@@ -799,8 +799,12 @@ referenced in commits, pull requests and discussions.
       the gain is smaller and the risk larger; reconsider after I15. Do I14 first.
       (done 2026-10-26: package `framescout_core/` with 15 area modules and `_common.py`,
       every statement moved unchanged (AST-compared); private helpers are not re-exported,
-      so a stale patch on the package now fails instead of silently missing; the patching
-      tests target the defining module and were checked to fail with the patch bypassed)
+      so a stale patch of a private helper on the package now fails instead of silently
+      missing; a patch of a re-exported public name on the package (e.g. `read_profiles`)
+      still succeeds without reaching the modules that import it, documented in
+      `docs/ARCHITECTURE.md`; the patching tests target the defining module and were
+      checked to fail with the patch bypassed; `tests/test_core_package.py` checks that
+      every public name of an area module is re-exported)
 - [ ] **I16 – A ZIP update leaves the old `framescout_core.py` behind:** since I15 the
       shared code is the package `framescout_core/`. A user who extracts a new ZIP over an
       older folder (instead of a fresh folder or `git pull`) keeps the old single file next
