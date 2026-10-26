@@ -47,5 +47,5 @@ from .marks import (MARKS_FILE, MARKS_FORMAT, MARK_OPEN, MARK_MATCH, MARK_NO_MAT
 from .copying import (COPY_FOLDERS_KEY, COPY_MAX_NAMES, default_copy_folder, copy_target,
     copy_photos, copy_summary_text, read_copy_folders, save_copy_folder, rename_copy_folder)
 from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLEANUP_CATEGORIES,
-    CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, scan_cleanup, cleanup_running, clean_up,
+    CACHE_CATEGORIES, CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, scan_cleanup, cleanup_running, clean_up,
     auto_cleanup, size_text, count_text, cleanup_summary_text)
