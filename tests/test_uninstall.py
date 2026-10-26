@@ -366,6 +366,39 @@ def test_a_running_environment_python_is_detected(project):
         _winapi.CloseHandle(handle)
 
 
+@windows_only
+def test_a_read_only_environment_python_is_not_taken_for_a_running_one(project):
+    # opening a read-only file for writing fails too, but it does not tell that it runs (review)
+    exe = project / ENVIRONMENT_PROGRAMS[0]
+    os.chmod(exe, stat.S_IREAD)
+    try:
+        assert programs_in_use(project) == []
+    finally:
+        os.chmod(exe, stat.S_IWRITE | stat.S_IREAD)
+
+
+@windows_only
+def test_a_running_read_only_environment_python_is_detected_after_clearing_the_attribute(project):
+    import _winapi
+    exe = project / ENVIRONMENT_PROGRAMS[0]
+    os.chmod(exe, stat.S_IREAD)
+    handle = _winapi.CreateFile(str(exe), _winapi.GENERIC_READ, 0, 0, _winapi.OPEN_EXISTING, 0, 0)
+    try:
+        assert programs_in_use(project) == []  # read-only: cannot tell
+        assert programs_in_use(project, clear_read_only=True) == [exe]
+    finally:
+        _winapi.CloseHandle(handle)
+    assert os.stat(exe).st_mode & stat.S_IWRITE
+
+
+def test_the_check_after_the_confirmation_clears_the_read_only_attribute(project, tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(framescout_uninstall, 'programs_in_use',
+                        lambda root, clear_read_only=False: calls.append(clear_read_only) or [])
+    code, _, _ = run(project, tmp_path, 'yes')
+    assert code == 0 and calls == [False, True]
+
+
 # --- user_data and outside_leftovers: listed only ---
 
 def test_user_data_lists_what_exists(project):

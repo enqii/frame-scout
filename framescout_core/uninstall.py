@@ -53,6 +53,11 @@ UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe')}
 ENVIRONMENT_PROGRAMS = tuple(f'.venv/{name}' for name in UNINSTALL_FIRST['.venv'])
 # Windows error of removing a folder that is not empty
 ERROR_DIR_NOT_EMPTY = 145
+# Windows: the access right to write a file's data, all sharing modes, and the error of opening
+# a file that a running program (or another handle without write sharing) holds
+FILE_WRITE_DATA = 0x2
+FILE_SHARE_ALL = 0x7
+ERROR_SHARING_VIOLATION = 32
 
 
 @dataclass(frozen=True)
@@ -228,20 +233,47 @@ def search_running(root):
     return lock_held(Path(root) / 'results' / RUN_LOCK)
 
 
-def programs_in_use(root):
-    """Return the ENVIRONMENT_PROGRAMS below root that a running process holds open."""
+def _held_open(path):
+    """Return True if path cannot be opened for writing because a process runs it or holds it
+    open without sharing it; opened without writing anything."""
+    if os.name != 'nt':
+        try:
+            with open(path, 'r+b'):
+                pass
+        except OSError as exc:
+            return exc.errno == errno.ETXTBSY
+        return False
+    import _winapi
+    try:
+        handle = _winapi.CreateFile(str(path), FILE_WRITE_DATA, FILE_SHARE_ALL, 0, _winapi.OPEN_EXISTING, 0, 0)
+    except OSError as exc:
+        # only a sharing violation tells that it runs: a read-only file or missing rights give
+        # "access denied", which open() reports alike (review)
+        return getattr(exc, 'winerror', None) == ERROR_SHARING_VIOLATION
+    _winapi.CloseHandle(handle)
+    return False
+
+
+def programs_in_use(root, clear_read_only=False):
+    """Return the ENVIRONMENT_PROGRAMS below root that a running process holds open.
+
+    A read-only program cannot be checked (Windows refuses to open it for writing before it
+    looks whether it runs), so it does not count as running; with clear_read_only, its
+    read-only attribute is cleared first. The uninstall does that only after the
+    confirmation, since the file is deleted then anyway.
+    """
     busy = []
     for relative in ENVIRONMENT_PROGRAMS:
         path = Path(root) / relative
         if not path.is_file() or _is_link(path):
             continue
-        try:
-            with open(path, 'r+b'):  # opened without writing; fails while the program runs
+        if clear_read_only and _read_only(path):
+            try:
+                os.chmod(path, os.lstat(path).st_mode | stat.S_IWRITE)
+            except OSError:
                 pass
-        except PermissionError:
+        if _held_open(path):
             busy.append(path)
-        except OSError:
-            continue
     return busy
 
 
