@@ -1,8 +1,8 @@
 """CLIP model choice and the feature cache signature (E1)."""
 import pytest
 
-from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_MODEL, ENGINE, MODEL_ENGINES, MODEL_KEYS, MODELS,
-                             engine_id, feature_signature)
+from framescout_core import (DEFAULT_MODEL, ENGINE, MODEL_ENGINES, MODEL_KEYS, MODELS, engine_id,
+                             feature_signature)
 
 DEFAULTS = dict(person_detection=True, max_persons=12, person_confidence=.3, yolo_model='yolo11n.pt')
 # Signature of the default settings in v1.1 (ENGINE v4, GELU embeddings)
@@ -11,21 +11,14 @@ V1_1_DEFAULT_SIGNATURE = '552c0464be05f62156f4acb048eb1555db8e3bc80f63416f990969
 PRE_E2_NO_DETECTION_SIGNATURE = '943924600aec2d9c711312c59c8db2ae7e33864857967169edc8f87ea2bdcb76'
 
 
-def test_model_config_matches_the_activation_of_the_weights():
-    # Runs only where open_clip is installed (the project venv); CI has no torch and skips
-    # it. Reads open_clip's config tables only, no model download. open_clip warns about a
-    # "QuickGELU mismatch" exactly when these two values differ: the OpenAI weights were
-    # trained with QuickGELU, the plain "ViT-B-32" config uses GELU (E1).
-    open_clip = pytest.importorskip('open_clip')
-    from open_clip.pretrained import get_pretrained_cfg
-    weights = get_pretrained_cfg(CLIP_MODEL, CLIP_PRETRAINED)
-    assert weights, f'open_clip has no {CLIP_PRETRAINED!r} weights for {CLIP_MODEL!r}'
-    assert open_clip.get_model_config(CLIP_MODEL).get('quick_gelu', False) == weights.get('quick_gelu', False)
+# the activation of the default model's weights (QuickGELU, E1) is checked for every model
+# in test_models.py
 
 
 def test_engine_names_the_clip_model():
     # a different CLIP model must never reuse cached embeddings of another one
-    assert CLIP_MODEL in ENGINE and CLIP_PRETRAINED in ENGINE
+    default = MODELS[DEFAULT_MODEL]
+    assert default.name in ENGINE and default.pretrained in ENGINE
 
 
 def test_signature_values_are_pinned():
@@ -75,7 +68,6 @@ def test_the_default_model_keeps_the_engine_and_its_signatures():
         'ff0961b445ea26b7f0a4c5ea39a078d1297927da627246d962cef5c1e698fa47')
     assert feature_signature(**{**DEFAULTS, 'person_detection': False}, model=DEFAULT_MODEL) == (
         '89ce5cc619f616f3e72ac6787db2739ed86dbf77a6abb820b6e5bc7f5128c08c')
-    assert (CLIP_MODEL, CLIP_PRETRAINED) == (MODELS[DEFAULT_MODEL].name, MODELS[DEFAULT_MODEL].pretrained)
 
 
 def test_every_model_has_its_own_engine_and_signatures():

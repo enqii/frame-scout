@@ -63,8 +63,10 @@ def test_the_engine_offers_the_registered_search_models():
 def test_the_engine_loads_and_caches_the_chosen_model():
     # the default model's names alone would load the default whatever --model says
     nodes = list(ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8'))))
-    names = {node.id for node in nodes if isinstance(node, ast.Name)}
-    assert not {'CLIP_MODEL', 'CLIP_PRETRAINED'} & names
+    # (CLIP_MODEL/CLIP_PRETRAINED are gone; review): DEFAULT_MODEL only as the --model default
+    defaults = [node for node in nodes if isinstance(node, ast.Name) and node.id == 'DEFAULT_MODEL'
+                and isinstance(node.ctx, ast.Load)]
+    assert len(defaults) == 1, 'the engine may use DEFAULT_MODEL only as the default of --model'
     [prepare] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'prepare_cache']
     assert any(k.arg == 'model' and ast.unparse(k.value) == 'args.model' for k in prepare.keywords)
 
