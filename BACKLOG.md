@@ -370,6 +370,14 @@ referenced in commits, pull requests and discussions.
       want them optional later). Idea: a separate requirements file, a question in
       `Install-FrameScout.bat`, and the engine's existing fallback (formats without their
       package are skipped with a note). Roadmap candidate, not scheduled.
+- [ ] **E30 – A RAW file is lost when its JPEG partner is broken:** E25 skips a RAW file
+      when a JPEG/HEIC of the same name is in the same folder, by names only. If that
+      JPEG is truncated or corrupt (e.g. a card or transfer error), the engine logs it as an
+      `ERROR` and the shot is missing from the search, although its RAW file is fine
+      (documented in the README). Fix idea: when a partner fails to decode, analyze its
+      skipped RAW file instead (the scan already lists them in `PhotoScan.raw_pairs`); the
+      cache and the gallery would then show the RAW path for that shot. Found in the PR #26
+      review.
 
 ### App (`app.py`)
 
@@ -686,6 +694,13 @@ referenced in commits, pull requests and discussions.
       setting (e.g. in its help text, built from `DEFAULT_SETTINGS` so it cannot drift) and
       mark a changed value. Not a search-quality change, since the defaults stay as they
       are.
+- [ ] **A27 – The photo folder is scanned on every rerun:** the "Photo folder" tab counts
+      the photos with `scan_photos` (since E25; before with the same `rglob`) at module
+      level, so every widget interaction anywhere in the app walks the whole photo tree
+      again – slow for tens of thousands of files on a network drive or HDD. Fix idea:
+      cache the scan (e.g. `st.cache_data` keyed on folder, extensions and the results
+      folder, with a short TTL and a "Rescan" button), or scan only when the folder setting
+      changes; how stale a count may be is a UX decision. Found in the PR #26 review.
 
 ### Installation / project
 
