@@ -112,6 +112,27 @@ def test_torch_pins_match_the_installer():
     assert pins()['torchvision'] == TORCHVISION_VERSION
 
 
+def installer_commands():
+    """The lines of Install-FrameScout.bat that run something: no rem, echo or label lines."""
+    result = []
+    for line in (ROOT / 'Install-FrameScout.bat').read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if line and not re.match(r'(?i)(rem\b|::|echo\b|:)', line):
+            result.append(line)
+    return result
+
+
 def test_installer_uses_the_constraints():
     text = (ROOT / 'Install-FrameScout.bat').read_text(encoding='utf-8')
     assert '-r requirements.txt -c constraints.txt' in text
+
+
+def test_installer_constrains_the_torch_install_too():
+    # PIP_CONSTRAINT reaches the pip call of install_torch.py, so torch's dependencies are
+    # installed in their pinned versions right away (I18); relative, because pip splits the
+    # value at spaces and the installer folder may contain one
+    commands = installer_commands()
+    setting = commands.index('set "PIP_CONSTRAINT=constraints.txt"')
+    torch_install = next(i for i, line in enumerate(commands) if 'install_torch.py' in line)
+    venv = next(i for i, line in enumerate(commands) if '-m venv' in line)
+    assert venv < setting < torch_install

@@ -38,13 +38,18 @@ if not exist ".venv\Scripts\python.exe" (
  py -!PYTHON_VERSION! -m venv .venv
  if errorlevel 1 (echo Creating the virtual environment failed. & pause & exit /b 1)
 )
+rem constraints.txt pins every package, including the dependencies of the dependencies, to
+rem the version of the verified runs (I12); requirements.txt names the direct dependencies.
+rem PIP_CONSTRAINT applies the pins to the pip call of install_torch.py too, so torch's
+rem dependencies are not first installed in their newest versions (I18). It is set after
+rem the venv is created and relative: pip splits its value at spaces, and both pip calls
+rem run in this folder.
+set "PIP_CONSTRAINT=constraints.txt"
 rem PyTorch first (CPU or CUDA build); requirements.txt pins the same version. Without an
 rem argument install_torch.py keeps an installed CUDA build, otherwise it asks if it finds
 rem an NVIDIA driver.
 ".venv\Scripts\python.exe" install_torch.py %TORCH_VARIANT%
 if errorlevel 1 (echo Installing PyTorch failed. See the error message above. & pause & exit /b 1)
-rem constraints.txt pins every package, including the dependencies of the dependencies, to
-rem the tested version (I12); requirements.txt names the direct dependencies.
 ".venv\Scripts\python.exe" -m pip install --no-cache-dir -r requirements.txt -c constraints.txt
 if errorlevel 1 (echo Installation failed. See the error message above. & pause & exit /b 1)
 ".venv\Scripts\python.exe" -c "import torch,open_clip,ultralytics,streamlit,pillow_heif,rawpy;print('FrameScout: import test OK');print('PyTorch', torch.__version__, '- CUDA available:', torch.cuda.is_available())"

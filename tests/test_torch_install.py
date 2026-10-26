@@ -182,7 +182,8 @@ def test_cpu_installs_the_cpu_build(monkeypatch):
     assert command[1:4] == ['-m', 'pip', 'install']
     assert index(command) == 'https://download.pytorch.org/whl/cpu'
     # torch's and torchvision's dependencies (e.g. numpy) also come from PyPI: the PyTorch
-    # index lags behind, so requirements.txt would replace them right away (review)
+    # index lags behind and may lack the pinned versions of constraints.txt, so
+    # requirements.txt would replace them right away (review, I18)
     assert command[command.index('--extra-index-url') + 1] == 'https://pypi.org/simple'
     assert torch_requirements('cpu')[0] in command
 
