@@ -22,15 +22,34 @@ import open_clip
 from PIL import Image, ImageOps, ImageFile
 
 from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
-                             DEVICES, DRAFT_REDUCING_GAP, EXT, FULL_IMAGE_LABEL, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
+                             DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, HEIF_EXT, RAW_EXT, RESULTS_FILE, RUN_LOCK,
+                             RUN_STATUS,
                              RunLock, StatusReporter, auto_cleanup, crop_label, cuda_hint, detection_options,
-                             draft_size, final_status, ensure_thumbnail, group_batches, load_profiles, prefetch,
-                             prepare_cache, profile_slugs, progress_due, progress_line, result_card, results_document,
-                             search_fingerprint, size_text, store_group, write_results)
+                             draft_size, final_status, ensure_thumbnail, group_batches, load_profiles,
+                             missing_decoder_lines, prefetch, prepare_cache, profile_slugs, progress_due, progress_line,
+                             raw_preview_transpose, raw_preview_usable, result_card, results_document, scan_photos,
+                             search_fingerprint, size_text, skipped_lines, store_group, supported_extensions,
+                             write_results)
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
+
+# HEIC/HEIF and camera RAW photos (E25). Both packages are in requirements.txt; an older
+# installation without them still runs and skips those photos with a note.
+try:
+    from pillow_heif import register_heif_opener
+except ImportError:
+    HEIF = False
+else:
+    register_heif_opener()
+    HEIF = True
+try:
+    import rawpy
+except ImportError:
+    rawpy = None
 
 Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+# EXIF tag of the image orientation
+ORIENTATION = 0x0112
 # Photos are decoded in threads ahead of CLIP (E2). Pillow releases the GIL while it
 # decodes; more threads would mostly compete with PyTorch for the same CPU cores.
 DECODE_THREADS = min(4, os.cpu_count() or 1)
@@ -68,12 +87,54 @@ def open_image(path, min_size=None):
     """Open path as an upright RGB image.
 
     With min_size, a JPEG is decoded at 1/2, 1/4 or 1/8 scale (Image.draft) as long as
-    both edges stay at least min_size pixels long; other formats ignore it (E2).
+    both edges stay at least min_size pixels long; other formats ignore it (E2). A camera
+    RAW file is read with open_raw (E25).
     """
+    suffix = Path(path).suffix.lower()
+    missing = missing_decoder_lines(HEIF or suffix not in HEIF_EXT, rawpy is not None or suffix not in RAW_EXT)
+    if missing:
+        # e.g. a HEIC reference image without pillow-heif: say why instead of a decoder error;
+        # other extensions are left to Pillow, as before (a reference image can be any format)
+        raise OSError(missing[0])
+    if suffix in RAW_EXT:
+        return open_raw(path, min_size)
     with Image.open(path) as image:
         if min_size:
             image.draft(None, (min_size, min_size))
         return ImageOps.exif_transpose(image).convert('RGB')
+
+
+def open_raw(path, min_size=None):
+    """Open the camera RAW file path as an upright RGB image (E25).
+
+    The JPEG (or bitmap) preview the camera embedded is used if it is large enough
+    (raw_preview_usable): it is fast, and a JPEG preview is drafted with min_size like any
+    JPEG. Otherwise the sensor data is decoded at half size with the camera's white
+    balance; LibRaw turns that image upright itself.
+    """
+    with rawpy.imread(str(path)) as raw:
+        try:
+            thumb = raw.extract_thumb()
+        except (rawpy.LibRawNoThumbnailError, rawpy.LibRawUnsupportedThumbnailError):
+            thumb = None
+        preview = None
+        if thumb is not None and thumb.format == rawpy.ThumbFormat.JPEG:
+            with Image.open(io.BytesIO(thumb.data)) as image:
+                if raw_preview_usable(*image.size):
+                    if min_size:
+                        image.draft(None, (min_size, min_size))
+                    turn = raw_preview_transpose(image.getexif().get(ORIENTATION), raw.sizes.flip)
+                    preview = ImageOps.exif_transpose(image) if turn == 'exif' else image.convert('RGB')
+        elif thumb is not None and thumb.format == rawpy.ThumbFormat.BITMAP:
+            image = Image.fromarray(thumb.data)
+            if raw_preview_usable(*image.size):
+                turn = raw_preview_transpose(None, raw.sizes.flip)
+                preview = image
+        if preview is None:
+            return Image.fromarray(raw.postprocess(half_size=True, use_camera_wb=True, output_bps=8)).convert('RGB')
+    if turn not in (None, 'exif'):
+        preview = preview.transpose(getattr(Image.Transpose, turn))
+    return preview.convert('RGB')
 
 
 def crops_for(image, detector, options, lock):
@@ -178,7 +239,13 @@ def search(args, parser, root, output, status):
         for ref in p['refs']:
             if not ref.is_file():
                 parser.error(f'Reference image not found: {ref}')
-    paths = sorted(x for x in root.rglob('*') if x.is_file() and x.suffix.lower() in EXT and output not in x.parents)
+    for line in missing_decoder_lines(HEIF, rawpy is not None):
+        print(line, flush=True)
+    scan = scan_photos(root, supported_extensions(HEIF, rawpy is not None), exclude=output)
+    paths = scan.paths
+    # files that are not analyzed are named, not skipped without a note (E25)
+    for line in skipped_lines(scan):
+        print(line, flush=True)
     if not paths:
         parser.error('No supported images found. Please check the local photo folder.')
     device = ('cuda' if torch.cuda.is_available() else 'cpu') if args.device == 'auto' else args.device
