@@ -112,19 +112,27 @@ def test_torch_pins_match_the_installer():
     assert pins()['torchvision'] == TORCHVISION_VERSION
 
 
+def batch_commands(text):
+    """The lines of a batch file that run something: no empty, rem, echo or label lines."""
+    lines = (line.strip() for line in text.splitlines())
+    return [line for line in lines if line and not re.match(r'(?i)(rem\b|::|echo\b|:)', line)]
+
+
 def installer_commands():
-    """The lines of Install-FrameScout.bat that run something: no rem, echo or label lines."""
-    result = []
-    for line in (ROOT / 'Install-FrameScout.bat').read_text(encoding='utf-8').splitlines():
-        line = line.strip()
-        if line and not re.match(r'(?i)(rem\b|::|echo\b|:)', line):
-            result.append(line)
-    return result
+    return batch_commands((ROOT / 'Install-FrameScout.bat').read_text(encoding='utf-8'))
+
+
+def test_batch_commands_skip_comments_and_messages():
+    text = ('rem ".venv\\Scripts\\python.exe" -m pip install -r requirements.txt -c constraints.txt\n'
+            ' REM x\n:: x\n echo -m pip install -r requirements.txt -c constraints.txt\n:label\n\n'
+            ' set "A=b"\nif errorlevel 1 (echo failed & exit /b 1)\n')
+    assert batch_commands(text) == ['set "A=b"', 'if errorlevel 1 (echo failed & exit /b 1)']
 
 
 def test_installer_uses_the_constraints():
-    text = (ROOT / 'Install-FrameScout.bat').read_text(encoding='utf-8')
-    assert '-r requirements.txt -c constraints.txt' in text
+    # the pip command itself, not a comment or a message that mentions it (review)
+    assert any('-m pip install' in line and '-r requirements.txt -c constraints.txt' in line
+               for line in installer_commands())
 
 
 def test_installer_constrains_the_torch_install_too():
