@@ -115,8 +115,10 @@ class Collection:
 def ranking(document, profile, weight):
     """Return the photo paths of a scores document in the order the engine ranks them for profile.
 
-    The same rank_photos as the engine, over the same per-crop scores (rounded to
-    SCORE_DIGITS), sorted by score with ties in scan order like the galleries.
+    The same rank_photos as the engine, over the same per-crop scores, sorted by score with
+    ties in scan order like the galleries. The scores file keeps SCORE_DIGITS decimals of
+    each raw similarity, so photos whose scores differ by less than that rounding can come
+    in another order than in the galleries (review); AP over the top 40 hardly notices.
     """
     text = [np.asarray(row, dtype=np.float64) for row in profile['text']]
     visual = None if profile['visual'] is None else [np.asarray(row, dtype=np.float64) for row in profile['visual']]
