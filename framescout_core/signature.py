@@ -3,17 +3,13 @@ import hashlib
 import json
 import math
 
-from .models import DEFAULT_MODEL, MODEL_KEYS, MODELS, _model
+from .models import DEFAULT_MODEL, MODEL_KEYS, _model
 from .pipeline import DRAFT_DECODING
 from .settings import SETTING_RANGES, SETTING_STEPS
 
 
-# OpenCLIP model and weights of the default search model (E22: framescout_core.MODELS). The
-# OpenAI CLIP weights were trained with QuickGELU; the plain "ViT-B-32" config uses GELU,
-# loads them with only a warning and yields degraded embeddings (E1). Same weights file, so
-# switching needed no new download.
-CLIP_MODEL = MODELS[DEFAULT_MODEL].name
-CLIP_PRETRAINED = MODELS[DEFAULT_MODEL].pretrained
+# The OpenCLIP model and weights of every search model, the default too, are only in
+# framescout_core.MODELS (E22): no second copy that code could load instead of --model.
 # The engine version of a search model, part of the feature cache signature: change the
 # template whenever cached embeddings become incompatible (preprocessing or crops; other
 # weights are another registry entry). v4 was ViT-B-32 with GELU.
