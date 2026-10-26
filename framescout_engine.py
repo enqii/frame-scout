@@ -102,34 +102,50 @@ def open_image(path, min_size=None):
 def open_raw(path, min_size=None):
     """Open the camera RAW file path as an upright RGB image (E25).
 
-    The JPEG (or bitmap) preview the camera embedded is used if it is large enough
-    (raw_preview_usable): it is fast, and a JPEG preview is drafted with min_size like any
-    JPEG. Otherwise the sensor data is decoded at half size with the camera's white
-    balance; LibRaw turns that image upright itself.
+    The preview the camera embedded is used if it is large enough and can be read
+    (raw_preview); otherwise the sensor data is decoded at half size with the camera's
+    white balance, and LibRaw turns that image upright itself.
     """
     with rawpy.imread(str(path)) as raw:
-        try:
-            thumb = raw.extract_thumb()
-        except (rawpy.LibRawNoThumbnailError, rawpy.LibRawUnsupportedThumbnailError):
-            thumb = None
-        preview = None
-        if thumb is not None and thumb.format == rawpy.ThumbFormat.JPEG:
-            with Image.open(io.BytesIO(thumb.data)) as image:
-                if raw_preview_usable(*image.size):
-                    if min_size:
-                        image.draft(None, (min_size, min_size))
-                    turn = raw_preview_transpose(image.getexif().get(ORIENTATION), raw.sizes.flip)
-                    preview = ImageOps.exif_transpose(image) if turn == 'exif' else image.convert('RGB')
-        elif thumb is not None and thumb.format == rawpy.ThumbFormat.BITMAP:
-            image = Image.fromarray(thumb.data)
-            if raw_preview_usable(*image.size):
-                turn = raw_preview_transpose(None, raw.sizes.flip)
-                preview = image
+        preview = raw_preview(raw, min_size)
         if preview is None:
-            return Image.fromarray(raw.postprocess(half_size=True, use_camera_wb=True, output_bps=8)).convert('RGB')
-    if turn not in (None, 'exif'):
-        preview = preview.transpose(getattr(Image.Transpose, turn))
+            preview = Image.fromarray(raw.postprocess(half_size=True, use_camera_wb=True, output_bps=8))
     return preview.convert('RGB')
+
+
+def raw_preview(raw, min_size=None):
+    """Return the upright preview embedded in the rawpy file raw, or None if there is no usable one.
+
+    A JPEG or bitmap preview is usable if its longer edge is long enough
+    (raw_preview_usable); a JPEG preview is drafted with min_size like any JPEG. A preview
+    that cannot be read (corrupt, truncated, unknown format) is not usable either, so the
+    caller falls back to the sensor data instead of failing the photo (review).
+    """
+    try:
+        thumb = raw.extract_thumb()
+        if thumb.format == rawpy.ThumbFormat.JPEG:
+            with Image.open(io.BytesIO(thumb.data)) as image:
+                if not raw_preview_usable(*image.size):
+                    return None
+                if min_size:
+                    image.draft(None, (min_size, min_size))
+                turn = raw_preview_transpose(image.getexif().get(ORIENTATION), raw.sizes.flip)
+                # both load the pixels before the file closes
+                image = ImageOps.exif_transpose(image) if turn == 'exif' else image.convert('RGB')
+        elif thumb.format == rawpy.ThumbFormat.BITMAP:
+            image = Image.fromarray(thumb.data)
+            if not raw_preview_usable(*image.size):
+                return None
+            turn = raw_preview_transpose(None, raw.sizes.flip)
+        else:
+            return None
+        if turn not in (None, 'exif'):
+            image = image.transpose(getattr(Image.Transpose, turn))
+        return image
+    except (rawpy.LibRawError, OSError, ValueError, SyntaxError):
+        # LibRawError covers a missing or unsupported thumbnail; Pillow raises OSError
+        # (UnidentifiedImageError), ValueError or SyntaxError for broken image data
+        return None
 
 
 def crops_for(image, detector, options, lock):
