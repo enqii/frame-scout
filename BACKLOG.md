@@ -772,7 +772,7 @@ referenced in commits, pull requests and discussions.
       (Markdown only). Also update the stale size note "47 KB" for `BACKLOG.md` (now about
       62 KB) in the `/roadmap` skill and the implementer brief. Found on 2026-10-25 while
       checking whether splitting the code saves agent context.
-- [ ] **I15 – `framescout_core.py` is too large to read for one change:** 2,375 lines /
+- [x] **I15 – `framescout_core.py` is too large to read for one change:** 2,375 lines /
       111 KB (roughly 30k tokens) covering about ten unrelated areas: slugs and reference
       moves, atomic file writes, the PyTorch build and devices, run lock and status,
       batching, profiles, settings, results and gallery helpers, marks, copying, cleanup.
@@ -797,6 +797,18 @@ referenced in commits, pull requests and discussions.
       PR). Not part of this item: splitting `app.py` (1,085 lines, e.g. one module per
       tab), since the tabs share `st.session_state` keys and the `setting_<name>` rule, so
       the gain is smaller and the risk larger; reconsider after I15. Do I14 first.
+      (done 2026-10-26: package `framescout_core/` with 15 area modules and `_common.py`,
+      every statement moved unchanged (AST-compared); private helpers are not re-exported,
+      so a stale patch on the package now fails instead of silently missing; the patching
+      tests target the defining module and were checked to fail with the patch bypassed)
+- [ ] **I16 – A ZIP update leaves the old `framescout_core.py` behind:** since I15 the
+      shared code is the package `framescout_core/`. A user who extracts a new ZIP over an
+      older folder (instead of a fresh folder or `git pull`) keeps the old single file next
+      to the package. It is harmless – Python imports the package, which takes precedence
+      over a module of the same name in the same folder (checked locally) – but it is a
+      stale file a user may edit by mistake. Fix with the update/uninstall story of P5
+      (e.g. the installer removes known obsolete files, or the README says to extract into
+      a fresh folder). Found on 2026-10-26 in I15.
 
 ## Roadmap (priority)
 
@@ -841,8 +853,8 @@ on the user's home PC first).
 Smaller files to read per change, so implementer and reviewer agents keep less context
 (added 2026-10-25 at the user's request, placed before the remaining P4 items).
 - [x] Reflow `docs/ARCHITECTURE.md` into short lines and sub-sections (I14) (done 2026-10-26)
-- [ ] Split `framescout_core.py` into a package of modules per area, re-exporting the
-      names; no behavior change (I15)
+- [x] Split `framescout_core.py` into a package of modules per area, re-exporting the
+      names; no behavior change (I15) (done 2026-10-26)
 
 ### P4 – UX
 The item "Result gallery in the app, mark matches/copy them to a folder, "open folder",
