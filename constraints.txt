@@ -1,18 +1,27 @@
 # Exact versions of every package FrameScout installs, including the dependencies of the
-# dependencies (I12). Install-FrameScout.bat runs
+# dependencies (I12), sorted by name. Install-FrameScout.bat sets PIP_CONSTRAINT to this
+# file for install_torch.py (I18) and runs
 #     pip install -r requirements.txt -c constraints.txt
-# so a fresh install gets these tested versions instead of the newest releases;
-# requirements.txt keeps the ranges of the direct dependencies. A constraint only limits
-# versions and installs nothing by itself, so a pin of a package that is not needed (e.g.
-# on another Python version) does no harm.
+# so a fresh install gets these versions instead of the newest releases; requirements.txt
+# keeps the ranges of the direct dependencies. A constraint only limits versions and
+# installs nothing by itself, so a pin of a package that is not needed (e.g. on another
+# Python version) does no harm.
 # torch and torchvision are pinned without a local label, so the pins match the CPU (+cpu)
-# and CUDA (+cu126, +cu130) builds that install_torch.py installs first; they must equal
+# and CUDA (+cu126, +cu130) builds that install_torch.py installs; they must equal
 # TORCH_VERSION and TORCHVISION_VERSION in framescout_core/torch_build.py (a test checks it,
 # and that every requirement has a pin it allows).
-# Source: the project venv of the verified runs (Python 3.14, Windows). Refresh the pins by
-# hand in a change of their own: update and test the venv, then write the closure of
-# requirements.txt here and check with pip install --dry-run --report for Python 3.12 to
-# 3.14 that no package is missing and every pin has a Windows wheel.
+# Source: the project venv of the verified runs (Python 3.14, Windows; a CPU engine run with
+# these versions); Python 3.12 and 3.13 are only checked by the dry-run below. Refresh the
+# pins by hand in a change of their own: update and test the venv, write the closure of
+# requirements.txt here, then check
+# - with pip install --dry-run --ignore-installed --report r.json --python-version 3.12 (to
+#   3.14) --platform win_amd64 --only-binary=:all: -r requirements.txt -c constraints.txt
+#   that every resolved package is pinned and has a Windows wheel (this resolves torch from
+#   PyPI, whose Windows wheels are CPU builds);
+# - for the CUDA builds that the Requires-Dist lines of the wheels' metadata on the PyTorch
+#   index (https://download.pytorch.org/whl/cu130/torch/ lists "<wheel>.metadata" files)
+#   allow the pinned versions; a pip dry-run against that index would download the
+#   wheels of about 2.5 GB.
 altair==6.3.0
 annotated-doc==0.0.5
 anyio==4.15.1
