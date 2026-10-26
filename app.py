@@ -654,17 +654,13 @@ def cleanup_signature():
     return feature_signature(settings['person_detection'], settings['max_persons'], settings['person_confidence'],
                              DEFAULT_YOLO_MODEL)
 
-def cleanup_photo_folders():
-    """The photo folders whose deleted photos' cache entries the cleanup looks for (none if the field is empty)."""
-    return photo_folders
-
 def cleanup_offered(category):
     return not category['problem'] and bool(category['items'])
 
 def scan_storage():
     """Look for what the cleanup can delete and select the default categories (E7)."""
     try:
-        scan = scan_cleanup(RESULTS, PROFILES, REFS, cleanup_photo_folders(), cleanup_signature())
+        scan = scan_cleanup(RESULTS, PROFILES, REFS, search_folders, cleanup_signature())
     except OSError as exc:
         st.session_state.cleanup_notice = ('warning', f'The storage could not be scanned: {exc}')
         return
@@ -680,7 +676,7 @@ def delete_storage(scan, selected):
     try:
         with st.spinner('Cleaning up …'):
             summary = clean_up(RESULTS, scan, selected, st.session_state.get('cleanup_vacuum', False), engine_alive,
-                               PROFILES, REFS, cleanup_photo_folders(), cleanup_signature())
+                               PROFILES, REFS, search_folders, cleanup_signature())
     except Exception as exc:
         # clean_up reports the errors of its steps in the summary; this is e.g. the lock file
         # that cannot be opened. The scan is dropped: some files may be gone (review)
@@ -1038,9 +1034,10 @@ with run_tab:
     st.subheader('Start search')
     c1,c2 = st.columns([1,1])
     with c1:
-        # at least one listed folder must exist; the engine leaves out the others with a note (A25)
+        # at least one listed folder must exist (as sorted out in the Photo source tab, without
+        # asking the file system again, review); the engine leaves out the others with a note (A25)
         start = st.button('▶ Start search', type='primary', use_container_width=True,
-                          disabled=active or not profiles or not any(f.is_dir() for f in search_folders))
+                          disabled=active or not profiles or not folder_scans)
     with c2:
         # a cleanup holding the run lock is no search to stop (review)
         stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), use_container_width=True)
