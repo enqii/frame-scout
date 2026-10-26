@@ -50,6 +50,8 @@ DEFAULT_DEPTH = 100
 # gallery length of the engine runs: their thumbnails are what the labelling page shows
 DEFAULT_TOP = 150
 DEFAULT_PORT = 8765
+# bytes of a label request the page accepts (a label is a few dozen)
+MAX_BODY = 10_000
 SWEEP = tuple(round(step / 10, 1) for step in range(11))
 # the reference weights whose rankings go into the pool: text only, the app's default and a
 # stronger one, so the sweep around them meets few unlabelled photos
@@ -540,6 +542,16 @@ class LabelSession:
         return 404, 'text/plain', b'not found'
 
 
+def body_length(header, limit=MAX_BODY):
+    """The Content-Length header of a request as a number from 0 to limit, or None if it is
+    invalid (e.g. negative, which would read until the connection closes) or larger."""
+    try:
+        length = int(header or 0)
+    except ValueError:
+        return None
+    return length if 0 <= length <= limit else None
+
+
 class LabelServer(http.server.ThreadingHTTPServer):
     # with SO_REUSEADDR, Windows lets a second server bind a port another one listens on, so
     # a second labelling page would share the port silently instead of failing (review)
@@ -563,8 +575,11 @@ def serve(session, port, open_browser):
             self.answer('GET')
 
         def do_POST(self):
-            length = int(self.headers.get('Content-Length') or 0)
-            self.answer('POST', self.rfile.read(min(length, 10_000)))
+            length = body_length(self.headers.get('Content-Length'))
+            if length is None:
+                self.send_error(400, 'invalid or too large Content-Length')
+                return
+            self.answer('POST', self.rfile.read(length))
 
         def log_message(self, *args):  # no line per photo in the console
             pass
