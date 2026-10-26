@@ -32,7 +32,8 @@ Read only what the item needs – every token you read is paid again on each lat
 - `docs/ARCHITECTURE.md`: Grep for the files, functions and IDs you touch and read those
   sections; read it whole only for an item that changes the architecture.
 - The code you are going to touch (search first, then read the relevant parts of large
-  files such as `framescout_core.py`).
+  files such as `app.py` and `framescout_engine.py`; in the package `framescout_core/`
+  read only the modules of the areas you touch).
 
 For modes other than `new`, also read the PR description, its commits,
 `git diff origin/main...HEAD` and all PR comments (`gh pr view {PR} --comments`, review

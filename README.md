@@ -364,7 +364,7 @@ Commits, one pull request per roadmap item).
 |---|---|
 | `app.py` | Streamlit user interface (profiles, photo source, settings, search run, result gallery with marks and copying) |
 | `framescout_engine.py` | Search engine as a standalone CLI |
-| `framescout_core.py` | Shared helpers of app and engine (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file, result file, marks and copying, cleanup); standard library only |
+| `framescout_core/` | Shared helpers of app and engine, one module per area (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file, result file, marks and copying, cleanup); standard library only |
 | `framescout_scoring.py` | Scoring of the engine: prompt ensemble, scaling and weighting of text and reference scores; numpy only |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies (PyTorch pinned) |

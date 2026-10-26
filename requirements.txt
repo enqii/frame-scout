@@ -1,7 +1,7 @@
 # PyTorch is pinned (I3): Install-FrameScout.bat installs this version first from the
 # PyTorch index, as the CPU build or a CUDA build (install_torch.py), and the same pins here
 # keep pip from replacing it. Change it together with TORCH_VERSION and TORCHVISION_VERSION
-# in framescout_core.py (a test checks that they match).
+# in framescout_core/torch_build.py (a test checks that they match).
 torch==2.14.1
 torchvision==0.29.1
 # Minimum versions only: the versions of the project venv of the verified runs (Python 3.14,
