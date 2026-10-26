@@ -198,9 +198,13 @@ def scan_folders(folders, extensions=EXT, exclude=None):
 
     folders should be distinct_folders' kept list, so no file is found twice.
     """
+    return join_scans([scan_photos(folder, extensions, exclude) for folder in folders])
+
+
+def join_scans(scans):
+    """Return one PhotoScan of the PhotoScans of several folders (the app counts each folder on its own)."""
     paths, pairs, unsupported = [], [], collections.Counter()
-    for folder in folders:
-        scan = scan_photos(folder, extensions, exclude)
+    for scan in scans:
         paths += scan.paths
         pairs += scan.raw_pairs
         unsupported.update(scan.unsupported)

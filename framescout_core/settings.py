@@ -25,17 +25,29 @@ DEFAULT_REFERENCE_WEIGHT = 0.3
 SETTINGS_LOCK_TIMEOUT = 5.0
 
 
+# the single photo folder of settings.json before A25: read as a list of one, replaced by
+# "photo_folders" on the next save
+LEGACY_PHOTO_FOLDER = 'photo_folder'
+
+
 def default_settings(base):
     """Return the app's default settings; base is the project folder (photos/ is the default input)."""
-    return {'photo_folder': str(Path(base) / 'photos'), 'device': 'auto', 'batch_size': 8, 'top': 150,
+    return {'photo_folders': [str(Path(base) / 'photos')], 'device': 'auto', 'batch_size': 8, 'top': 150,
             'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30,
             'reference_weight': DEFAULT_REFERENCE_WEIGHT}
 
 
+def folder_lines(text):
+    """Return the folders of the app's photo folder field (one per line): the non-empty lines, stripped (A25)."""
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
 def _setting_value(key, value):
     """Return value as the setting key uses it, or None if it is not allowed."""
-    if key == 'photo_folder':
-        return value if isinstance(value, str) else None
+    if key == 'photo_folders':
+        if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+            return None
+        return [x.strip() for x in value if x.strip()]
     if key == 'device':
         return value if isinstance(value, str) and value in DEVICES else None
     if key == 'person_detection':
@@ -59,18 +71,40 @@ def _read_settings_file(filename, attempts=5, retry_delay=0.05):
     return _read_json_object(filename, 'settings file', attempts, retry_delay)
 
 
+def _with_folder_list(data):
+    """Return the saved settings data with the old single photo folder as "photo_folders" (A25).
+
+    The old key is removed; it becomes a list of one (none for an empty folder) unless
+    "photo_folders" is saved too, which wins. An old value that is not a string stays
+    under the old key, so read_settings can report it.
+    """
+    if LEGACY_PHOTO_FOLDER not in data:
+        return data
+    data = dict(data)
+    legacy = data[LEGACY_PHOTO_FOLDER]
+    if isinstance(legacy, str) or 'photo_folders' in data:
+        del data[LEGACY_PHOTO_FOLDER]
+        if 'photo_folders' not in data:
+            data['photo_folders'] = [legacy] if legacy.strip() else []
+    return data
+
+
 def read_settings(filename, defaults, attempts=5, retry_delay=0.05):
     """Return (settings, problems) of the app's settings file.
 
     settings has the keys of defaults: a saved value replaces its default if it is allowed
     (the same range as the app's widget); a missing file gives the defaults. problems lists
     the saved values that are not allowed and were replaced by their defaults. Unknown keys
-    are ignored (save_settings keeps them). Raises ValueError (including JSON and Unicode
-    decoding errors) for a file that is not a JSON object, and OSError if it still cannot
-    be read after attempts tries.
+    are ignored (save_settings keeps them). The single "photo_folder" of older versions is
+    read as "photo_folders", a list of one (A25). Raises ValueError (including JSON and
+    Unicode decoding errors) for a file that is not a JSON object, and OSError if it still
+    cannot be read after attempts tries.
     """
-    data = _read_settings_file(filename, attempts, retry_delay)
+    data = _with_folder_list(_read_settings_file(filename, attempts, retry_delay))
     settings, problems = dict(defaults), []
+    if LEGACY_PHOTO_FOLDER in data:  # not a string
+        problems.append(f'{LEGACY_PHOTO_FOLDER}: {data[LEGACY_PHOTO_FOLDER]!r} is not allowed, '
+                        f'the default {defaults["photo_folders"]!r} is used')
     for key in defaults:
         if key not in data:
             continue
@@ -108,6 +142,10 @@ def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05, loc
 
     def update(current):
         document = {}
+        # the old single photo folder is replaced by photo_folders, never written again (A25);
+        # an invalid one is dropped like an invalid value of a known setting
+        current = _with_folder_list(current)
+        current.pop(LEGACY_PHOTO_FOLDER, None)
         for key, value in {**current, **normalized}.items():
             if key in defaults:
                 # after normalizing, a known setting has the type of its default (no True == 1)
