@@ -86,4 +86,4 @@ def model_problem(key, find_spec=importlib.util.find_spec):
     names = ', '.join(missing)
     return (f'The search model {_model(key).label} needs the Python package{"s" if len(missing) > 1 else ""} '
             f'{names}, which {"are" if len(missing) > 1 else "is"} not installed. Run Install-FrameScout.bat again '
-            '(or pip install -r requirements.txt), or choose another search model.')
+            '(or pip install -r requirements.txt -c constraints.txt), or choose another search model.')
