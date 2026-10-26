@@ -40,51 +40,78 @@ matches to a folder (A17); below it the expander "Clean up storage" (E7).
 optionally detects persons, caches embeddings, ranks and exports HTML galleries, then
 removes temporary and unreferenced thumbnails (`auto_cleanup`, E7/E13).
 
-### `framescout_core.py`
+### `framescout_core/`
 
-- `framescout_core.py`: shared by app and engine, **standard library only** (importable
-  without torch/Streamlit): `EXT`, `create_from_example` (first-start `profiles.json`),
-  `slugify`, `profile_slugs` (unique gallery file names, used by the engine),
-  `reference_folder` (one reference folder per profile, A1),
+The package `framescout_core/` is shared by app and engine and uses the **standard library
+only** (importable without torch/Streamlit). It has one module per area (I15, split from
+the former single file `framescout_core.py`); `__init__.py` re-exports every public name,
+so callers write `import framescout_core` or `from framescout_core import <name>`. Put
+logic here when both sides need it or it should be unit-tested without models; add it to
+the module of its area and to the re-exports in `__init__.py`.
+
+- `names.py`: `EXT` (supported image extensions), `slugify`, `profile_slugs` (unique
+  gallery file names, used by the engine).
+- `references.py`: `reference_folder` (one reference folder per profile, A1),
   `stage_reference_move`/`update_backup_references`/`finish_reference_move`/`undo_reference_move`
   (a renamed profile's references follow its name, A1), `write_new_file` (reference
-  uploads without overwriting), `generic_prompts` and `load_profiles` (profile
-  loading/validation, used by the engine), `read_profiles`/`save_profiles` (the app's
-  `profiles.json`: same validation, v3 conversion, atomic save with `profiles.json.bak`,
-  A2), `thumbnail_name`/`ensure_thumbnail` (gallery thumbnails; a photo deleted before the
-  export is skipped, E6), `progress_line`/`progress_due` (the progress line the engine
-  logs for people, A11),
-  `RUN_LOCK`/`RUN_STATUS`/`RunLock`/`lock_held`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`
-  (one search per output folder, its phase and progress, A4/A5),
-  `prefetch`/`group_batches`/`store_group`/`draft_size`/`DRAFT_DECODING` (the engine's
-  analysis pipeline: decoding ahead in threads, crops of several photos per CLIP batch,
-  photo-by-photo fallback after a failed group, `Image.draft` size and its part of the
-  cache signature, E2), `crop_label`/`FULL_IMAGE_LABEL` (gallery crop labels),
-  `detection_options` (YOLO arguments on the CLIP device, E14),
+  uploads without overwriting).
+- `profiles.py`: `create_from_example` (first-start `profiles.json`), `generic_prompts`
+  and `load_profiles` (profile loading/validation, used by the engine),
+  `read_profiles`/`save_profiles` (the app's `profiles.json`: same validation, v3
+  conversion, atomic save with `profiles.json.bak`, A2).
+- `thumbnails.py`: `thumbnail_name`/`ensure_thumbnail` (gallery thumbnails; a photo
+  deleted before the export is skipped, E6), `crop_label`/`FULL_IMAGE_LABEL` (gallery crop
+  labels).
+- `pipeline.py`: `progress_line`/`progress_due` (the progress line the engine logs for
+  people, A11), `prefetch`/`group_batches`/`store_group`/`draft_size`/`DRAFT_DECODING`
+  (the engine's analysis pipeline: decoding ahead in threads, crops of several photos per
+  CLIP batch, photo-by-photo fallback after a failed group, `Image.draft` size and its part
+  of the cache signature, E2).
+- `locks.py`: `RunLock`/`lock_held` (the operating-system file lock of a search run, A4,
+  also used around the read-merge-write of `settings.json` and `marks.json`).
+- `run_status.py`:
+  `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`
+  (one search per output folder, its phase and progress, A4/A5).
+- `devices.py`: `detection_options` (YOLO arguments on the CLIP device, E14),
   `device_choices`/`cuda_status`/`cuda_hint` (the app's device choice, CUDA status and the
-  way to GPU support, A7),
+  way to GPU support, A7).
+- `torch_build.py`:
   `TORCH_VERSION`/`TORCHVISION_VERSION`/`CUDA_BUILDS`/`parse_gpu_query`/`cuda_build`/`unsupported_gpus`/`installed_build_matches`/`installed_cuda_build`/`torch_requirements`/`torch_index_url`
-  (which PyTorch build the installer installs, A7/I3)
-- `CLIP_MODEL`/`CLIP_PRETRAINED`/`ENGINE`/`feature_signature` (CLIP model choice and the
-  feature cache signature, E1)
-- `CACHE_FILE`/`DEFAULT_YOLO_MODEL`/`prepare_cache`/`known_signatures`/`SLIDER_NOISE_ULPS`/`classify_signatures`
+  (which PyTorch build the installer installs, A7/I3).
+- `signature.py`: `CLIP_MODEL`/`CLIP_PRETRAINED`/`ENGINE`/`feature_signature` (CLIP model
+  choice and the feature cache signature, E1),
+  `CACHE_FILE`/`DEFAULT_YOLO_MODEL`/`prepare_cache`/`known_signatures`/`SLIDER_NOISE_ULPS`/`classify_signatures`
   (the cache tables with the `signatures` side table, and which engine version and
-  settings a cached row belongs to, E11)
-- `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`DEVICES`/`default_settings`/`read_settings`/`save_settings`/`reconcile_settings`
+  settings a cached row belongs to, E11).
+- `settings.py`:
+  `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`DEVICES`/`default_settings`/`read_settings`/`save_settings`/`reconcile_settings`
   (the app's `settings.json`, the ranges of its widgets, the engine's `--device` choices,
-  and the sync of the widgets with the file, A8)
-- `RESULTS_FILE`/`RESULTS_FORMAT`/`result_card`/`results_document`/`write_results`/`read_results`/`search_fingerprint`/`profile_fingerprints`/`profile_state`/`GALLERY_PAGE_SIZE`/`page_count`/`page_cards`/`openable_photo`/`open_command`/`reveal_command`
+  and the sync of the widgets with the file, A8).
+- `results.py`:
+  `RESULTS_FILE`/`RESULTS_FORMAT`/`result_card`/`results_document`/`write_results`/`read_results`/`search_fingerprint`/`profile_fingerprints`/`profile_state`/`GALLERY_PAGE_SIZE`/`page_count`/`page_cards`/`openable_photo`/`open_command`/`reveal_command`
   (the result file of a search and the app's gallery: validation of the file (plain
   gallery and thumbnail file names only), whether a profile changed since the search,
-  pages, and opening only existing image files, A12)
-- `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks` (the user's marks,
-  A17)
-- `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`
-  (copying marked matches and their saved target folders, A17)
-- `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
+  pages, and opening only existing image files, A12).
+- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks` (the
+  user's marks, A17).
+- `copying.py`:
+  `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`
+  (copying marked matches and their saved target folders in `settings.json`, A17).
+- `cleanup.py`:
+  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14).
+- `_common.py` (internal, not re-exported): helpers several areas share, i.e. atomic
+  writes (`_publish_via_temp`, `_publish_new`, `_replace_atomically`,
+  `_replace_with_retry`), reading a JSON object file with retries (`_read_json_object`),
+  the locked read-change-write of a JSON file (`_update_locked`) and `_path_key`.
 
-Put logic here when both sides need it or it should be unit-tested without models.
+Dependencies between the modules go one way (no import cycles): `cleanup` uses most of the
+others, `_common` uses only `locks`. Private helpers (leading underscore) are not
+re-exported. A test that monkeypatches a helper patches the module that calls it, e.g.
+`monkeypatch.setattr(framescout_core.cleanup, '_remove_file', …)`: a patch on the package
+would no longer reach the calling code. This also holds for a public name another module
+imports (`framescout_core.cleanup.read_profiles`). Patches of `framescout_core.os`,
+`.shutil` and `.Path` keep working, since they change the shared module or class.
 
 ### `framescout_scoring.py`
 
@@ -95,7 +122,7 @@ z-scores and their combination, E5) and `score_caption` (the numbers on a galler
 
 ### `tests/`, `pytest.ini`, `requirements-dev.txt`
 
-`tests/`, `pytest.ini`, `requirements-dev.txt`: pytest suite for `framescout_core`,
+`tests/`, `pytest.ini`, `requirements-dev.txt`: pytest suite for `framescout_core/`,
 `framescout_scoring` and `install_torch.py` (no torch, no model download); dev
 dependencies `pytest` and `numpy` (for `framescout_scoring`, user decision in PR #11). One
 test (`test_signature.py`, QuickGELU config check, E1) also reads open_clip's config
