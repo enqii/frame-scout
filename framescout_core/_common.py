@@ -72,9 +72,11 @@ def _replace_with_retry(target, data, attempts, retry_delay, durable=True):
 
 
 def _read_json_object(filename, what, attempts=5, retry_delay=0.05):
-    """Return the JSON object of the file filename ({} if it is missing), see _read_settings_file.
+    """Return the JSON object of the file filename ({} if it is missing); ValueError if unreadable.
 
-    what names the file in the error for a file that is not a JSON object.
+    On Windows, reading fails for a moment while another session replaces the file, so an
+    OSError is retried up to attempts times, retry_delay seconds apart. what names the file
+    in the error for a file that is not a JSON object.
     """
     for attempt in range(max(attempts, 1)):
         try:
