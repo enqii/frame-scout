@@ -64,13 +64,13 @@ def test_the_target_never_exists_half_written(tmp_path, monkeypatch):
     example.write_bytes(b'{"profiles": [{"name": "Red car"}]}')
     target = tmp_path / 'profiles.json'
     seen = []
-    real_publish = framescout_core._publish_new
+    real_publish = framescout_core.profiles._publish_new
 
     def publish(tmp, final):
         seen.append((final.exists(), tmp.read_bytes()))
         real_publish(tmp, final)
 
-    monkeypatch.setattr(framescout_core, '_publish_new', publish)
+    monkeypatch.setattr(framescout_core.profiles, '_publish_new', publish)
     assert create_from_example(target, example) is True
     assert seen == [(False, example.read_bytes())]
 
@@ -79,13 +79,13 @@ def test_a_file_created_concurrently_wins_and_is_not_replaced(tmp_path, monkeypa
     example = tmp_path / 'profiles.example.json'
     example.write_text('{"profiles": [{"name": "Red car"}]}', encoding='utf-8')
     target = tmp_path / 'profiles.json'
-    real_publish = framescout_core._publish_new
+    real_publish = framescout_core.profiles._publish_new
 
     def publish(tmp, final):
         final.write_text('{"profiles": [{"name": "Other session"}]}', encoding='utf-8')
         real_publish(tmp, final)
 
-    monkeypatch.setattr(framescout_core, '_publish_new', publish)
+    monkeypatch.setattr(framescout_core.profiles, '_publish_new', publish)
     assert create_from_example(target, example) is False
     assert target.read_text(encoding='utf-8') == '{"profiles": [{"name": "Other session"}]}'
     assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.example.json', 'profiles.json']
@@ -98,7 +98,7 @@ def test_a_failed_copy_leaves_neither_target_nor_temporary_file(tmp_path, monkey
     def publish(tmp, final):
         raise PermissionError('read-only folder')
 
-    monkeypatch.setattr(framescout_core, '_publish_new', publish)
+    monkeypatch.setattr(framescout_core.profiles, '_publish_new', publish)
     with pytest.raises(PermissionError):
         create_from_example(tmp_path / 'profiles.json', example)
     assert [p.name for p in tmp_path.iterdir()] == ['profiles.example.json']

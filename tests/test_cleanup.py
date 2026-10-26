@@ -392,13 +392,13 @@ def test_a_search_cannot_take_the_lock_during_the_cleanup(project, monkeypatch):
     project.thumb(T1)
     scan = project.scan()
     held = []
-    real = framescout_core._remove_file
+    real = framescout_core.cleanup._remove_file
 
     def remove(path, summary):
         held.append(not RunLock(project.results / RUN_LOCK).acquire())
         return real(path, summary)
 
-    monkeypatch.setattr(framescout_core, '_remove_file', remove)
+    monkeypatch.setattr(framescout_core.cleanup, '_remove_file', remove)
     project.clean(scan, {'thumbnails'})
     assert held == [True]
     lock = RunLock(project.results / RUN_LOCK)
@@ -477,7 +477,7 @@ def make_db(path):
 
 
 def test_the_read_only_uri_opens_a_path_with_special_characters(tmp_path):
-    from framescout_core import _read_only_uri
+    from framescout_core.cleanup import _read_only_uri
     path = tmp_path / 'a b#%?.sqlite3' if os.name != 'nt' else tmp_path / 'a b#%;.sqlite3'
     make_db(path)
     con = sqlite3.connect(_read_only_uri(path), uri=True)
@@ -492,7 +492,7 @@ def test_the_read_only_uri_opens_a_path_with_special_characters(tmp_path):
 @pytest.mark.skipif(os.name != 'nt', reason='UNC paths are a Windows feature')
 def test_the_read_only_uri_opens_a_unc_path(tmp_path):
     # FrameScout run from a network share: Path.as_uri() would give the URI a host authority
-    from framescout_core import _read_only_uri
+    from framescout_core.cleanup import _read_only_uri
     path = tmp_path.resolve() / 'cache.sqlite3'
     make_db(path)
     unc = Path('//localhost/' + str(path)[0] + '$' + str(path)[2:])  # \\localhost\C$\...
@@ -510,8 +510,8 @@ def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, mo
     gone = project.photos / 'b.jpg'
     project.cache([(gone, CURRENT), (gone, OTHER), (gone, OLD)])
     calls = []
-    real = framescout_core._missing
-    monkeypatch.setattr(framescout_core, '_missing', lambda path: calls.append(path) or real(path))
+    real = framescout_core.cleanup._missing
+    monkeypatch.setattr(framescout_core.cleanup, '_missing', lambda path: calls.append(path) or real(path))
     assert project.scan()['cache_missing']['rows'] == 3
     assert calls == [str(gone)]
 
@@ -523,8 +523,8 @@ def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):
     project.page('red-car.html', 'Red car', [T1])
     calls = []
     for name in ('read_profiles', '_gallery_links'):
-        real = getattr(framescout_core, name)
-        monkeypatch.setattr(framescout_core, name,
+        real = getattr(framescout_core.cleanup, name)
+        monkeypatch.setattr(framescout_core.cleanup, name,
                             lambda *args, real=real, name=name: calls.append(name) or real(*args))
     project.scan()
     assert sorted(calls) == ['_gallery_links', '_gallery_links', 'read_profiles']
@@ -541,7 +541,7 @@ def test_an_error_in_one_step_keeps_the_summary_of_what_was_deleted(project, mon
     def broken(*args, **kwargs):
         raise PermissionError('access denied')
 
-    monkeypatch.setattr(framescout_core, '_unreferenced_references', broken)
+    monkeypatch.setattr(framescout_core.cleanup, '_unreferenced_references', broken)
     summary = project.clean(scan, everything(scan))
     assert summary['files'] == 1 and summary['rows'] == 1
     assert summary['skipped'] == ['Reference images: stopped (access denied).']
@@ -557,13 +557,13 @@ def test_cleanup_running_while_clean_up_holds_the_lock(project, monkeypatch):
     project.thumb(T1)
     scan = project.scan()
     seen = []
-    real = framescout_core._remove_file
+    real = framescout_core.cleanup._remove_file
 
     def remove(path, summary):
         seen.append(framescout_core.cleanup_running(project.results))
         return real(path, summary)
 
-    monkeypatch.setattr(framescout_core, '_remove_file', remove)
+    monkeypatch.setattr(framescout_core.cleanup, '_remove_file', remove)
     assert not framescout_core.cleanup_running(project.results)
     project.clean(scan, {'thumbnails'})
     assert seen == [True]

@@ -111,7 +111,7 @@ def test_a_failure_while_staging_undoes_the_files_staged_before(project, monkeyp
         raise PermissionError('access denied')
 
     monkeypatch.setattr(framescout_core.os, 'link', link)
-    monkeypatch.setattr(framescout_core, '_copy_new', copy)
+    monkeypatch.setattr(framescout_core.references, '_copy_new', copy)
     with pytest.raises(PermissionError):
         stage(project, ['references/red-car/reference-1.jpg', 'references/red-car/reference-2.png'])
     assert sorted(p.name for p in (project / 'references' / 'red-car').iterdir()) == [

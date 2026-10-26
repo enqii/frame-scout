@@ -207,14 +207,14 @@ def test_a_renamed_profile_keeps_its_target_folder(tmp_path):
 def test_a_name_that_cannot_be_created_moves_on_to_the_next(tmp_path, monkeypatch):
     # e.g. a dangling symbolic link: exists() is False, but the name is taken (review: no endless loop)
     import framescout_core
-    publish = framescout_core._publish_new
+    publish = framescout_core.copying._publish_new
 
     def refuse_first(tmp, target):
         if target.name == 'a.jpg':
             raise FileExistsError(target)
         publish(tmp, target)
 
-    monkeypatch.setattr(framescout_core, '_publish_new', refuse_first)
+    monkeypatch.setattr(framescout_core.copying, '_publish_new', refuse_first)
     a = photo(tmp_path / 'photos' / 'a.jpg')
     assert copy_photos([str(a)], tmp_path / 'out')['renamed'] == 1
     assert (tmp_path / 'out' / 'a (2).jpg').is_file()
