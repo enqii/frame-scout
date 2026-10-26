@@ -56,7 +56,7 @@ the module of its area and to the re-exports in `__init__.py`.
   can be read here), `supported_extensions` (`EXT` without the extensions of a missing
   decoder), `missing_decoder`, `scan_photos` (the photos of a search as a `PhotoScan`; app
   and engine use it), `skipped_lines` (the log lines about skipped files),
-  `distinct_folders`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
+  `distinct_folders`/`output_folder_problem`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
   (several photo folders per search, A25; see "Several photo folders"),
   `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
   (the engine's RAW decoding; see "Photo formats").
@@ -246,8 +246,9 @@ hold point).
 ### Several photo folders
 
 A search covers a list of photo folders (A25, user decisions at the hold point of PR #28).
-The engine resolves the positional folders; an output folder equal to one of them is an
-error. `distinct_folders` drops a folder listed twice and one inside another listed
+The engine resolves the positional folders (parsed with `parse_intermixed_args`, so they
+may stand between options); an output folder equal to one of them, or containing one
+(whose files the scan would always leave out), is an error (`output_folder_problem`). `distinct_folders` drops a folder listed twice and one inside another listed
 folder (compared by `os.path.normcase` of the resolved path; the notes go to the log).
 Missing folders are left out with a log line ("Photo folder not found, searched without
 it"); only if none exists is it an error (`missing_folders_message`, before the lock as
@@ -255,8 +256,9 @@ for one folder, see "Run lock and status"). `scan_folders` joins the `scan_photo
 folders. The gallery and `results.json` name a photo by `photo_name`: its path in its
 folder, after the folder's label (`folder_labels`: none for one folder, so a one-folder
 gallery is unchanged; otherwise the folder name, with more trailing path parts for
-folders of the same name, compared case-insensitively; a drive root is labeled by its
-drive, e.g. `D:`). Cache rows and marks stay keyed by absolute path, so neither the cache
+folders of the same name, compared case-insensitively, and for a label that starts
+another label, e.g. `Event` and `Event\sub`, so no two photos get the same name; a drive
+root is labeled by its drive, e.g. `D:`). Cache rows and marks stay keyed by absolute path, so neither the cache
 signature (`ENGINE`) nor `marks.json` changes. Not recognized: the same folder by another
 path (hard links, another drive letter or UNC path for the same share, A28) and junctions
 inside a listed folder, which `Path.rglob` follows on Python 3.14 (checked on Windows
@@ -268,13 +270,15 @@ line). `settings.json` stores the list `photo_folders`; `setting_of_widget` /
 the non-empty lines, stripped), so `reconcile_settings` and `save_settings` work on
 lists. The tab shows the count per existing folder (each scanned once per page run, as
 before: A6), the notes of `distinct_folders` and a warning per missing folder. "Start
-search" needs one existing folder and passes all distinct folders. The copy target check
-takes the folders of `results.json` and the current list; the cleanup takes the current
-list (see "Storage cleanup"). Checked in PR #28 with one CPU engine smoke run on
-synthetic photos under `.tmp/` (two folders of the same name, a nested and a missing
-one; one folder; none existing; output equal to a folder) and the app with Streamlit's
-`AppTest` (old `settings.json`, format 1 `results.json`, editing the list), not in a
-browser.
+search" needs one existing folder (from that scan, no second `is_dir`) and passes all
+distinct folders. The copy target check takes the folders of `results.json` and the
+current list; the cleanup takes the distinct resolved list (see "Storage cleanup").
+Checked in PR #28 with one CPU engine smoke run on synthetic photos under `.tmp/` (two
+folders of the same name, a nested and a missing one; one folder; none existing; output
+equal to a folder; after the review folders between options and a folder inside the
+output folder) and the app with Streamlit's `AppTest` (old `settings.json`, format 1
+`results.json`, editing the list, the cleanup scan with a missing folder listed twice),
+not in a browser.
 
 ### Photo formats
 
