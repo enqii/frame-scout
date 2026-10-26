@@ -429,6 +429,40 @@ every pull request and every push to `main` – see `.github/workflows/tests.yml
 Contributions follow the PR workflow described in [CLAUDE.md](CLAUDE.md) (Conventional
 Commits, one pull request per roadmap item).
 
+### Evaluating the search models
+
+`framescout_eval.py` is a development tool (not part of the app; numpy only, no torch in
+the tool itself) that measures how well each search model ranks **your own** photos. It
+runs every model on a photo collection, builds a pool of the photos the models rank
+highest, lets you label them in the browser as match / no match, and reports the average
+precision of the top 40 (AP@40) per profile and model. The numbers are a relative ranking
+quality on your labels, not certainty, and they say little for a collection or profile that
+has few hits (the chosen profiles should have hits in the collection). A model that is not
+yet in `.cache` downloads its weights on its first use; the first model run on a CPU can
+take long (ViT-L/14 is about 18 times slower than the default). Everything stays local; the
+labels are not uploaded anywhere.
+
+```powershell
+# 1. once per collection: run all models (a profiles file with reference images is needed for the weight sweep)
+.\.venv\Scripts\python.exe framescout_eval.py run cosplay D:\Photos\Convention --profiles .\eval-cosplay.json
+.\.venv\Scripts\python.exe framescout_eval.py run outdoor D:\Photos\Hiking --profiles .\eval-outdoor.json
+# 2. build the pool of photos to label
+.\.venv\Scripts\python.exe framescout_eval.py pool cosplay
+# 3. label them in the browser (Ctrl+C in the console stops the page; run again to continue)
+.\.venv\Scripts\python.exe framescout_eval.py label cosplay
+# 4. AP@40 per profile and model, and a reference-weight sweep
+.\.venv\Scripts\python.exe framescout_eval.py metrics cosplay outdoor --json .\.tmp\eval\metrics.json
+```
+
+`run --models a,b` limits the models, `--no-person-detection` speeds the run up, and
+`pool --depth/--weights` widen the pool (labels are kept when `pool` is run again). In the
+labelling page `Y`/`1` marks a match, `N`/`2` no match, `U`/`Delete` clears, `Space`/`→`
+and `←` move, `Enter` jumps to the next unlabelled photo and `O` opens the original. The
+files of a collection are written to `.tmp/eval/<collection>/` (gitignored; `--dir` chooses
+another place). The engine option `--scores-file JSON` that `run` uses can also be used
+directly; the app never passes it. See `docs/ARCHITECTURE.md` -> "Model evaluation tool"
+for the formats. Status: not yet run with real models (E34).
+
 ### Project structure
 
 | File / folder | Purpose |
@@ -437,6 +471,7 @@ Commits, one pull request per roadmap item).
 | `framescout_engine.py` | Search engine as a standalone CLI |
 | `framescout_core/` | Shared helpers of app and engine, one module per area (file names, supported formats, loading and saving profiles and settings, thumbnails, run lock and status file, result file, marks and copying, cleanup); standard library only |
 | `framescout_scoring.py` | Scoring of the engine: prompt ensemble, scaling and weighting of text and reference scores; numpy only |
+| `framescout_eval.py`, `framescout_eval_page.html` | Development tool to evaluate the search models on your own labelled photos (see above); not used by the app |
 | `profiles.example.json` | Example search profiles; the app copies them to `profiles.json` on the first start |
 | `requirements.txt` | Python dependencies (PyTorch pinned) |
 | `install_torch.py` | Installs the CPU or CUDA build of PyTorch; called by `Install-FrameScout.bat` |
