@@ -88,8 +88,18 @@ def test_version_comparison():
     assert satisfies('5.0.0.93', [('>=', '5')])
 
 
-def test_constraints_are_exact_pins():
-    assert len(pins()) > len(requirements('requirements.txt'))
+def test_every_line_is_an_exact_pin_in_sorted_order():
+    # every line pins one package exactly ("name==version"; no local label, hash or
+    # duplicate), in order of the name, so a refresh shows up as a readable diff; whether
+    # every transitive dependency is pinned is checked when the pins are refreshed
+    names = []
+    for line in lines('constraints.txt'):
+        match = PIN.match(line)
+        assert match, f'constraints.txt: {line!r} is not an exact pin "name==version" (no local label, no hash)'
+        names.append(canonical(match.group(1)))
+    assert len(set(names)) == len(names), 'constraints.txt pins a package twice'
+    assert names == sorted(names), 'constraints.txt is not sorted by package name'
+    assert set(requirements('requirements.txt')) < set(names)  # the dependencies' dependencies too
 
 
 @pytest.mark.parametrize('path', ['requirements.txt', 'requirements-dev.txt'])
