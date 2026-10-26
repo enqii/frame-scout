@@ -455,9 +455,16 @@ labels are not uploaded anywhere.
 ```
 
 `run --models a,b` limits the models, `--no-person-detection` speeds the run up, and
-`pool --depth/--weights` widen the pool (labels are kept when `pool` is run again). In the
+`pool --depth/--weights` widen the pool (labels are kept when `pool` is run again). A model
+whose run is skipped or fails keeps no scores of an earlier run, so run it again before
+`pool`/`metrics`. In the
 labelling page `Y`/`1` marks a match, `N`/`2` no match, `U`/`Delete` clears, `Space`/`→`
-and `←` move, `Enter` jumps to the next unlabelled photo and `O` opens the original. The
+and `←` move, `Enter` jumps to the next unlabelled photo and `O` opens the original; if
+port 8765 is taken, choose another with `label --port`. A photo without a gallery
+thumbnail is shown as its original file, which a browser cannot display for HEIC/HEIF and
+RAW (E35). Labels belong to a profile **name**: editing the prompts keeps them (so prompt
+wordings can be compared on the same labels), but give a profile a new name when its motif
+changes (E36). `metrics` warns about labels that no model run scored. The
 files of a collection are written to `.tmp/eval/<collection>/` (gitignored; `--dir` chooses
 another place). The engine option `--scores-file JSON` that `run` uses can also be used
 directly; the app never passes it. See `docs/ARCHITECTURE.md` -> "Model evaluation tool"

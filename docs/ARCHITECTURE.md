@@ -30,7 +30,9 @@ measured once on a Core Ultra 9 285K.
 
 Evaluation tooling (E32/E20, PR #32): `framescout_eval.py`, `framescout_core/evaluation.py`
 and the engine's `--scores-file` are covered by unit tests, the engine change additionally by
-its syntax tree and `py_compile`; the labelling page was rendered in headless Edge. **Not
+its syntax tree and `py_compile`; the labelling page was rendered in headless Edge (again
+after the review fixes, with fake scores), and the labelling server answered real HTTP
+requests on Windows (a label POST, a negative `Content-Length`, a wrong token). **Not
 run:** `framescout_eval.py run` with real models, the engine's `--scores-file` in a real
 search, the page's keyboard and click handling in a real browser (E34), originals that a
 browser cannot display (E35), macOS/Linux.
@@ -271,7 +273,8 @@ and never deleted by the cleanup, E7), `profiles.json`, `run.log`, `.cache/`, `.
 `framescout_eval.py {run,pool,label,metrics}` (E32/E20, PR #32) measures the search
 models on the user's own labelled photos. Collection layout, default
 `<project>/.tmp/eval/<collection>/` (gitignored; `--dir` elsewhere):
-`collection.json` (folders and profiles file, remembered so a re-run may omit them),
+`collection.json` (folders and profiles file, remembered so a re-run may omit them; a file
+without a folder list or profiles path is an error, exit code 2, and is left as it is),
 `engine/<model>/` (one engine output folder per model: cache, galleries, thumbnails; separate
 so one run's thumbnail cleanup never removes another model's), `scores/<model>.json`,
 `pool.json`, `labels.json` (`{"format": 1, "labels": {profile: {absolute photo path:
@@ -279,25 +282,38 @@ true|false}}}`; an unreadable file is never saved over, the page refuses to star
 
 - Scores file (`{"format": 1, "model", "signature", "photos": [{"path", "mtime_ns", "crops"}],
   "profiles": [{"name", "prompts", "references", "text", "visual"}]}`): scores per photo and
-  crop rounded to `SCORE_DIGITS` (6); `visual` is null without reference images.
+  crop rounded to `SCORE_DIGITS` (6), so the tool's ranking can order near-ties within that
+  rounding differently from the galleries; `visual` is null without reference images.
+  `read_scores` accepts finite numbers only, and `write_document` refuses NaN/infinity
+  (`allow_nan=False`); the engine cannot produce them (`photo_scores` skips such a photo).
 - `run`: per model `framescout_engine.py <folders> --profiles P --output engine/<model>
   --model <model> --scores-file scores/<model>.json --device --batch-size --top 150
   [--no-person-detection]` with `TORCH_HOME`/`HF_HOME`/`YOLO_CONFIG_DIR`/`XDG_CACHE_HOME`
   under `<project>/.cache` (`--cache-dir`) and `PYTHONIOENCODING=utf-8`. A model with a
-  missing package (`model_problem`) is skipped; exit 1 if any model was not scored. A model
-  not yet cached downloads its weights on first use.
+  missing package (`model_problem`) is skipped; exit 1 if any model was not scored. A
+  model's `scores/<model>.json` is removed before its run and again after a failed one, so a
+  skipped or failed model keeps no scores of an older run. A model not yet cached downloads
+  its weights on first use.
 - `pool`: ranks each model's scores with `rank_photos` (the engine's scoring) at
   `--weights` (default `0,0.3,0.6`, only for profiles with reference images), top `--depth`
   (100) per model and weight, prints pool size, labelled count and a time estimate (1.5 s
   per photo), and warns if a profile changed between model runs or the models scored
-  different photos. Re-running keeps all labels.
-- `label`: `ThreadingHTTPServer` on `127.0.0.1:8765` (`--port`, `--no-browser`), every
-  route behind a random token (`/<token>/`); shows the profile and one photo (the gallery
-  thumbnail of any model's run if present, else the original, E35); each label is POSTed and
-  saved atomically at once, a failed save is shown and reverted; resumes at the first
-  unlabelled photo.
+  different photos (path and `mtime_ns`). Re-running keeps all labels. Labels are keyed by
+  profile name and photo path only, so they survive prompt edits; a new motif needs a new
+  profile name (E36).
+- `label`: `LabelServer` (a `ThreadingHTTPServer` without `SO_REUSEADDR` on Windows, where
+  it would let a second page bind the same port silently) on `127.0.0.1:8765` (`--port`
+  0-65535, `--no-browser`; a port in use is an error, exit code 2), every route behind a
+  random token (`/<token>/`, compared with `secrets.compare_digest`); shows the profile and
+  one photo (the gallery thumbnail of any model's run if present, else the original, E35;
+  the state's `thumb` flag lets the page prefetch thumbnails only, never originals); each
+  label is POSTed (`Content-Length` 0 to `MAX_BODY` = 10,000, else 400) and saved
+  atomically at once, a failed save is shown and reverted; resumes at the first unlabelled
+  photo.
 - `metrics <collection>...`: AP@`--k` (40) per profile and model at `--weight` (default
-  `DEFAULT_REFERENCE_WEIGHT`), unlabelled photos in a top list count as no match, a
+  `DEFAULT_REFERENCE_WEIGHT`), warnings about labels no model run scored (another profile
+  name, a moved or relative photo path: such a match counts as missed by every model,
+  `label_warnings`), unlabelled photos in a top list count as no match, a
   reference-weight sweep (`--sweep`, best per model marked `*`), the mean over several
   collections; Markdown tables, `--json FILE`.
 

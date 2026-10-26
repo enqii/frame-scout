@@ -462,7 +462,18 @@ referenced in commits, pull requests and discussions.
       photos from the other pool weights may lack one and are then shown as the original
       file, which a browser cannot display for HEIC/HEIF and RAW. Fix idea: render the
       missing thumbnails with the engine's decoders (needs Pillow/rawpy in the tool) or
-      raise `run --top`. Found in E32 (PR #32).
+      raise `run --top`. Found in E32 (PR #32). Since the review of PR #32 the page names
+      such a photo "original file" and prefetches only thumbnails, so large originals are
+      loaded only when shown.
+- [ ] **E36 – Labels do not record the motif they were made for:** `labels.json` keys a
+      label by profile name and photo path only. Editing the prompts under the same name
+      keeps the labels (intended: prompt wordings can be compared on the same labels), but
+      a profile whose motif changes under the same name (context, features, reference
+      images) silently reuses labels made for the old motif, and the "profile has changed"
+      warning of `pool`/`metrics` disappears once every model has been run again. Today
+      the README asks for a new profile name instead. Fix idea: store each profile's
+      context, features and reference images in `labels.json` when a label is set and warn
+      in `pool`/`metrics` when they differ. Found in the review of PR #32 (E32).
 
 ### App (`app.py`)
 
