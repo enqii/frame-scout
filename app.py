@@ -662,6 +662,10 @@ def cleanup_signature():
     return feature_signature(settings['person_detection'], settings['max_persons'], settings['person_confidence'],
                              DEFAULT_YOLO_MODEL, model=settings['model'])
 
+def cleanup_inputs():
+    """What a cleanup scan was classified for: a scan of other values is out of date (E22 review)."""
+    return cleanup_signature(), settings['model'], tuple(map(str, search_folders))
+
 def cleanup_offered(category):
     return not category['problem'] and bool(category['items'])
 
@@ -675,6 +679,7 @@ def scan_storage():
         st.session_state.cleanup_notice = ('warning', f'The storage could not be scanned: {exc}')
         return
     st.session_state.cleanup_scan = scan
+    st.session_state.cleanup_scan_inputs = cleanup_inputs()
     st.session_state.cleanup_confirm = False
     for key, category in scan.items():
         # set before the checkboxes are drawn, never as their value= (they have keys)
@@ -718,6 +723,11 @@ def show_cleanup():
         kind, text = st.session_state.pop('cleanup_notice')
         (st.success if kind == 'success' else st.warning)(plain(text))
     scan = st.session_state.get('cleanup_scan')
+    if scan and st.session_state.get('cleanup_scan_inputs') != cleanup_inputs():
+        # e.g. another search model: the scan would offer the rows of the model chosen now
+        st.session_state.pop('cleanup_scan', None)
+        st.caption('The AI settings or photo folders changed since the scan. Scan again.')
+        return
     if not scan:
         return
     for key in CLEANUP_CATEGORIES:
