@@ -143,6 +143,69 @@ def test_the_default_photo_folder_is_protected_without_settings(project):
     assert protected_folders(project) == [project / 'photos']
 
 
+@pytest.mark.parametrize('document', [
+    {'photo_folders': ['.tmp/shoot', 5]},
+    {'photo_folders': '.tmp/shoot'},
+    {'photo_folder': 5},
+    {'copy_folders': {'hero': 5}},
+    {'copy_folders': ['.tmp/copies']},
+])
+def test_invalid_photo_or_copy_folders_block_the_plan(project, document):
+    # the app would fall back to the default folder, so the real folders are unknown (review)
+    (project / 'settings.json').write_text(json.dumps(document), encoding='utf-8')
+    with pytest.raises(ValueError):
+        protected_folders(project)
+
+
+def test_the_settings_file_is_read_once(project, monkeypatch):
+    # photo folders and copy folders come from the same version of the file (review)
+    (project / 'settings.json').write_text(json.dumps({'photo_folders': ['a'], 'copy_folders': {'hero': 'b'}}),
+                                           encoding='utf-8')
+    reads = []
+    original = uninstall_module._read_settings_file
+    monkeypatch.setattr(uninstall_module, '_read_settings_file', lambda *args: reads.append(1) or original(*args))
+    assert protected_folders(project) == [project / 'a', project / 'b']
+    assert len(reads) == 1
+
+
+@pytest.mark.parametrize('folder', ['.', 'ROOT', 'PARENT'])
+def test_nothing_inside_a_photo_folder_is_deleted(project, folder):
+    # a photo folder that is the project folder or holds it holds every item (review)
+    folder = {'ROOT': str(project), 'PARENT': str(project.parent)}.get(folder, folder)
+    (project / 'settings.json').write_text(json.dumps({'photo_folders': [folder]}), encoding='utf-8')
+    items, skipped = plan(project)
+    assert items == []
+    assert sorted(path.name for path, _ in skipped) == sorted(
+        ['.cache', '.tmp', '.venv', '__pycache__', '__pycache__', 'yolo11n.pt'])
+    assert all('inside' in reason for _, reason in skipped)
+
+
+case_insensitive = pytest.mark.skipif(os.path.normcase('A') == 'A' or not Path(__file__.upper()).exists(),
+                                      reason='needs a case-insensitive file system (Windows)')
+
+
+@case_insensitive
+def test_a_kept_entry_in_another_case_is_kept(project):
+    # settings name .tmp\eval\shots, the folder on disk is .tmp\Eval (review)
+    (project / '.tmp' / 'eval').rename(project / '.tmp' / 'Eval')
+    shot = write(project / '.tmp' / 'Eval' / 'shots' / 'IMG_0003.jpg', b'shot')
+    (project / 'settings.json').write_text(json.dumps({'photo_folders': ['.tmp/eval/shots']}), encoding='utf-8')
+    items, skipped = plan(project)
+    tmp = next(item for item in items if item.path.name == '.tmp')
+    assert tmp.size == 10 and skipped == []
+    assert remove_items(items) == []
+    assert shot.is_file() and (project / '.tmp' / 'Eval' / 'cosplay' / 'labels.json').is_file()
+    assert not (project / '.tmp' / 'pip-build').exists()
+
+
+@case_insensitive
+def test_a_tmp_folder_with_only_kept_entries_in_another_case_is_not_listed(project):
+    (project / '.tmp' / 'pip-build' / 'x.whl').unlink()
+    (project / '.tmp' / 'pip-build').rmdir()
+    (project / '.tmp' / 'eval').rename(project / '.tmp' / 'EVAL')
+    assert '.tmp' not in names(plan(project)[0], project)
+
+
 # --- remove_items ---
 
 def test_removing_the_plan_keeps_the_user_data(project):
@@ -355,6 +418,15 @@ def test_nothing_to_delete(tmp_path):
     write(root / 'app.py')
     code, text, questions = run(root, tmp_path, 'yes')
     assert code == 0 and 'Nothing to delete' in text and questions == []
+
+
+def test_a_photo_folder_holding_the_project_stops_the_uninstall(project, tmp_path):
+    (project / 'settings.json').write_text(json.dumps({'photo_folders': [str(project)]}), encoding='utf-8')
+    code, text, questions = run(project, tmp_path, 'yes')
+    assert code == 1 and questions == [] and 'Nothing to delete' not in text
+    assert f'Not deleted: .venv{os.sep} is inside the folder {project}' in text
+    assert 'photo folders' in text  # how to get past it
+    assert (project / '.venv').exists()
 
 
 # --- Uninstall-FrameScout.bat ---
