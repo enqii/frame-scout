@@ -4,8 +4,8 @@ import json
 import pytest
 
 from framescout_core import (EVAL_K, LABELS_FORMAT, SCORES_FORMAT, average_precision, build_pool,
-                             collection_name_problem, read_labels, read_scores, save_labels, scores_document,
-                             set_label, write_scores)
+                             collection_name_problem, read_document, read_labels, read_scores, save_labels,
+                             scores_document, set_label, write_document, write_scores)
 
 
 def sample_document():
@@ -119,6 +119,28 @@ def test_an_unusable_scores_file_raises_value_error(tmp_path, content):
     path.write_text(content, encoding='utf-8')
     with pytest.raises(ValueError):
         read_scores(path)
+
+
+def test_a_missing_scores_file_is_reported(tmp_path):
+    with pytest.raises(ValueError, match='not found'):
+        read_scores(tmp_path / 'm.json')
+
+
+# --- JSON documents (collection, pool) ---
+
+def test_a_document_is_written_and_read_back_by_its_format(tmp_path):
+    path = tmp_path / 'a' / 'pool.json'
+    write_document(path, {'format': 1, 'x': 'ä'})
+    assert read_document(path, 'pool file', 1) == {'format': 1, 'x': 'ä'}
+    with pytest.raises(ValueError, match='pool file of format 2'):
+        read_document(path, 'pool file', 2)
+
+
+def test_a_missing_document_is_none_and_a_broken_one_raises(tmp_path):
+    assert read_document(tmp_path / 'pool.json', 'pool file', 1) is None
+    (tmp_path / 'pool.json').write_text('{', encoding='utf-8')
+    with pytest.raises(ValueError):
+        read_document(tmp_path / 'pool.json', 'pool file', 1)
 
 
 # --- labels ---

@@ -66,21 +66,39 @@ def scores_document(model, signature, photos, profiles):
             'profiles': entries}
 
 
-def write_scores(path, document):
-    """Write a scores document to path atomically (its folder is created)."""
+def write_document(path, document, indent=None):
+    """Write the JSON object document to path atomically (its folder is created)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    _replace_atomically(path, (json.dumps(document, ensure_ascii=False) + '\n').encode('utf-8'))
+    _replace_atomically(path, (json.dumps(document, ensure_ascii=False, indent=indent) + '\n').encode('utf-8'))
+
+
+def read_document(path, what, version):
+    """Return the JSON object of path if its "format" is version, None if path is missing.
+
+    Anything else (not JSON, not an object, another format) raises ValueError naming what.
+    """
+    if not Path(path).exists():
+        return None
+    try:
+        document = _read_json_object(path, what)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f'{path} is not a readable {what}: {exc}') from None
+    if document.get('format') != version:
+        raise ValueError(f'{path} is not a {what} of format {version}')
+    return document
+
+
+def write_scores(path, document):
+    """Write a scores document to path atomically (its folder is created)."""
+    write_document(path, document)
 
 
 def read_scores(path):
-    """Return the validated scores document of path; ValueError if it is not a usable one."""
-    try:
-        document = _read_json_object(path, 'scores file')
-    except json.JSONDecodeError as exc:
-        raise ValueError(f'{path} is not a scores file: {exc}') from None
-    if document.get('format') != SCORES_FORMAT:
-        raise ValueError(f'{path} is not a scores file of format {SCORES_FORMAT}')
+    """Return the validated scores document of path; ValueError if it is missing or not a usable one."""
+    document = read_document(path, 'scores file', SCORES_FORMAT)
+    if document is None:
+        raise ValueError(f'Scores file not found: {path}')
     photos, profiles = document.get('photos'), document.get('profiles')
     if not isinstance(document.get('model'), str) or not isinstance(photos, list) or not isinstance(profiles, list):
         raise ValueError(f'{path}: model, photos or profiles missing')
@@ -109,14 +127,11 @@ def read_labels(path):
     A missing file has no labels; any other unreadable content raises ValueError, so the
     labelling page never saves over labels it could not read.
     """
-    try:
-        document = _read_json_object(path, 'labels file')
-    except json.JSONDecodeError as exc:
-        raise ValueError(f'{path} is not a labels file: {exc}') from None
-    if not document:
+    document = read_document(path, 'labels file', LABELS_FORMAT)
+    if document is None:
         return {}
     labels = document.get('labels')
-    if document.get('format') != LABELS_FORMAT or not isinstance(labels, dict) or not all(
+    if not isinstance(labels, dict) or not all(
             isinstance(photos, dict) and all(isinstance(value, bool) for value in photos.values())
             for photos in labels.values()):
         raise ValueError(f'{path} is not a labels file of format {LABELS_FORMAT}')
@@ -125,10 +140,7 @@ def read_labels(path):
 
 def save_labels(path, labels):
     """Write labels ({profile: {photo path: bool}}) to path atomically (its folder is created)."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    document = {'format': LABELS_FORMAT, 'labels': labels}
-    _replace_atomically(path, (json.dumps(document, ensure_ascii=False, indent=1) + '\n').encode('utf-8'))
+    write_document(path, {'format': LABELS_FORMAT, 'labels': labels}, indent=1)
 
 
 def set_label(labels, profile, photo, value):
