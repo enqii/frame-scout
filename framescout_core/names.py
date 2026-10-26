@@ -1,11 +1,15 @@
-"""File names: the supported image extensions (EXT) and the slugs of profile names."""
+"""File names: the supported image extensions (EXT, HEIF_EXT, RAW_EXT) and the slugs of profile names."""
 import hashlib
 import re
 import unicodedata
 
 
-# Supported image file extensions (lowercase, with leading dot).
-EXT = frozenset({'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'})
+# Supported image file extensions (lowercase, with leading dot). Pillow reads the first
+# ones itself (AVIF since Pillow 11.3); HEIC/HEIF needs pillow-heif and camera RAW
+# rawpy (E25). Without one of them the engine skips its files (supported_extensions).
+HEIF_EXT = frozenset({'.heic', '.heif'})
+RAW_EXT = frozenset({'.dng', '.cr2', '.cr3', '.nef', '.arw', '.orf', '.rw2', '.raf', '.pef', '.srw'})
+EXT = frozenset({'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff', '.avif'}) | HEIF_EXT | RAW_EXT
 
 
 # Lowercase Latin letters that Unicode decomposition does not reduce to ASCII (all of
