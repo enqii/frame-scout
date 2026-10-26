@@ -609,7 +609,14 @@ no direct import in `framescout_engine.py`), which first sets `ULTRALYTICS_ENV` 
 Checked with Ultralytics 8.4.183 (a probe: `ONLINE`/`AUTOINSTALL` false, analytics
 `events.enabled` false, `Image.open` restored, a broken `.jpg` raises
 `UnidentifiedImageError` without importing `pi_heif`; plus a CPU smoke run with person
-detection). A later Ultralytics version may rename these switches; check them when
+detection). The first-run weight download was not run (a download), but for the review a
+probe with `safe_download` replaced by a recorder showed that with `ONLINE` false a
+missing `yolo11n.pt` still reaches the download
+(`attempt_download_asset` → `safe_download(.../releases/download/v8.4.0/yolo11n.pt)`;
+neither checks `ONLINE`), and that `Image.open` is still the original after `YOLO()` and a
+prediction (Ultralytics patches it once, when `ultralytics/utils/patches.py` is first
+imported, which happens on `import ultralytics`). The variables stay set for the rest of
+the engine process; the engine starts no subprocesses that would inherit them. A later Ultralytics version may rename these switches; check them when
 raising its minimum version.
 
 ## Test coverage and known quirks
