@@ -808,11 +808,17 @@ referenced in commits, pull requests and discussions.
 - [ ] **I16 – A ZIP update leaves the old `framescout_core.py` behind:** since I15 the
       shared code is the package `framescout_core/`. A user who extracts a new ZIP over an
       older folder (instead of a fresh folder or `git pull`) keeps the old single file next
-      to the package. It is harmless – Python imports the package, which takes precedence
-      over a module of the same name in the same folder (checked locally) – but it is a
-      stale file a user may edit by mistake. Fix with the update/uninstall story of P5
-      (e.g. the installer removes known obsolete files, or the README says to extract into
-      a fresh folder). Found on 2026-10-26 in I15.
+      to the package. Python imports the package, which takes precedence over a module of
+      the same name in the same folder (checked locally), so the new app runs correctly, but
+      the stale file may be edited by mistake. The reverse case is not harmless: extracting
+      an *older* ZIP over a newer folder (a rollback) restores `framescout_core.py` and the
+      old `app.py`/`framescout_engine.py`, but the leftover package still wins, so the old
+      frontend silently runs against the newer core (e.g. another `ENGINE` and cache
+      signature). Bytecode in `__pycache__/` is not a problem: Python ignores a cached
+      `.pyc` whose source is gone. Fix with the update/uninstall story of P5 (e.g. the
+      installer removes known obsolete files, `Start-FrameScout.bat` warns when both
+      `framescout_core.py` and `framescout_core/` exist, or the README says to extract into
+      a fresh folder). Found on 2026-10-26 in I15 (rollback case: PR #25 review).
 
 ## Roadmap (priority)
 
