@@ -86,8 +86,17 @@ class Collection:
         return self.root / 'scores' / f'{model}.json'
 
     def config(self):
-        """Return {"folders": [...], "profiles": path} of the collection, or None before its first run."""
-        return read_document(self.config_file, 'collection file', COLLECTION_FORMAT)
+        """Return {"folders": [...], "profiles": path} of the collection, or None before its first run.
+
+        ValueError if the file is not a usable collection file (e.g. a key is missing).
+        """
+        config = read_document(self.config_file, 'collection file', COLLECTION_FORMAT)
+        if config is not None and not (isinstance(config.get('folders'), list)
+                                       and all(isinstance(f, str) for f in config['folders'])
+                                       and isinstance(config.get('profiles'), str)):
+            raise ValueError(f'{self.config_file} is not a usable collection file: "folders" or "profiles" '
+                             'is missing; delete it and name the photo folder(s) and --profiles again.')
+        return config
 
     def save_config(self, folders, profiles):
         write_document(self.config_file, {'format': COLLECTION_FORMAT, 'folders': [str(f) for f in folders],
