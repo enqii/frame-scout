@@ -305,6 +305,24 @@ referenced in commits, pull requests and discussions.
       preview instead), and so is a hold point; the cache, thumbnails and "Open" (an
       `EXT` check) would follow the new extensions. Split out of the cleanup roadmap item
       (user decision at the PR #18 hold point).
+      Investigation (2026-10-26, open decisions at the hold point of the E25 PR):
+      - Candidates, all with `cp314-win_amd64` wheels on PyPI: `pi-heif` 1.4.0 (BSD-3,
+        about 2.4 MB, decode-only build of `pillow-heif`, the package Ultralytics uses),
+        `pillow-heif` 1.8.1 (BSD-3, about 6.6 MB, also encodes; its wheels bundle the
+        GPL x265 encoder, a concern for a redistributed portable build in P5), `rawpy`
+        0.27.1 (MIT, about 0.9 MB, bundles LibRaw under LGPL-2.1/CDDL-1.0; needs numpy).
+      - RAW decoding: `rawpy` can return the camera's embedded JPEG preview
+        (`extract_thumb`, fast, often full size, decodable at reduced scale like any
+        JPEG) or decode the sensor data (`postprocess`, about 1–3 s per photo on a CPU,
+        colors of LibRaw's defaults rather than the camera's).
+      - AVIF needs no new package: the venv's Pillow 12.3 reads it
+        (`PIL.features.check('avif')`).
+      - Cache: new extensions only add rows, the signature and `ENGINE` stay; a later
+        change of the RAW decoding would change their embeddings and so need an `ENGINE`
+        bump. Cameras often write RAW+JPEG pairs of the same shot, which would then
+        appear twice in the results. Browsers cannot show HEIC/RAW files, so the HTML
+        gallery link of such a photo downloads it or hands it to the OS instead of
+        showing it (the thumbnails are JPEG and work).
 - [ ] **E26 – Other temporary files of a stopped run stay in `results/`:** the atomic
       writes of `run-status.json` and `results.json` (and of `marks.json` by the app) go
       through `<name>.<random>.tmp`; `terminate()`/`kill()` during such a write leaves that
@@ -312,6 +330,28 @@ referenced in commits, pull requests and discussions.
       of E7 does not remove them (an app session may be writing `marks.json` at that
       moment). Fix idea: remove `run-status.json.*.tmp` and `results.json.*.tmp` older than
       a minute in `auto_cleanup`. Found in PR #18.
+- [ ] **E27 – Ultralytics sends usage analytics:** with person detection the engine runs
+      `YOLO.predict`, and Ultralytics registers its analytics callbacks on every
+      predictor (`ultralytics/utils/callbacks/base.py`, `add_integration_callbacks`):
+      at the end of a prediction it posts an anonymous event (CPU, device, versions,
+      model name, image count, speeds; no images or paths) to Google Analytics, at most
+      every 30 s, while its setting `sync` is `true` (the default; it is `true` in the
+      project's `.cache/ultralytics/Ultralytics/settings.json`). This breaks engineering
+      principle 2 (no tracking without consent). Fix idea: turn `sync` off before the
+      first prediction (e.g. `ultralytics.settings.update({'sync': False})` in the
+      engine, or in the `.bat` files and the app's engine environment), with a test
+      that does not need ultralytics. Found in the E25 PR.
+- [ ] **E28 – Ultralytics installs packages at run time:** importing `ultralytics`
+      replaces `PIL.Image.open` for the whole engine process (`ultralytics/utils/patches.py`);
+      the first file Pillow cannot identify (e.g. a broken `.jpg`) makes it run
+      `check_requirements("pi-heif")`, which pip-installs `pi-heif` into the venv
+      (`YOLO_AUTOINSTALL` is `true` by default). That is how `pi_heif` 1.4.0 got into the
+      project venv (`pip show` lists no package requiring it). Other code paths of
+      Ultralytics may auto-install more packages the same way. This is a download and a
+      venv change without consent (engineering principle 2 and the hold points). Fix
+      idea: set `YOLO_AUTOINSTALL=false` in the `.bat` files and the app's engine
+      environment (and say in the README how to set it for manual runs, like I10).
+      Found in the E25 PR.
 
 ### App (`app.py`)
 
