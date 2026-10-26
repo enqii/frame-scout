@@ -22,11 +22,15 @@ def test_the_engine_uses_the_shared_default_reference_weight():
 
 def test_the_engine_imports_ultralytics_only_through_import_detector_class():
     # E27, E28: a direct import would skip the environment that turns off its analytics and installs
-    direct = [node.lineno for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
+    nodes = list(ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8'))))
+    direct = [node.lineno for node in nodes
               if (isinstance(node, ast.ImportFrom) and (node.module or '').split('.')[0] == 'ultralytics')
               or (isinstance(node, ast.Import) and any(a.name.split('.')[0] == 'ultralytics' for a in node.names))]
     assert direct == [], f'framescout_engine.py imports ultralytics directly on line(s) {direct}'
-    assert 'import_detector_class(os.environ, importlib.import_module, Image)' in ENGINE.read_text(encoding='utf-8')
+    calls = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'import_detector_class']
+    assert len(calls) == 1, 'the engine must load the detector class with import_detector_class'
+    # it must change the real process environment, which Ultralytics reads on import (review)
+    assert ast.unparse(calls[0].args[0]) == 'os.environ'
 
 
 def test_the_engine_uses_the_shared_default_yolo_model():
