@@ -28,6 +28,13 @@ them, person detection with them, a run without `transformers` installed, and
 `Install-FrameScout.bat` with the new requirement. The CPU factors in the registry were
 measured once on a Core Ultra 9 285K.
 
+Evaluation tooling (E32/E20, PR #32): `framescout_eval.py`, `framescout_core/evaluation.py`
+and the engine's `--scores-file` are covered by unit tests, the engine change additionally by
+its syntax tree and `py_compile`; the labelling page was rendered in headless Edge. **Not
+run:** `framescout_eval.py run` with real models, the engine's `--scores-file` in a real
+search, the page's keyboard and click handling in a real browser (E34), originals that a
+browser cannot display (E35), macOS/Linux.
+
 ## Files and responsibilities
 
 ### `app.py`
@@ -47,7 +54,11 @@ matches to a folder (A17); below it the expander "Clean up storage" (E7).
 `framescout_engine.py`: standalone CLI. Takes one or more photo folders (positional
 `folder`, `nargs='+'`, A25). Parses arguments, loads models, embeds images,
 optionally detects persons, caches embeddings, ranks and exports HTML galleries, then
-removes temporary and unreferenced thumbnails (`auto_cleanup`, E7/E13).
+removes temporary and unreferenced thumbnails (`auto_cleanup`, E7/E13). The optional
+`--scores-file JSON` (E32, default off, never passed by the app) writes, after scoring and
+before the galleries, every crop's text and reference scores per profile for the
+evaluation tool (`framescout_core.evaluation.scores_document`; see "Model evaluation
+tool"); it changes no cache, profile, settings or `results.json`.
 
 ### `framescout_core/`
 
@@ -127,6 +138,14 @@ the module of its area and to the re-exports in `__init__.py`.
 - `cleanup.py`:
   `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14).
+- `evaluation.py` (E32/E20):
+  `SCORES_FORMAT`/`LABELS_FORMAT`/`EVAL_K`/`SCORE_DIGITS`/`collection_name_problem`/`write_document`/`read_document`/`scores_document`/`write_scores`/`read_scores`/`read_labels`/`save_labels`/`set_label`/`average_precision`/`build_pool`
+  (the formats of the model evaluation tool: scores file of the engine's `--scores-file`,
+  labels file, AP@k = mean of the precision at each hit in the top k divided by
+  min(labelled hits, k), a labelled hit outside the top k counts as a miss, no hits ->
+  `None`; `build_pool` = union of each ranking's first `depth`, shuffled reproducibly with
+  the profile name as seed, independent of the model order; collection names 1-64 of
+  `A-Za-z0-9_-`, no Windows device names).
 - `_common.py` (internal, not re-exported): helpers several areas share, i.e. atomic
   writes (`_publish_via_temp`, `_publish_new`, `_replace_atomically`,
   `_replace_with_retry`), reading a JSON object file with retries (`_read_json_object`),
@@ -150,6 +169,12 @@ own module (`monkeypatch.setattr(os, 'replace', …)`), which reaches every area
 (the generated templates averaged into one query, custom prompts kept apart, E4),
 `best_scores`, `spread`/`MIN_SCORES`/`MIN_SPREAD`, `rank_photos`/`Match` (per-profile
 z-scores and their combination, E5) and `score_caption` (the numbers on a gallery card).
+
+### `framescout_eval.py` and `framescout_eval_page.html`
+
+Development tool (E32/E20, not part of the app, not on the install path): numpy,
+`framescout_scoring` and `framescout_core`, no torch; `run` starts the engine as a
+subprocess. See "Model evaluation tool" below.
 
 ### `tests/`, `pytest.ini`, `requirements-dev.txt`
 
@@ -239,7 +264,42 @@ app's settings and the lock of their saves, A8), `photos/` (default input), `ref
 `results/results.json` (the last finished search, A12), `results/marks.json` and
 `results/marks.json.lock` (the user's marks, A17: user data, never written by the engine
 and never deleted by the cleanup, E7), `profiles.json`, `run.log`, `.cache/`, `.tmp/`,
-`.venv/`, `yolo11n.pt`.
+`.venv/`, `yolo11n.pt`; `.tmp/eval/<collection>/` of the evaluation tool (below).
+
+### Model evaluation tool
+
+`framescout_eval.py {run,pool,label,metrics}` (E32/E20, PR #32) measures the search
+models on the user's own labelled photos. Collection layout, default
+`<project>/.tmp/eval/<collection>/` (gitignored; `--dir` elsewhere):
+`collection.json` (folders and profiles file, remembered so a re-run may omit them),
+`engine/<model>/` (one engine output folder per model: cache, galleries, thumbnails; separate
+so one run's thumbnail cleanup never removes another model's), `scores/<model>.json`,
+`pool.json`, `labels.json` (`{"format": 1, "labels": {profile: {absolute photo path:
+true|false}}}`; an unreadable file is never saved over, the page refuses to start).
+
+- Scores file (`{"format": 1, "model", "signature", "photos": [{"path", "mtime_ns", "crops"}],
+  "profiles": [{"name", "prompts", "references", "text", "visual"}]}`): scores per photo and
+  crop rounded to `SCORE_DIGITS` (6); `visual` is null without reference images.
+- `run`: per model `framescout_engine.py <folders> --profiles P --output engine/<model>
+  --model <model> --scores-file scores/<model>.json --device --batch-size --top 150
+  [--no-person-detection]` with `TORCH_HOME`/`HF_HOME`/`YOLO_CONFIG_DIR`/`XDG_CACHE_HOME`
+  under `<project>/.cache` (`--cache-dir`) and `PYTHONIOENCODING=utf-8`. A model with a
+  missing package (`model_problem`) is skipped; exit 1 if any model was not scored. A model
+  not yet cached downloads its weights on first use.
+- `pool`: ranks each model's scores with `rank_photos` (the engine's scoring) at
+  `--weights` (default `0,0.3,0.6`, only for profiles with reference images), top `--depth`
+  (100) per model and weight, prints pool size, labelled count and a time estimate (1.5 s
+  per photo), and warns if a profile changed between model runs or the models scored
+  different photos. Re-running keeps all labels.
+- `label`: `ThreadingHTTPServer` on `127.0.0.1:8765` (`--port`, `--no-browser`), every
+  route behind a random token (`/<token>/`); shows the profile and one photo (the gallery
+  thumbnail of any model's run if present, else the original, E35); each label is POSTed and
+  saved atomically at once, a failed save is shown and reverted; resumes at the first
+  unlabelled photo.
+- `metrics <collection>...`: AP@`--k` (40) per profile and model at `--weight` (default
+  `DEFAULT_REFERENCE_WEIGHT`), unlabelled photos in a top list count as no match, a
+  reference-weight sweep (`--sweep`, best per model marked `*`), the mean over several
+  collections; Markdown tables, `--json FILE`.
 
 ## Current search pipeline
 
@@ -747,7 +807,10 @@ model registry, the per-model signatures and cleanup category and the `model` se
 (E22, `test_models.py`; the engine's `--model`, its `stdout.reconfigure` and the app's
 `PYTHONIOENCODING` only from their syntax trees, `test_engine_defaults.py`; the app's
 selectbox, its disabled Start, the results note and the dropped cleanup scan are not
-unit-tested);
+unit-tested), and the evaluation tooling (E32: `test_evaluation.py` for the formats, AP@k
+and the pool; `test_eval_tool.py` for the tool's commands, metrics and labelling server
+with fake scores; the engine's `--scores-file` only from its syntax tree in
+`test_engine_defaults.py`; no real-model run, no browser test);
 still missing: cache
 reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.

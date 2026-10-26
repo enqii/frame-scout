@@ -194,6 +194,12 @@ referenced in commits, pull requests and discussions.
       0.515 → 0.472). Outdoor, object, animal or landscape photos are not measured; of
       the extra profiles, "Outdoor scene" could not have hits and "Group photo" was
       saturated, because the profiles were chosen without looking at the collection.
+      Since 2026-10-26 (PR #32) the repository has reusable, documented tooling for such
+      measurements (`framescout_eval.py`, E32) that supports several collections; the
+      labels and scripts of PR #11 stay outside the repository. Keep this item open until
+      a second, non-cosplay collection has been measured (choose its profiles after
+      looking at a sample of the collection: profiles without hits or saturated ones say
+      nothing).
       Next evaluation (e.g. for stronger models, E22, or a multilingual one, E21): look at
       a sample of the collection or ask the user first, and use a second, non-cosplay
       collection. The tooling (`evaluate.py`, labelling page, metrics) and the labels
@@ -427,11 +433,16 @@ referenced in commits, pull requests and discussions.
 - [ ] **E32 – The offered search models are not evaluated:** E22 offers ViT-B/16 and
       ViT-L/14 (DataComp-XL) and SigLIP B/16 next to the default, marked "not evaluated"
       (`SearchModel.evaluated`), because their search quality has not been measured.
-      Follow-up PR of E22 (user decision: two PRs): label a new pool on the user's PC
-      (Core i5-13600K, RTX 4070; no labelling tooling in the repository, E20), AP@40 per
-      profile per model, re-check the reference weight (0.3, E5) per model, add a second,
-      non-cosplay collection (E20); then trim `MODELS`, set `evaluated`, and update the
-      labels and the README. A key trimmed from the registry falls back to the default with
+      Follow-up PR of E22 (user decision: two PRs). **Tooling delivered 2026-10-26 in
+      PR #32** (user decision: that PR builds only the tooling): `framescout_eval.py`
+      (`run` / `pool` / `label` / `metrics`, README "Evaluating the search models",
+      ARCHITECTURE "Model evaluation tool") computes AP@40 per profile and model, a
+      reference-weight sweep per model and supports several collections (E20); the engine
+      got `--scores-file`. **Remaining (a later PR):** the user labels a pool on the home PC
+      (Core i5-13600K, RTX 4070) for the cosplay collection and a second, non-cosplay one;
+      then record the run metrics, choose the reference weight per model (0.3, E5), trim
+      `MODELS`, set `evaluated`, and update the labels and the README. The tool itself was
+      not run with real models yet (E34). A key trimmed from the registry falls back to the default with
       a warning in a user's `settings.json` (`read_settings`); its cache rows then count as
       "older version" in the cleanup. Search quality is a hold point.
 - [ ] **E33 – Hugging Face warning about symlinks in `run.log` on Windows:** without
@@ -440,6 +451,18 @@ referenced in commits, pull requests and discussions.
       without symlinks (more disk space). Fix idea: set `HF_HUB_DISABLE_SYMLINKS_WARNING=1`
       in the `.bat` files and the engine's environment and mention it in the README. Found
       in the E22 smoke runs.
+- [ ] **E34 – The evaluation tool is not runtime-tested with real models:**
+      `framescout_eval.py run` and the engine's `--scores-file` (E32, PR #32) were checked
+      by unit tests, the syntax tree and `py_compile` only (no real-model run without
+      approval); the labelling page was rendered in headless Edge, but its keyboard and
+      click handling was not tried in a real browser. Verify on the first real use (the
+      user's home PC) and fix what shows up.
+- [ ] **E35 – The labelling page may show originals a browser cannot display:** thumbnails
+      exist only for each model's top `--top` (150) at the run's reference weight; pool
+      photos from the other pool weights may lack one and are then shown as the original
+      file, which a browser cannot display for HEIC/HEIF and RAW. Fix idea: render the
+      missing thumbnails with the engine's decoders (needs Pillow/rawpy in the tool) or
+      raise `run --top`. Found in E32 (PR #32).
 
 ### App (`app.py`)
 
@@ -1090,7 +1113,8 @@ decision in PR #14):
       investigation, candidates and user decisions recorded there) (plumbing and three
       candidates marked "not evaluated" done 2026-10-26 in PR #31; evaluation: E32)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
-      pool at home, search quality is a hold point)
+      pool at home, search quality is a hold point) (tooling done 2026-10-26 in PR #32;
+      labelling, metrics and trimming remain)
 - [ ] Optional multilingual CLIP model (`xlm-roberta-base-ViT-B-32`), built on the model
       choice of E22 (E21)
 
