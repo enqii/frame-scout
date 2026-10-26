@@ -144,14 +144,24 @@ the module of its area and to the re-exports in `__init__.py`.
   `UNINSTALL_ITEMS`/`UNINSTALL_KEEP`/`UNINSTALL_FIRST`/`USER_DATA`/`ENVIRONMENT_PROGRAMS`/`UninstallItem`/`protected_folders`/`uninstall_plan`/`user_data`/`outside_leftovers`/`search_running`/`programs_in_use`/`remove_items`
   (what the uninstall script deletes, keeps and only reports; standard library only.
   `uninstall_plan(root, protected)` returns the existing items to delete and the skipped
-  ones: an item that contains a photo or copy folder of `settings.json`
-  (`protected_folders`, which raises if `settings.json` is unreadable) is skipped, except
-  inside a kept entry (`.tmp/eval`). Links and junctions are removed as links, never
-  followed. `remove_items` deletes the environment's `python.exe`/`pythonw.exe` first
-  (`UNINSTALL_FIRST`), clears read-only attributes, continues after a failure and returns
-  the failures. `search_running` = the run lock of `results/` is held; `programs_in_use` =
-  the environment's `python.exe`/`pythonw.exe` cannot be opened for writing, which on
-  Windows means a process runs them. `outside_leftovers` lists the PyTorch, Hugging Face
+  ones: an item that contains a photo or copy folder of `settings.json` (except inside a
+  kept entry, `.tmp/eval`), that lies inside one (a photo folder that is the project
+  folder or above it) or whose kept entries cannot be listed is skipped.
+  `protected_folders` reads `settings.json` once and raises if it is unreadable or its
+  `photo_folders`/`photo_folder`/`copy_folders` are not allowed values (the app would fall
+  back to the default photo folder). Kept entries match case-insensitively where the file
+  system does (`normcase` or `samefile`), like `_inside`. Links and junctions are removed
+  as links, never followed. `remove_items` deletes the environment's
+  `python.exe`/`pythonw.exe` first (`UNINSTALL_FIRST`), retries read-only files and
+  folders after clearing the attribute (only those), continues after a failure (also an
+  unlistable item) and returns the failures; a folder that is not empty because a file
+  inside it failed is not reported again. `search_running` = the run lock of `results/`
+  is held; `programs_in_use(root, clear_read_only=False)` = opening the environment's
+  `python.exe`/`pythonw.exe` for writing fails with a sharing violation (Windows error
+  32), i.e. a process runs or holds them; a read-only program gives "access denied"
+  before that check, so it counts as not running unless `clear_read_only` clears its
+  attribute first (done only after the user typed `yes`). `user_data` lists names only
+  (no sizes: no walk of `photos/`, `results/`). `outside_leftovers` lists the PyTorch, Hugging Face
   and Ultralytics folders outside the project (from `TORCH_HOME`, `HF_HOME`,
   `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `APPDATA` or the user profile defaults), never
   deleted: they are shared with other programs, I10).
@@ -277,14 +287,19 @@ library only.
 through the `py` launcher (I20: no launcher, no uninstall; it prints the manual steps) and
 runs `framescout_uninstall.py` with `-B -E -s`, **not** with `.venv`'s Python, which
 cannot delete itself while it runs. It sets no cache or `TMP` variables (`.tmp` is
-deleted). The script uses `framescout_core.uninstall`: it refuses (deleting nothing) when
-`results/run.lock` is held, the environment's `python.exe`/`pythonw.exe` is in use or
-`settings.json` is unreadable; otherwise it prints the items to delete with sizes, the
-kept user data (`USER_DATA`, listed, never deleted: photos, references, results with
-`marks.json`, profiles and backup, settings, `run.log`, `.tmp/eval`) and the caches
-outside the folder (listed only), and deletes after the answer `yes`. `--dry-run` stops
-after the lists. Exit code 0 done or listed, 1 refused or failures. Not deleted: the
-program files themselves. Opt-in deletion of user data is I19.
+deleted) and uses no delayed expansion, which would drop a `!` from the folder path and
+the arguments (review: the `cd` then failed and the script of the current directory
+ran); the folder path is never used inside parentheses. The script uses
+`framescout_core.uninstall`: it refuses (deleting nothing) when `results/run.lock` is
+held, the environment's `python.exe`/`pythonw.exe` is in use (checked again after `yes`,
+then with read-only attributes cleared) or `settings.json` is unreadable or has invalid
+photo/copy folders; otherwise it prints the items to delete with sizes, the skipped ones
+with the reason, the kept user data (`USER_DATA`, listed without sizes, never deleted:
+photos, references, results with `marks.json`, profiles and backup, settings, `run.log`,
+`.tmp/eval`) and the caches outside the folder (listed only, with sizes), and deletes
+after the answer `yes`. `--dry-run` stops after the lists. Exit code 0 done or listed, 1
+refused, all items skipped, or failures. Not deleted: the program files themselves.
+Opt-in deletion of user data is I19.
 
 ### `Start-FrameScout.bat`
 
@@ -895,11 +910,15 @@ non-comment pip line of the installer passes `-r requirements.txt -c constraints
 it sets `PIP_CONSTRAINT=constraints.txt` between the venv and `install_torch.py` (I18);
 the torch pins of both files equal `TORCH_VERSION`/`TORCHVISION_VERSION` in
 `test_torch_install.py`; completeness of the transitive pins is not checkable in CI), and
-the uninstall script (P5, `test_uninstall.py`, 33 tests on `tmp_path` trees: plan, kept
-entries, protected folders from settings, links and junctions, read-only files, failures,
-user-data and outside listings, the run lock, the dialog of `framescout_uninstall.py`;
-the real `.bat` was run once by hand on a scratch copy, not against a real installation,
-not while Streamlit was running and not on a PC without the `py` launcher);
+the uninstall script (P5, `test_uninstall.py`, 53 tests on `tmp_path` trees: plan, kept
+entries (also in another case, Windows only), protected folders from settings (invalid
+values, read once, photo folder around the project), links and junctions, read-only
+files and folders, unlistable items, failures reported once, user-data and outside
+listings, the run lock, read-only vs. running `python.exe` (Windows only), the dialog of
+`framescout_uninstall.py`, no delayed expansion in the `.bat`; the real `.bat` was run by
+hand on scratch copies, once with `!` and `)` in the folder path as a dry run, not
+against a real installation, not while Streamlit was running and not on a PC without the
+`py` launcher; the running check was tried by hand with a running read-only executable);
 still missing: cache
 reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
