@@ -444,8 +444,9 @@ class LabelSession:
             marks = self.labels.get(profile['name'], {})
             profiles.append({'name': profile['name'], 'context': profile['context'], 'features': profile['features'],
                              'references': len(profile['references']),
-                             'photos': [{'name': Path(p['path']).name, 'folder': str(Path(p['path']).parent)}
-                                        for p in profile['photos']],
+                             # thumb: False shows the original file, which the page does not prefetch
+                             'photos': [{'name': Path(p['path']).name, 'folder': str(Path(p['path']).parent),
+                                         'thumb': self.thumbnail(p) is not None} for p in profile['photos']],
                              'labels': [marks.get(p['path']) for p in profile['photos']]})
         return {'collection': self.collection.name, 'profiles': profiles}
 
@@ -459,13 +460,18 @@ class LabelSession:
         except (ValueError, IndexError):
             return None
 
+    def thumbnail(self, photo):
+        """The gallery thumbnail of a pool photo in any model's engine output, or None."""
+        name = thumbnail_name(Path(photo['path']), photo['mtime_ns'])
+        return next((folder / name for folder in self.thumb_folders if (folder / name).is_file()), None)
+
     def image(self, path, thumbnail=None):
         path = Path(path)
         if thumbnail:
-            for folder in self.thumb_folders:
-                candidate = folder / thumbnail
-                if candidate.is_file():
-                    return 200, 'image/jpeg', candidate.read_bytes()
+            try:
+                return 200, 'image/jpeg', thumbnail.read_bytes()
+            except OSError:  # removed meanwhile: the original
+                pass
         try:
             data = path.read_bytes()
         except OSError:
@@ -506,8 +512,7 @@ class LabelSession:
             found = self.entry(route[1], route[2], 'photos')
             if found:
                 photo = found[1]
-                thumb = thumbnail_name(Path(photo['path']), photo['mtime_ns']) if route[0] == 'photo' else None
-                return self.image(photo['path'], thumb)
+                return self.image(photo['path'], self.thumbnail(photo) if route[0] == 'photo' else None)
         if len(route) == 3 and route[0] == 'reference':
             found = self.entry(route[1], route[2], 'references')
             if found:

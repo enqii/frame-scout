@@ -376,10 +376,13 @@ def test_a_photo_is_shown_by_its_gallery_thumbnail_or_else_the_original(session,
     entry = session.pool['profiles'][0]['photos'][0]
     status, kind, body = get(session, 'photo/0/0')
     assert status == 200 and kind == 'image/jpeg' and body == b'original ' + Path(entry['path']).name.encode()
+    # the page prefetches only photos with a thumbnail, not the (possibly large) originals
+    assert json.loads(get(session, 'state')[2])['profiles'][0]['photos'][0]['thumb'] is False
     thumbs = collection.engine_output(DEFAULT_MODEL) / 'thumbnails'
     thumbs.mkdir(parents=True)
     (thumbs / thumbnail_name(Path(entry['path']), entry['mtime_ns'])).write_bytes(b'thumb')
     assert get(session, 'photo/0/0')[2] == b'thumb'
+    assert [p['thumb'] for p in json.loads(get(session, 'state')[2])['profiles'][0]['photos']] == [True, False, False]
     assert get(session, 'original/0/0')[2].startswith(b'original')
     assert get(session, 'reference/1/0')[2] == b'reference'
 
