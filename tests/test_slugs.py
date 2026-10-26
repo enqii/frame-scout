@@ -92,4 +92,6 @@ def test_profile_slugs_match_slugify_without_collisions():
 
 
 def test_supported_extensions():
-    assert EXT == {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'}
+    # HEIC/HEIF (pillow-heif), camera RAW (rawpy) and AVIF (Pillow) since E25
+    assert EXT == {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff', '.avif', '.heic', '.heif',
+                   '.dng', '.cr2', '.cr3', '.nef', '.arw', '.orf', '.rw2', '.raf', '.pef', '.srw'}

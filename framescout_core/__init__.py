@@ -9,7 +9,10 @@ underscore) are not re-exported: import or monkeypatch them on their defining mo
 The same holds for a public name that another module imports, e.g. read_profiles as
 used by the cleanup: patch framescout_core.cleanup.read_profiles.
 """
-from .names import (EXT, SLUG_MAX_LENGTH, slugify, profile_slugs)
+from .names import (HEIF_EXT, RAW_EXT, EXT, SLUG_MAX_LENGTH, slugify, profile_slugs)
+from .photos import (RAW_PARTNER_EXT, RAW_PREVIEW_MIN_EDGE, RAW_FLIP_TRANSPOSE, SKIPPED_EXTENSIONS_SHOWN,
+    PhotoScan, supported_extensions, missing_decoder_lines, scan_photos, skipped_lines, raw_preview_usable,
+    raw_preview_transpose)
 from .locks import (RunLock, lock_held)
 from .references import (reference_folder, stage_reference_move, finish_reference_move,
     undo_reference_move, update_backup_references, write_new_file)
