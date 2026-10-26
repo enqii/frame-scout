@@ -38,7 +38,7 @@ Run these as separate, plain commands from the main checkout:
 2. If the main checkout is on `main` and clean: `git merge --ff-only origin/main`.
    Otherwise do not touch it; mention it to the user.
 3. Roadmap: read only the section "## Roadmap (priority)" of `BACKLOG.md` (the last
-   section, about 60 lines), not the whole 70 KB file: find its line with the Grep tool
+   section, about 60 lines), not the whole 85 KB file: find its line with the Grep tool
    (`^## Roadmap` in `BACKLOG.md`) and Read from that line. If step 2 could not
    fast-forward `main`, read `git show origin/main:BACKLOG.md` instead. The
    **next item** is the first unchecked `- [ ]` line, scanning all sections (P0 … P5,
@@ -52,7 +52,10 @@ Run these as separate, plain commands from the main checkout:
    uncommitted or unpushed work. Also list stale local branches
    (`git branch --list "worktree-agent-*"` without a worktree, merged PR branches) and
    offer to clean them up as in step 6 of "Merge".
-6. If you spawned a subagent in this session that is still running, its notification
+6. For a PR labeled `fs:in-progress`, check for the docs handoff marker:
+   `gh pr view <n> --json comments --jq '.comments[-1].body | startswith("Docs pending")'`
+   (`true` = the last comment is the implementer's "Docs pending:" handoff).
+7. If you spawned a subagent in this session that is still running, its notification
    has not arrived yet: **wait**, do not spawn a second agent for the same PR.
 
 Keep only the conclusions in your context (PR number, label, branch, next item); do not
@@ -67,9 +70,10 @@ Check the rows top to bottom; the first match decides.
 | Local worktree with uncommitted or unpushed changes | Report path, branch and the changes to the user. **Never discard.** Ask how to proceed (e.g. let an implementer commit and push them). |
 | More than one open roadmap PR, or a PR with several `fs:*` labels | Inconsistent – report to the user and ask. |
 | No open roadmap PR | Take the next unchecked roadmap item → spawn an **implementer** (mode `new`). If no item is left, report that the roadmap is done. |
-| PR labeled `fs:in-progress` | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
+| PR labeled `fs:in-progress`, last comment starts with `Docs pending` (step 6) | Code and tests are committed; spawn a fresh **implementer** (mode `docs-update`, kind `docs` model/effort) on the existing branch. |
+| PR labeled `fs:in-progress`, otherwise | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
 | PR labeled `fs:needs-review` | Spawn a fresh **reviewer**. |
-| PR labeled `fs:review-done` | Implementer (mode `address-review`) handles all unanswered review comments: continue the previous implementer with `SendMessage` if it is still alive, otherwise spawn a new one. Afterwards the PR goes to `fs:ready`: there is **no second review round**. |
+| PR labeled `fs:review-done` | Spawn a **fresh** implementer (mode `address-review`) for all unanswered review comments; never continue the previous implementer with `SendMessage` (I17). Afterwards the PR goes to `fs:ready`: there is **no second review round**. |
 | PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>` for the head commit `headRefOid`, open risks) and **wait for explicit merge approval**. Base the report on the implementer's final report and `gh pr view <n> --json title,body,headRefOid`; do not read the diff or comment threads yourself. |
 
 An open PR without any `fs:*` label is not a roadmap PR; mention it but do not act on it.
@@ -116,6 +120,10 @@ Agent(
 )
 ```
 
+Mode `docs-update` always uses the `docs` row (`sonnet`, `medium`), whatever the kind of
+the item: it only edits Markdown from a diff. Its brief is the same file; pass the
+commit SHAs from the "Docs pending" comment in `{ANSWERS}`.
+
 **Reviewer** – fresh context, no isolation needed (it does not change code); `effort`
 is always `"medium"`, `model` is `"opus"` for `code-risky` and `"sonnet"` otherwise:
 
@@ -135,7 +143,7 @@ not continue silently.
 Placeholders:
 - `{ITEM}` – the roadmap line verbatim (e.g. `(1) pytest scaffold + shared module … (A3, A9, part of I2)`).
 - `{IDS}` – backlog IDs of the item (e.g. `A3, A9, I2`).
-- `{MODE}` – `new` | `continue` | `address-review` | `answer`.
+- `{MODE}` – `new` | `continue` | `docs-update` | `address-review` | `answer`.
 - `{BRANCH}` – suggested branch `<type>/<id>-<short>` for `new`; the PR's head branch otherwise.
 - `{PR}` – PR number, or `none` for mode `new`.
 - `{ANSWERS}` – the user's answers to earlier hold-point questions, verbatim, or `none`.
@@ -159,8 +167,9 @@ points in `CLAUDE.md`):
    implementer's options and its recommendation).
 2. If a PR exists, also post the question and later the answer as a PR comment
    (`gh pr comment <n> --body-file <file>`), so the decision is recorded on GitHub.
-3. Continue the implementer with `SendMessage` (answers verbatim). If it is no longer
-   alive, spawn a new implementer with mode `answer` and the answers in `{ANSWERS}`.
+3. Spawn a new implementer with mode `answer` and the answers in `{ANSWERS}` (verbatim);
+   continue a still-alive implementer with `SendMessage` only if it has not yet passed
+   its code phase, and never for `address-review` or `docs-update`.
 
 ## 5. Merge (only on explicit user approval)
 
