@@ -298,7 +298,7 @@ referenced in commits, pull requests and discussions.
       run did not finish). Opening such a gallery from the app shows the newer, partial
       result. Fix idea: write the galleries under temporary names and publish them
       together with `results.json` at the end. Found in PR #14.
-- [ ] **E25 – No HEIC/HEIF or camera RAW photos:** the engine reads only `EXT` (JPG, PNG,
+- [x] **E25 – No HEIC/HEIF or camera RAW photos:** the engine reads only `EXT` (JPG, PNG,
       WebP, BMP, TIFF), so photos from many phones (HEIC) and cameras (CR2/CR3, NEF, ARW,
       DNG, …) are skipped without a note. Supporting them needs new dependencies (e.g.
       `pillow-heif`; `rawpy` for RAW, which decodes slowly and may need the embedded
@@ -329,11 +329,13 @@ referenced in commits, pull requests and discussions.
       extras later: E29); a RAW file with a JPEG/HEIC of the same name in its folder is
       skipped; `.avif` added; the log names the skipped files. Ultralytics' analytics and
       auto-install (E27, E28) get their own PR after this one.
-      (Implemented 2026-10-26 in PR #26: `framescout_core.scan_photos`, `open_raw` in the
+      (Done 2026-10-26 in PR #26: `framescout_core.scan_photos`, `open_raw` in the
       engine, the app's photo count. Also uses the preview only if its longer edge has at
       least 1024 pixels, else the half-size decode. An installation without the packages
-      skips those formats with a note. AVIF and that note were checked in a CPU smoke run;
-      decoding real HEIC/RAW files is not runtime-tested yet.)
+      skips those formats with a note. Checked in CPU smoke runs with and without person
+      detection on CC0 RAW samples (CR2, CR3, NEF, ARW, DNG), HEIC files made with
+      pillow-heif and AVIF; not checked: a RAW file stored rotated or without a usable
+      preview, HEIC from a real phone – see `docs/ARCHITECTURE.md` → "Photo formats".)
 - [ ] **E26 – Other temporary files of a stopped run stay in `results/`:** the atomic
       writes of `run-status.json` and `results.json` (and of `marks.json` by the app) go
       through `<name>.<random>.tmp`; `terminate()`/`kill()` during such a write leaves that
@@ -937,8 +939,8 @@ decision in PR #14):
 - [x] Cleanup of cache/thumbnails/orphaned HTML files and reference files (E7, E11, A14);
       never delete `results/marks.json` (A17) (done 2026-10-25; also E13, E23; HEIC/RAW
       split out into the next item by user decision)
-- [ ] Optional HEIC/RAW support (E25; new dependencies: a hold point) (in PR #26;
-      packages required by user decision, optional extras: E29)
+- [x] Optional HEIC/RAW support (E25; new dependencies: a hold point) (done 2026-10-26 in
+      PR #26; also AVIF; packages required by user decision, optional extras: E29)
 - [ ] Turn off Ultralytics' usage analytics and run-time package installs (E27, E28; own
       PR after E25, user decision at the PR #26 hold point)
 - [ ] Several photo folders per search (A25; changes `results.json` and the CLI: a hold point)
