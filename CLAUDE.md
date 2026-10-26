@@ -61,6 +61,7 @@ The roadmap is implemented semi-autonomously, **one pull request per roadmap ite
 
 - **Strictly sequential:** the next roadmap item is started only after the previous PR has been merged.
 - **Branch naming:** `<type>/<id>-<short>`, e.g. `fix/a1-unique-reference-names`, `chore/p0-workflow-english`. Branch from an up-to-date `origin/main` without tracking it (`git switch --no-track -c <branch> origin/main`) and always push with the branch named (`git push [-u] origin <branch>`); never push to `main` directly, never force-push, never discard work you did not create.
+- **Fresh agents per phase (I17):** one implementer context must not carry a whole item. Kinds `code`/`code-risky`: the implementer commits and pushes code and tests, posts a PR comment starting `Docs pending:` (item, commit SHAs, docs to update) and returns; a fresh agent (`docs-update`) then updates `README.md`, `docs/ARCHITECTURE.md` and `BACKLOG.md` from the diff and the doc sections it touches and marks the PR ready. Review fixes always run in a fresh implementer (`address-review`), never by continuing the previous one. Kind `docs` has no separate docs step.
 - **Commits:** atomic Conventional Commits (see below), each pushed immediately after it is created, so that no work exists only locally.
 - **Draft PR early:** right after the first commit, open a draft PR (template: `.github/pull_request_template.md`) and label it `fs:in-progress`.
 - **State labels** (exactly one per roadmap PR):

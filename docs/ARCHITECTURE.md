@@ -197,7 +197,8 @@ workflow.
 ### `.claude/skills/roadmap/` and `.claude/settings.json`
 
 `.claude/skills/roadmap/`: the `/roadmap` orchestrator skill plus implementer/reviewer
-briefs. `.claude/settings.json`: shared permission rules for the workflow.
+briefs (the implementer brief also covers the fresh `docs-update` and `address-review`
+agents, I17). `.claude/settings.json`: shared permission rules for the workflow.
 
 ### `.github/pull_request_template.md`
 

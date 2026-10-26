@@ -943,7 +943,7 @@ referenced in commits, pull requests and discussions.
       installer removes known obsolete files, `Start-FrameScout.bat` warns when both
       `framescout_core.py` and `framescout_core/` exist, or the README says to extract into
       a fresh folder). Found on 2026-10-26 in I15 (rollback case: PR #25 review).
-- [ ] **I17 – One implementer carries the whole item in one growing context:** the
+- [x] **I17 – One implementer carries the whole item in one growing context:** the
       implementer of A25 (PR #28, Opus, effort high) ended at 290k tokens of context
       after 129 API calls and 233 tool calls (105 Edit, 71 Bash, 27 Read); it grew
       steadily from 42k with no compaction and no error loops, and hit the user's
@@ -1013,8 +1013,10 @@ agents per workflow phase (I17, added 2026-10-26, placed before P4b).
 - [x] Reflow `docs/ARCHITECTURE.md` into short lines and sub-sections (I14) (done 2026-10-26)
 - [x] Split `framescout_core.py` into a package of modules per area, re-exporting the
       names; no behavior change (I15) (done 2026-10-26)
-- [ ] Fresh agents for review fixes and documentation updates instead of one growing
+- [x] Fresh agents for review fixes and documentation updates instead of one growing
       implementer context (I17; workflow change decided by the user on 2026-10-26)
+      (done 2026-10-26: `address-review` always a fresh implementer; code implementers
+      hand docs to a fresh `docs-update` agent via a "Docs pending:" PR comment)
 
 ### P4 – UX
 The item "Result gallery in the app, mark matches/copy them to a folder, "open folder",
