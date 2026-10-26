@@ -217,9 +217,25 @@ referenced in commits, pull requests and discussions.
       the README depends on the selected model. SigLIP 2 (a candidate of E22) has a
       multilingual tokenizer and training data and may cover this item as well; check
       it with German queries before adding `xlm-roberta-base-ViT-B-32`. A download and a
-      new dependency are hold points.
-- [ ] **E22 – Only one CLIP model, no stronger option:** FrameScout always uses OpenAI
-      CLIP ViT-B/32. Investigated in PR #13 (no weights downloaded; continue from here).
+      new dependency are hold points. **Status after E22 (PR #31):** the registry and its
+      `multilingual` flag exist, but all offered models are English-only and the "in
+      English" hint does not depend on the model yet.
+- [x] **E22 – Only one CLIP model, no stronger option:** FrameScout always used OpenAI
+      CLIP ViT-B/32. **Done (PR #31, 2026-10-26): the plumbing and three optional
+      candidates;** which of them stay is E32. Delivered as planned below, with these user
+      decisions: the registry offers the default plus `vit-b-16-datacomp`,
+      `vit-l-14-datacomp` and `vit-b-16-siglip` (SigLIP 2 and the others of the table were
+      not offered); `transformers>=5.21.0` is in `requirements.txt`; downloads were
+      approved for these three only; evaluation is done by the user later on this PC with
+      new labels, as a follow-up PR (E32), so the candidates are marked "not evaluated".
+      New: `framescout_core/models.py` (`MODELS`, `model_problem`), `ENGINE_TEMPLATE` and
+      `engine_id(model)` (the default's `ENGINE` is unchanged: no re-analysis), the cleanup
+      category "Cache entries of other search models" (default off), the settings key
+      `model`, the engine option `--model`, the "Search model" selectbox, the model in log,
+      gallery note and `results.json`. Verified: CPU smoke runs of all four models with 3
+      synthetic images; **not verified:** search quality, CUDA, person detection with the
+      new models, a run without `transformers`, `Install-FrameScout.bat` with the new
+      requirement. Investigated in PR #13 (no weights downloaded).
       **User decisions (PR #13):** the default stays `ViT-B-32-quickgelu`/`openai`; if a
       SigLIP model is chosen, `transformers` goes into `requirements.txt`; the
       evaluation runs on the user's home PC, so the roadmap item moved behind P4; the
@@ -396,6 +412,24 @@ referenced in commits, pull requests and discussions.
       the search fail or wait without a network. Fix idea: once the weights are cached,
       set `HF_HUB_OFFLINE=1` (and `HF_HUB_DISABLE_TELEMETRY=1`) for the engine, keeping the
       first-run download; check how open_clip behaves offline. Found in the E27/E28 PR.
+      Since E22 (PR #31) this applies to every search model, including the SigLIP
+      tokenizer.
+- [ ] **E32 – The offered search models are not evaluated:** E22 offers ViT-B/16 and
+      ViT-L/14 (DataComp-XL) and SigLIP B/16 next to the default, marked "not evaluated"
+      (`SearchModel.evaluated`), because their search quality has not been measured.
+      Follow-up PR of E22 (user decision: two PRs): label a new pool on the user's PC
+      (Core i5-13600K, RTX 4070; no labelling tooling in the repository, E20), AP@40 per
+      profile per model, re-check the reference weight (0.3, E5) per model, add a second,
+      non-cosplay collection (E20); then trim `MODELS`, set `evaluated`, and update the
+      labels and the README. A key trimmed from the registry falls back to the default with
+      a warning in a user's `settings.json` (`read_settings`); its cache rows then count as
+      "older version" in the cleanup. Search quality is a hold point.
+- [ ] **E33 – Hugging Face warning about symlinks in `run.log` on Windows:** without
+      Windows Developer Mode, `huggingface_hub` prints a long "cache-system uses symlinks"
+      `UserWarning` into `run.log` at the first download of each model and stores the files
+      without symlinks (more disk space). Fix idea: set `HF_HUB_DISABLE_SYMLINKS_WARNING=1`
+      in the `.bat` files and the engine's environment and mention it in the README. Found
+      in the E22 smoke runs.
 
 ### App (`app.py`)
 
@@ -1042,10 +1076,13 @@ decision in PR #14):
       (done 2026-10-26 in PR #28; same folder by another path: A28, junctions: A29)
 
 ### P4b – Search models (evaluate at home first)
-- [ ] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note (E22;
-      investigation, candidates and user decisions recorded there)
+- [x] Optional stronger models (ViT-B-16, ViT-L-14, SigLIP) with a CPU runtime note (E22;
+      investigation, candidates and user decisions recorded there) (plumbing and three
+      candidates marked "not evaluated" done 2026-10-26 in PR #31; evaluation: E32)
+- [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
+      pool at home, search quality is a hold point)
 - [ ] Optional multilingual CLIP model (`xlm-roberta-base-ViT-B-32`), built on the model
-      choice of the previous item (E21)
+      choice of E22 (E21)
 
 ### P5 – Distribution
 - [ ] Pinned dependencies (I12), portable Python variant, uninstall script

@@ -17,7 +17,7 @@ Current baseline: **v1.1, prototype**, with a Streamlit frontend and a separate 
 
 ## Gotchas (rules that are easy to break without reading the details)
 - Settings widgets in `app.py` get their values through `st.session_state` with keys `setting_<name>`; never pass them `value=`/`index=` (PR #10 review).
-- Bump `framescout_core.ENGINE` whenever cached embeddings become incompatible (model, weights, preprocessing, crops); signature golden values are pinned in `tests/test_signature.py`; cache rows of other signatures are never deleted automatically, only by the user's "Clean up storage" (E7/E11), which must never delete `framescout_core.NEVER_DELETED` files (e.g. `marks.json`).
+- Change `framescout_core.ENGINE_TEMPLATE` whenever cached embeddings become incompatible for all models (preprocessing, crops); another model or weights is a new `framescout_core.MODELS` entry with its own `engine_id`; signature golden values for every model are pinned in `tests/test_signature.py`; cache rows of other signatures are never deleted automatically, only by the user's "Clean up storage" (E7/E11), which must never delete `framescout_core.NEVER_DELETED` files (e.g. `marks.json`).
 - Search terms are **English only** (E3): hint text only, no language check, warning or translation without a new user decision.
 - `torch`/`torchvision` pins in `requirements.txt` must equal `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION` (a test checks it).
 - CI installs only `requirements-dev.txt` and fails if torch is installed: tests must not need torch, Pillow or model downloads.
