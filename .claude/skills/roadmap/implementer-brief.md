@@ -27,7 +27,7 @@ commit convention). This brief only adds the procedure and commands. If this bri
 `CLAUDE.md` ever disagree, `CLAUDE.md` wins – mention the conflict in your report.
 
 Read only what the item needs – every token you read is paid again on each later turn:
-- `BACKLOG.md` (47 KB): do not read it whole. Grep for the item's IDs (e.g.
+- `BACKLOG.md` (70 KB): do not read it whole. Grep for the item's IDs (e.g.
   `\*\*E7 –`) and Read those entries, and the roadmap section (Grep `^## Roadmap`).
 - `docs/ARCHITECTURE.md`: Grep for the files, functions and IDs you touch and read those
   sections; read it whole only for an item that changes the architecture.

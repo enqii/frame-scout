@@ -761,7 +761,7 @@ referenced in commits, pull requests and discussions.
       sets the cache variables). Long smoke or evaluation runs in the PR workflow should be
       started detached (and the agent should wait for their end) — document it in the
       implementer brief or `CLAUDE.md`.
-- [ ] **I14 – `docs/ARCHITECTURE.md` cannot be searched cheaply:** the file has 35 KB in
+- [x] **I14 – `docs/ARCHITECTURE.md` cannot be searched cheaply:** the file has 35 KB in
       68 lines; whole paragraphs are single lines of up to 3,747 characters, so a Grep hit
       returns about as much text as a section, and the implementer brief's rule "Grep for
       the files, functions and IDs you touch and read those sections" saves little agent
@@ -840,7 +840,7 @@ on the user's home PC first).
 ### P3b – Agent context (before further features)
 Smaller files to read per change, so implementer and reviewer agents keep less context
 (added 2026-10-25 at the user's request, placed before the remaining P4 items).
-- [ ] Reflow `docs/ARCHITECTURE.md` into short lines and sub-sections (I14)
+- [x] Reflow `docs/ARCHITECTURE.md` into short lines and sub-sections (I14) (done 2026-10-26)
 - [ ] Split `framescout_core.py` into a package of modules per area, re-exporting the
       names; no behavior change (I15)
 
