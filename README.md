@@ -382,11 +382,13 @@ will delete and what it keeps, and deletes only after you type `yes`.
 - **Deleted:** `.venv` (the Python environment), `.cache` (model weights and pip cache),
   `.tmp` (temporary files, except `.tmp\eval`), `yolo11n.pt`, `.pytest_cache` and the
   compiled `__pycache__` folders of the program.
-- **Kept (listed with sizes):** `photos\`, `references\`, `results\` (including your marks
+- **Kept (listed):** `photos\`, `references\`, `results\` (including your marks
   in `marks.json`), `profiles.json` and its backup, `settings.json`, `run.log`, the
   labels of the evaluation tool in `.tmp\eval` and the program files. A folder from
-  your settings (photo or copy folders) that lies inside a deleted folder is never
-  deleted; that item is skipped.
+  your settings (photo or copy folders) is never deleted: an item that holds one, or
+  that lies inside one (e.g. a photo folder that is the FrameScout folder or a folder
+  above it), is skipped. To delete it anyway, remove that folder from the photo folders
+  (or the profile's copy folder) in the app first, or delete the item yourself.
 - **Outside the project folder:** copied matches (`Pictures\FrameScout` or the folders you
   chose) stay. Caches that model downloads or Ultralytics wrote into your user profile
   when FrameScout ran without the `.bat` files (PyTorch and Hugging Face caches,
@@ -394,7 +396,7 @@ will delete and what it keeps, and deletes only after you type `yes`.
   may use them.
 - **Refuses and deletes nothing** while a search or the app is running (the script
   checks the run lock and the environment's `python.exe`) or when `settings.json`
-  cannot be read.
+  cannot be read or names photo or copy folders in a form the app does not accept.
 
 Afterwards the folder holds the program files and your data. To remove FrameScout
 completely, back up what you want to keep and delete the project folder yourself.

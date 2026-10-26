@@ -1095,6 +1095,16 @@ referenced in commits, pull requests and discussions.
       3.14/3.13/3.12 through `py -<version>` and cannot run without it (it prints manual
       steps). Part C of P5 (portable Python variant) must give it the portable interpreter
       and decide how a portable build is uninstalled. Found on 2026-10-27 in P5 part B.
+- [ ] **I21 – `Install-FrameScout.bat` breaks in a folder with `!` in its path:** it uses
+      `setlocal EnableDelayedExpansion`, so cmd drops the `!` from `cd /d "%~dp0"` and from
+      every `%CD%` (`TORCH_HOME`, `HF_HOME`, `PIP_CACHE_DIR`, `TMP`, ...): the `cd` fails
+      and the caches point to a folder that does not exist (or another one). Shown for the
+      uninstaller in a dry run on a scratch copy (`Fo!to (old)\fs`: it ran the script of
+      the current directory); `Uninstall-FrameScout.bat` was fixed in PR #34. Fix idea: no
+      delayed expansion in the installer (only `!PYTHON_VERSION!` inside the venv block
+      needs it; move that part out of the block), or enable it only around that block; a
+      test like `test_the_uninstaller_keeps_exclamation_marks_in_paths_and_arguments`.
+      Found on 2026-10-27 in the review of PR #34.
 
 ## Roadmap (priority)
 
@@ -1183,4 +1193,4 @@ decision in PR #14):
 ### P5 – Distribution
 - [ ] Pinned dependencies (I12), portable Python variant, uninstall script (three PRs:
       A pinned dependencies done 2026-10-26 (I12); B uninstall script done 2026-10-27
-      (I19, I20); C portable Python variant open; keep this line unchecked until C is done)
+      (I19, I20, I21); C portable Python variant open; keep this line unchecked until C is done)
