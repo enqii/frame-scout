@@ -925,6 +925,9 @@ referenced in commits, pull requests and discussions.
       user profile). This is a gap for a clean uninstall. Fix idea: the engine sets these
       variables to the project's `.cache/` when they are unset (`os.environ.setdefault`
       before importing torch, open_clip and ultralytics), or a documented PowerShell snippet.
+      (2026-10-27, P5 part B: `Uninstall-FrameScout.bat` now lists these folders outside
+      the project but never deletes them; the engine still sets no variables, so this
+      stays open.)
 - [ ] **I11 – The CUDA path has run on a GPU only once:** the development PC had no NVIDIA GPU,
       so the CUDA install (`cu130`/`cu126` choice, about 2.5 GB), CLIP and YOLO on CUDA
       (E14), the app's device choice with a CUDA build (A7) and the speed gain are
@@ -1055,6 +1058,9 @@ referenced in commits, pull requests and discussions.
       installer removes known obsolete files, `Start-FrameScout.bat` warns when both
       `framescout_core.py` and `framescout_core/` exist, or the README says to extract into
       a fresh folder). Found on 2026-10-26 in I15 (rollback case: PR #25 review).
+      (2026-10-27, P5 part B: the README now advises extracting a ZIP into a fresh folder,
+      and the uninstall script removes `__pycache__`; the stale file itself is still not
+      detected or removed, so this stays open.)
 - [x] **I17 – One implementer carries the whole item in one growing context:** the
       implementer of A25 (PR #28, Opus, effort high) ended at 290k tokens of context
       after 129 API calls and 233 tool calls (105 Edit, 71 Bash, 27 Read); it grew
@@ -1078,6 +1084,17 @@ referenced in commits, pull requests and discussions.
       at about 150–180k per agent (estimate, not measured). Not part of this item:
       lower effort for implementers, splitting large items. Found on 2026-10-26 by
       analyzing the transcript of the PR #28 implementer.
+- [ ] **I19 – The uninstall script never deletes user data:** `Uninstall-FrameScout.bat`
+      keeps photos, references, results (with `marks.json`), `profiles.json`,
+      `settings.json`, `run.log` and the evaluation labels in `.tmp/eval`, and tells the
+      user to delete the folder. Fix idea: opt-in deletion per category (results and
+      marks, references, profiles and settings, `run.log`, evaluation labels) with its own
+      confirmation; photos are never deleted. Needs a user decision (what is
+      offered, how it is confirmed). Found on 2026-10-27 in P5 part B.
+- [ ] **I20 – The uninstall script depends on the `py` launcher:** it looks for Python
+      3.14/3.13/3.12 through `py -<version>` and cannot run without it (it prints manual
+      steps). Part C of P5 (portable Python variant) must give it the portable interpreter
+      and decide how a portable build is uninstalled. Found on 2026-10-27 in P5 part B.
 
 ## Roadmap (priority)
 
@@ -1165,5 +1182,5 @@ decision in PR #14):
 
 ### P5 – Distribution
 - [ ] Pinned dependencies (I12), portable Python variant, uninstall script (three PRs:
-      A pinned dependencies done 2026-10-26 (I12); B uninstall script and C portable
-      Python variant open; keep this line unchecked until both are done)
+      A pinned dependencies done 2026-10-26 (I12); B uninstall script done 2026-10-27
+      (I19, I20); C portable Python variant open; keep this line unchecked until C is done)
