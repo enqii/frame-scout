@@ -14,7 +14,6 @@ from .profiles import _backup_path, _read_entries, read_profiles
 from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
 from .run_status import RUN_LOCK, RUN_STATUS, read_status, run_active
 from .settings import SETTINGS_FILE
-from .models import DEFAULT_MODEL
 from .signature import CACHE_FILE, classify_signatures, engine_id
 
 
@@ -282,15 +281,16 @@ def _unreferenced_references(refs_root, profiles_file, profiles=None):
                   if p.suffix.lower() in EXT and p.is_file() and _path_key(p) not in used)
 
 
-def scan_cleanup(results, profiles_file, refs_root, photo_folders, current_signature, current_model=DEFAULT_MODEL):
+def scan_cleanup(results, profiles_file, refs_root, photo_folders, current_signature, *, current_model):
     """Return {category: dict} of what the cleanup can delete; nothing is changed (E7).
 
     results: the results folder; profiles_file: the app's profiles.json; refs_root: the
     references folder; photo_folders: the current photo folders (None or empty if none is
     set; A25): cache entries of deleted photos are looked for in those that exist;
     current_signature: the cache signature of the current settings (never offered);
-    current_model: the search model key of the current settings (E22): rows of the other
-    registered models are cache_models, not cache_old.
+    current_model: the search model key of the current settings (E22; required, as the
+    signature, a hash, does not tell it): rows of the other registered models are
+    cache_models, not cache_old.
     Each category of CLEANUP_CATEGORIES has items (paths; (path, signature) rows for
     cache_missing; the signatures for cache_old/cache_other/cache_models), size (bytes), default,
     problem (why it is not offered, else None) and names (file names to show); the cache
@@ -452,7 +452,7 @@ def _galleries_and_thumbnails(results, shown, selected, profiles_file, summary):
 
 
 def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, photo_folders, current_signature,
-             lock_timeout=CLEANUP_LOCK_TIMEOUT, current_model=DEFAULT_MODEL):
+             lock_timeout=CLEANUP_LOCK_TIMEOUT, *, current_model):
     """Delete the selected categories of the scan shown (scan_cleanup) permanently; return a summary (E7).
 
     current_model: the search model key of the current settings, as for scan_cleanup (E22).

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (CACHE_FILE, DEFAULT_YOLO_MODEL, ENGINE, MARKS_FILE, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
+from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_YOLO_MODEL, ENGINE, MARKS_FILE, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
                              RunLock, auto_cleanup, clean_up, cleanup_summary_text, engine_id, feature_signature,
                              prepare_cache,
                              result_card, results_document, save_profiles, scan_cleanup, size_text, write_results)
@@ -89,14 +89,16 @@ class Project:
         path.write_bytes(b'photo')
         return path
 
-    def scan(self, photo_folders='default', current=CURRENT, **model):
+    def scan(self, photo_folders='default', current=CURRENT, current_model=DEFAULT_MODEL):
         return scan_cleanup(self.results, self.profiles, self.refs,
-                            [self.photos] if photo_folders == 'default' else photo_folders, current, **model)
+                            [self.photos] if photo_folders == 'default' else photo_folders, current,
+                            current_model=current_model)
 
     def clean(self, scan, selected, vacuum=False, alive=lambda pid, status: False, current=CURRENT,
-              photo_folders='default', **model):
+              photo_folders='default', current_model=DEFAULT_MODEL, **options):
         return clean_up(self.results, scan, selected, vacuum, alive, self.profiles, self.refs,
-                        [self.photos] if photo_folders == 'default' else photo_folders, current, **model)
+                        [self.photos] if photo_folders == 'default' else photo_folders, current,
+                        current_model=current_model, **options)
 
 
 @pytest.fixture
@@ -324,6 +326,17 @@ def test_with_another_model_chosen_the_default_rows_are_another_model(project):
     # the deletion classifies again with the same model
     summary = project.clean(scan, {'cache_models', 'cache_other'}, current=b16, current_model='vit-b-16-datacomp')
     assert summary['rows'] == 3 and project.rows() == [(str(photo), b16)]
+
+
+def test_the_search_model_must_be_named(project):
+    # E22 review: the signature alone does not tell the model, and a default would sort the
+    # rows of a non-default signature into the wrong categories without an error
+    with pytest.raises(TypeError, match='current_model'):
+        scan_cleanup(project.results, project.profiles, project.refs, [project.photos], CURRENT)
+    scan = project.scan()
+    with pytest.raises(TypeError, match='current_model'):
+        clean_up(project.results, scan, set(), False, lambda pid, status: False, project.profiles, project.refs,
+                 [project.photos], CURRENT)
 
 
 def test_no_cache_means_nothing_to_clean(project):
