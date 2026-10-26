@@ -7,6 +7,7 @@ average precision of each model's ranking against the user's labels. Everything 
 standard library only, so it is tested without torch or a model.
 """
 import json
+import math
 import random
 import re
 from pathlib import Path
@@ -67,10 +68,14 @@ def scores_document(model, signature, photos, profiles):
 
 
 def write_document(path, document, indent=None):
-    """Write the JSON object document to path atomically (its folder is created)."""
+    """Write the JSON object document to path atomically (its folder is created).
+
+    ValueError for NaN or infinity, which standard JSON cannot hold (review).
+    """
     path = Path(path)
+    text = json.dumps(document, ensure_ascii=False, indent=indent, allow_nan=False)
     path.parent.mkdir(parents=True, exist_ok=True)
-    _replace_atomically(path, (json.dumps(document, ensure_ascii=False, indent=indent) + '\n').encode('utf-8'))
+    _replace_atomically(path, (text + '\n').encode('utf-8'))
 
 
 def read_document(path, what, version):
@@ -115,6 +120,9 @@ def read_scores(path):
                 if key == 'visual' and rows is None:
                     continue
                 if [len(row) for row in rows] != crops:
+                    raise ValueError
+                # finite numbers only: json reads NaN and Infinity, which would break the ranking
+                if not all(type(value) in (int, float) and math.isfinite(value) for row in rows for value in row):
                     raise ValueError
     except (KeyError, TypeError, ValueError):
         raise ValueError(f'{path}: the scores do not match the photos and their crops') from None
