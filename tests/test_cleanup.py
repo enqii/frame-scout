@@ -250,6 +250,17 @@ def test_a_missing_listed_folder_is_skipped_with_a_note(project):
     assert summary['rows'] == 1 and project.rows() == [(str(on_drive), CURRENT)]
 
 
+def test_a_missing_folder_listed_twice_gets_one_note(project):
+    # review: the app's list may name a folder twice, or with another case on Windows
+    gone_drive = project.base / 'drive'
+    listed = [gone_drive, project.photos, gone_drive, Path(str(gone_drive).upper()) if os.name == 'nt' else gone_drive]
+    scan = project.scan(photo_folders=listed)
+    assert len(scan['cache_missing']['notes']) == 1
+    scan = project.scan(photo_folders=[gone_drive, gone_drive])
+    assert 'None of the photo folders' not in scan['cache_missing']['problem']
+    assert 'does not exist' in scan['cache_missing']['problem']
+
+
 def test_rows_of_a_folder_that_disappeared_since_the_scan_are_kept(project):
     second = project.base / 'second'
     second.mkdir()

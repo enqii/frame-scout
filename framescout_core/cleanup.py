@@ -9,6 +9,7 @@ from ._common import _path_key
 from .locks import RunLock
 from .marks import MARKS_FILE
 from .names import EXT, profile_slugs
+from .photos import _folder_key, _inside_prefix
 from .profiles import _backup_path, _read_entries, read_profiles
 from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
 from .run_status import RUN_LOCK, RUN_STATUS, read_status, run_active
@@ -184,8 +185,16 @@ def _read_cache(cache):
 
 
 def _photo_folder_list(photo_folders):
-    """The non-empty entries of photo_folders (None: none) as Paths."""
-    return [Path(f) for f in photo_folders or () if str(f).strip()]
+    """The non-empty entries of photo_folders (None: none) as resolved Paths, each folder once (review)."""
+    folders, seen = [], set()
+    for entry in photo_folders or ():
+        if not str(entry).strip():
+            continue
+        folder = Path(entry).resolve()
+        if _folder_key(folder) not in seen:
+            seen.add(_folder_key(folder))
+            folders.append(folder)
+    return folders
 
 
 def _missing_rows(rows, photo_folders):
@@ -203,13 +212,11 @@ def _missing_rows(rows, photo_folders):
                                  'looked for.')
     # only inside the listed photo folders that exist (user decisions on E7 and A25): rows
     # of other folders may belong to a drive that is not connected now
-    prefixes = []
-    for folder in existing:
-        key = os.path.normcase(str(folder.resolve()))
-        prefixes.append(key if key.endswith(os.sep) else key + os.sep)
+    # compared as photos.distinct_folders compares folders; one normcase per row (review)
+    prefixes = tuple(_inside_prefix(_folder_key(folder)) for folder in existing)
     # each photo is looked at once, however many signatures it has (review), and once
     # however many listed folders hold it
-    inside = {path for path, _, _ in rows if any(os.path.normcase(path).startswith(p) for p in prefixes)}
+    inside = {path for path, _, _ in rows if os.path.normcase(path).startswith(prefixes)}
     gone = {path for path in inside if _missing(path)}
     dead = [(path, signature, size or 0) for path, signature, size in rows if path in gone]
     notes = [f'The photo folder {f} does not exist (e.g. a disconnected drive), so cache entries of deleted photos '
