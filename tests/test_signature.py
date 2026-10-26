@@ -1,7 +1,8 @@
 """CLIP model choice and the feature cache signature (E1)."""
 import pytest
 
-from framescout_core import CLIP_MODEL, CLIP_PRETRAINED, ENGINE, feature_signature
+from framescout_core import (CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_MODEL, ENGINE, MODEL_ENGINES, MODEL_KEYS, MODELS,
+                             engine_id, feature_signature)
 
 DEFAULTS = dict(person_detection=True, max_persons=12, person_confidence=.3, yolo_model='yolo11n.pt')
 # Signature of the default settings in v1.1 (ENGINE v4, GELU embeddings)
@@ -62,3 +63,43 @@ def test_detector_settings_are_ignored_without_person_detection():
     base = feature_signature(**off)
     for key, value in dict(max_persons=5, person_confidence=.5, yolo_model='yolo11s.pt').items():
         assert feature_signature(**{**off, key: value}) == base, key
+
+
+# --- one signature per search model (E22) ---
+
+def test_the_default_model_keeps_the_engine_and_its_signatures():
+    # golden: the cached rows of every user stay valid with the default model (E22)
+    assert ENGINE == 'v5-clip-ViT-B-32-quickgelu-openai-crop-features-1'
+    assert engine_id(DEFAULT_MODEL) == ENGINE == engine_id()
+    assert feature_signature(**DEFAULTS, model=DEFAULT_MODEL) == (
+        'ff0961b445ea26b7f0a4c5ea39a078d1297927da627246d962cef5c1e698fa47')
+    assert feature_signature(**{**DEFAULTS, 'person_detection': False}, model=DEFAULT_MODEL) == (
+        '89ce5cc619f616f3e72ac6787db2739ed86dbf77a6abb820b6e5bc7f5128c08c')
+    assert (CLIP_MODEL, CLIP_PRETRAINED) == (MODELS[DEFAULT_MODEL].name, MODELS[DEFAULT_MODEL].pretrained)
+
+
+def test_every_model_has_its_own_engine_and_signatures():
+    engines = {key: engine_id(key) for key in MODEL_KEYS}
+    assert len(set(engines.values())) == len(MODEL_KEYS)
+    assert MODEL_ENGINES == frozenset(engines.values())
+    for key, engine in engines.items():
+        # a different model must never reuse cached embeddings of another one
+        assert MODELS[key].name in engine and MODELS[key].pretrained in engine
+    for detection in (True, False):
+        settings = {**DEFAULTS, 'person_detection': detection}
+        assert len({feature_signature(**settings, model=key) for key in MODEL_KEYS}) == len(MODEL_KEYS)
+
+
+def test_signatures_of_the_other_models_are_pinned():
+    # golden values: a change re-analyzes every photo of that model
+    assert {key: feature_signature(**DEFAULTS, model=key) for key in MODEL_KEYS[1:]} == {
+        'vit-b-16-datacomp': '4f33d37166a75471fda50657e1749fa42a5572150b84089d51cb65449f6c5a5c',
+        'vit-l-14-datacomp': 'e820c5bad123b5c4ac15582aedfe03b8e9571adf2b3fe6132d9e128571e14de3',
+        'vit-b-16-siglip': 'b06a0621f82162485430853221d0a22dd1a66f41ce612ebc75ab50b3ba2bbcc4'}
+
+
+def test_an_unknown_model_has_no_signature():
+    with pytest.raises(ValueError, match='Unknown search model'):
+        feature_signature(**DEFAULTS, model='ViT-B-32')
+    with pytest.raises(ValueError, match='Unknown search model'):
+        engine_id('nope')
