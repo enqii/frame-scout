@@ -43,15 +43,18 @@ def _rows(rows, root, out):
         out(f'  {_name(path, root):<{width}}  {size_text(size):>8}  {label}')
 
 
-def _blocked(root, out):
-    """Print why nothing may be deleted now and return True, or return False."""
+def _blocked(root, out, confirmed=False):
+    """Print why nothing may be deleted now and return True, or return False. confirmed: the
+    user agreed to the deletion, so a read-only environment Python may be made writable to
+    check it."""
     if search_running(root):
         out('A search is running. Stop it (or wait for its end), close FrameScout and run the uninstall again.')
         return True
-    busy = programs_in_use(root)
+    busy = programs_in_use(root, clear_read_only=confirmed)
     if busy:
         out(f'FrameScout is still running ({busy[0]} is in use). Close the Start-FrameScout window and any '
-            'other program that uses this Python environment, then run the uninstall again.')
+            'other program that uses this Python environment, then run the uninstall again. If FrameScout is '
+            'closed, another program (e.g. a virus scanner) has the file open: try again in a moment.')
         return True
     return False
 
@@ -115,7 +118,7 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
     if answer.strip().lower() != CONFIRMATION:
         out('Cancelled: nothing was deleted.')
         return 0
-    if _blocked(root, out):  # FrameScout may have been started while the question waited
+    if _blocked(root, out, confirmed=True):  # FrameScout may have been started while the question waited
         return 1
     failures = remove_items(items)
     if failures:
