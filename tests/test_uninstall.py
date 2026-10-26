@@ -401,10 +401,11 @@ def test_the_check_after_the_confirmation_clears_the_read_only_attribute(project
 
 # --- user_data and outside_leftovers: listed only ---
 
-def test_user_data_lists_what_exists(project):
-    rows = {path.relative_to(project).as_posix(): size for path, _, size in user_data(project)}
-    assert rows == {'photos': 5, 'references': 3, 'results': 22, 'profiles.json': 16, 'settings.json': 2,
-                    'run.log': 3, '.tmp/eval': 2}
+def test_user_data_lists_what_exists_without_walking_it(project, monkeypatch):
+    # photos/ and results/ may hold many thousands of files, never deleted: no sizes (review)
+    monkeypatch.setattr(uninstall_module, '_tree_size', lambda *args: pytest.fail('walked the user data'))
+    rows = [path.relative_to(project).as_posix() for path, _ in user_data(project)]
+    assert rows == ['photos', 'references', 'results', 'profiles.json', 'settings.json', 'run.log', '.tmp/eval']
 
 
 def test_caches_in_the_user_profile_are_listed(project, tmp_path):

@@ -199,10 +199,13 @@ def uninstall_plan(root, protected):
 
 
 def user_data(root):
-    """Return (path, what it is, size) of the user's data that exists below root."""
+    """Return (path, what it is) of the user's data that exists below root.
+
+    Without sizes: photos/ and results/ may hold many thousands of files, and walking them
+    would delay the question for what is never deleted anyway (review).
+    """
     root = Path(root)
-    return [(root / relative, label, _size(root / relative)) for relative, label in USER_DATA
-            if os.path.lexists(root / relative)]
+    return [(root / relative, label) for relative, label in USER_DATA if os.path.lexists(root / relative)]
 
 
 def outside_leftovers(root, environ, home):
