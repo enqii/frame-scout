@@ -5,6 +5,7 @@ The first model start needs internet access; your own images are never uploaded.
 """
 import argparse
 import html
+import importlib
 import io
 import json
 import os
@@ -25,6 +26,7 @@ from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_RE
                              DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, RAW_EXT, RESULTS_FILE, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, detection_options, draft_size, final_status, ensure_thumbnail, group_batches,
+                             import_detector_class,
                              load_profiles, missing_decoder, prefetch, prepare_cache, profile_slugs, progress_due,
                              progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
                              scan_photos, search_fingerprint, size_text, skipped_lines, store_group,
@@ -300,7 +302,8 @@ def search(args, parser, root, output, status):
 
     detector = None
     if not args.no_person_detection:
-        from ultralytics import YOLO
+        # without Ultralytics' usage analytics and run-time pip installs (E27, E28)
+        YOLO = import_detector_class(os.environ, importlib.import_module, Image)
         detector = YOLO(args.yolo_model)
     con = sqlite3.connect(output / CACHE_FILE)
     # also records which engine version and settings the signature stands for (E11)

@@ -24,7 +24,7 @@ from .torch_build import (TORCH_VERSION, TORCHVISION_VERSION, TORCH_INDEX, CUDA_
     parse_gpu_query, unsupported_gpus, cuda_build, driver_text, torch_requirements,
     installed_build_matches, installed_cuda_build, torch_index_url)
 from .devices import (device_choices, cuda_hint, cuda_status, DETECTION_IMAGE_SIZE,
-    detection_options)
+    detection_options, ULTRALYTICS_ENV, import_detector_class)
 from .thumbnails import (FULL_IMAGE_LABEL, crop_label, thumbnail_name, ensure_thumbnail)
 from .pipeline import (progress_line, progress_due, DRAFT_REDUCING_GAP, DRAFT_DECODING, draft_size,
     group_batches, store_group, prefetch)
