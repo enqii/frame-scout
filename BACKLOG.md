@@ -943,6 +943,29 @@ referenced in commits, pull requests and discussions.
       installer removes known obsolete files, `Start-FrameScout.bat` warns when both
       `framescout_core.py` and `framescout_core/` exist, or the README says to extract into
       a fresh folder). Found on 2026-10-26 in I15 (rollback case: PR #25 review).
+- [ ] **I17 – One implementer carries the whole item in one growing context:** the
+      implementer of A25 (PR #28, Opus, effort high) ended at 290k tokens of context
+      after 129 API calls and 233 tool calls (105 Edit, 71 Bash, 27 Read); it grew
+      steadily from 42k with no compaction and no error loops, and hit the user's
+      session limit once (56 minutes' pause). Measured parts: about 80k tokens of tool
+      results, about 113k of the agent's own output (edits, commands and thinking, which
+      stays in context for the whole tool loop). Two steps ran late with the full
+      context: the documentation updates (`README.md`, `docs/ARCHITECTURE.md`,
+      `BACKLOG.md`) started at about 230k, and the review fixes ran in the same agent
+      (`/roadmap` continues the implementer with `SendMessage` while it is alive),
+      starting at 249k, so every call of that phase sent over 250k tokens. Fix:
+      (1) `address-review` always spawns a fresh implementer that reads the PR text,
+      diff and unanswered review comments itself, never continues the previous one;
+      (2) the implementer commits the code and tests and then hands the documentation
+      updates to a fresh agent (or returns, and `/roadmap` spawns one) with a short
+      brief: the item, the commits, which docs to update; that agent reads only the
+      diff and the doc sections it touches. Update the PR workflow in `CLAUDE.md` (the
+      single source of the rules), the state table and spawning section of `/roadmap`
+      and the implementer brief, plus a docs brief if (2) needs one. Expected: a
+      fresh agent starts at about 60–80k instead of 250k; an item like A25 should end
+      at about 150–180k per agent (estimate, not measured). Not part of this item:
+      lower effort for implementers, splitting large items. Found on 2026-10-26 by
+      analyzing the transcript of the PR #28 implementer.
 
 ## Roadmap (priority)
 
@@ -985,10 +1008,13 @@ on the user's home PC first).
 
 ### P3b – Agent context (before further features)
 Smaller files to read per change, so implementer and reviewer agents keep less context
-(added 2026-10-25 at the user's request, placed before the remaining P4 items).
+(added 2026-10-25 at the user's request, placed before the remaining P4 items); fresh
+agents per workflow phase (I17, added 2026-10-26, placed before P4b).
 - [x] Reflow `docs/ARCHITECTURE.md` into short lines and sub-sections (I14) (done 2026-10-26)
 - [x] Split `framescout_core.py` into a package of modules per area, re-exporting the
       names; no behavior change (I15) (done 2026-10-26)
+- [ ] Fresh agents for review fixes and documentation updates instead of one growing
+      implementer context (I17; workflow change decided by the user on 2026-10-26)
 
 ### P4 – UX
 The item "Result gallery in the app, mark matches/copy them to a folder, "open folder",
