@@ -375,17 +375,34 @@ it can be turned off for other motifs.
 
 ## Uninstalling
 
-1. Back up results, your search profiles (`profiles.json`, `references/`), your
-   settings (`settings.json`), your marks (`results/marks.json`) and any photos you want
-   to keep elsewhere. Copied matches are in `Pictures\FrameScout` (or the folders you
-   chose), outside the project folder, and stay.
-2. Close FrameScout and delete the project folder. This removes `.venv`, caches
-   (`.cache`, `.tmp`), model weights (including `yolo11n.pt`) and results.
+Double-click `Uninstall-FrameScout.bat` (`Uninstall-FrameScout.bat --dry-run` only shows
+the lists). Close FrameScout and any running search first. The script lists what it
+will delete and what it keeps, and deletes only after you type `yes`.
 
-A system-wide Python installation remains in place. Individual dependencies may also
-create their own caches in your user profile. For example, Ultralytics (person detection)
-writes `%APPDATA%\Ultralytics\settings.json` when it is used outside the `.bat` files,
-e.g. from a manual command line without `YOLO_CONFIG_DIR`.
+- **Deleted:** `.venv` (the Python environment), `.cache` (model weights and pip cache),
+  `.tmp` (temporary files, except `.tmp\eval`), `yolo11n.pt`, `.pytest_cache` and the
+  compiled `__pycache__` folders of the program.
+- **Kept (listed with sizes):** `photos\`, `references\`, `results\` (including your marks
+  in `marks.json`), `profiles.json` and its backup, `settings.json`, `run.log`, the
+  labels of the evaluation tool in `.tmp\eval` and the program files. A folder from
+  your settings (photo or copy folders) that lies inside a deleted folder is never
+  deleted; that item is skipped.
+- **Outside the project folder:** copied matches (`Pictures\FrameScout` or the folders you
+  chose) stay. Caches that model downloads or Ultralytics wrote into your user profile
+  when FrameScout ran without the `.bat` files (PyTorch and Hugging Face caches,
+  `%APPDATA%\Ultralytics`) are only listed, never deleted, because other programs
+  may use them.
+- **Refuses and deletes nothing** while a search or the app is running (the script
+  checks the run lock and the environment's `python.exe`) or when `settings.json`
+  cannot be read.
+
+Afterwards the folder holds the program files and your data. To remove FrameScout
+completely, back up what you want to keep and delete the project folder yourself.
+
+The script needs the Python 3.12 to 3.14 that the installer used (found through the
+`py` launcher); without it, delete `.venv`, `.cache` and `.tmp` by hand. A system-wide
+Python installation remains in place. When you update from a ZIP, extract it into a
+fresh folder instead of over an old one (old files of earlier versions would stay).
 
 ## Development
 

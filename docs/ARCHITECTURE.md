@@ -140,6 +140,21 @@ the module of its area and to the re-exports in `__init__.py`.
 - `cleanup.py`:
   `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14).
+- `uninstall.py` (P5):
+  `UNINSTALL_ITEMS`/`UNINSTALL_KEEP`/`UNINSTALL_FIRST`/`USER_DATA`/`ENVIRONMENT_PROGRAMS`/`UninstallItem`/`protected_folders`/`uninstall_plan`/`user_data`/`outside_leftovers`/`search_running`/`programs_in_use`/`remove_items`
+  (what the uninstall script deletes, keeps and only reports; standard library only.
+  `uninstall_plan(root, protected)` returns the existing items to delete and the skipped
+  ones: an item that contains a photo or copy folder of `settings.json`
+  (`protected_folders`, which raises if `settings.json` is unreadable) is skipped, except
+  inside a kept entry (`.tmp/eval`). Links and junctions are removed as links, never
+  followed. `remove_items` deletes the environment's `python.exe`/`pythonw.exe` first
+  (`UNINSTALL_FIRST`), clears read-only attributes, continues after a failure and returns
+  the failures. `search_running` = the run lock of `results/` is held; `programs_in_use` =
+  the environment's `python.exe`/`pythonw.exe` cannot be opened for writing, which on
+  Windows means a process runs them. `outside_leftovers` lists the PyTorch, Hugging Face
+  and Ultralytics folders outside the project (from `TORCH_HOME`, `HF_HOME`,
+  `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `APPDATA` or the user profile defaults), never
+  deleted: they are shared with other programs, I10).
 - `evaluation.py` (E32/E20):
   `SCORES_FORMAT`/`LABELS_FORMAT`/`EVAL_K`/`SCORE_DIGITS`/`collection_name_problem`/`write_document`/`read_document`/`scores_document`/`write_scores`/`read_scores`/`read_labels`/`save_labels`/`set_label`/`average_precision`/`build_pool`
   (the formats of the model evaluation tool: scores file of the engine's `--scores-file`,
@@ -255,6 +270,21 @@ an NVIDIA driver. If no CUDA build fits, an installed CUDA build is kept, otherw
 CPU build is installed; **only an explicit `cpu` replaces a CUDA build** (PR #8 review). A
 matching installed build is not downloaded again. Exit code 0 done, 1 failed. Standard
 library only.
+
+### `Uninstall-FrameScout.bat` and `framescout_uninstall.py`
+
+`Uninstall-FrameScout.bat [--dry-run]` (P5 part B) finds the first of Python 3.14/3.13/3.12
+through the `py` launcher (I20: no launcher, no uninstall; it prints the manual steps) and
+runs `framescout_uninstall.py` with `-B -E -s`, **not** with `.venv`'s Python, which
+cannot delete itself while it runs. It sets no cache or `TMP` variables (`.tmp` is
+deleted). The script uses `framescout_core.uninstall`: it refuses (deleting nothing) when
+`results/run.lock` is held, the environment's `python.exe`/`pythonw.exe` is in use or
+`settings.json` is unreadable; otherwise it prints the items to delete with sizes, the
+kept user data (`USER_DATA`, listed, never deleted: photos, references, results with
+`marks.json`, profiles and backup, settings, `run.log`, `.tmp/eval`) and the caches
+outside the folder (listed only), and deletes after the answer `yes`. `--dry-run` stops
+after the lists. Exit code 0 done or listed, 1 refused or failures. Not deleted: the
+program files themselves. Opt-in deletion of user data is I19.
 
 ### `Start-FrameScout.bat`
 
@@ -798,7 +828,8 @@ cuda` and start it again, since the running app keeps the loaded torch and the c
 The Windows batch scripts set cache/temp environment variables under the project directory
 (`TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `TMP`, `TEMP`), aiming for
 easy cleanup. Some dependencies may still leave user-level caches (e.g. Ultralytics writes
-`%APPDATA%\Ultralytics\settings.json` when imported without `YOLO_CONFIG_DIR`, I10); do
+`%APPDATA%\Ultralytics\settings.json` when imported without `YOLO_CONFIG_DIR`, I10; the
+uninstall script lists these folders but never deletes them); do
 not promise perfect portability or no residual files.
 
 **Ultralytics without analytics and run-time installs (E27, E28):** the engine imports
@@ -863,7 +894,12 @@ without local label, hash or duplicate, sorted by name; every requirement of
 non-comment pip line of the installer passes `-r requirements.txt -c constraints.txt`, and
 it sets `PIP_CONSTRAINT=constraints.txt` between the venv and `install_torch.py` (I18);
 the torch pins of both files equal `TORCH_VERSION`/`TORCHVISION_VERSION` in
-`test_torch_install.py`; completeness of the transitive pins is not checkable in CI);
+`test_torch_install.py`; completeness of the transitive pins is not checkable in CI), and
+the uninstall script (P5, `test_uninstall.py`, 33 tests on `tmp_path` trees: plan, kept
+entries, protected folders from settings, links and junctions, read-only files, failures,
+user-data and outside listings, the run lock, the dialog of `framescout_uninstall.py`;
+the real `.bat` was run once by hand on a scratch copy, not against a real installation,
+not while Streamlit was running and not on a PC without the `py` launcher);
 still missing: cache
 reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
