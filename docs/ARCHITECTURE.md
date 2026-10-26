@@ -20,6 +20,14 @@ another machine and the edge cases in the backlog are **not** verified. Treat sy
 checks, unit tests and a real model run as distinct kinds of evidence, and do not call the
 app production-ready.
 
+Search models (E22, PR #31): CPU smoke runs of all four registered models (default,
+ViT-B/16, ViT-L/14, SigLIP) with `--no-person-detection`, 3 synthetic images and `.tmp/`
+output succeeded, the weights downloaded into the main checkout's `.cache/`. **Not
+verified:** search quality of the three optional models (none is evaluated, E32), CUDA with
+them, person detection with them, a run without `transformers` installed, and
+`Install-FrameScout.bat` with the new requirement. The CPU factors in the registry were
+measured once on a Core Ultra 9 285K.
+
 ## Files and responsibilities
 
 ### `app.py`
@@ -89,8 +97,14 @@ the module of its area and to the re-exports in `__init__.py`.
 - `torch_build.py`:
   `TORCH_VERSION`/`TORCHVISION_VERSION`/`CUDA_BUILDS`/`parse_gpu_query`/`cuda_build`/`unsupported_gpus`/`installed_build_matches`/`installed_cuda_build`/`torch_requirements`/`torch_index_url`
   (which PyTorch build the installer installs, A7/I3).
-- `signature.py`: `CLIP_MODEL`/`CLIP_PRETRAINED`/`ENGINE`/`feature_signature` (CLIP model
-  choice and the feature cache signature, E1),
+- `models.py`:
+  `SearchModel`/`MODELS`/`DEFAULT_MODEL`/`MODEL_KEYS`/`model_label`/`missing_packages`/`model_problem`
+  (the registry of the search models the engine's `--model` and the app's selectbox offer,
+  E22; no imports beyond the standard library; fields: key, OpenCLIP name and pretrained
+  weights, label, download size, CPU factor, image size, embedding size, `requires`,
+  `multilingual`, `evaluated`).
+- `signature.py`: `CLIP_MODEL`/`CLIP_PRETRAINED` (the default model's, from the registry)/`ENGINE_TEMPLATE`/`engine_id`/`ENGINE`/`MODEL_ENGINES`/`feature_signature`
+  (the engine id per search model and the feature cache signature, E1/E22),
   `CACHE_FILE`/`DEFAULT_YOLO_MODEL`/`prepare_cache`/`known_signatures`/`SLIDER_NOISE_ULPS`/`classify_signatures`
   (the cache tables with the `signatures` side table, and which engine version and
   settings a cached row belongs to, E11).
@@ -109,7 +123,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`
   (copying marked matches and their saved target folders in `settings.json`, A17).
 - `cleanup.py`:
-  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
+  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14).
 - `_common.py` (internal, not re-exported): helpers several areas share, i.e. atomic
   writes (`_publish_via_temp`, `_publish_new`, `_replace_atomically`,
@@ -141,7 +155,9 @@ z-scores and their combination, E5) and `score_caption` (the numbers on a galler
 `framescout_scoring` and `install_torch.py` (no torch, no model download); dev
 dependencies `pytest` and `numpy` (for `framescout_scoring`, user decision in PR #11). One
 test (`test_signature.py`, QuickGELU config check, E1) also reads open_clip's config
-tables where open_clip is installed and is skipped in CI.
+tables where open_clip is installed and is skipped in CI; `test_models.py` (E22) tests the
+registry, and its checks of every model's open_clip config (image size, embedding size,
+QuickGELU) run only where open_clip is installed.
 
 ### `profiles.example.json` and `profiles.json`
 
@@ -156,7 +172,8 @@ saved over (A2). Back it up before overwriting user changes.
 
 `requirements.txt`: `torch==2.14.1` and `torchvision==0.29.1` pinned (same values as
 `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, checked by a test; change them
-together); Streamlit `>=1.40` (A10); numpy, Pillow, open_clip_torch, ultralytics and
+together); Streamlit `>=1.40` (A10); `transformers>=5.21.0` (the SigLIP tokenizer, E22;
+torch and huggingface-hub unchanged, `pip check` clean); numpy, Pillow, open_clip_torch, ultralytics and
 psutil with the versions of the verified runs as minimum, no upper bounds (user decision;
 untested newer majors: I12). `pillow-heif` and `rawpy` (E25, required by user decision;
 optional extras: E29) have the versions of the venv's smoke runs (PR #26) as minimum. Full
@@ -227,9 +244,19 @@ and never deleted by the cleanup, E7), `profiles.json`, `run.log`, `.cache/`, `.
 
 ### Model and prompts
 
-Uses OpenCLIP `ViT-B-32-quickgelu`, `pretrained='openai'` (`framescout_core.CLIP_MODEL`;
-the OpenAI weights need QuickGELU, plain `ViT-B-32` would run them with GELU, E1), for
-normalized text and image embeddings. No LLM is required. Four generic English prompt
+The search model is chosen from the registry `framescout_core.MODELS` (E22; engine option
+`--model <key>`, settings key `model`). The default `vit-b-32-openai` is OpenCLIP
+`ViT-B-32-quickgelu`, `pretrained='openai'` (`framescout_core.CLIP_MODEL`; the OpenAI
+weights need QuickGELU, plain `ViT-B-32` would run them with GELU, E1). Optional and **not
+evaluated** (E32): `vit-b-16-datacomp` (`ViT-B-16`, `datacomp_xl_s13b_b90k`),
+`vit-l-14-datacomp` (`ViT-L-14`, same weights) and `vit-b-16-siglip` (`ViT-B-16-SigLIP`,
+`webli`; needs `transformers` for its tokenizer, `SearchModel.requires`). The engine
+checks `model_problem` before the scan (`parser.error`), loads the model and the tokenizer
+of that name, takes the draft size from `model.visual.image_size` (falling back to the
+registry's `image_size`) and logs `search model: <label> (<name>/<pretrained>)`. The
+embeddings are normalized text and image embeddings. The reference weight (E5) and all
+other defaults are tuned for the default model; scores of different models are not
+comparable (SigLIP's raw cosines are lower; the z-scores absorb this). No LLM is required. Four generic English prompt
 templates are derived from each profile's name and optional context, plus two extra
 templates if `features` is provided (`load_profiles` reports their number as `generated`);
 user-defined `prompts` are appended.
@@ -377,14 +404,19 @@ it runs on the cached features at query time.
 ### Feature cache
 
 Feature rows are stored in `results/cache.sqlite3` per resolved file path + engine/config
-signature (`framescout_core.feature_signature`: `ENGINE`, whether person detection is on
-and, only if it is, the detector settings; pinned by golden values in
-`tests/test_signature.py`), checked against modification nanoseconds and size. Image
+signature (`framescout_core.feature_signature`: the engine id of the search model, whether
+person detection is on and, only if it is, the detector settings; pinned by golden values
+of every model in `tests/test_signature.py`), checked against modification nanoseconds and size. Image
 embeddings are serialized in float16; profile queries can reuse existing image features.
-Changes to detector settings invalidate the cached feature signature; bump `ENGINE`
-whenever cached embeddings become incompatible (model, weights, preprocessing, crops). The
-engine creates the tables with `framescout_core.prepare_cache`, which also records its
-signature with `ENGINE` and the settings in the side table `signatures(signature PK,
+Changes to detector settings invalidate the cached feature signature. The engine id comes
+from `ENGINE_TEMPLATE` (`v5-clip-{model}-{pretrained}-crop-features-1`, `engine_id(model)`;
+`ENGINE = engine_id(DEFAULT_MODEL)`, the same string as before E22, so no default-model
+cache row was invalidated): change the template whenever cached embeddings become
+incompatible for all models (preprocessing, crops); another model or other weights is a new
+`MODELS` entry and gets its own id and signature. Each model therefore has its own rows
+next to the others (about 10–15 MB per model for 5,000 photos); switching back reuses
+them. The engine creates the tables with `framescout_core.prepare_cache(..., model=)`,
+which also records its signature with `engine_id(model)` and the settings in the side table `signatures(signature PK,
 engine, settings)` (E11; the features table is unchanged, so older versions read the same
 file). Rows of other signatures are never deleted automatically, only by "Clean up
 storage" after the user's selection (E7, E11).
@@ -406,7 +438,9 @@ is logged and never fails the run. Local paths may not work on another computer.
 
 After the galleries the engine writes `results/results.json`
 (`framescout_core.write_results`, format 2 since A25): run start and end, the searched
-photo folders (`photo_folders`, a list), settings, number of photos and per profile its
+photo folders (`photo_folders`, a list), settings (including `model`, the search model key
+since E22; results without it count as the default, which the app's results caption
+shows as "search model <label>"), number of photos and per profile its
 name, `search_fingerprint` (hash of its search texts and reference paths, relative to the
 profiles file's folder when inside it, so a moved project folder changes nothing),
 gallery file name, `normalized` and the cards (rank, path, `relative` (the `photo_name`
@@ -488,7 +522,9 @@ the Start button; A25), `device`
 PyTorch cannot use is shown and used as "auto" but stays saved until another one or "Use
 auto from now on" is chosen), `batch_size` 8, `top` 150, `person_detection` on,
 `max_persons` 12, `person_confidence` .30, `reference_weight` 0.3
-(`DEFAULT_REFERENCE_WEIGHT`; 0.35 before PR #11, a saved value is not migrated).
+(`DEFAULT_REFERENCE_WEIGHT`; 0.35 before PR #11, a saved value is not migrated), `model`
+(a registry key, `DEFAULT_MODEL`; not written when it is the default; a free-text name or a
+key removed from the registry falls back to the default with the usual warning, E22).
 `read_settings` checks each value against the range of its widget (an invalid one falls
 back to its default with a warning, `save_settings` removes it with the next save; floats
 are rounded, as sliders return values like 0.30000000000000004); an unreadable file is
@@ -547,12 +583,18 @@ path is inside one of the current photo folders that exist, compared normcased, 
 certainly does not exist, each path checked once; a listed folder that does not exist is
 left out with a note in the category's `notes`, shown as a caption, and its rows are never
 offered (A25); not offered without an existing photo folder); `cache_old` and
-`cache_other` (`classify_signatures`: the side table decides, otherwise
-`known_signatures`, i.e. the current-`ENGINE` signatures of every `max_persons` and every
+`cache_other` and `cache_models` (`classify_signatures(..., current_engine=)`: the side
+table decides, otherwise `known_signatures`, i.e. the signatures of the default engine id
+of every `max_persons` and every
 slider value of `person_confidence` (each step and its float neighbors up to
 `SLIDER_NOISE_ULPS` = 8 ULPs either way, so slider noise of any arithmetic path counts)
 with `DEFAULT_YOLO_MODEL`, plus the no-detection signature; the current signature is never
-offered); `references` (`EXT` files in `references/` that neither `profiles.json` nor
+offered). `cache_models` ("Cache entries of other search models", default off, E22) holds
+rows whose recorded engine is that of another registered model, and unrecorded
+`known_signatures` rows when another model is current (those can only be the default's);
+`scan_cleanup` and `clean_up` take `current_model`, `CACHE_CATEGORIES` lists the cache
+categories. Before E22 rows of any other engine counted as `cache_old` (selected);
+`references` (`EXT` files in `references/` that neither `profiles.json` nor
 `profiles.json.bak` names). `galleries`/`thumbnails` are not offered if `results.json` (a
 missing one counts as empty) or `profiles.json` (also missing) cannot be read,
 `references` if `profiles.json` or the `.bak` cannot be read; an unreadable cache blocks
@@ -596,7 +638,9 @@ the exit code (`final_status`: 0 finished, 130 interrupted, others failed).
 ### Starting a search from the app
 
 The frontend spawns the engine via `subprocess.Popen` and redirects stdout/stderr to
-`run.log`. `start_run` takes the run lock (1 s timeout: every open tab probes it every two
+`run.log`; it passes `--model` from the setting `model` (the AI settings tab starts with
+the "Search model" selectbox, key `setting_model`, `format_func=model_label`, with a
+caption per model and a warning from `model_problem`, E22). `start_run` takes the run lock (1 s timeout: every open tab probes it every two
 seconds), truncates `run.log`, spawns the engine and writes the status `starting` with the
 child's pid, then releases the lock to the engine; if that status cannot be written it
 ends the child again. A start while the lock is held, or while a `starting` status names a
@@ -688,7 +732,10 @@ target folders (A17), the cleanup with the cache side table (E7, E11,
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2, cleanup per folder) are
-covered by `tests/` (via `framescout_core` and `framescout_scoring`); still missing: cache
+covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search
+model registry, the per-model signatures and cleanup category and the `model` setting
+(E22, `test_models.py`; the engine's `--model` and the app's selectbox are not unit-tested);
+still missing: cache
 reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
 

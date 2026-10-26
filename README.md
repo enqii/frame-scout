@@ -8,7 +8,8 @@ matching photos as an HTML gallery.
 - **Local:** Your images never leave your computer. Only model weights and Python
   packages are downloaded during installation or the first run.
 - **General-purpose:** People, objects, vehicles, animals, landscapes, scenes.
-- **No language model:** Search is based on OpenAI CLIP (ViT-B/32), optionally combined with
+- **No language model:** Search is based on OpenAI CLIP (ViT-B/32) by default (stronger,
+  slower models are optional, see "AI settings"), optionally combined with
   YOLO11n person detection for group photos.
 - **English search terms:** CLIP understands practically only English, so describe your
   motifs in English (see [Search terms in English](#search-terms-in-english)).
@@ -125,7 +126,24 @@ starts with the new example profiles.
    from a manual command line (the search sets `YOLO_OFFLINE=true` and
    `YOLO_AUTOINSTALL=false` for itself, overriding values you set; the person detection
    model is still downloaded on first use).
-4. **AI settings:** with "auto", CUDA is used if PyTorch detects a
+4. **AI settings:** the **search model** is the AI model that turns photos and search
+   terms into comparable numbers. The default, OpenAI CLIP ViT-B/32, is the fastest and
+   the one FrameScout's settings are tuned for. Three optional models are offered:
+   ViT-B/16 and ViT-L/14 (both DataComp-XL) and SigLIP B/16. On a CPU they take roughly
+   4×, 18× and 4× as long per photo part (measured on one Core Ultra 9 285K; your PC
+   will differ), and the first use downloads their weights (about 0.6 GB, 1.7 GB and
+   0.8 GB). They are marked "not evaluated": whether they find motifs better has not been
+   measured yet, so treat them as an experiment. The first search with a new model
+   analyzes every photo once more; the cache keeps the analyses of each model, so switching
+   back is fast (about 10–15 MB per model for 5,000 photos). Scores of different models
+   are not comparable (SigLIP's raw similarities are lower; the gallery's relative
+   scores absorb this), and the reference weight below is tuned for the default model.
+   SigLIP needs the extra Python package `transformers`; on an older installation run
+   `Install-FrameScout.bat` again. All offered models understand English search terms only.
+   The same choice on the command line is `--model` (`vit-b-32-openai`,
+   `vit-b-16-datacomp`, `vit-l-14-datacomp`, `vit-b-16-siglip`).
+
+   With "auto", CUDA is used if PyTorch detects a
    compatible NVIDIA GPU, otherwise the CPU; "cuda" is offered only if PyTorch was
    installed with GPU support (see "GPU support" above). The batch size is the number of image
    parts (whole photos and person crops, also from several photos) that CLIP analyzes
@@ -203,8 +221,8 @@ phones) and camera RAW files (DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW).
 
 ### Search terms in English
 
-FrameScout supports **English search terms only**. The CLIP model it uses (OpenAI
-ViT-B/32) was trained on mostly English image captions and understands practically only
+FrameScout supports **English search terms only**. The CLIP model it uses by default
+(OpenAI ViT-B/32; the optional models are English-only as well) was trained on mostly English image captions and understands practically only
 English. FrameScout puts the motif name, context and features into English sentences
 (e.g. "A photograph of red car (vehicles).") and does not translate anything. So write
 the motif name, the context, the features and your custom search texts in English, e.g.
@@ -292,6 +310,7 @@ runs, and no search can start while the cleanup deletes.
 | Cache entries of deleted photos | yes | Analyses of photos inside the **current** photo folders that no longer exist; only in listed folders that exist, so a disconnected drive is never cleaned (it is named in a note) |
 | Cache entries of older versions or unknown settings | yes | Analyses of an earlier FrameScout version (never used again) or of settings only the command line offers (e.g. another `--yolo-model`) |
 | Cache entries of other AI settings | no | Analyses with other person detection settings; they are used again when you switch back, so deleting them means analyzing those photos again then |
+| Cache entries of other search models | no | Analyses made with another search model than the selected one; they are used again when you switch back, so deleting them means analyzing those photos again then |
 | Reference images no profile uses | no | Image files in `references/` that neither `profiles.json` nor `profiles.json.bak` names (the file names are listed) |
 
 "Compact cache.sqlite3 afterwards" (on by default) shrinks the cache file after
