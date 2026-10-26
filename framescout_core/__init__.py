@@ -49,3 +49,5 @@ from .copying import (COPY_FOLDERS_KEY, COPY_MAX_NAMES, default_copy_folder, cop
 from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLEANUP_CATEGORIES,
     CACHE_CATEGORIES, CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, scan_cleanup, cleanup_running, clean_up,
     auto_cleanup, size_text, count_text, cleanup_summary_text)
+from .evaluation import (SCORES_FORMAT, LABELS_FORMAT, EVAL_K, SCORE_DIGITS, collection_name_problem,
+    scores_document, write_scores, read_scores, read_labels, save_labels, set_label, average_precision, build_pool)
