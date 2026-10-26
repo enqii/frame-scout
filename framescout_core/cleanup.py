@@ -14,7 +14,8 @@ from .profiles import _backup_path, _read_entries, read_profiles
 from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
 from .run_status import RUN_LOCK, RUN_STATUS, read_status, run_active
 from .settings import SETTINGS_FILE
-from .signature import CACHE_FILE, classify_signatures
+from .models import DEFAULT_MODEL
+from .signature import CACHE_FILE, classify_signatures, engine_id
 
 
 # Cleanup (E7, E11, E13, E23, A14; user decisions at the PR #18 hold point): the app's
@@ -29,10 +30,13 @@ LEGACY_THUMBNAILS_DIR = 'vorschaubilder'
 # every gallery the engine has written (also v1.1) has this title
 GALLERY_MARKER = '<title>FrameScout – '
 CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missing', 'cache_old', 'cache_other',
-                      'references')
-# selected when a scan is shown; reference images and rows of other current settings are not
+                      'cache_models', 'references')
+# the categories of cache rows (deleted by signature, except cache_missing: by path and signature)
+CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
+# selected when a scan is shown; reference images, rows of other current settings and rows of
+# other search models (E22) are not
 CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': True,
-                    'cache_old': True, 'cache_other': False, 'references': False}
+                    'cache_old': True, 'cache_other': False, 'cache_models': False, 'references': False}
 NEVER_DELETED = frozenset({MARKS_FILE, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE, CACHE_FILE,
                            SETTINGS_FILE, SETTINGS_FILE + '.lock', 'profiles.json', 'profiles.json.bak'})
 # seconds clean_up waits for the run lock of the results folder
@@ -225,17 +229,18 @@ def _missing_rows(rows, photo_folders):
                      rows=len(dead), notes=notes)
 
 
-def _cache_categories(results, photo_folders, current):
-    """The categories cache_missing, cache_old and cache_other of the cache in results."""
-    keys = ('cache_missing', 'cache_old', 'cache_other')
+def _cache_categories(results, photo_folders, current, current_model):
+    """The cache categories (CACHE_CATEGORIES) of the cache in results; current_model: the search model key."""
+    keys = CACHE_CATEGORIES
     try:
         read = _read_cache(results / CACHE_FILE)
     except ValueError as exc:
         return {key: _category(key, problem=f'Not offered: {exc}.', rows=0) for key in keys}
     rows, recorded = read if read else ([], {})
     found = {}
-    classes = classify_signatures({signature for _, signature, _ in rows}, recorded, current) if rows else {}
-    for key, wanted in (('cache_old', 'old'), ('cache_other', 'other')):
+    classes = (classify_signatures({signature for _, signature, _ in rows}, recorded, current,
+                                   current_engine=engine_id(current_model)) if rows else {})
+    for key, wanted in (('cache_old', 'old'), ('cache_other', 'other'), ('cache_models', 'model')):
         chosen = {signature for signature, kind in classes.items() if kind == wanted}
         sizes = [size or 0 for _, signature, size in rows if signature in chosen]
         found[key] = _category(key, sorted(chosen), sum(sizes), rows=len(sizes))
@@ -277,15 +282,17 @@ def _unreferenced_references(refs_root, profiles_file, profiles=None):
                   if p.suffix.lower() in EXT and p.is_file() and _path_key(p) not in used)
 
 
-def scan_cleanup(results, profiles_file, refs_root, photo_folders, current_signature):
+def scan_cleanup(results, profiles_file, refs_root, photo_folders, current_signature, current_model=DEFAULT_MODEL):
     """Return {category: dict} of what the cleanup can delete; nothing is changed (E7).
 
     results: the results folder; profiles_file: the app's profiles.json; refs_root: the
     references folder; photo_folders: the current photo folders (None or empty if none is
     set; A25): cache entries of deleted photos are looked for in those that exist;
-    current_signature: the cache signature of the current settings (never offered).
+    current_signature: the cache signature of the current settings (never offered);
+    current_model: the search model key of the current settings (E22): rows of the other
+    registered models are cache_models, not cache_old.
     Each category of CLEANUP_CATEGORIES has items (paths; (path, signature) rows for
-    cache_missing; the signatures for cache_old/cache_other), size (bytes), default,
+    cache_missing; the signatures for cache_old/cache_other/cache_models), size (bytes), default,
     problem (why it is not offered, else None) and names (file names to show); the cache
     categories have rows; cache_missing has notes (the listed folders that do not exist,
     e.g. on a disconnected drive, and were left out); galleries has
@@ -314,7 +321,7 @@ def scan_cleanup(results, profiles_file, refs_root, photo_folders, current_signa
                                        thumbnails=extra, thumbnails_size=sum(_file_size(p) for p in extra))
         found['galleries']['names'] = [p.name for p in found['galleries']['items']]
         found['thumbnails'] = _category('thumbnails', free, sum(_file_size(p) for p in free))
-    found.update(_cache_categories(results, photo_folders, current_signature))
+    found.update(_cache_categories(results, photo_folders, current_signature, current_model))
     try:
         refs = _unreferenced_references(refs_root, profiles_file, profiles)
     except ValueError as exc:
@@ -369,11 +376,11 @@ def _delete_unlinked(results, links, listed, allowed, summary):
     _remove_empty_folders(results / LEGACY_THUMBNAILS_DIR, results)
 
 
-def _delete_rows(results, shown, selected, photo_folders, current, vacuum, summary):
+def _delete_rows(results, shown, selected, photo_folders, current, current_model, vacuum, summary):
     """Delete the selected cache rows that the scan shown listed and that still qualify now."""
-    fresh = _cache_categories(results, photo_folders, current)
+    fresh = _cache_categories(results, photo_folders, current, current_model)
     rows, signatures = [], []
-    for key in ('cache_missing', 'cache_old', 'cache_other'):
+    for key in CACHE_CATEGORIES:
         if key not in selected:
             continue
         if fresh[key]['problem']:
@@ -445,8 +452,10 @@ def _galleries_and_thumbnails(results, shown, selected, profiles_file, summary):
 
 
 def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, photo_folders, current_signature,
-             lock_timeout=CLEANUP_LOCK_TIMEOUT):
+             lock_timeout=CLEANUP_LOCK_TIMEOUT, current_model=DEFAULT_MODEL):
     """Delete the selected categories of the scan shown (scan_cleanup) permanently; return a summary (E7).
+
+    current_model: the search model key of the current settings, as for scan_cleanup (E22).
 
     Holds the run lock of results, so it is refused while a search runs (also one being
     started: alive(pid, status) tells whether the process of a "starting" status runs) and
@@ -497,7 +506,8 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                  ('Galleries and thumbnails', bool({'galleries', 'thumbnails'} & selected),
                   lambda: _galleries_and_thumbnails(results, shown, selected, profiles_file, summary)),
                  ('Cache entries', True,
-                  lambda: _delete_rows(results, shown, selected, photo_folders, current_signature, vacuum, summary)),
+                  lambda: _delete_rows(results, shown, selected, photo_folders, current_signature, current_model,
+                                       vacuum, summary)),
                  ('Reference images', 'references' in selected, references)]
         for name, wanted, step in steps:
             if not wanted:

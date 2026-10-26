@@ -12,7 +12,7 @@ from pathlib import Path
 import psutil
 import streamlit as st
 
-from framescout_core import (CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
+from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
                              FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_FILE,
                              PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
                              SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_running, cleanup_summary_text,
@@ -86,6 +86,9 @@ CLEANUP_LABELS = {
     'cache_other': ('Cache entries of other AI settings',
                     'Analyses with other person detection settings of this version. They are used again when you '
                     'switch back to those settings; after deleting them, those photos are analyzed again then.'),
+    'cache_models': ('Cache entries of other search models',
+                     'Analyses made with another search model (AI settings). They are used again when you switch '
+                     'back to that model; after deleting them, every photo is analyzed again then.'),
     'references': ('Reference images no profile uses',
                    'Image files in the references folder that neither profiles.json nor its backup '
                    'profiles.json.bak names, e.g. removed from a profile or of a deleted profile.'),
@@ -736,7 +739,7 @@ def show_cleanup():
             names = category['names'][:CLEANUP_NAMES_SHOWN]
             more = len(category['names']) - len(names)
             st.caption(plain(', '.join(names)) + (f' and {more:,} more' if more else ''))
-    if any(cleanup_offered(scan[key]) for key in ('cache_missing', 'cache_old', 'cache_other')):
+    if any(cleanup_offered(scan[key]) for key in CACHE_CATEGORIES):
         st.checkbox(f'Compact {CACHE_FILE} afterwards', key='cleanup_vacuum',
                     help='Without compacting, the file keeps its size and reuses the space for new analyses. '
                          'Compacting can take a while for a large cache.', disabled=active)

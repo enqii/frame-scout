@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (CACHE_FILE, DEFAULT_YOLO_MODEL, ENGINE, MARKS_FILE, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
-                             RunLock, auto_cleanup, clean_up, cleanup_summary_text, feature_signature, prepare_cache,
+                             RunLock, auto_cleanup, clean_up, cleanup_summary_text, engine_id, feature_signature,
+                             prepare_cache,
                              result_card, results_document, save_profiles, scan_cleanup, size_text, write_results)
 
 CURRENT = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL)
@@ -88,14 +89,14 @@ class Project:
         path.write_bytes(b'photo')
         return path
 
-    def scan(self, photo_folders='default', current=CURRENT):
+    def scan(self, photo_folders='default', current=CURRENT, **model):
         return scan_cleanup(self.results, self.profiles, self.refs,
-                            [self.photos] if photo_folders == 'default' else photo_folders, current)
+                            [self.photos] if photo_folders == 'default' else photo_folders, current, **model)
 
     def clean(self, scan, selected, vacuum=False, alive=lambda pid, status: False, current=CURRENT,
-              photo_folders='default'):
+              photo_folders='default', **model):
         return clean_up(self.results, scan, selected, vacuum, alive, self.profiles, self.refs,
-                        [self.photos] if photo_folders == 'default' else photo_folders, current)
+                        [self.photos] if photo_folders == 'default' else photo_folders, current, **model)
 
 
 @pytest.fixture
@@ -295,9 +296,39 @@ def test_rows_of_old_engines_and_other_settings(project):
     assert scan['cache_old']['size'] > 0
 
 
+def test_rows_of_other_search_models_are_kept_by_default(project):
+    # E22: switching back to a model reuses its rows, so they are offered unselected
+    photo = project.photo('a.jpg')
+    b16 = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL, model='vit-b-16-datacomp')
+    l14 = feature_signature(False, 12, .3, DEFAULT_YOLO_MODEL, model='vit-l-14-datacomp')
+    project.cache([(photo, CURRENT), (photo, OTHER), (photo, b16), (photo, l14)],
+                  recorded=[(b16, engine_id('vit-b-16-datacomp')), (l14, engine_id('vit-l-14-datacomp'))])
+    scan = project.scan()
+    assert sorted(scan['cache_models']['items']) == sorted([b16, l14])
+    assert scan['cache_models']['rows'] == 2 and scan['cache_models']['default'] is False
+    assert scan['cache_old']['items'] == [] and scan['cache_other']['items'] == [OTHER]
+    summary = project.clean(scan, {'cache_models'})
+    assert summary['rows'] == 2 and project.rows() == sorted([(str(photo), CURRENT), (str(photo), OTHER)])
+
+
+def test_with_another_model_chosen_the_default_rows_are_another_model(project):
+    photo = project.photo('a.jpg')
+    b16 = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL, model='vit-b-16-datacomp')
+    b16_other = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL, model='vit-b-16-datacomp')
+    # CURRENT and OTHER: rows of the default model, OTHER written before the side table
+    project.cache([(photo, CURRENT), (photo, OTHER), (photo, b16), (photo, b16_other)],
+                  recorded=[(CURRENT, ENGINE), (b16_other, engine_id('vit-b-16-datacomp'))])
+    scan = project.scan(current=b16, current_model='vit-b-16-datacomp')
+    assert sorted(scan['cache_models']['items']) == sorted([CURRENT, OTHER])
+    assert scan['cache_other']['items'] == [b16_other] and scan['cache_old']['items'] == []
+    # the deletion classifies again with the same model
+    summary = project.clean(scan, {'cache_models', 'cache_other'}, current=b16, current_model='vit-b-16-datacomp')
+    assert summary['rows'] == 3 and project.rows() == [(str(photo), b16)]
+
+
 def test_no_cache_means_nothing_to_clean(project):
     scan = project.scan()
-    for key in ('cache_missing', 'cache_old', 'cache_other'):
+    for key in ('cache_missing', 'cache_old', 'cache_other', 'cache_models'):
         assert scan[key]['items'] == [] and scan[key]['problem'] is None
     assert not (project.results / CACHE_FILE).exists()  # the scan creates no cache
 
@@ -305,7 +336,7 @@ def test_no_cache_means_nothing_to_clean(project):
 def test_an_unreadable_cache_is_not_offered(project):
     (project.results / CACHE_FILE).write_bytes(b'not a database' * 100)
     scan = project.scan()
-    for key in ('cache_missing', 'cache_old', 'cache_other'):
+    for key in ('cache_missing', 'cache_old', 'cache_other', 'cache_models'):
         assert scan[key]['items'] == [] and CACHE_FILE in scan[key]['problem']
 
 
