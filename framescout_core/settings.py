@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from ._common import _read_json_object, _update_locked
+from .models import DEFAULT_MODEL, MODELS
 
 
 # The app's settings (A8): kept in settings.json in the project folder, so they survive a
@@ -34,7 +35,7 @@ def default_settings(base):
     """Return the app's default settings; base is the project folder (photos/ is the default input)."""
     return {'photo_folders': [str(Path(base) / 'photos')], 'device': 'auto', 'batch_size': 8, 'top': 150,
             'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30,
-            'reference_weight': DEFAULT_REFERENCE_WEIGHT}
+            'reference_weight': DEFAULT_REFERENCE_WEIGHT, 'model': DEFAULT_MODEL}
 
 
 def folder_lines(text):
@@ -50,6 +51,8 @@ def _setting_value(key, value):
         return [x.strip() for x in value if x.strip()]
     if key == 'device':
         return value if isinstance(value, str) and value in DEVICES else None
+    if key == 'model':  # a registry key, never a free-text OpenCLIP name (E22)
+        return value if isinstance(value, str) and value in MODELS else None
     if key == 'person_detection':
         return value if isinstance(value, bool) else None
     if key not in SETTING_RANGES:
