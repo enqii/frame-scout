@@ -538,6 +538,13 @@ def test_the_uninstaller_looks_for_the_python_versions_of_the_installer():
     assert re.search(pattern, uninstaller()).group(1) == re.search(pattern, installer).group(1)
 
 
+def test_the_uninstaller_keeps_exclamation_marks_in_paths_and_arguments():
+    # with delayed expansion, cmd removes the "!" of a folder like C:\Photos!2026 from %~dp0 and %* (review)
+    text = uninstaller()
+    assert 'EnableDelayedExpansion' not in text
+    assert not any('!' in line for line in batch_commands(text))
+
+
 def test_the_uninstaller_does_not_point_temporary_files_into_the_project():
     # .tmp is deleted, and the user's cache folders are what the script reports
     for line in batch_commands(uninstaller()):
