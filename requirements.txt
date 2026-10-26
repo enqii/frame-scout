@@ -17,3 +17,6 @@ psutil>=7.2.2
 # as minimum; without them the engine skips those photos with a note.
 pillow-heif>=1.8.1
 rawpy>=0.27.1
+# The tokenizer of the optional SigLIP search model (E22), with the version of the project
+# venv's smoke run as minimum; without it only that model is refused, with a note.
+transformers>=5.21.0
