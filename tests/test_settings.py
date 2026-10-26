@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, SETTING_RANGES, SETTINGS_FILE, default_settings,
-                             read_settings, reconcile_settings, save_settings)
+                             folder_lines, read_settings, reconcile_settings, save_settings)
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def stored(path):
 def test_the_defaults_are_the_previous_session_defaults(tmp_path):
     assert SETTINGS_FILE == 'settings.json'
     assert default_settings(tmp_path) == {
-        'photo_folder': str(tmp_path / 'photos'), 'device': 'auto', 'batch_size': 8, 'top': 150,
+        'photo_folders': [str(tmp_path / 'photos')], 'device': 'auto', 'batch_size': 8, 'top': 150,
         'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.3}
 
 
@@ -44,11 +44,11 @@ def test_a_missing_file_gives_the_defaults(tmp_path, defaults):
 
 
 def test_saved_values_replace_the_defaults_and_missing_keys_keep_them(tmp_path, defaults):
-    path = write(tmp_path / 'settings.json', {'photo_folder': 'D:\\Fotos', 'device': 'cpu', 'batch_size': 16,
-                                              'person_detection': False, 'reference_weight': 0})
+    path = write(tmp_path / 'settings.json', {'photo_folders': ['D:\\Fotos', 'E:\\Event'], 'device': 'cpu',
+                                              'batch_size': 16, 'person_detection': False, 'reference_weight': 0})
     settings, problems = read_settings(path, defaults)
     assert problems == []
-    assert settings == {**defaults, 'photo_folder': 'D:\\Fotos', 'device': 'cpu', 'batch_size': 16,
+    assert settings == {**defaults, 'photo_folders': ['D:\\Fotos', 'E:\\Event'], 'device': 'cpu', 'batch_size': 16,
                         'person_detection': False, 'reference_weight': 0.0}
     assert isinstance(settings['reference_weight'], float)
 
@@ -61,6 +61,7 @@ def test_a_byte_order_mark_is_accepted(tmp_path, defaults):
 
 
 @pytest.mark.parametrize('key, value', [
+    ('photo_folders', 5), ('photo_folders', 'D:\\Fotos'), ('photo_folders', ['D:\\Fotos', 5]),
     ('photo_folder', 5), ('device', 'gpu'), ('device', None),
     ('batch_size', 0), ('batch_size', 65), ('batch_size', 8.0), ('batch_size', True), ('batch_size', '8'),
     ('top', 5001), ('max_persons', 51), ('person_detection', 1), ('person_detection', 'yes'),
@@ -262,6 +263,68 @@ def test_concurrent_saves_of_different_settings_keep_every_change(tmp_path, defa
         t.join()
     assert errors == []
     assert stored(path) == {name: values[name][-1] for name in names}
+
+
+# --- several photo folders (A25) ---
+
+def test_folder_lines_are_the_non_empty_lines_without_spaces():
+    # the app's field has one folder per line
+    assert folder_lines('D:\\Fotos\n\n  E:\\Event 2024  \r\nF:\\x\n') == ['D:\\Fotos', 'E:\\Event 2024', 'F:\\x']
+    assert folder_lines('') == [] and folder_lines(' \n ') == []
+
+
+def test_photo_folders_are_saved_without_empty_lines(tmp_path, defaults):
+    path = tmp_path / 'settings.json'
+    written = save_settings(path, {'photo_folders': [' D:\\Fotos ', '', 'E:\\Event']}, defaults)
+    assert written == {'photo_folders': ['D:\\Fotos', 'E:\\Event']}
+    assert stored(path) == {'photo_folders': ['D:\\Fotos', 'E:\\Event']}
+
+
+def test_an_empty_folder_list_is_saved(tmp_path, defaults):
+    # differs from the default folder: the app then asks for a folder
+    path = tmp_path / 'settings.json'
+    save_settings(path, {'photo_folders': []}, defaults)
+    assert stored(path) == {'photo_folders': []}
+    assert read_settings(path, defaults) == ({**defaults, 'photo_folders': []}, [])
+
+
+@pytest.mark.parametrize('legacy, expected', [('D:\\Fotos', ['D:\\Fotos']), ('', [])])
+def test_the_old_single_photo_folder_is_read_as_a_list_of_one(tmp_path, defaults, legacy, expected):
+    # settings.json of FrameScout before A25
+    path = write(tmp_path / 'settings.json', {'photo_folder': legacy, 'top': 300})
+    assert read_settings(path, defaults) == ({**defaults, 'photo_folders': expected, 'top': 300}, [])
+
+
+def test_the_new_folder_list_wins_over_the_old_single_folder(tmp_path, defaults):
+    path = write(tmp_path / 'settings.json', {'photo_folder': 'D:\\Old', 'photo_folders': ['E:\\New']})
+    assert read_settings(path, defaults) == ({**defaults, 'photo_folders': ['E:\\New']}, [])
+
+
+def test_the_next_save_replaces_the_old_single_photo_folder(tmp_path, defaults):
+    # any save, also of another setting, moves it to photo_folders and drops photo_folder
+    path = write(tmp_path / 'settings.json', {'photo_folder': 'D:\\Fotos', 'top': 300, 'theme': 'dark'})
+    save_settings(path, {'batch_size': 4}, defaults)
+    assert stored(path) == {'photo_folders': ['D:\\Fotos'], 'top': 300, 'theme': 'dark', 'batch_size': 4}
+
+
+def test_an_old_photo_folder_equal_to_the_default_is_dropped(tmp_path, defaults):
+    path = write(tmp_path / 'settings.json', {'photo_folder': str(tmp_path / 'photos'), 'top': 300})
+    save_settings(path, {'batch_size': 4}, defaults)
+    assert stored(path) == {'top': 300, 'batch_size': 4}
+
+
+@pytest.mark.parametrize('current', [{'photo_folder': 'D:\\Old'}, {'photo_folder': 5},
+                                     {'photo_folder': 'D:\\Old', 'photo_folders': ['F:\\Other']}])
+def test_a_saved_folder_list_replaces_the_old_single_photo_folder(tmp_path, defaults, current):
+    path = write(tmp_path / 'settings.json', current)
+    save_settings(path, {'photo_folders': ['E:\\New', 'F:\\More']}, defaults)
+    assert stored(path) == {'photo_folders': ['E:\\New', 'F:\\More']}
+
+
+def test_an_invalid_old_photo_folder_is_dropped_on_the_next_save(tmp_path, defaults):
+    path = write(tmp_path / 'settings.json', {'photo_folder': 5, 'top': 300})
+    save_settings(path, {'batch_size': 4}, defaults)
+    assert stored(path) == {'top': 300, 'batch_size': 4}
 
 
 def test_the_ranges_are_the_ones_of_the_widgets():

@@ -7,7 +7,7 @@ import pytest
 
 from framescout_core import (ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
                              RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, available_decoders, distinct_folders,
-                             folder_labels, missing_decoder, missing_folders_message, photo_name,
+                             folder_labels, join_scans, missing_decoder, missing_folders_message, photo_name,
                              raw_preview_transpose, raw_preview_usable, scan_folders, scan_photos, skipped_lines,
                              supported_extensions)
 
@@ -277,6 +277,15 @@ def test_scan_folders_joins_the_scans_of_several_folders(tmp_path):
     assert scan.paths == sorted([a, b]) and scan.raw_pairs == [raw]
     assert scan.unsupported == collections.Counter({'.mov': 2})
     assert scan_folders([]) == PhotoScan([], [], collections.Counter())
+
+
+def test_join_scans_of_folders_counted_one_by_one(tmp_path):
+    # the app counts each listed folder on its own and names the skipped files of all
+    a = touch(tmp_path / 'one' / 'a.jpg'); touch(tmp_path / 'one' / 'x.mov')
+    b = touch(tmp_path / 'two' / 'b.jpg'); touch(tmp_path / 'two' / 'y.mov')
+    scans = [scan_photos(tmp_path / 'two'), scan_photos(tmp_path / 'one')]
+    assert join_scans(scans) == PhotoScan([a, b], [], collections.Counter({'.mov': 2}))
+    assert join_scans(scans) == scan_folders([tmp_path / 'one', tmp_path / 'two'])
 
 
 # --- skipped_lines ---

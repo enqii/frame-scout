@@ -12,7 +12,7 @@ used by the cleanup: patch framescout_core.cleanup.read_profiles.
 from .names import (AVIF_EXT, HEIF_EXT, RAW_EXT, EXT, SLUG_MAX_LENGTH, slugify, profile_slugs)
 from .photos import (RAW_PARTNER_EXT, RAW_PREVIEW_MIN_EDGE, RAW_FLIP_TRANSPOSE, SKIPPED_EXTENSIONS_SHOWN,
     PhotoScan, Decoders, ALL_DECODERS, available_decoders, supported_extensions, missing_decoder, scan_photos,
-    distinct_folders, missing_folders_message, folder_labels, photo_name, scan_folders,
+    distinct_folders, missing_folders_message, folder_labels, photo_name, scan_folders, join_scans,
     skipped_lines, raw_preview_usable, raw_preview_transpose)
 from .locks import (RunLock, lock_held)
 from .references import (reference_folder, stage_reference_move, finish_reference_move,
@@ -33,8 +33,8 @@ from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINA
     StatusReporter, write_status, stopped_status, started_in_time, final_status, read_status,
     run_active, status_fraction, status_text)
 from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
-    DEFAULT_REFERENCE_WEIGHT, SETTINGS_LOCK_TIMEOUT, default_settings, read_settings, save_settings,
-    reconcile_settings)
+    DEFAULT_REFERENCE_WEIGHT, SETTINGS_LOCK_TIMEOUT, LEGACY_PHOTO_FOLDER, default_settings, folder_lines,
+    read_settings, save_settings, reconcile_settings)
 from .results import (RESULTS_FILE, RESULTS_FORMAT, GALLERY_PAGE_SIZE, search_fingerprint,
     profile_fingerprints, profile_state, result_card, results_document, write_results, read_results,
     page_count, page_cards, openable_photo, open_command, reveal_command)

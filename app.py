@@ -22,7 +22,8 @@ from framescout_core import (CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_W
                              profile_fingerprints, profile_state, read_copy_folders, read_marks, read_profiles,
                              read_results, read_settings, read_status, reconcile_settings, reference_folder,
                              rename_copy_folder, rename_marks, reveal_command, run_active, save_copy_folder,
-                             available_decoders, save_marks, save_profiles, save_settings, scan_cleanup, scan_photos,
+                             available_decoders, distinct_folders, folder_lines, join_scans, save_marks,
+                             save_profiles, save_settings, scan_cleanup, scan_photos,
                              size_text, skipped_lines, stage_reference_move, started_in_time, status_fraction,
                              status_text, stopped_status, supported_extensions, undo_reference_move,
                              update_backup_references, write_new_file, write_status)
@@ -655,7 +656,7 @@ def cleanup_signature():
 
 def cleanup_photo_folders():
     """The photo folders whose deleted photos' cache entries the cleanup looks for (none if the field is empty)."""
-    return [photo_folder] if str(settings['photo_folder']).strip() else []
+    return photo_folders
 
 def cleanup_offered(category):
     return not category['problem'] and bool(category['items'])
@@ -840,14 +841,26 @@ except ValueError as exc:
 if settings_problems:
     st.warning(f'Some values in {SETTINGS.name} are not allowed and were replaced by their defaults: '
                + '; '.join(settings_problems) + '. The next saved change removes them from the file.')
+def setting_of_widget(name, value):
+    """Return the setting value of the widget value of setting name.
+
+    The photo folder field is a text area with one folder per line, and the setting is the
+    list of its lines (A25): reconcile_settings and save_settings work on the lists.
+    """
+    return folder_lines(value) if name == 'photo_folders' else value
+
+def widget_of_setting(name, value):
+    """Return the widget value that shows the setting value of setting name (see setting_of_widget)."""
+    return '\n'.join(value) if name == 'photo_folders' else value
+
 seen = st.session_state.setdefault('settings_seen', {})
 shown = st.session_state.setdefault('settings_shown', {})
-widget_values = {name: st.session_state[setting_key(name)] for name in DEFAULT_SETTINGS
+widget_values = {name: setting_of_widget(name, st.session_state[setting_key(name)]) for name in DEFAULT_SETTINGS
                  if setting_key(name) in st.session_state}
 setting_updates, changed_settings, settings_taken_over = reconcile_settings(
     widget_values, seen, shown, saved_settings, DEFAULT_SETTINGS)
 for name, value in setting_updates.items():
-    st.session_state[setting_key(name)] = value
+    st.session_state[setting_key(name)] = widget_of_setting(name, value)
 if changed_settings:
     if saved_settings is None:
         st.warning(f'The changed settings are used, but not saved yet, since {SETTINGS.name} cannot be read.')
@@ -861,9 +874,11 @@ if changed_settings:
         else:
             shown.update(changed_settings)
             seen.update(written)  # as stored, e.g. rounded (review)
-settings = {name: st.session_state[setting_key(name)] for name in DEFAULT_SETTINGS}
-# the folder as the image count, the Start check and the engine use it (review: ~ expanded)
-photo_folder = Path(settings['photo_folder']).expanduser()
+settings = {name: setting_of_widget(name, st.session_state[setting_key(name)]) for name in DEFAULT_SETTINGS}
+# the folders as the image count, the Start check and the engine use them (review: ~ expanded)
+photo_folders = [Path(folder).expanduser() for folder in settings['photo_folders']]
+# a folder listed twice or inside another listed folder is searched once (A25)
+search_folders, dropped_folders = distinct_folders([folder.resolve() for folder in photo_folders])
 p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source', 'AI settings', 'Search & results'])
 
 with p_tab:
@@ -940,16 +955,37 @@ with p_tab:
 
 with f_tab:
     st.subheader('Photo collection')
-    st.text_input('Local photo folder (including subfolders)', key=setting_key('photo_folder'), disabled=active)
-    if photo_folder.is_dir():
-        # the same scan as the engine's (E25), so the numbers match its log
-        photo_scan = scan_photos(photo_folder, SUPPORTED, exclude=RESULTS)
+    st.text_area('Local photo folders (one per line, including subfolders)', key=setting_key('photo_folders'),
+                 disabled=active, help='One search covers all listed folders, e.g. event folders on several '
+                                       'drives. A folder inside another listed folder is searched as part of it.')
+    # per listed folder (A25): its photo count, or why it is not searched on its own. Each
+    # folder is scanned once per page run, as the engine scans it (E25), so the numbers
+    # match its log.
+    folder_scans, missing_folders = [], []
+    for folder in search_folders:
+        if folder.is_dir():
+            folder_scans.append((folder, scan_photos(folder, SUPPORTED, exclude=RESULTS)))
+        else:
+            missing_folders.append(folder)
+    photo_scan = join_scans([scan for _, scan in folder_scans])
+    if len(search_folders) == 1 and folder_scans:
         st.success(f'{len(photo_scan.paths):,} supported image files found.')
-        # a missing decoder is named only if the folder has files of it (review)
-        for line in skipped_lines(photo_scan, DECODERS):
-            st.caption(line)
-    else:
+    elif folder_scans:
+        st.success(f'{len(photo_scan.paths):,} supported image files found in {len(folder_scans)} folders.')
+        for folder, scan in folder_scans:
+            st.caption(plain(f"{folder}: {count_text(len(scan.paths), 'supported image file', 'supported image files')}"))
+    for _, note in dropped_folders:  # listed twice or inside another listed folder
+        st.caption(plain(note))
+    if not photo_folders:
+        st.warning('Enter a photo folder.')
+    elif len(search_folders) == 1 and missing_folders:
         st.warning('The folder does not exist yet. Create it or choose an existing image folder.')
+    else:
+        for folder in missing_folders:
+            st.warning(plain(f'{folder} does not exist (e.g. a disconnected drive); the search leaves it out.'))
+    # a missing decoder is named only if the folders have files of it (review)
+    for line in skipped_lines(photo_scan, DECODERS):
+        st.caption(line)
     st.caption('Supports JPG, PNG, WebP, BMP, TIFF, AVIF, HEIC/HEIF and camera RAW (DNG, CR2, CR3, NEF, ARW, ORF, '
                'RW2, RAF, PEF, SRW; a RAW file next to a JPEG or HEIC of the same name is skipped). '
                'FrameScout searches local files and does not download images from online services.')
@@ -1002,7 +1038,9 @@ with run_tab:
     st.subheader('Start search')
     c1,c2 = st.columns([1,1])
     with c1:
-        start = st.button('▶ Start search', type='primary', disabled=active or not profiles or not photo_folder.is_dir(), use_container_width=True)
+        # at least one listed folder must exist; the engine leaves out the others with a note (A25)
+        start = st.button('▶ Start search', type='primary', use_container_width=True,
+                          disabled=active or not profiles or not any(f.is_dir() for f in search_folders))
     with c2:
         # a cleanup holding the run lock is no search to stop (review)
         stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), use_container_width=True)
@@ -1014,7 +1052,7 @@ with run_tab:
                                        'shown now and start again.')
         st.rerun()
     if start:
-        cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), str(photo_folder.resolve()),
+        cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), *map(str, search_folders),
             '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',st.session_state[setting_key('device')],
             '--batch-size',str(settings['batch_size']),'--top',str(settings['top']),
             '--max-persons',str(settings['max_persons']),'--person-confidence',str(settings['person_confidence']),
@@ -1088,7 +1126,7 @@ with run_tab:
                    f'the search again writes it anew.\n\nDetails: {plain(str(results_error))}')
     if last_results:
         # a copy target must not be in a photo folder of this search or of the next one (A17, A25)
-        show_results(last_results, [*last_results['photo_folders'], str(photo_folder)])
+        show_results(last_results, [*last_results['photo_folders'], *map(str, photo_folders)])
     elif RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
         # galleries of a search before results.json: listed by file name, since the
         # current profile list may no longer match them (A12)
