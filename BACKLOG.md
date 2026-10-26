@@ -235,7 +235,17 @@ referenced in commits, pull requests and discussions.
       gallery note and `results.json`. Verified: CPU smoke runs of all four models with 3
       synthetic images; **not verified:** search quality, CUDA, person detection with the
       new models, a run without `transformers`, `Install-FrameScout.bat` with the new
-      requirement. Investigated in PR #13 (no weights downloaded).
+      requirement. **Review of PR #31 (addressed):** the app starts the engine with
+      `PYTHONIOENCODING=utf-8` and the engine escapes characters its output cannot encode
+      (the "·" of a model label crashed a search on a cp932 code page and showed as "�" in
+      `run.log` on cp1252; non-ASCII profile names and paths were garbled there before);
+      Start is disabled while the chosen model lacks its package; a cleanup scan is dropped
+      when the AI settings or folders change; results of another model than the chosen one
+      get a note; `scan_cleanup`/`clean_up` require `current_model`; `embedding_size` and
+      the aliases `CLIP_MODEL`/`CLIP_PRETRAINED` were removed. Not fixable here, documented
+      in the README: a cleanup in a FrameScout version before E22 counts the rows of the
+      optional models as "older versions" (selected). Investigated in PR #13 (no weights
+      downloaded).
       **User decisions (PR #13):** the default stays `ViT-B-32-quickgelu`/`openai`; if a
       SigLIP model is chosen, `transformers` goes into `requirements.txt`; the
       evaluation runs on the user's home PC, so the roadmap item moved behind P4; the
