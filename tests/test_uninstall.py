@@ -206,6 +206,32 @@ def test_a_tmp_folder_with_only_kept_entries_in_another_case_is_not_listed(proje
     assert '.tmp' not in names(plan(project)[0], project)
 
 
+def failing_scandir(monkeypatch, folder):
+    original = os.scandir
+
+    def scandir(path='.'):
+        if isinstance(path, (str, os.PathLike)) and Path(path) == folder:  # shutil may pass a file descriptor
+            raise PermissionError(13, 'Access is denied', str(path))
+        return original(path)
+    monkeypatch.setattr(uninstall_module.os, 'scandir', scandir)
+
+
+def test_an_unlistable_item_with_kept_entries_is_skipped(project, monkeypatch):
+    failing_scandir(monkeypatch, project / '.tmp')
+    items, skipped = plan(project)
+    assert '.tmp' not in names(items, project) and '.cache' in names(items, project)
+    assert [path.name for path, _ in skipped] == ['.tmp'] and 'cannot be listed' in skipped[0][1]
+
+
+def test_an_unlistable_item_does_not_stop_the_other_items(project, monkeypatch):
+    items, _ = plan(project)
+    failing_scandir(monkeypatch, project / '.tmp')
+    failures = remove_items(items)
+    assert [path for path, _ in failures] == [project / '.tmp']
+    assert not (project / '.venv').exists() and not (project / 'yolo11n.pt').exists()
+    assert (project / '.tmp' / 'eval' / 'cosplay' / 'labels.json').is_file()
+
+
 # --- remove_items ---
 
 def test_removing_the_plan_keeps_the_user_data(project):
@@ -257,6 +283,31 @@ def test_failures_are_reported_and_the_rest_is_removed(project, monkeypatch):
     monkeypatch.setattr(uninstall_module.os, 'chmod', lambda *args: None)
     failures = remove_items(plan(project)[0])
     assert [path.name for path, _ in failures] == ['yolo11n.pt']
+    assert not (project / '.cache').exists()
+
+
+def test_a_locked_file_is_reported_once_without_its_folders(project, monkeypatch):
+    # its folders cannot be removed because it is still there: only the file is the culprit (review)
+    original = os.unlink
+    calls = []
+
+    def unlink(path, *args, **kwargs):
+        if Path(path).name == 'model.bin':
+            calls.append(path)
+            raise PermissionError(13, 'The process cannot access the file', str(path))
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(uninstall_module.os, 'unlink', unlink)
+    items = [item for item in plan(project)[0] if item.path.name == '.cache']
+    failures = remove_items(items)
+    assert [path.name for path, _ in failures] == ['model.bin']
+    assert len(calls) == 1  # not read-only: no second try
+
+
+@windows_only
+def test_a_read_only_folder_is_removed(project):
+    folder = project / '.cache' / 'huggingface'
+    os.chmod(folder, stat.S_IREAD)
+    assert remove_items([item for item in plan(project)[0] if item.path.name == '.cache']) == []
     assert not (project / '.cache').exists()
 
 
