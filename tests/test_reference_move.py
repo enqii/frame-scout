@@ -1,6 +1,7 @@
 """Moving a renamed profile's reference images to the folder of its new name (A1, review)."""
 import json
 import os
+from pathlib import Path
 
 import pytest
 
@@ -91,7 +92,7 @@ def test_without_hard_links_the_file_is_copied(project, monkeypatch):
     def link(src, dst):
         raise OSError('hard links are not supported on this file system')
 
-    monkeypatch.setattr(framescout_core.os, 'link', link)
+    monkeypatch.setattr(os, 'link', link)
     new_refs, staged = stage(project, ['references/red-car/reference-1.jpg'])
     assert (project / new_refs[0]).read_bytes() == b'one'
     assert finish_reference_move(staged, project / 'references') == []
@@ -110,7 +111,7 @@ def test_a_failure_while_staging_undoes_the_files_staged_before(project, monkeyp
     def copy(src, dst):
         raise PermissionError('access denied')
 
-    monkeypatch.setattr(framescout_core.os, 'link', link)
+    monkeypatch.setattr(os, 'link', link)
     monkeypatch.setattr(framescout_core.references, '_copy_new', copy)
     with pytest.raises(PermissionError):
         stage(project, ['references/red-car/reference-1.jpg', 'references/red-car/reference-2.png'])
@@ -138,14 +139,14 @@ def test_a_references_folder_that_is_a_junction_elsewhere_works(tmp_path):
 
 def test_an_old_name_that_cannot_be_removed_is_reported(project, monkeypatch):
     new_refs, staged = stage(project, ['references/red-car/reference-1.jpg'])
-    real_unlink = framescout_core.Path.unlink
+    real_unlink = Path.unlink
 
     def unlink(self, missing_ok=False):
         if self.name == 'reference-1.jpg' and self.parent.name == 'red-car':
             raise PermissionError('in use')
         real_unlink(self, missing_ok=missing_ok)
 
-    monkeypatch.setattr(framescout_core.Path, 'unlink', unlink)
+    monkeypatch.setattr(Path, 'unlink', unlink)
     problems = finish_reference_move(staged, project / 'references')
     assert len(problems) == 1 and 'reference-1.jpg' in problems[0]
     assert (project / new_refs[0]).read_bytes() == b'one'
@@ -188,7 +189,7 @@ def test_the_backup_is_flushed_to_disk_before_it_replaces_the_old_one(project, m
     previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}]}
     path, staged = rename_red_car(project, previous)
     events = []
-    real_fsync, real_replace = framescout_core.os.fsync, framescout_core.os.replace
+    real_fsync, real_replace = os.fsync, os.replace
 
     def fsync(fd):
         events.append('fsync')
@@ -198,8 +199,8 @@ def test_the_backup_is_flushed_to_disk_before_it_replaces_the_old_one(project, m
         events.append(('replace', os.path.basename(dst)))
         real_replace(src, dst)
 
-    monkeypatch.setattr(framescout_core.os, 'fsync', fsync)
-    monkeypatch.setattr(framescout_core.os, 'replace', replace)
+    monkeypatch.setattr(os, 'fsync', fsync)
+    monkeypatch.setattr(os, 'replace', replace)
     assert update_backup_references(path, staged, project) is True
     assert events == ['fsync', ('replace', 'profiles.json.bak')]
 
@@ -241,7 +242,7 @@ def test_a_failed_backup_rewrite_raises_and_keeps_the_old_backup(project, monkey
     def replace(src, dst):
         raise PermissionError('backup not writable')
 
-    monkeypatch.setattr(framescout_core.os, 'replace', replace)
+    monkeypatch.setattr(os, 'replace', replace)
     with pytest.raises(PermissionError):
         update_backup_references(path, staged, project)
     assert (project / 'profiles.json.bak').read_bytes() == before

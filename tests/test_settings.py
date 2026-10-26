@@ -1,5 +1,6 @@
 """The app's settings.json: defaults, validation and saving without losing data (framescout_core, A8)."""
 import json
+import os
 import threading
 from pathlib import Path
 
@@ -142,9 +143,8 @@ def test_saving_leaves_no_temporary_file(tmp_path, defaults):
 
 def test_a_failed_replace_is_retried(tmp_path, defaults, monkeypatch):
     # on Windows, replacing fails while another session reads the file at that moment
-    import framescout_core
     calls = []
-    real_replace = framescout_core.os.replace
+    real_replace = os.replace
 
     def flaky(src, dst):
         calls.append(dst)
@@ -152,19 +152,18 @@ def test_a_failed_replace_is_retried(tmp_path, defaults, monkeypatch):
             raise PermissionError('in use')
         real_replace(src, dst)
 
-    monkeypatch.setattr(framescout_core.os, 'replace', flaky)
+    monkeypatch.setattr(os, 'replace', flaky)
     path = tmp_path / 'settings.json'
     save_settings(path, {'top': 300}, defaults, retry_delay=0)
     assert len(calls) == 2 and stored(path) == {'top': 300}
 
 
 def test_a_replace_that_keeps_failing_raises_os_error(tmp_path, defaults, monkeypatch):
-    import framescout_core
 
     def failing(src, dst):
         raise PermissionError('in use')
 
-    monkeypatch.setattr(framescout_core.os, 'replace', failing)
+    monkeypatch.setattr(os, 'replace', failing)
     path = write(tmp_path / 'settings.json', {'top': 300})
     with pytest.raises(OSError):
         save_settings(path, {'top': 400}, defaults, attempts=3, retry_delay=0)

@@ -1,10 +1,10 @@
 """Reading and saving the app's profiles.json without losing data (framescout_core, A2)."""
 import json
+import os
 from pathlib import Path
 
 import pytest
 
-import framescout_core
 from framescout_core import load_profiles, read_profiles, save_profiles
 
 
@@ -116,7 +116,7 @@ def test_both_files_are_flushed_to_disk_before_they_get_their_final_names(tmp_pa
     # leave an empty profiles.json and profiles.json.bak
     path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
     events = []
-    real_fsync, real_replace = framescout_core.os.fsync, framescout_core.os.replace
+    real_fsync, real_replace = os.fsync, os.replace
 
     def fsync(fd):
         events.append('fsync')
@@ -126,8 +126,8 @@ def test_both_files_are_flushed_to_disk_before_they_get_their_final_names(tmp_pa
         events.append(('replace', Path(dst).name))
         real_replace(src, dst)
 
-    monkeypatch.setattr(framescout_core.os, 'fsync', fsync)
-    monkeypatch.setattr(framescout_core.os, 'replace', replace)
+    monkeypatch.setattr(os, 'fsync', fsync)
+    monkeypatch.setattr(os, 'replace', replace)
     save_profiles(path, [{'name': 'Cat'}])
     assert events == ['fsync', ('replace', 'profiles.json.bak'), 'fsync', ('replace', 'profiles.json')]
 
@@ -135,14 +135,14 @@ def test_both_files_are_flushed_to_disk_before_they_get_their_final_names(tmp_pa
 def test_if_the_backup_fails_the_profiles_file_is_not_changed(tmp_path, monkeypatch):
     path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
     original = path.read_bytes()
-    real_replace = framescout_core.os.replace
+    real_replace = os.replace
 
     def replace(src, dst):
         if str(dst).endswith('.bak'):
             raise PermissionError('backup not writable')
         real_replace(src, dst)
 
-    monkeypatch.setattr(framescout_core.os, 'replace', replace)
+    monkeypatch.setattr(os, 'replace', replace)
     with pytest.raises(PermissionError):
         save_profiles(path, [])
     assert path.read_bytes() == original

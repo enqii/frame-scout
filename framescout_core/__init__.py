@@ -9,12 +9,6 @@ underscore) are not re-exported: import or monkeypatch them on their defining mo
 The same holds for a public name that another module imports, e.g. read_profiles as
 used by the cleanup: patch framescout_core.cleanup.read_profiles.
 """
-# Tests patch framescout_core.os.replace, .shutil.copyfile and .Path.unlink; these change
-# the shared module or class, so they reach every area.
-import os  # noqa: F401
-import shutil  # noqa: F401
-from pathlib import Path  # noqa: F401
-
 from .names import (EXT, SLUG_MAX_LENGTH, slugify, profile_slugs)
 from .locks import (RunLock, lock_held)
 from .references import (reference_folder, stage_reference_move, finish_reference_move,

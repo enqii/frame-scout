@@ -1,5 +1,6 @@
 """Gallery thumbnails of the HTML export (framescout_core.ensure_thumbnail, E6)."""
 import os
+import shutil
 from pathlib import Path
 
 import framescout_core
@@ -109,7 +110,7 @@ def test_an_interrupted_copy_of_an_old_thumbnail_leaves_nothing_behind(tmp_path,
         Path(dst).write_bytes(b'old')
         raise OSError('I/O error')
 
-    monkeypatch.setattr(framescout_core.shutil, 'copyfile', copyfile)
+    monkeypatch.setattr(shutil, 'copyfile', copyfile)
     log = []
     assert ensure_thumbnail(photo, thumbs, legacy, renderer([]), log.append) is None
     assert list(thumbs.iterdir()) == []

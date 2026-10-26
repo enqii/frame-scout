@@ -1,5 +1,6 @@
 """Run lock and status file: one search per output folder, progress the app can read back (A4, A5)."""
 import json
+import os
 import subprocess
 import sys
 import time
@@ -8,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-import framescout_core
 from framescout_core import (FINAL_PHASES, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
                              read_status, run_active, started_in_time, status_fraction, status_text,
                              stopped_status, write_status)
@@ -304,7 +304,7 @@ def test_write_status_round_trips(tmp_path):
 
 def test_write_status_retries_a_failed_replace(tmp_path, monkeypatch):
     # the app reads the file every two seconds; on Windows a replace fails for that moment
-    real_replace = framescout_core.os.replace
+    real_replace = os.replace
     calls = []
 
     def flaky(src, dst):
@@ -313,7 +313,7 @@ def test_write_status_retries_a_failed_replace(tmp_path, monkeypatch):
             raise PermissionError('in use')
         real_replace(src, dst)
 
-    monkeypatch.setattr(framescout_core.os, 'replace', flaky)
+    monkeypatch.setattr(os, 'replace', flaky)
     path = tmp_path / RUN_STATUS
     assert write_status(path, {'pid': 3}, attempts=2, retry_delay=0)
     assert len(calls) == 2 and read_status(path) == {'pid': 3}
@@ -386,5 +386,5 @@ def test_a_lock_file_that_cannot_be_opened_counts_as_held(tmp_path, monkeypatch)
     def refuse(*args, **kwargs):
         raise PermissionError(13, 'Access is denied')
 
-    monkeypatch.setattr(framescout_core.os, 'open', refuse)
+    monkeypatch.setattr(os, 'open', refuse)
     assert lock_held(path)

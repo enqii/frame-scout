@@ -107,11 +107,15 @@ the module of its area and to the re-exports in `__init__.py`.
 
 Dependencies between the modules go one way (no import cycles): `cleanup` uses most of the
 others, `_common` uses only `locks`. Private helpers (leading underscore) are not
-re-exported. A test that monkeypatches a helper patches the module that calls it, e.g.
+re-exported (`tests/test_core_package.py` checks both directions: every public name of
+an area module is on the package, no private one is). A test that monkeypatches a helper
+patches the module that calls it, e.g.
 `monkeypatch.setattr(framescout_core.cleanup, '_remove_file', …)`: a patch on the package
-would no longer reach the calling code. This also holds for a public name another module
-imports (`framescout_core.cleanup.read_profiles`). Patches of `framescout_core.os`,
-`.shutil` and `.Path` keep working, since they change the shared module or class.
+does not reach the calling code. For a private helper such a patch fails (the package has
+no such attribute), but for a public name another module imports, e.g. `read_profiles` as
+used by the cleanup, it succeeds silently and has no effect: patch
+`framescout_core.cleanup.read_profiles`. Standard library functions are patched on their
+own module (`monkeypatch.setattr(os, 'replace', …)`), which reaches every area.
 
 ### `framescout_scoring.py`
 
