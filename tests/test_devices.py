@@ -1,5 +1,11 @@
-"""Compute devices: person detection on the CLIP device (E14), device choice in the app (A7)."""
-from framescout_core import cuda_hint, cuda_status, detection_options, device_choices
+"""Compute devices: person detection on the CLIP device (E14), device choice in the app (A7),
+the detector's import without Ultralytics' analytics and run-time installs (E27, E28)."""
+from types import SimpleNamespace
+
+import pytest
+
+from framescout_core import (ULTRALYTICS_ENV, cuda_hint, cuda_status, detection_options, device_choices,
+                             import_detector_class)
 
 
 def test_cuda_is_offered_only_when_pytorch_can_use_it():
@@ -46,3 +52,48 @@ def test_detection_options_are_pinned():
     # the crops of a cached signature).
     assert detection_options('cpu', 12, .3) == dict(classes=[0], conf=.3, imgsz=640, max_det=12, verbose=False,
                                                     device='cpu')
+
+
+class FakeImageModule:
+    """Stands in for PIL.Image: only its open function matters here."""
+    @staticmethod
+    def open(path):
+        return 'original'
+
+
+def fake_ultralytics(environ, image_module, seen):
+    """An import_module that records the environment at import time and patches open like Ultralytics."""
+    def import_module(name):
+        assert name == 'ultralytics'
+        seen.update(environ)
+        image_module.open = lambda path: 'patched'  # ultralytics/utils/patches.py does this on import
+        return SimpleNamespace(YOLO='the YOLO class')
+    return import_module
+
+
+def test_ultralytics_is_imported_without_analytics_and_installs():
+    # E27: YOLO_OFFLINE turns off its usage analytics (and update checks); E28: no pip installs at run time
+    environ, seen, image_module = {'PATH': 'x', 'YOLO_AUTOINSTALL': 'true'}, {}, FakeImageModule()
+    detector_class = import_detector_class(environ, fake_ultralytics(environ, image_module, seen), image_module)
+    assert detector_class == 'the YOLO class'
+    assert seen['YOLO_OFFLINE'] == 'true' and seen['YOLO_AUTOINSTALL'] == 'false'
+    assert seen['PATH'] == 'x'
+    assert ULTRALYTICS_ENV == {'YOLO_OFFLINE': 'true', 'YOLO_AUTOINSTALL': 'false'}
+
+
+def test_ultralytics_does_not_keep_its_image_open_replacement():
+    # E28: its replacement of PIL.Image.open pip-installs pi-heif for the first unreadable file
+    image_module = FakeImageModule()
+    import_detector_class({}, fake_ultralytics({}, image_module, {}), image_module)
+    assert image_module.open('photo.jpg') == 'original'
+
+
+def test_the_original_image_open_is_restored_when_the_import_fails():
+    image_module = FakeImageModule()
+
+    def failing_import(name):
+        image_module.open = lambda path: 'patched'
+        raise ImportError('broken installation')
+    with pytest.raises(ImportError):
+        import_detector_class({}, failing_import, image_module)
+    assert image_module.open('photo.jpg') == 'original'

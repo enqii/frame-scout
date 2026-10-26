@@ -20,6 +20,15 @@ def test_the_engine_uses_the_shared_default_reference_weight():
         f'--reference-weight must default to DEFAULT_REFERENCE_WEIGHT, found {ast.dump(default) if default else None}'
 
 
+def test_the_engine_imports_ultralytics_only_through_import_detector_class():
+    # E27, E28: a direct import would skip the environment that turns off its analytics and installs
+    direct = [node.lineno for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
+              if (isinstance(node, ast.ImportFrom) and (node.module or '').split('.')[0] == 'ultralytics')
+              or (isinstance(node, ast.Import) and any(a.name.split('.')[0] == 'ultralytics' for a in node.names))]
+    assert direct == [], f'framescout_engine.py imports ultralytics directly on line(s) {direct}'
+    assert 'import_detector_class(os.environ, importlib.import_module, Image)' in ENGINE.read_text(encoding='utf-8')
+
+
 def test_the_engine_uses_the_shared_default_yolo_model():
     # known_signatures computes the cache signatures of the app's settings with it (E11)
     default = option_default_node('--yolo-model')

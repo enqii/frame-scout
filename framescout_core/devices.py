@@ -1,4 +1,4 @@
-"""The app's device choices and CUDA hints, and the engine's person detector options."""
+"""The app's device choices and CUDA hints, and the engine's person detector options and import."""
 
 
 def device_choices(cuda_available):
@@ -47,3 +47,27 @@ def detection_options(device, max_persons, person_confidence):
     """
     return dict(classes=[0], conf=person_confidence, imgsz=DETECTION_IMAGE_SIZE, max_det=max_persons,
                 verbose=False, device=device)
+
+
+# Ultralytics reads these when it is imported. YOLO_OFFLINE turns off its usage analytics
+# (an event per prediction to Google Analytics while its setting "sync" is on, E27), its
+# Sentry reports and PyPI update checks; model downloads still work. YOLO_AUTOINSTALL=false
+# stops it from pip-installing missing packages into the venv at run time (E28).
+ULTRALYTICS_ENV = {'YOLO_OFFLINE': 'true', 'YOLO_AUTOINSTALL': 'false'}
+
+
+def import_detector_class(environ, import_module, image_module):
+    """Import Ultralytics and return its YOLO class, without its analytics and run-time installs (E27, E28).
+
+    environ is os.environ (ULTRALYTICS_ENV overrides the variables, also values a user set),
+    import_module is importlib.import_module and image_module is PIL.Image. Importing
+    Ultralytics replaces PIL.Image.open with a version that pip-installs pi-heif for the
+    first file Pillow cannot identify; the engine passes the detector decoded images and
+    registers pillow-heif itself, so the original open is put back, also when the import fails.
+    """
+    environ.update(ULTRALYTICS_ENV)
+    image_open = image_module.open
+    try:
+        return import_module('ultralytics').YOLO
+    finally:
+        image_module.open = image_open
