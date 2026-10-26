@@ -202,8 +202,8 @@ saved over (A2). Back it up before overwriting user changes.
 `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, checked by a test; change them
 together); Streamlit `>=1.40` (A10); `transformers>=5.21.0` (the SigLIP tokenizer, E22;
 torch and huggingface-hub unchanged, `pip check` clean); numpy, Pillow, open_clip_torch, ultralytics and
-psutil with the versions of the verified runs as minimum, no upper bounds (user decision;
-untested newer majors: I12). `pillow-heif` and `rawpy` (E25, required by user decision;
+psutil with the versions of the verified runs as minimum, no upper bounds (user decision);
+the installer pins the versions of the verified runs with `constraints.txt` (I12). `pillow-heif` and `rawpy` (E25, required by user decision;
 optional extras: E29) have the versions of the venv's smoke runs (PR #26) as minimum.
 
 ### `constraints.txt`
@@ -214,27 +214,40 @@ closure of `requirements.txt`, direct and transitive, taken from the project ven
 (`torch==2.14.1`), so the `+cpu`, `+cu126` and `+cu130` builds all satisfy the pin. It is a
 pip constraints file: it limits versions but installs nothing by itself, and
 `requirements.txt` keeps its ranges (no upper bounds, I3). Only `Install-FrameScout.bat`
-passes it (`-c constraints.txt`); a plain `pip install -r requirements.txt` takes the newest
-releases. Refreshing is manual, in a PR of its own: update and test the venv, write the
-closure into the file, then check with `pip install --dry-run --ignore-installed --report
-r.json --python-version 3.12|3.13|3.14 --platform win_amd64 --only-binary=:all: -r
-requirements.txt -c constraints.txt` that every resolved package is pinned and has a wheel
-(the header of the file says this). `tests/test_constraints.py` keeps the file consistent
-(see "Test coverage"). `install_torch.py` does not use it yet (I18).
+uses it: it sets `PIP_CONSTRAINT=constraints.txt` (after creating the venv, so `ensurepip`
+is not affected) for the pip call of `install_torch.py` (I18) and passes `-c
+constraints.txt` to the requirements install. The value is relative because pip splits
+`PIP_CONSTRAINT` at whitespace and the install folder may contain a space; both pip calls
+run in the install folder. A plain `pip install -r requirements.txt` or a manual
+`install_torch.py` takes the newest releases. The file is sorted by package name.
+Evidence: the pins are the venv of the verified runs (a CPU engine run on Python 3.14);
+3.12 and 3.13 are only checked by the dry-run below; the CUDA wheels only by their
+metadata (their Windows Requires-Dist is the same as that of the `+cpu` wheels and allows
+every pin; PR #33 review). Refreshing is manual, in a PR of its own: update and test the
+venv, write the closure into the file, then check with `pip install --dry-run
+--ignore-installed --report r.json --python-version 3.12|3.13|3.14 --platform win_amd64
+--only-binary=:all: -r requirements.txt -c constraints.txt` that every resolved package is
+pinned and has a wheel, and compare the Requires-Dist lines of the CUDA wheels' metadata
+on the PyTorch index (`<wheel>.metadata`, PEP 658) with the pins; a pip dry-run against
+that index downloads the wheels (pip 25.2 downloads them even with `--dry-run`). The
+header of the file says this. `tests/test_constraints.py` keeps the file consistent (see
+"Test coverage").
 
 ### `Install-FrameScout.bat`
 
 `Install-FrameScout.bat [cpu|cuda]`: checks installed Python 3.14/3.13/3.12 (in that
-order), creates project-local `.venv`, installs PyTorch with `install_torch.py` (passing
-the argument on), then `pip install --no-cache-dir -r requirements.txt -c constraints.txt`
-(this moves packages that torch pulled in to the pinned versions and may downgrade newer
-ones on a re-run; an installed CUDA build is kept), performs imports and prints the PyTorch build and
-whether CUDA is available.
+order), creates project-local `.venv`, sets `PIP_CONSTRAINT=constraints.txt` (I18),
+installs PyTorch with `install_torch.py` (passing the argument on; torch's dependencies
+come in their pinned versions), then `pip install --no-cache-dir -r requirements.txt -c
+constraints.txt` (on a re-run this moves installed packages to the pinned versions and may
+downgrade newer ones; an installed CUDA build is kept), performs imports and prints the
+PyTorch build and whether CUDA is available.
 
 ### `install_torch.py`
 
 `install_torch.py [cpu|cuda] [--dry-run]`: installs the pinned PyTorch from the PyTorch
-index (dependencies also from PyPI) – the CPU build or the CUDA build that
+index (dependencies also from PyPI; in the versions of `constraints.txt` when run by
+`Install-FrameScout.bat`, which sets `PIP_CONSTRAINT`) – the CPU build or the CUDA build that
 `framescout_core.cuda_build` picks from `nvidia-smi` (`cu130`, otherwise `cu126`; a build
 for every GPU, else for the most capable one). Without an argument an installed CUDA build
 is kept and nothing is asked; otherwise it asks for GPU support only if `nvidia-smi` finds
@@ -845,10 +858,12 @@ and the pool; `test_eval_tool.py` for the tool's commands, metrics and labelling
 with fake scores; the engine's `--scores-file` only from its syntax tree in
 `test_engine_defaults.py`; no real-model run, no browser test), and the pinned
 dependencies (I12, `test_constraints.py`: every line of `constraints.txt` is an exact pin
-without local label, hash or duplicate; every requirement of `requirements.txt` and the
-pinned numpy of `requirements-dev.txt` has an allowed pin; the torch pins equal
-`TORCH_VERSION`/`TORCHVISION_VERSION`; the installer passes `-r requirements.txt -c
-constraints.txt`; completeness of the transitive pins is not checkable in CI);
+without local label, hash or duplicate, sorted by name; every requirement of
+`requirements.txt` and the pinned numpy of `requirements-dev.txt` has an allowed pin; a
+non-comment pip line of the installer passes `-r requirements.txt -c constraints.txt`, and
+it sets `PIP_CONSTRAINT=constraints.txt` between the venv and `install_torch.py` (I18);
+the torch pins of both files equal `TORCH_VERSION`/`TORCHVISION_VERSION` in
+`test_torch_install.py`; completeness of the transitive pins is not checkable in CI);
 still missing: cache
 reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
