@@ -959,22 +959,36 @@ referenced in commits, pull requests and discussions.
       (done 2026-10-26, part A of P5: new `constraints.txt` pins all 84 packages of the
       dependency closure of `requirements.txt` exactly (`name==version`, no hashes; torch
       and torchvision without a local label, so `+cpu`, `+cu126` and `+cu130` match);
-      `Install-FrameScout.bat` runs `pip install -r requirements.txt -c constraints.txt`.
+      `Install-FrameScout.bat` runs `pip install -r requirements.txt -c constraints.txt`
+      and sets `PIP_CONSTRAINT` for `install_torch.py` (I18).
       `requirements.txt` keeps its ranges without upper bounds (I3 decision); a plain
-      `pip install -r requirements.txt` still takes the newest releases. Refreshing the
+      `pip install -r requirements.txt` still takes the newest releases, and the
+      missing-package message of a search model names `-c constraints.txt`. Refreshing the
       pins is manual in a PR of its own (no Dependabot; procedure in the header of
-      `constraints.txt`). `tests/test_constraints.py` checks the pins against
-      `requirements.txt`, `TORCH_VERSION`/`TORCHVISION_VERSION` and the installer line;
-      transitive completeness is only checked by the dry-run at refresh time. Verified:
-      metadata-only dry-run for Python 3.12, 3.13 and 3.14 (win_amd64, wheels only), a CPU
-      engine run on 22 photos (incl. 2 HEIC) with the pinned versions. Not run:
-      `Install-FrameScout.bat` on a fresh clone, the CUDA installer variant, a real install
-      on 3.12/3.13, a camera RAW photo, the `+cpu` torch build.)
-- [ ] **I18 – `install_torch.py` ignores `constraints.txt`:** it installs torch with its
+      `constraints.txt`, including a check of the CUDA wheels' metadata).
+      `tests/test_constraints.py` checks the pins (exact, sorted) against
+      `requirements.txt` and the installer's command lines, `test_torch_install.py` the
+      torch pins against `TORCH_VERSION`/`TORCHVISION_VERSION`; transitive completeness is
+      only checked by the dry-run at refresh time. Verified: pip dry-run for Python 3.12,
+      3.13 and 3.14 (win_amd64, wheels only), a CPU engine run on 22 photos (incl. 2 HEIC)
+      with the pinned versions on Python 3.14; the Requires-Dist of the `+cpu`, `+cu126` and
+      `+cu130` wheels (cp312 to cp314) on the PyTorch index allow every pin (PR #33
+      review). Not run: `Install-FrameScout.bat` on a fresh clone, the CUDA installer
+      variant, a real install on 3.12/3.13, a camera RAW photo, the `+cpu` torch build.)
+- [x] **I18 – `install_torch.py` ignores `constraints.txt`:** it installs torch with its
       dependencies from PyPI in their newest versions, and the next installer step moves
       them to the pins (an extra download and reinstall of e.g. numpy, Pillow, sympy on a
       fresh install). Passing `-c constraints.txt` to its pip command would avoid that; left
       out of I12 because `install_torch.py` stayed unchanged by decision. Small and optional.
+      (done 2026-10-26 in PR #33 after its review, without changing `install_torch.py`'s
+      code: `Install-FrameScout.bat` sets `PIP_CONSTRAINT=constraints.txt` after creating
+      the venv, and the pip call of `install_torch.py` inherits it. Relative, because pip
+      splits the variable at whitespace; both pip calls run in the install folder. A test
+      checks the order venv, variable, `install_torch.py`. Verified: pip dry-run of the
+      `+cpu` install on Python 3.14 with the variable set resolves torch, torchvision and
+      their 11 dependencies all to their pins; the requirements step against the project
+      venv with the variable and `-c` installs nothing. Not run: the installer itself, the
+      CUDA variant (only its wheel metadata), Python 3.12/3.13.)
 - [ ] **I13 – Background runs die with the agent session:** a long engine run that an
       agent starts as a background command of Claude Code ends when that agent session
       ends; the first evaluation run of PR #11 stopped at 1,110 of 4,997 photos (stale
