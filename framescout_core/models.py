@@ -40,7 +40,7 @@ MODELS = {model.key: model for model in (
                 224, 512),
     SearchModel('vit-l-14-datacomp', 'ViT-L-14', 'datacomp_xl_s13b_b90k', 'ViT-L/14 · DataComp-XL', '1.71 GB', '~18×',
                 224, 768),
-    SearchModel('vit-b-16-siglip', 'ViT-B-16-SigLIP', 'webli', 'ViT-B/16 · SigLIP (WebLI)', '813 MB', '~4×',
+    SearchModel('vit-b-16-siglip', 'ViT-B-16-SigLIP', 'webli', 'ViT-B/16 · SigLIP WebLI', '813 MB', '~4×',
                 224, 768, requires=('transformers',)),
 )}
 DEFAULT_MODEL = 'vit-b-32-openai'
