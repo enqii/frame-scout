@@ -109,10 +109,14 @@ def _folder_key(folder):
     return os.path.normcase(str(folder))
 
 
+def _inside_prefix(key):
+    """The text every _folder_key of a path inside the folder of key starts with."""
+    return key if key.endswith(os.sep) else key + os.sep
+
+
 def _inside_key(key, parent):
     """True if the folder of key is inside (below) the folder of parent; both are _folder_key texts."""
-    prefix = parent if parent.endswith(os.sep) else parent + os.sep
-    return key != parent and key.startswith(prefix)
+    return key != parent and key.startswith(_inside_prefix(parent))
 
 
 def distinct_folders(folders):
