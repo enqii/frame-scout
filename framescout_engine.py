@@ -474,8 +474,8 @@ def search(args, parser, roots, dropped, output, status):
                 visual_scores[name].append(photo_visual[name])
     con.close()
     if args.scores_file:
-        # the same per-crop scores rank_photos combines below, so the evaluation ranks
-        # exactly as the galleries do (E32)
+        # the same per-crop scores rank_photos combines below, so the evaluation ranks as
+        # the galleries do, up to near-ties within the rounding to SCORE_DIGITS (E32)
         write_scores(args.scores_file.resolve(), scores_document(
             args.model, signature, list(zip(scored, mtimes, crop_labels)),
             [{'name': p['name'], 'prompts': p['prompts'], 'references': p['refs'],
