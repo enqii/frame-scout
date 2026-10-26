@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FrameScout labelling</title>
+<style>
+:root{--bg:#f6f6f4;--panel:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#ddddd8;--match:#1f8a4c;--nomatch:#c0392b;
+  --open:#c9c9c4;--accent:#2f6fde}
+@media (prefers-color-scheme:dark){:root{--bg:#161616;--panel:#222;--text:#ececea;--muted:#a3a39e;--line:#3a3a38;
+  --match:#3fbf73;--nomatch:#e5604f;--open:#4a4a47;--accent:#7aa7ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;background:var(--panel);
+  border-bottom:1px solid var(--line)}
+header b{font-size:16px}
+select,button{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+button{cursor:pointer}
+button.match{border-color:var(--match);color:var(--match)}
+button.nomatch{border-color:var(--nomatch);color:var(--nomatch)}
+#status{margin-left:auto;color:var(--muted)}
+#status.error{color:var(--nomatch);font-weight:600}
+.layout{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:16px}
+@media (max-width:800px){.layout{grid-template-columns:1fr}}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;align-self:start}
+aside h2{margin:0 0 6px;font-size:20px}
+aside p{margin:4px 0;color:var(--muted)}
+.refs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.refs img{width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.keys{font-size:13px;color:var(--muted);margin-top:12px}
+kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--bg);font-size:12px}
+main{min-width:0}
+.frame{background:var(--panel);border:4px solid var(--open);border-radius:10px;padding:8px;text-align:center}
+.frame.match{border-color:var(--match)}.frame.nomatch{border-color:var(--nomatch)}
+.frame img{max-width:100%;height:calc(100vh - 290px);min-height:240px;object-fit:contain}
+.info{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;overflow-wrap:anywhere}
+.info .name{font-weight:600}.info .folder{color:var(--muted);font-size:13px}
+.badge{padding:2px 8px;border-radius:10px;background:var(--open);color:var(--text);font-size:13px}
+.badge.match{background:var(--match);color:#fff}.badge.nomatch{background:var(--nomatch);color:#fff}
+.strip{display:flex;flex-wrap:wrap;gap:2px;margin-top:8px}
+.strip span{width:9px;height:9px;border-radius:2px;background:var(--open);cursor:pointer}
+.strip span.match{background:var(--match)}.strip span.nomatch{background:var(--nomatch)}
+.strip span.current{outline:2px solid var(--accent);outline-offset:1px}
+.done{padding:30px;text-align:center;color:var(--muted)}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <b>FrameScout labelling</b><span id="collection"></span>
+  <select id="profile" aria-label="Search profile"></select>
+  <span id="progress"></span>
+  <span id="status">Loading ...</span>
+</header>
+<div class="layout">
+  <aside>
+    <h2 id="title"></h2>
+    <p id="context"></p>
+    <p id="features"></p>
+    <div class="refs" id="refs"></div>
+    <p>Does the photo show this motif? Judge the photo, not the score.</p>
+    <div class="keys">
+      <kbd>Y</kbd>/<kbd>1</kbd> match · <kbd>N</kbd>/<kbd>2</kbd> no match<br>
+      <kbd>→</kbd>/<kbd>Space</kbd> next · <kbd>←</kbd>/<kbd>Backspace</kbd> previous<br>
+      <kbd>U</kbd> clear · <kbd>Enter</kbd> next unlabelled · <kbd>O</kbd> open original<br>
+      <kbd>PageDown</kbd>/<kbd>PageUp</kbd> next/previous profile<br>
+      Every label is saved at once; close the page any time and continue later.
+    </div>
+  </aside>
+  <main>
+    <div class="frame" id="frame"><img id="photo" alt=""></div>
+    <div class="info">
+      <span class="badge" id="badge">not labelled</span>
+      <span class="name" id="name"></span><span class="folder" id="folder"></span>
+      <a id="original" target="_blank" rel="noopener">Open original</a>
+    </div>
+    <div>
+      <button class="match" id="yes">Match (Y)</button>
+      <button class="nomatch" id="no">No match (N)</button>
+      <button id="prev">← Previous</button>
+      <button id="next">Next →</button>
+      <button id="clear">Clear (U)</button>
+    </div>
+    <div class="strip" id="strip"></div>
+  </main>
+</div>
+<script>
+'use strict';
+let state = null, p = 0, i = 0;
+const $ = (id) => document.getElementById(id);
+const key = () => 'framescout-eval-' + state.collection;
+
+function remember() {
+  try { localStorage.setItem(key(), JSON.stringify({p, i})); } catch (e) { /* private window: no memory */ }
+}
+function recall() {
+  try { return JSON.parse(localStorage.getItem(key()) || 'null'); } catch (e) { return null; }
+}
+function cls(value) { return value === true ? 'match' : value === false ? 'nomatch' : ''; }
+function status(text, error) { $('status').textContent = text; $('status').className = error ? 'error' : ''; }
+function profile() { return state.profiles[p]; }
+function unlabelledAfter(start) {
+  const labels = profile().labels;
+  for (let step = 1; step <= labels.length; step++) {
+    const j = (start + step) % labels.length;
+    if (labels[j] === null) return j;
+  }
+  return -1;
+}
+
+function fillProfiles() {
+  $('profile').innerHTML = '';
+  state.profiles.forEach((prof, index) => {
+    const done = prof.labels.filter((v) => v !== null).length;
+    const option = document.createElement('option');
+    option.value = index;
+    option.textContent = `${prof.name} (${done}/${prof.labels.length})`;
+    $('profile').appendChild(option);
+  });
+  $('profile').value = p;
+}
+
+function showProfile() {
+  const prof = profile();
+  $('title').textContent = prof.name;
+  $('context').textContent = prof.context ? 'Context: ' + prof.context : '';
+  $('features').textContent = prof.features ? 'Features: ' + prof.features : '';
+  $('refs').innerHTML = '';
+  for (let r = 0; r < prof.references; r++) {
+    const img = document.createElement('img');
+    img.src = `reference/${p}/${r}`; img.alt = 'Reference image ' + (r + 1);
+    $('refs').appendChild(img);
+  }
+  $('strip').innerHTML = '';
+  prof.labels.forEach((_, index) => {
+    const dot = document.createElement('span');
+    dot.title = prof.photos[index].name;
+    dot.onclick = () => { i = index; show(); };
+    $('strip').appendChild(dot);
+  });
+}
+
+function show() {
+  const prof = profile();
+  fillProfiles();
+  const labels = prof.labels, done = labels.filter((v) => v !== null).length;
+  const matches = labels.filter((v) => v === true).length;
+  $('progress').textContent = `photo ${i + 1}/${labels.length} · ${done} labelled · ${matches} matches`;
+  [...$('strip').children].forEach((dot, index) => {
+    dot.className = cls(labels[index]) + (index === i ? ' current' : '');
+  });
+  if (!labels.length) { $('photo').removeAttribute('src'); return; }
+  const photo = prof.photos[i], value = labels[i];
+  $('photo').src = `photo/${p}/${i}`;
+  $('photo').alt = photo.name;
+  $('frame').className = 'frame ' + cls(value);
+  $('badge').className = 'badge ' + cls(value);
+  $('badge').textContent = value === true ? 'match' : value === false ? 'no match' : 'not labelled';
+  $('name').textContent = photo.name;
+  $('folder').textContent = photo.folder;
+  $('original').href = `original/${p}/${i}`;
+  if (done === labels.length) status(`All ${labels.length} photos of this profile labelled. PageDown: next profile.`);
+  for (let ahead = 1; ahead <= 3 && i + ahead < labels.length; ahead++) new Image().src = `photo/${p}/${i + ahead}`;
+  remember();
+}
+
+async function label(value) {
+  const prof = profile(), index = i, before = prof.labels[index];
+  prof.labels[index] = value;
+  const next = value === null ? index : unlabelledAfter(index);
+  if (next >= 0) i = next;
+  show();
+  status('Saving ...');
+  try {
+    const answer = await fetch('label', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                         body: JSON.stringify({profile: p, photo: index, value})});
+    if (!answer.ok) throw new Error('HTTP ' + answer.status);
+    status('Saved');
+    if (prof.labels.every((v) => v !== null)) show();
+  } catch (e) {
+    prof.labels[index] = before;
+    i = index;
+    show();
+    status('Not saved: ' + e.message + ' (is framescout_eval.py still running?)', true);
+  }
+}
+
+function go(step) {
+  const n = profile().labels.length;
+  if (n) { i = Math.min(n - 1, Math.max(0, i + step)); show(); }
+}
+function switchProfile(index) {
+  p = (index + state.profiles.length) % state.profiles.length;
+  const first = profile().labels.indexOf(null);
+  i = first >= 0 ? first : 0;
+  showProfile(); show(); status('');
+}
+
+document.addEventListener('keydown', (event) => {
+  if (!state || event.ctrlKey || event.altKey || event.metaKey || event.target.tagName === 'SELECT') return;
+  const k = event.key.toLowerCase();
+  const actions = {
+    y: () => label(true), 1: () => label(true), n: () => label(false), 2: () => label(false),
+    u: () => label(null), delete: () => label(null),
+    arrowright: () => go(1), ' ': () => go(1), arrowleft: () => go(-1), backspace: () => go(-1),
+    enter: () => { const j = unlabelledAfter(i); if (j >= 0) { i = j; show(); } },
+    o: () => window.open(`original/${p}/${i}`, '_blank', 'noopener'),
+    pagedown: () => switchProfile(p + 1), pageup: () => switchProfile(p - 1),
+  };
+  if (actions[k]) { event.preventDefault(); actions[k](); }
+});
+$('yes').onclick = () => label(true);
+$('no').onclick = () => label(false);
+$('clear').onclick = () => label(null);
+$('prev').onclick = () => go(-1);
+$('next').onclick = () => go(1);
+$('profile').onchange = (event) => { switchProfile(Number(event.target.value)); event.target.blur(); };
+
+fetch('state').then((answer) => {
+  if (!answer.ok) throw new Error('HTTP ' + answer.status);
+  return answer.json();
+}).then((data) => {
+  state = data;
+  $('collection').textContent = state.collection;
+  if (!state.profiles.length) { status('The pool has no profiles.', true); return; }
+  const saved = recall();
+  if (saved && saved.p < state.profiles.length) {
+    p = saved.p;
+    const first = profile().labels.indexOf(null);
+    i = first >= 0 ? first : Math.min(saved.i, Math.max(0, profile().labels.length - 1));
+  } else {
+    const open = state.profiles.findIndex((prof) => prof.labels.includes(null));
+    p = open >= 0 ? open : 0;
+    const first = profile().labels.indexOf(null);
+    i = first >= 0 ? first : 0;
+  }
+  showProfile(); show(); status('Ready');
+}).catch((e) => status('Could not load the pool: ' + e.message, true));
+</script>
+</body>
+</html>
