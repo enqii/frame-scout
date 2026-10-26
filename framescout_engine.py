@@ -33,8 +33,8 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              prefetch,
                              prepare_cache, profile_slugs, progress_due,
                              progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
-                             scan_folders, search_fingerprint, size_text, skipped_lines, store_group,
-                             supported_extensions, write_results)
+                             scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
+                             store_group, supported_extensions, write_results, write_scores)
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
 
 # AVIF, HEIC/HEIF and camera RAW photos (E25). pillow-heif and rawpy are in
@@ -211,6 +211,10 @@ def main():
                              'their weights on first use and are not evaluated yet')
     parser.add_argument('--reference-weight', type=float, default=DEFAULT_REFERENCE_WEIGHT,
                         help='weight of the reference image score (0..1); profiles without reference images use text only')
+    # E32: the input of the search-model evaluation (framescout_eval.py); not used by the app
+    parser.add_argument('--scores-file', type=Path, default=None, metavar='JSON',
+                        help='also write the raw text and reference similarity of every part of every photo '
+                             'to this JSON file (for the evaluation tool framescout_eval.py)')
     # the folders may come before, between or after the options, as one folder could (review)
     args = parser.parse_intermixed_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):
@@ -445,7 +449,7 @@ def search(args, parser, roots, dropped, output, status):
     status.update('scoring', total=len(paths))
     # first the per-crop text and reference scores of every photo, then per profile the
     # normalization over all crops of this search and the combination (E4, E5)
-    scored, crop_labels = [], []
+    scored, crop_labels, mtimes = [], [], []
     text_scores = {p['name']: [] for p in profiles}
     visual_scores = {p['name']: [] for p in profiles}
     for number, path in enumerate(paths, 1):
@@ -463,12 +467,22 @@ def search(args, parser, roots, dropped, output, status):
         except Exception as exc:
             print(f'CACHE ERROR {path}: {exc}', flush=True)
             continue
-        scored.append(path); crop_labels.append(labels)
+        scored.append(path); crop_labels.append(labels); mtimes.append(stat.st_mtime_ns)
         for name in profile_vectors:
             text_scores[name].append(photo_text[name])
             if name in photo_visual:
                 visual_scores[name].append(photo_visual[name])
     con.close()
+    if args.scores_file:
+        # the same per-crop scores rank_photos combines below, so the evaluation ranks
+        # exactly as the galleries do (E32)
+        write_scores(args.scores_file.resolve(), scores_document(
+            args.model, signature, list(zip(scored, mtimes, crop_labels)),
+            [{'name': p['name'], 'prompts': p['prompts'], 'references': p['refs'],
+              'text': [s.tolist() for s in text_scores[p['name']]],
+              'visual': ([s.tolist() for s in visual_scores[p['name']]]
+                         if profile_vectors[p['name']][1] is not None else None)} for p in profiles]))
+        print(f'Scores written: {args.scores_file.resolve()}', flush=True)
     scores, normalized = {}, {}
     for p in profiles:
         name = p['name']

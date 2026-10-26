@@ -97,3 +97,19 @@ def test_the_engine_uses_the_shared_default_yolo_model():
     # known_signatures computes the cache signatures of the app's settings with it (E11)
     default = option_default_node('--yolo-model')
     assert isinstance(default, ast.Name) and default.id == 'DEFAULT_YOLO_MODEL'
+
+
+def test_the_engine_can_write_the_raw_scores_for_the_evaluation():
+    # E32: --scores-file is off by default and writes the scores file of framescout_core
+    default = option_default_node('--scores-file')
+    assert default is None or (isinstance(default, ast.Constant) and default.value is None)
+    keywords = {k.arg: ast.unparse(k.value) for k in add_argument_call('--scores-file').keywords}
+    assert keywords.get('type') == 'Path'
+    tree = ast.parse(ENGINE.read_text(encoding='utf-8'))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and getattr(node.func, 'id', None) in ('write_scores', 'scores_document')]
+    assert sorted(node.func.id for node in calls) == ['scores_document', 'write_scores']
+    # written from the scores the galleries rank, before the (slower) gallery export
+    [search] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'search']
+    source = ast.unparse(search)
+    assert source.index('write_scores(') < source.index("thumbs = output / 'thumbnails'")
