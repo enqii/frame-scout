@@ -113,7 +113,9 @@ starts with the new example profiles.
 3. **Photo source:** choose a local image folder (default: `photos` in the
    project folder). Subfolders are searched as well. Download and extract archives and
    online albums yourself beforehand – FrameScout does not download images from the
-   internet.
+   internet. FrameScout turns off the anonymous usage analytics and the automatic
+   package installs of Ultralytics (the person detection library) for every search, also
+   from a manual command line.
 4. **AI settings:** with "auto", CUDA is used if PyTorch detects a
    compatible NVIDIA GPU, otherwise the CPU; "cuda" is offered only if PyTorch was
    installed with GPU support (see "GPU support" above). The batch size is the number of image

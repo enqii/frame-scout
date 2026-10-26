@@ -343,7 +343,7 @@ referenced in commits, pull requests and discussions.
       of E7 does not remove them (an app session may be writing `marks.json` at that
       moment). Fix idea: remove `run-status.json.*.tmp` and `results.json.*.tmp` older than
       a minute in `auto_cleanup`. Found in PR #18.
-- [ ] **E27 – Ultralytics sends usage analytics:** with person detection the engine runs
+- [x] **E27 – Ultralytics sends usage analytics:** with person detection the engine runs
       `YOLO.predict`, and Ultralytics registers its analytics callbacks on every
       predictor (`ultralytics/utils/callbacks/base.py`, `add_integration_callbacks`):
       at the end of a prediction it posts an anonymous event (CPU, device, versions,
@@ -354,7 +354,12 @@ referenced in commits, pull requests and discussions.
       first prediction (e.g. `ultralytics.settings.update({'sync': False})` in the
       engine, or in the `.bat` files and the app's engine environment), with a test
       that does not need ultralytics. Found in the E25 PR.
-- [ ] **E28 – Ultralytics installs packages at run time:** importing `ultralytics`
+      (Done 2026-10-26: the engine imports Ultralytics only through
+      `framescout_core.import_detector_class`, which sets `YOLO_OFFLINE=true` first; that
+      turns off the analytics, Sentry and update checks without writing Ultralytics'
+      settings file, and model downloads still work – see `docs/ARCHITECTURE.md` →
+      "Environment variables and caches".)
+- [x] **E28 – Ultralytics installs packages at run time:** importing `ultralytics`
       replaces `PIL.Image.open` for the whole engine process (`ultralytics/utils/patches.py`);
       the first file Pillow cannot identify (e.g. a broken `.jpg`) makes it run
       `check_requirements("pi-heif")`, which pip-installs `pi-heif` into the venv
@@ -365,6 +370,11 @@ referenced in commits, pull requests and discussions.
       idea: set `YOLO_AUTOINSTALL=false` in the `.bat` files and the app's engine
       environment (and say in the README how to set it for manual runs, like I10).
       Found in the E25 PR.
+      (Done 2026-10-26: `import_detector_class` also sets `YOLO_AUTOINSTALL=false`, in the
+      engine itself, so manual runs need no setting, and puts the original
+      `PIL.Image.open` back after the import, so an unreadable file no longer triggers the
+      `pi-heif` install. An already installed `pi_heif` stays in an existing venv; it is
+      unused and goes with the venv.)
 - [ ] **E29 – HEIC/RAW support as optional extras:** E25 made `pillow-heif` and `rawpy`
       required in `requirements.txt` (user decision at the PR #26 hold point; the user may
       want them optional later). Idea: a separate requirements file, a question in
@@ -378,6 +388,14 @@ referenced in commits, pull requests and discussions.
       skipped RAW file instead (the scan already lists them in `PhotoScan.raw_pairs`); the
       cache and the gallery would then show the RAW path for that shot. Found in the PR #26
       review.
+- [ ] **E31 – Every search contacts the Hugging Face Hub:** loading the CLIP weights with
+      open_clip goes through `huggingface_hub`, which asks the Hub for the model files on
+      every run even when they are in `.cache/huggingface` (the log shows "You are sending
+      unauthenticated requests to the HF Hub"). No images or paths are sent, but it is a
+      network request per search (with a user agent naming library versions) and makes
+      the search fail or wait without a network. Fix idea: once the weights are cached,
+      set `HF_HUB_OFFLINE=1` (and `HF_HUB_DISABLE_TELEMETRY=1`) for the engine, keeping the
+      first-run download; check how open_clip behaves offline. Found in the E27/E28 PR.
 
 ### App (`app.py`)
 
@@ -956,8 +974,9 @@ decision in PR #14):
       split out into the next item by user decision)
 - [x] Optional HEIC/RAW support (E25; new dependencies: a hold point) (done 2026-10-26 in
       PR #26; also AVIF; packages required by user decision, optional extras: E29)
-- [ ] Turn off Ultralytics' usage analytics and run-time package installs (E27, E28; own
-      PR after E25, user decision at the PR #26 hold point)
+- [x] Turn off Ultralytics' usage analytics and run-time package installs (E27, E28; own
+      PR after E25, user decision at the PR #26 hold point) (done 2026-10-26; Hugging Face
+      Hub requests per search: E31)
 - [ ] Several photo folders per search (A25; changes `results.json` and the CLI: a hold point)
 
 ### P4b – Search models (evaluate at home first)
