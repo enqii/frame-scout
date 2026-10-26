@@ -121,6 +121,23 @@ def test_an_unusable_scores_file_raises_value_error(tmp_path, content):
         read_scores(path)
 
 
+@pytest.mark.parametrize('value', ['NaN', 'Infinity', '-Infinity', '"0.5"', 'true', 'null'])
+def test_a_scores_file_with_a_score_that_is_no_finite_number_is_refused(tmp_path, value):
+    path = tmp_path / 'm.json'
+    path.write_text('{"format": 1, "model": "m", "photos": [{"path": "a", "mtime_ns": 1, "crops": ["Full image"]}], '
+                    f'"profiles": [{{"name": "X", "text": [[{value}]], "visual": null}}]}}', encoding='utf-8')
+    with pytest.raises(ValueError):
+        read_scores(path)
+
+
+def test_a_score_that_is_not_finite_is_never_written(tmp_path):
+    document = scores_document('m', 's', [('a.jpg', 1, ['Full image'])],
+                               [{'name': 'X', 'prompts': [], 'references': [], 'text': [[float('nan')]], 'visual': None}])
+    with pytest.raises(ValueError):
+        write_scores(tmp_path / 'm.json', document)
+    assert not (tmp_path / 'm.json').exists()
+
+
 def test_a_missing_scores_file_is_reported(tmp_path):
     with pytest.raises(ValueError, match='not found'):
         read_scores(tmp_path / 'm.json')
