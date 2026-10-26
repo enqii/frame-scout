@@ -45,6 +45,6 @@ rem an NVIDIA driver.
 if errorlevel 1 (echo Installing PyTorch failed. See the error message above. & pause & exit /b 1)
 ".venv\Scripts\python.exe" -m pip install --no-cache-dir -r requirements.txt
 if errorlevel 1 (echo Installation failed. See the error message above. & pause & exit /b 1)
-".venv\Scripts\python.exe" -c "import torch,open_clip,ultralytics,streamlit;print('FrameScout: import test OK');print('PyTorch', torch.__version__, '- CUDA available:', torch.cuda.is_available())"
+".venv\Scripts\python.exe" -c "import torch,open_clip,ultralytics,streamlit,pillow_heif,rawpy;print('FrameScout: import test OK');print('PyTorch', torch.__version__, '- CUDA available:', torch.cuda.is_available())"
 if errorlevel 1 (echo The import test failed. See the error message above. & pause & exit /b 1)
 pause
