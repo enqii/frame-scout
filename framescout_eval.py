@@ -515,6 +515,13 @@ class LabelSession:
         return 404, 'text/plain', b'not found'
 
 
+class LabelServer(http.server.ThreadingHTTPServer):
+    # with SO_REUSEADDR, Windows lets a second server bind a port another one listens on, so
+    # a second labelling page would share the port silently instead of failing (review)
+    allow_reuse_address = os.name != 'nt'
+    allow_reuse_port = False
+
+
 def serve(session, port, open_browser):
     class Handler(http.server.BaseHTTPRequestHandler):
         def answer(self, method, body=b''):
@@ -537,7 +544,11 @@ def serve(session, port, open_browser):
         def log_message(self, *args):  # no line per photo in the console
             pass
 
-    server = http.server.ThreadingHTTPServer(('127.0.0.1', port), Handler)
+    try:
+        server = LabelServer(('127.0.0.1', port), Handler)
+    except OSError as exc:
+        raise UsageError(f'The labelling page cannot use port {port} ({exc}): another program or labelling page '
+                         'may use it; choose another one with --port.') from None
     url = f'http://127.0.0.1:{server.server_address[1]}/{session.token}/'
     print(f'Labelling page of {session.collection.name}: {url}\nLabels are saved in {session.collection.labels_file}. '
           'Stop with Ctrl+C.', flush=True)
@@ -552,6 +563,8 @@ def serve(session, port, open_browser):
 
 
 def command_label(args):
+    if not 0 <= args.port <= 65535:
+        raise UsageError('--port must be from 0 to 65535 (0: any free port).')
     session = LabelSession(Collection(args.dir, args.collection))
     serve(session, args.port, not args.no_browser)
     return 0

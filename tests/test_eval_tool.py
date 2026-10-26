@@ -1,4 +1,5 @@
 """The search-model evaluation tool framescout_eval.py (E32, E20), without torch or a model."""
+import http.server
 import json
 from pathlib import Path
 
@@ -393,6 +394,25 @@ def test_the_page_refuses_to_start_on_an_unreadable_labels_file(session, collect
     with pytest.raises(ValueError):
         ev.LabelSession(collection)
     assert collection.labels_file.read_text(encoding='utf-8') == '{broken'
+
+
+def test_a_port_in_use_is_an_error_not_a_traceback(session, collection, capsys):
+    first = ev.LabelServer(('127.0.0.1', 0), http.server.BaseHTTPRequestHandler)
+    try:
+        port = first.server_address[1]
+        # also on Windows, where SO_REUSEADDR would let the second page share the port
+        with pytest.raises(OSError):
+            ev.LabelServer(('127.0.0.1', port), http.server.BaseHTTPRequestHandler).server_close()
+        assert ev.main(['label', 'cosplay', '--dir', str(collection.root.parent), '--no-browser',
+                        '--port', str(port)]) == 2
+        assert '--port' in capsys.readouterr().err
+    finally:
+        first.server_close()
+
+
+def test_a_port_out_of_range_is_refused(session, collection, capsys):
+    assert ev.main(['label', 'cosplay', '--dir', str(collection.root.parent), '--no-browser', '--port', '70000']) == 2
+    assert '--port' in capsys.readouterr().err
 
 
 def test_the_page_needs_a_pool(collection, capsys):
