@@ -413,6 +413,13 @@ def test_the_page_refuses_to_start_on_an_unreadable_labels_file(session, collect
     assert collection.labels_file.read_text(encoding='utf-8') == '{broken'
 
 
+@pytest.mark.parametrize('header, expected', [(None, 0), ('42', 42), (str(ev.MAX_BODY), ev.MAX_BODY),
+                                              ('-1', None), (str(ev.MAX_BODY + 1), None), ('x', None)])
+def test_a_label_request_needs_a_sensible_length(header, expected):
+    # a negative length would read until the connection closes, a larger one is cut off
+    assert ev.body_length(header) == expected
+
+
 def test_a_port_in_use_is_an_error_not_a_traceback(session, collection, capsys):
     first = ev.LabelServer(('127.0.0.1', 0), http.server.BaseHTTPRequestHandler)
     try:
