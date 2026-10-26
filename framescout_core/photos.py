@@ -163,7 +163,9 @@ def folder_labels(folders):
 
     One folder has no label (''), so the gallery of a single folder is unchanged. Several
     are labeled by their names; folders of the same name (ignoring case) get as many of
-    their last path parts as tell them apart, a drive root its drive (e.g. "D:").
+    their last path parts as tell them apart, a drive root its drive (e.g. "D:"). A label
+    is never the start of another one ("Event" and "Event/sub"): it gets more of its path
+    too, so no two photos of different folders get the same name (review).
     """
     if len(folders) < 2:
         return [''] * len(folders)
@@ -171,11 +173,20 @@ def folder_labels(folders):
     depth = [1] * len(folders)
     while True:
         labels = [os.sep.join(p[-d:]) for p, d in zip(parts, depth)]
-        counts = collections.Counter(label.casefold() for label in labels)
-        clashing = [i for i, label in enumerate(labels) if counts[label.casefold()] > 1 and depth[i] < len(parts[i])]
-        if not clashing:
+        folded = [label.casefold() for label in labels]
+        counts = collections.Counter(folded)
+        deeper = {i for i in range(len(labels)) if counts[folded[i]] > 1 and depth[i] < len(parts[i])}
+        for i, short in enumerate(folded):
+            for j, long in enumerate(folded):
+                if long.startswith(short + os.sep):
+                    # the shorter label gets more of its path, or else the longer one
+                    if depth[i] < len(parts[i]):
+                        deeper.add(i)
+                    elif depth[j] < len(parts[j]):
+                        deeper.add(j)
+        if not deeper:
             return labels
-        for i in clashing:
+        for i in deeper:
             depth[i] += 1
 
 

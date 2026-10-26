@@ -248,6 +248,19 @@ def test_folders_of_the_same_name_get_more_of_their_path(tmp_path):
                       'other']
 
 
+def test_a_label_never_starts_another_label(tmp_path):
+    # review: labels "Event" and "Event/sub" would show D:/Event/sub/x.jpg and
+    # E:/Event/sub/x.jpg both as "Event/sub/x.jpg"
+    a, b, c = tmp_path / 'd' / 'Event', tmp_path / 'e' / 'Event' / 'sub', tmp_path / 'f' / 'sub'
+    labels = folder_labels([a, b, c])
+    folded = [label.casefold() for label in labels]
+    assert not any(x != y and y.startswith(x + os.sep) for x in folded for y in folded)
+    names = {photo_name(a / 'sub' / 'x.jpg', [a, b, c], labels), photo_name(b / 'x.jpg', [a, b, c], labels),
+             photo_name(c / 'x.jpg', [a, b, c], labels)}
+    assert len(names) == 3
+    assert labels[2] == os.sep.join(['f', 'sub'])  # "sub" clashes with "Event/sub" by name
+
+
 @pytest.mark.skipif(os.name != 'nt', reason='drive letters are Windows paths')
 def test_a_drive_root_is_labeled_by_its_drive():
     labels = folder_labels([Path('D:/'), Path('E:/photos')])
