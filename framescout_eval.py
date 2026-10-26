@@ -519,7 +519,8 @@ class LabelSession:
     def handle(self, method, target, body):
         """Answer one request: (status, content type, body)."""
         parts = unquote(urlsplit(target).path).split('/')
-        if len(parts) < 2 or parts[1] != self.token:
+        # compared in constant time, as bytes: compare_digest refuses str that is not ASCII (review)
+        if len(parts) < 2 or not secrets.compare_digest(parts[1].encode('utf-8'), self.token.encode()):
             return 404, 'text/plain', b'not found'
         route = parts[2:]
         if method == 'POST':

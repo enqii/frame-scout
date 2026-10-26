@@ -350,6 +350,8 @@ def test_the_page_and_its_state_need_the_session_token(session):
     status, kind, body = get(session, '')
     assert status == 200 and kind.startswith('text/html') and b'FrameScout' in body
     assert get(session, '', token='wrong')[0] == 404
+    assert get(session, 'state', token='%C3%A4bc')[0] == 404  # not ASCII: still a plain 404
+    assert get(session, 'state', token='%ED%A0%80')[0] == 404  # not UTF-8
     assert session.handle('GET', '/', b'')[0] == 404
     # without the trailing slash: forwarded, so the relative links keep the token
     status, _, body = session.handle('GET', f'/{session.token}', b'')
