@@ -26,6 +26,11 @@ def test_the_engine_takes_one_or_more_photo_folders():
     # A25: "framescout_engine.py D:\a E:\b --profiles ..."; a call with one folder works as before
     keywords = {k.arg: k.value for k in add_argument_call('folder').keywords}
     assert isinstance(keywords.get('nargs'), ast.Constant) and keywords['nargs'].value == '+'
+    # review: "D:\a --device cpu E:\b" must work too, as options before a single folder did
+    calls = [node.func.attr for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
+             if isinstance(node, ast.Call) and getattr(node.func, 'attr', '').startswith('parse_')
+             and getattr(node.func, 'attr', '').endswith('args')]
+    assert calls == ['parse_intermixed_args']
 
 
 def test_the_engine_uses_the_shared_default_reference_weight():

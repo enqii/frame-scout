@@ -7,8 +7,8 @@ import pytest
 
 from framescout_core import (ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
                              RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, available_decoders, distinct_folders,
-                             folder_labels, join_scans, missing_decoder, missing_folders_message, photo_name,
-                             raw_preview_transpose, raw_preview_usable, scan_folders, scan_photos, skipped_lines,
+                             folder_labels, join_scans, missing_decoder, missing_folders_message,
+                             output_folder_problem, photo_name, raw_preview_transpose, raw_preview_usable, scan_folders, scan_photos, skipped_lines,
                              supported_extensions)
 
 NO_HEIF = Decoders(avif=True, heif=False, raw=True)
@@ -221,6 +221,19 @@ def test_distinct_folders_handle_a_drive_root():
     child = root / 'photos'
     kept, dropped = distinct_folders([child, root])
     assert kept == [root] and [d[0] for d in dropped] == [child]
+
+
+def test_the_output_folder_must_be_outside_every_photo_folder_list_entry(tmp_path):
+    photos, results = tmp_path / 'photos', tmp_path / 'results'
+    assert output_folder_problem([photos], results) is None
+    # the output folder inside a photo folder is left out of the scan, as before
+    assert output_folder_problem([tmp_path], results) is None
+    assert 'must not be a photo folder' in output_folder_problem([photos, results], results)
+    # review: a photo folder inside the output folder would be searched without any photo
+    inside = results / 'import'
+    problem = output_folder_problem([photos, inside], results)
+    assert str(inside) in problem and 'inside the output folder' in problem
+    assert output_folder_problem([tmp_path / 'results-2'], results) is None
 
 
 def test_missing_folders_message():

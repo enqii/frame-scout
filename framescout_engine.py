@@ -27,7 +27,8 @@ from framescout_core import (CACHE_FILE, CLIP_MODEL, CLIP_PRETRAINED, DEFAULT_RE
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, detection_options, distinct_folders, draft_size, final_status,
                              ensure_thumbnail, folder_labels, group_batches, import_detector_class,
-                             load_profiles, missing_decoder, missing_folders_message, photo_name, prefetch,
+                             load_profiles, missing_decoder, missing_folders_message, output_folder_problem, photo_name,
+                             prefetch,
                              prepare_cache, profile_slugs, progress_due,
                              progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
                              scan_folders, search_fingerprint, size_text, skipped_lines, store_group,
@@ -197,13 +198,16 @@ def main():
     parser.add_argument('--yolo-model', default=DEFAULT_YOLO_MODEL)
     parser.add_argument('--reference-weight', type=float, default=DEFAULT_REFERENCE_WEIGHT,
                         help='weight of the reference image score (0..1); profiles without reference images use text only')
-    args = parser.parse_args()
+    # the folders may come before, between or after the options, as one folder could (review)
+    args = parser.parse_intermixed_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):
         parser.error('Invalid value for batch-size, top, max-persons, person-confidence or reference-weight.')
     listed = [folder.resolve() for folder in args.folder]
     output = args.output.resolve()
-    if output in listed:
-        parser.error('The output folder must not be a photo folder.')
+    # also refused: a photo folder inside the output folder, which the scan leaves out (review)
+    problem = output_folder_problem(listed, output)
+    if problem:
+        parser.error(problem)
     # a folder listed twice or inside another listed folder is searched once (A25)
     roots, dropped = distinct_folders(listed)
     if not any(root.is_dir() for root in roots) and not output.is_dir():

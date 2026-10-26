@@ -145,6 +145,23 @@ def distinct_folders(folders):
     return kept, dropped
 
 
+def output_folder_problem(folders, output):
+    """Return why output cannot be the output folder of a search of the photo folders, or None.
+
+    folders and output are resolved paths. Refused: output equal to a photo folder, and a
+    photo folder inside output, whose files the scan always leaves out (review). An output
+    folder inside a photo folder is fine: the scan leaves it out.
+    """
+    key = _folder_key(output)
+    for folder in folders:
+        if _folder_key(folder) == key:
+            return 'The output folder must not be a photo folder.'
+        if _inside_key(_folder_key(folder), key):
+            return (f'The photo folder {folder} is inside the output folder {output}, whose files a search never '
+                    'reads. Choose another output folder or move the photos.')
+    return None
+
+
 def missing_folders_message(folders):
     """Return the error for a search none of whose photo folders exists."""
     if len(folders) == 1:
