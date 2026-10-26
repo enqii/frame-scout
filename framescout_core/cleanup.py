@@ -183,7 +183,42 @@ def _read_cache(cache):
     return rows, recorded
 
 
-def _cache_categories(results, photo_folder, current):
+def _photo_folder_list(photo_folders):
+    """The non-empty entries of photo_folders (None: none) as Paths."""
+    return [Path(f) for f in photo_folders or () if str(f).strip()]
+
+
+def _missing_rows(rows, photo_folders):
+    """The cache_missing category of the cache rows [(path, signature, size)] (E7, A25)."""
+    folders = _photo_folder_list(photo_folders)
+    if not folders:
+        return _category('cache_missing', problem='No photo folder is set.', rows=0, notes=[])
+    existing = [f for f in folders if f.is_dir()]
+    absent = [f for f in folders if f not in existing]
+    if not existing:
+        named = (f'The photo folder {absent[0]} does not exist' if len(absent) == 1 else
+                 'None of the photo folders exists (' + '; '.join(str(f) for f in absent) + ')')
+        return _category('cache_missing', rows=0, notes=[],
+                         problem=f'{named} (e.g. a disconnected drive), so cache entries of deleted photos are not '
+                                 'looked for.')
+    # only inside the listed photo folders that exist (user decisions on E7 and A25): rows
+    # of other folders may belong to a drive that is not connected now
+    prefixes = []
+    for folder in existing:
+        key = os.path.normcase(str(folder.resolve()))
+        prefixes.append(key if key.endswith(os.sep) else key + os.sep)
+    # each photo is looked at once, however many signatures it has (review), and once
+    # however many listed folders hold it
+    inside = {path for path, _, _ in rows if any(os.path.normcase(path).startswith(p) for p in prefixes)}
+    gone = {path for path in inside if _missing(path)}
+    dead = [(path, signature, size or 0) for path, signature, size in rows if path in gone]
+    notes = [f'The photo folder {f} does not exist (e.g. a disconnected drive), so cache entries of deleted photos '
+             'are not looked for there.' for f in absent]
+    return _category('cache_missing', sorted((p, s) for p, s, _ in dead), sum(size for *_, size in dead),
+                     rows=len(dead), notes=notes)
+
+
+def _cache_categories(results, photo_folders, current):
     """The categories cache_missing, cache_old and cache_other of the cache in results."""
     keys = ('cache_missing', 'cache_old', 'cache_other')
     try:
@@ -197,23 +232,7 @@ def _cache_categories(results, photo_folder, current):
         chosen = {signature for signature, kind in classes.items() if kind == wanted}
         sizes = [size or 0 for _, signature, size in rows if signature in chosen]
         found[key] = _category(key, sorted(chosen), sum(sizes), rows=len(sizes))
-    if photo_folder is None or not str(photo_folder).strip():
-        found['cache_missing'] = _category('cache_missing', problem='No photo folder is set.', rows=0)
-    elif not Path(photo_folder).is_dir():
-        found['cache_missing'] = _category(
-            'cache_missing', rows=0, problem=f'The photo folder {photo_folder} does not exist (e.g. a disconnected '
-                                             'drive), so cache entries of deleted photos are not looked for.')
-    else:
-        # only inside the current photo folder (user decision): rows of other folders may
-        # belong to a drive that is not connected now
-        folder = os.path.normcase(str(Path(photo_folder).resolve()))
-        prefix = folder if folder.endswith(os.sep) else folder + os.sep
-        # each photo is looked at once, however many signatures it has (review)
-        inside = {path for path, _, _ in rows if os.path.normcase(path).startswith(prefix)}
-        gone = {path for path in inside if _missing(path)}
-        dead = [(path, signature, size or 0) for path, signature, size in rows if path in gone]
-        found['cache_missing'] = _category('cache_missing', sorted((p, s) for p, s, _ in dead),
-                                           sum(size for *_, size in dead), rows=len(dead))
+    found['cache_missing'] = _missing_rows(rows, photo_folders)
     return {key: found[key] for key in keys}
 
 
@@ -251,17 +270,20 @@ def _unreferenced_references(refs_root, profiles_file, profiles=None):
                   if p.suffix.lower() in EXT and p.is_file() and _path_key(p) not in used)
 
 
-def scan_cleanup(results, profiles_file, refs_root, photo_folder, current_signature):
+def scan_cleanup(results, profiles_file, refs_root, photo_folders, current_signature):
     """Return {category: dict} of what the cleanup can delete; nothing is changed (E7).
 
     results: the results folder; profiles_file: the app's profiles.json; refs_root: the
-    references folder; photo_folder: the current photo folder (None if not set);
+    references folder; photo_folders: the current photo folders (None or empty if none is
+    set; A25): cache entries of deleted photos are looked for in those that exist;
     current_signature: the cache signature of the current settings (never offered).
     Each category of CLEANUP_CATEGORIES has items (paths; (path, signature) rows for
     cache_missing; the signatures for cache_old/cache_other), size (bytes), default,
     problem (why it is not offered, else None) and names (file names to show); the cache
-    categories have rows; galleries has thumbnails/thumbnails_size: the thumbnails only
-    the orphaned galleries link, deleted together with them.
+    categories have rows; cache_missing has notes (the listed folders that do not exist,
+    e.g. on a disconnected drive, and were left out); galleries has
+    thumbnails/thumbnails_size: the thumbnails only the orphaned galleries link, deleted
+    together with them.
     """
     results, refs_root = Path(results), Path(refs_root)
     temps = _temp_thumbnails(results)
@@ -285,7 +307,7 @@ def scan_cleanup(results, profiles_file, refs_root, photo_folder, current_signat
                                        thumbnails=extra, thumbnails_size=sum(_file_size(p) for p in extra))
         found['galleries']['names'] = [p.name for p in found['galleries']['items']]
         found['thumbnails'] = _category('thumbnails', free, sum(_file_size(p) for p in free))
-    found.update(_cache_categories(results, photo_folder, current_signature))
+    found.update(_cache_categories(results, photo_folders, current_signature))
     try:
         refs = _unreferenced_references(refs_root, profiles_file, profiles)
     except ValueError as exc:
@@ -340,9 +362,9 @@ def _delete_unlinked(results, links, listed, allowed, summary):
     _remove_empty_folders(results / LEGACY_THUMBNAILS_DIR, results)
 
 
-def _delete_rows(results, shown, selected, photo_folder, current, vacuum, summary):
+def _delete_rows(results, shown, selected, photo_folders, current, vacuum, summary):
     """Delete the selected cache rows that the scan shown listed and that still qualify now."""
-    fresh = _cache_categories(results, photo_folder, current)
+    fresh = _cache_categories(results, photo_folders, current)
     rows, signatures = [], []
     for key in ('cache_missing', 'cache_old', 'cache_other'):
         if key not in selected:
@@ -415,7 +437,7 @@ def _galleries_and_thumbnails(results, shown, selected, profiles_file, summary):
     _delete_unlinked(results, links, listed, allowed_thumbnails, summary)
 
 
-def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, photo_folder, current_signature,
+def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, photo_folders, current_signature,
              lock_timeout=CLEANUP_LOCK_TIMEOUT):
     """Delete the selected categories of the scan shown (scan_cleanup) permanently; return a summary (E7).
 
@@ -468,7 +490,7 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                  ('Galleries and thumbnails', bool({'galleries', 'thumbnails'} & selected),
                   lambda: _galleries_and_thumbnails(results, shown, selected, profiles_file, summary)),
                  ('Cache entries', True,
-                  lambda: _delete_rows(results, shown, selected, photo_folder, current_signature, vacuum, summary)),
+                  lambda: _delete_rows(results, shown, selected, photo_folders, current_signature, vacuum, summary)),
                  ('Reference images', 'references' in selected, references)]
         for name, wanted, step in steps:
             if not wanted:

@@ -88,12 +88,14 @@ class Project:
         path.write_bytes(b'photo')
         return path
 
-    def scan(self, photo_folder='default', current=CURRENT):
+    def scan(self, photo_folders='default', current=CURRENT):
         return scan_cleanup(self.results, self.profiles, self.refs,
-                            self.photos if photo_folder == 'default' else photo_folder, current)
+                            [self.photos] if photo_folders == 'default' else photo_folders, current)
 
-    def clean(self, scan, selected, vacuum=False, alive=lambda pid, status: False, current=CURRENT):
-        return clean_up(self.results, scan, selected, vacuum, alive, self.profiles, self.refs, self.photos, current)
+    def clean(self, scan, selected, vacuum=False, alive=lambda pid, status: False, current=CURRENT,
+              photo_folders='default'):
+        return clean_up(self.results, scan, selected, vacuum, alive, self.profiles, self.refs,
+                        [self.photos] if photo_folders == 'default' else photo_folders, current)
 
 
 @pytest.fixture
@@ -214,10 +216,58 @@ def test_rows_of_deleted_photos_inside_the_photo_folder(project):
 
 def test_rows_of_deleted_photos_need_an_existing_photo_folder(project):
     project.cache([(project.base / 'gone' / 'b.jpg', CURRENT)])
-    scan = project.scan(photo_folder=project.base / 'gone')  # e.g. a disconnected drive
+    scan = project.scan(photo_folders=[project.base / 'gone'])  # e.g. a disconnected drive
     assert scan['cache_missing']['items'] == [] and 'does not exist' in scan['cache_missing']['problem']
-    scan = project.scan(photo_folder=None)
-    assert scan['cache_missing']['items'] == [] and scan['cache_missing']['problem']
+    for none in (None, [], ['', '  ']):
+        scan = project.scan(photo_folders=none)
+        assert scan['cache_missing']['items'] == [] and scan['cache_missing']['problem']
+    scan = project.scan(photo_folders=[project.base / 'gone', project.base / 'gone too'])
+    assert scan['cache_missing']['items'] == [] and 'None of the photo folders' in scan['cache_missing']['problem']
+
+
+def test_rows_of_deleted_photos_in_every_listed_photo_folder(project):
+    # several photo folders per search (A25): each listed folder counts
+    second = project.base / 'second'
+    second.mkdir()
+    gone1, gone2 = project.photos / 'a.jpg', second / 'sub' / 'b.jpg'
+    outside = project.base / 'elsewhere' / 'c.jpg'
+    project.cache([(gone1, CURRENT), (gone2, CURRENT), (outside, CURRENT)])
+    scan = project.scan(photo_folders=[project.photos, second])
+    assert sorted(scan['cache_missing']['items']) == sorted([(str(gone1), CURRENT), (str(gone2), CURRENT)])
+    assert scan['cache_missing']['notes'] == []
+
+
+def test_a_missing_listed_folder_is_skipped_with_a_note(project):
+    # e.g. a disconnected drive: its rows are never offered, the other folders still are
+    gone_drive = project.base / 'drive'
+    gone1, on_drive = project.photos / 'a.jpg', gone_drive / 'b.jpg'
+    project.cache([(gone1, CURRENT), (on_drive, CURRENT)])
+    scan = project.scan(photo_folders=[project.photos, gone_drive])
+    assert scan['cache_missing']['items'] == [(str(gone1), CURRENT)] and scan['cache_missing']['problem'] is None
+    notes = scan['cache_missing']['notes']
+    assert len(notes) == 1 and str(gone_drive) in notes[0] and 'does not exist' in notes[0]
+    summary = project.clean(scan, {'cache_missing'}, photo_folders=[project.photos, gone_drive])
+    assert summary['rows'] == 1 and project.rows() == [(str(on_drive), CURRENT)]
+
+
+def test_rows_of_a_folder_that_disappeared_since_the_scan_are_kept(project):
+    second = project.base / 'second'
+    second.mkdir()
+    gone = second / 'b.jpg'
+    project.cache([(gone, CURRENT)])
+    scan = project.scan(photo_folders=[project.photos, second])
+    assert scan['cache_missing']['items'] == [(str(gone), CURRENT)]
+    second.rmdir()  # the drive is disconnected before the deletion
+    summary = project.clean(scan, {'cache_missing'}, photo_folders=[project.photos, second])
+    assert summary['rows'] == 0 and project.rows() == [(str(gone), CURRENT)]
+
+
+def test_nested_listed_folders_count_a_row_once(project):
+    gone = project.photos / 'sub' / 'a.jpg'
+    (project.photos / 'sub').mkdir()
+    project.cache([(gone, CURRENT)])
+    scan = project.scan(photo_folders=[project.photos, project.photos / 'sub', project.photos])
+    assert scan['cache_missing']['items'] == [(str(gone), CURRENT)] and scan['cache_missing']['rows'] == 1
 
 
 def test_rows_of_old_engines_and_other_settings(project):
