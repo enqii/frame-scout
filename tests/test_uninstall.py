@@ -532,10 +532,9 @@ def test_the_uninstaller_runs_the_script_outside_the_environment():
     assert not any('.venv' in line for line in commands)  # .venv's Python cannot delete itself
 
 
-def test_the_uninstaller_looks_for_the_python_versions_of_the_installer():
-    pattern = r'for %%V in \(([\d. ]+)\) do'
-    installer = (ROOT / 'Install-FrameScout.bat').read_text(encoding='utf-8')
-    assert re.search(pattern, uninstaller()).group(1) == re.search(pattern, installer).group(1)
+def test_the_uninstaller_falls_back_to_the_python_versions_of_older_installers():
+    # installers before P5 part C created .venv with an installed Python 3.14, 3.13 or 3.12
+    assert re.search(r'for %%V in \(([\d. ]+)\) do', uninstaller()).group(1) == '3.14 3.13 3.12'
 
 
 def test_the_uninstaller_keeps_exclamation_marks_in_paths_and_arguments():

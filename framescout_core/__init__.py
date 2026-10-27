@@ -28,6 +28,7 @@ from .signature import (ENGINE_TEMPLATE, engine_id, ENGINE, MODEL_ENGINES,
 from .torch_build import (TORCH_VERSION, TORCHVISION_VERSION, TORCH_INDEX, CUDA_BUILDS,
     parse_gpu_query, unsupported_gpus, cuda_build, driver_text, torch_requirements,
     installed_build_matches, installed_cuda_build, torch_index_url)
+from .portable_python import (PYTHON_VERSION, PYTHON_URL, PYTHON_SHA256, PRIVATE_PYTHON)
 from .devices import (device_choices, cuda_hint, cuda_status, DETECTION_IMAGE_SIZE,
     detection_options, ULTRALYTICS_ENV, import_detector_class)
 from .thumbnails import (FULL_IMAGE_LABEL, crop_label, thumbnail_name, ensure_thumbnail)
