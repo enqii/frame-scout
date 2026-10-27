@@ -97,7 +97,10 @@ the module of its area and to the re-exports in `__init__.py`.
   on `profiles.json.lock` (`PROFILES_LOCK_TIMEOUT` = 5 s, then `OSError`), compares the
   file's current version with `expected` and raises `ProfilesChangedError` (a
   `ValueError`) without writing if it differs, also for a file created or deleted since;
-  without `expected` the save is unchecked; the lock file stays, empty).
+  without `expected` the save is unchecked; the lock file stays, empty; `save_profiles`
+  returns the version of the file it wrote; both functions retry a read or replace that
+  fails for a moment on Windows while another session reads or replaces the file, 5
+  tries 0.05 s apart, like the settings and marks files).
 - `thumbnails.py`: `thumbnail_name`/`ensure_thumbnail` (gallery thumbnails; a photo
   deleted before the export is skipped, E6), `crop_label`/`FULL_IMAGE_LABEL` (gallery crop
   labels).
@@ -188,8 +191,10 @@ the module of its area and to the re-exports in `__init__.py`.
   `A-Za-z0-9_-`, no Windows device names).
 - `_common.py` (internal, not re-exported): helpers several areas share, i.e. atomic
   writes (`_publish_via_temp`, `_publish_new`, `_replace_atomically`,
-  `_replace_with_retry`), reading a JSON object file with retries (`_read_json_object`),
-  the locked read-change-write of a JSON file (`_update_locked`) and `_path_key`.
+  `_replace_with_retry`), reading a file (`_read_with_retry`) or a JSON object file
+  (`_read_json_object`) with retries, the save lock of a file on `<file>.lock`
+  (`_file_lock`, used by `_update_locked` and `save_profiles`), the locked
+  read-change-write of a JSON file (`_update_locked`) and `_path_key`.
 
 Dependencies between the modules go one way (no import cycles): `cleanup` uses most of the
 others, `_common` uses only `locks`. Private helpers (leading underscore) are not
@@ -713,8 +718,16 @@ Profile forms (A13): `app.py` reads `profiles.json` with `read_profiles_versione
 rerun and keeps the version that the forms of the last complete run showed in
 `st.session_state.profiles_shown` (set after the forms are drawn; an interrupted run keeps
 the older version, so a save is refused, not lost). `store()` saves with
-`expected=profiles_shown`; on `ProfilesChangedError` it shows "Your changes were not saved"
-and the next run shows the current profiles. A click on a form that no longer exists after
+`expected=profiles_shown` and, on success, keeps the version `save_profiles` returns as
+`profiles_shown`, so the session's own next save is never refused, also if the following
+run is interrupted before the forms. On `ProfilesChangedError` it increments
+`st.session_state.saves` (new keys for the edit forms: the form at the same place may now
+show another profile, which must not get the edited profile's uploads or ticked "Remove"
+checkbox), stores "Your changes were not saved" in `st.session_state.profile_error` and
+reruns; the message is shown at the top of the profile tab (not in the form's expander,
+which a changed profile name redraws closed), the new-profile form keeps its input.
+Checked once with Streamlit's `AppTest` (refused save after another writer deleted a
+profile above the edited one). A click on a form that no longer exists after
 another session shortened the list is dropped by Streamlit without a message (A31).
 
 `framescout_core.reconcile_settings` does the sync on every page run with two session
@@ -1002,8 +1015,9 @@ and rawpy, which CI does not install). Add a small integration smoke test for re
 Potential current quirks to investigate rather than assume solved (most are tracked in
 `BACKLOG.md`): "Clean up storage" was checked with `AppTest` only (not in a browser), and
 `auto_cleanup` in one CPU smoke run with synthetic photos under `.tmp/`; marks follow the
-absolute photo path (A21); the app saves its whole profile list, so edits by another
-session in between are overwritten (A13); the engine still takes an empty folder
+absolute photo path (A21); the app saves its whole profile list, so a save based on a
+file that another session changed in between is refused and has to be made again (A13);
+the engine still takes an empty folder
 argument as its working directory (the app no longer passes one, A16); result file downloads do not contain thumbnails (ZIP export: P4
 (C), A18); `app.py` itself has no automated tests (A4/A5 were checked once with
 Streamlit's `AppTest` and real engine runs, and manually in a browser: start, reload,
