@@ -50,8 +50,15 @@ rem the private Python, otherwise it is created again.
 echo The Python environment in .venv does not work: its Python or pip is missing. The
 echo installer repairs it.
 :python
-if exist ".python\python.exe" goto venv
-rem a .python without python.exe is a leftover, e.g. of an uninstall that stopped halfway
+rem A .python is reused only if it is complete and the pinned version (review, I24): a
+rem leftover of an uninstall or a delete that stopped halfway, or the Python of an older
+rem pin, is downloaded again.
+if not exist ".python\python.exe" goto python_download
+".python\python.exe" -I -c "import sys, platform, venv, ensurepip; sys.exit(platform.python_version() not in sys.argv[1:])" %PYTHON_VERSION% >nul 2>&1
+if not errorlevel 1 goto venv
+echo The private Python in .python is incomplete or not Python %PYTHON_VERSION%, so it is
+echo downloaded again.
+:python_download
 if exist ".python" rmdir /s /q ".python"
 if exist ".python" goto python_locked
 echo Downloading Python %PYTHON_VERSION% (about 33 MB) from python.org ...
@@ -118,8 +125,9 @@ pause
 exit /b 0
 
 :python_locked
-echo The folder .python is incomplete and cannot be deleted. Close the programs that use it,
-echo delete the folder .python in this folder and run the installer again.
+echo The folder .python has to be downloaded again but cannot be deleted. Close the
+echo programs that use it, delete the folder .python in this folder and run the installer
+echo again.
 goto failed
 :download_failed
 echo Downloading Python failed. Check the internet connection (and the proxy settings, if
