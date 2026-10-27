@@ -37,7 +37,7 @@ Run these as separate, plain commands from the main checkout:
 1. `git fetch origin --prune`
 2. If the main checkout is on `main` and clean: `git merge --ff-only origin/main`.
    Otherwise do not touch it; mention it to the user.
-3. Roadmap: read `ROADMAP.md` (about 90 lines; not `BACKLOG.md`, which holds the items'
+3. Roadmap: read `ROADMAP.md` (about 130 lines; not `BACKLOG.md`, which holds the items'
    details). If step 2 could not fast-forward `main`, read
    `git show origin/main:ROADMAP.md` instead. The **next item** is the first unchecked
    `- [ ]` line of the section "Open (priority order)", top to bottom. Lines marked `- [~]` are deferred by

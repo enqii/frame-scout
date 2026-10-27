@@ -13,6 +13,42 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       pinned dependencies (I12), and B, uninstall script (I19, I20, I21), are done, see
       "Done"; I20 depends on this part)
 
+### P6 – Safety of user data (added 2026-10-27 from the open backlog)
+- [ ] (A) Concurrent profile edits no longer overwrite each other; more than one backup
+      generation (A13; how many generations is a user decision)
+- [ ] (B) Deleting a profile: ask first, and decide what happens to its marks and copy
+      folder (A8, A22; user decision, a stable profile id would be a `profiles.json`
+      schema change = hold point)
+- [ ] (C) Marks and cache follow the path relative to the photo folder (E8, A21; changes
+      cache keys and `marks.json`: a migration and a hold point)
+
+### P7 – Offline and nothing outside the project folder
+- [ ] (A) No Hugging Face Hub request per search once the weights are cached, no symlink
+      warning in `run.log` (E16 and E31 describe the same problem: close one as a
+      duplicate; E33; check the behavior without internet, the first download must still
+      work)
+- [ ] (B) Model and config files stay under `.cache/`, also for manual runs (E9, I10; keeps
+      the uninstall clean, relates to I20 and P5 part C)
+
+### P8 – Robust runs and galleries
+- [ ] (A) Skipped photos leave no gaps in the gallery (E12)
+- [ ] (B) Stopped runs leave no half-written galleries and temporary files (E24, E26)
+- [ ] (C) A RAW file whose JPEG partner is broken is analyzed instead (E30)
+- [ ] (D) The same photo folder by another path, and junctions inside a folder (A28, A29)
+
+### P9 – App polish
+- [ ] (A) The photo folder is not scanned on every rerun (A6 and A27 are the same
+      problem: close one as a duplicate; how stale a count may be is a UX decision)
+- [ ] (B) Raise the Streamlit minimum and switch to `width="stretch"` (A10)
+- [ ] (C) "Hide no match" keeps the pages stable, "Reset to defaults" for the AI settings
+      (A24, A26)
+
+### P10 – Checks on the home PC (needs the user's hardware; before P4b)
+- [ ] (A) Run the CUDA path and the evaluation tool with real models and fix what shows up
+      (I11, E34, E35; a PR "runtime-tested on the home PC")
+- [ ] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
+      detection results is a hold point)
+
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
       pool at home, search quality is a hold point) (tooling done 2026-10-26 in PR #32;
