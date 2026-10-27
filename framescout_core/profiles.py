@@ -3,8 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from ._common import _publish_new, _publish_via_temp, _replace_atomically
-from .locks import RunLock
+from ._common import _file_lock, _publish_new, _publish_via_temp, _replace_atomically
 
 
 def create_from_example(target, example):
@@ -166,10 +165,7 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
     folder, flushed to disk and then renamed, so a crash or power loss leaves a complete
     old or new file, never a half-written one.
     """
-    lock = RunLock(filename.with_name(filename.name + '.lock'))
-    if not lock.acquire(timeout=lock_timeout, poll=0.01):
-        raise OSError(f'{filename.name} is being saved by another session')
-    try:
+    with _file_lock(filename, lock_timeout):
         try:
             previous = filename.read_bytes()
         except FileNotFoundError:
@@ -190,8 +186,6 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
                 document = {**old, 'profiles': profiles}
         text = json.dumps(document, ensure_ascii=False, indent=2) + '\n'
         _replace_atomically(filename, text.encode('utf-8'))
-    finally:
-        lock.release()
 
 
 def _version_of(content):

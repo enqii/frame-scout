@@ -2,13 +2,14 @@
 
 Atomic file writes (_publish_via_temp, _publish_new, _replace_atomically,
 _replace_with_retry), reading a JSON object file with retries (_read_json_object), the
-locked read-change-write of a JSON file (_update_locked) and the comparable form of a
-path (_path_key).
+save lock of a file (_file_lock), the locked read-change-write of a JSON file
+(_update_locked) and the comparable form of a path (_path_key).
 """
 import json
 import os
 import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from .locks import RunLock
@@ -104,14 +105,25 @@ def _update_locked(filename, read, update, attempts, retry_delay, lock_timeout):
     the lock is not free within lock_timeout seconds; errors of read() and update() (e.g.
     ValueError for an unreadable file, which is then never replaced) are passed on.
     """
-    filename = Path(filename)
-    lock = RunLock(filename.with_name(filename.name + '.lock'))
-    if not lock.acquire(timeout=lock_timeout, poll=0.01):
-        raise OSError(f'{filename.name} is being saved by another session')
-    try:
+    with _file_lock(filename, lock_timeout):
         document = update(read())
         if document is not None:
             data = (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
             _replace_with_retry(filename, data, attempts, retry_delay)
+
+
+@contextmanager
+def _file_lock(filename, timeout):
+    """Hold a RunLock on <filename>.lock while the block runs, so no other save comes in between.
+
+    App sessions are threads of one process, and two RunLocks conflict there too. The lock
+    file stays (empty). Raises OSError if the lock is not free within timeout seconds.
+    """
+    filename = Path(filename)
+    lock = RunLock(filename.with_name(filename.name + '.lock'))
+    if not lock.acquire(timeout=timeout, poll=0.01):
+        raise OSError(f'{filename.name} is being saved by another session')
+    try:
+        yield
     finally:
         lock.release()
