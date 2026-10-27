@@ -232,13 +232,6 @@ and discussions.
       (I3 is done, but the user kept the Streamlit floor at `>=1.40` in PR #8: raising
       it and switching to `width` belong together in this item. The result gallery of P4
       (A) uses `use_container_width` for its buttons as well.)
-- [ ] **A13 – Concurrent profile edits are lost:** the app reads `profiles.json` on every
-      rerun and saves its whole list, so an edit made in another tab/session (or by hand)
-      between that read and a save is overwritten; `profiles.json.bak` holds only the
-      state before the last save. Fix idea: save only if the file is unchanged since it
-      was read (mtime/hash), otherwise reload and ask. More than one backup generation
-      (rotating `.bak` files, a one-time copy before the v3 conversion) also belongs
-      here; for now the user chose a single `profiles.json.bak` (PR #6 review).
 - [ ] **A15 – Reference folder and gallery file can get different suffixes:**
       `reference_folder` adds `-2`, `-3`, … when another profile's references occupy the
       folder, `profile_slugs` adds them by profile order. The same profile can therefore
@@ -353,6 +346,26 @@ and discussions.
       idea: skip junctions and folder links in `scan_photos` (or resolve and dedupe the
       found files), or document it; a user who links event folders into one parent may
       rely on it today, so a user decision. Found in PR #28.
+
+- [ ] **A30 – Only one backup generation of `profiles.json`:** the user chose a single
+      `profiles.json.bak` in PR #6 and again in the PR of A13 (hold point), so the backup is
+      the state before the last save only and the next save replaces it. Options if more
+      are wanted: rotate N generations (`.bak` newest, then `.bak.1`, ...); timestamped
+      backups; a one-time copy before the v3 conversion. Consequences to handle then:
+      cleanup (E7, A14) must keep the reference images of all generations, and
+      `update_backup_references` (rename of the photo/reference folder) must rewrite all
+      of them. How many generations is a user decision. Split from A13.
+- [ ] **A31 – A click on a profile form that no longer exists is dropped silently:** if
+      another session shortened the profile list, a form submit or button of a form that
+      the page no longer shows is not delivered by Streamlit, and the app shows no
+      message (found in the PR of A13, not reproduced beyond the reading of the code).
+      Fix idea: tell the user when the profile list changed under an open page.
+- [ ] **A32 – `update_backup_references` runs outside the lock of `profiles.json`:** after
+      a folder rename the paths in `profiles.json.bak` are rewritten without the
+      `profiles.json.lock` that `save_profiles` holds (A13), so it could in theory
+      rewrite a `.bak` that another session has just replaced with newer state. Probably
+      harmless (it only rewrites paths of the moved folder); not analysed. Found in the
+      PR of A13.
 
 ### Installation / project
 

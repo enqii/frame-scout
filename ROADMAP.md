@@ -9,8 +9,8 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
 ## Open (priority order)
 
 ### P6 – Safety of user data (added 2026-10-27 from the open backlog)
-- [ ] (A) Concurrent profile edits no longer overwrite each other; more than one backup
-      generation (A13; how many generations is a user decision)
+- [x] (A) Concurrent profile edits no longer overwrite each other (A13) (done 2026-10-27;
+      more than one backup generation: A30, deferred by user decision: single `.bak` kept)
 - [ ] (B) Deleting a profile: ask first, and decide what happens to its marks and copy
       folder (A8, A22; user decision, a stable profile id would be a `profiles.json`
       schema change = hold point)
