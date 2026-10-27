@@ -269,17 +269,27 @@ header of the file says this. `tests/test_constraints.py` keeps the file consist
 `Install-FrameScout.bat [cpu|cuda]` (P5 part C): needs no installed Python and has no
 search for Python 3.14/3.13/3.12. A new installation downloads python.org's full package
 `python-3.14.9-amd64.zip` (about 33 MB, about 117 MB extracted) with `curl.exe` to `.tmp`,
-checks its SHA-256 with `Get-FileHash` (Windows PowerShell; `PSModulePath` is cleared
-because a PowerShell 7 parent breaks the cmdlet lookup), extracts it with `tar.exe` to
-`.tmp\python-3.14.9`, moves it as a whole to `.python\` and creates `.venv` with
-`.python\python.exe -I -m venv .venv`. The pins are `PYTHON_VERSION`/`PYTHON_URL`/
+checks its SHA-256 with `Get-FileHash` (Windows PowerShell; `PSModulePath` is cleared for
+this one call and restored right after it, because a PowerShell 7 parent breaks the
+cmdlet lookup), extracts it with `tar.exe` to `.tmp\python-3.14.9`, moves it as a whole to
+`.python\` (up to five tries about three seconds apart, waiting with `ping`, because a
+virus scanner that checks the new files makes the move fail with "Access is denied"; then
+it reports the move as failed) and creates `.venv` with
+`.python\python.exe -I -m venv --clear .venv`. The pins are `PYTHON_VERSION`/`PYTHON_URL`/
 `PYTHON_SHA256`/`PRIVATE_PYTHON` in `framescout_core/portable_python.py`; the `.bat` holds
-the same values and `tests/test_installer.py` keeps them in sync. An existing `.venv` (older
-installer, installed Python 3.12-3.14) is kept without a download or migration; a `.python`
-without `python.exe` is removed and downloaded again, while a `.python` with `python.exe`
-is taken for complete (I24); if `venv` fails, the message says to delete `.python` and
-`.venv`. `.venv` refers to `.python` by absolute path, so the folder cannot be moved
-afterwards (prebuilt movable bundle: I23). The script uses no delayed expansion (a `!` in
+the same values and `tests/test_installer.py` keeps them in sync. An existing `.venv` is kept
+without a download or migration if `.venv\Scripts\python.exe -I -c "import pip"` works,
+also one of an older installer (installed Python 3.12-3.14). Otherwise (its Python is
+gone: `.python` deleted, the folder moved, an installed Python removed; or `venv` stopped
+before pip) the installer gets the private Python, checks the `.venv` again (a `.venv` of
+the private Python works again once `.python` is back, so its packages are kept) and else
+creates it again with `--clear`. A `.python` is reused only if `python.exe` exists and
+runs `import venv, ensurepip` and reports `PYTHON_VERSION` (`platform.python_version()`);
+otherwise it is deleted and downloaded again (I24; a `.python` that cannot be deleted
+stops with a message). If `venv` fails, the half-created `.venv` is removed and the message
+says to delete `.python`. `.venv` refers to `.python` by absolute path, so the folder
+cannot be moved afterwards without running the installer again, which then re-creates
+`.venv` and downloads all packages again (prebuilt movable bundle: I23). The script uses no delayed expansion (a `!` in
 the folder path would be dropped from `cd` and `%CD%`), `goto` instead of parenthesized
 blocks and never the folder path inside parentheses (I21). Then it sets `PIP_CONSTRAINT=constraints.txt` (I18),
 installs PyTorch with `install_torch.py` (passing the argument on; torch's dependencies
@@ -306,7 +316,8 @@ library only.
 `Uninstall-FrameScout.bat [--dry-run]` (P5 part B, I20 in part C) runs
 `framescout_uninstall.py` with `.python\python.exe` if it exists, otherwise (installations
 of older installers) with the first of Python 3.14/3.13/3.12 found through the `py`
-launcher (neither: it prints the manual steps), with `-B -E -s` and **not** with `.venv`'s Python, which
+launcher (neither: it prints the manual steps, which name `.venv`, `.python`, `.cache` and
+`.tmp`), with `-B -E -s` and **not** with `.venv`'s Python, which
 cannot delete itself while it runs. It sets no cache or `TMP` variables (`.tmp` is
 deleted) and uses no delayed expansion, which would drop a `!` from the folder path and
 the arguments (review: the `cd` then failed and the script of the current directory
@@ -944,11 +955,16 @@ the torch pins of both files equal `TORCH_VERSION`/`TORCHVISION_VERSION` in
 `test_torch_install.py`; completeness of the transitive pins is not checkable in CI), and
 the installer (P5 part C, `test_installer.py`, text checks of `Install-FrameScout.bat`:
 pins equal `framescout_core.portable_python`, the full package of python.org, no installed
-Python needed, SHA-256 checked before extraction and use, extracted in `.tmp` and moved as
-a whole, an existing `.venv` kept without a download, no delayed expansion, folder path
+Python needed, SHA-256 checked before extraction and use, `PSModulePath` cleared only for
+that check, extracted in `.tmp` and moved as a whole with retries, a working `.venv` kept
+without a download, a broken one checked again and else created again with `--clear`, a
+failed `venv` removed, an existing `.python` checked for `venv`/`ensurepip` and the pinned
+version (the check itself runs on the test Python), no delayed expansion, folder path
 never inside a block; the real download, extraction and `venv` creation and the folder
-`Fo!to (old)\fs` were run by hand under `.tmp`, a full install with PyTorch on the private
-Python was not), and the uninstall script (P5, `test_uninstall.py`, tests on `tmp_path` trees: plan, kept
+`Fo!to (old)\fs` were run by hand under `.tmp`, as were the repair paths of the review
+(`python.exe` of `.python` deleted, pip removed from `.venv`, a failed `venv`, `Lib\venv`
+removed from `.python`, the folder renamed, the move blocked by an open file for 7 s and
+for 25 s); a full install with PyTorch on the private Python was not), and the uninstall script (P5, `test_uninstall.py`, tests on `tmp_path` trees: plan, kept
 entries (also in another case, Windows only), protected folders from settings (invalid
 values, read once, photo folder around the project), links and junctions, read-only
 files and folders, unlistable items, failures reported once, user-data and outside

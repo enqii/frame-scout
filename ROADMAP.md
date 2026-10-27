@@ -135,5 +135,4 @@ decision in PR #14):
 - [x] (A) Pinned dependencies (I12) (done 2026-10-26)
 - [x] (B) Uninstall script (done 2026-10-27; follow-ups I19, I20, I21)
 - [x] (C) Portable Python variant (done 2026-10-27; a private Python 3.14.9 in `.python\`
-      for new installations, I20 and I21 done; prebuilt movable bundle: I23, installer check
-      of `.python`: I24)
+      for new installations, I20, I21 and I24 done; prebuilt movable bundle: I23)

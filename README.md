@@ -38,14 +38,18 @@ matching photos as an HTML gallery.
    of the project, so no installed Python is needed and an installed one is not used,
    creates an isolated `.venv` with it and installs the dependencies in the fixed
    versions of `constraints.txt` (those of the project's verified runs on Python 3.14).
-   An existing `.venv` from an earlier installer (Python 3.12 to 3.14 installed on the
-   PC) is kept as it is.
+   An existing `.venv` that works is kept as it is, also one from an earlier installer
+   (Python 3.12 to 3.14 installed on the PC). Running the installer again repairs an
+   environment that no longer starts or lacks pip, and downloads the private Python
+   again if it is incomplete or another version.
 
 **Do not move or rename the FrameScout folder after the installation:** `.venv` refers
-to `.python` by its absolute path. To move it, uninstall (see below) and install again in
-the new folder.
+to `.python` by its absolute path, so FrameScout no longer starts in the new place. If
+you moved it anyway, run the installer again: it creates the environment again and
+downloads all packages again (several GB with CUDA).
 
-If the installation fails, delete `.python` and `.venv` and run the installer again.
+If the installation fails, run the installer again; if it fails again, delete `.python`
+and run it once more.
 
 ### GPU support (NVIDIA, CUDA)
 
@@ -411,8 +415,8 @@ completely, back up what you want to keep and delete the project folder yourself
 The script runs with the private Python in `.python`, which it deletes last: it ends
 first, and `Uninstall-FrameScout.bat` then removes `.python`. For an installation of an
 older installer (without `.python`) it uses the Python 3.12 to 3.14 that the installer
-used (found through the `py` launcher); without either, delete `.venv`, `.cache` and
-`.tmp` by hand. A Python installed on the PC by yourself remains in place. When you
+used (found through the `py` launcher); without either, delete `.venv`, `.python`,
+`.cache` and `.tmp` by hand. A Python installed on the PC by yourself remains in place. When you
 update from a ZIP, extract it into a fresh folder instead of over an old one (old files
 of earlier versions would stay).
 
