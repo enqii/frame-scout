@@ -541,10 +541,16 @@ def deletion_consequences(p):
         lines.append(f'{SETTINGS.name} cannot be read, so a saved copy target folder of it cannot be removed now '
                      f'({plain(str(exc))}).')
         saved = None
+    # the folder typed in this session that settings.json could not save is used instead of
+    # the saved one (copy_folder_value) and is forgotten as well (review)
+    unsaved = st.session_state.get('copy_folders_unsaved', {}).get(name)
+    if unsaved is not None:
+        lines.append(f'The copy target folder {plain(unsaved) or "(empty)"} typed for it in this session (not saved '
+                     f'in {SETTINGS.name}) is forgotten. The folder and the photos copied into it stay where they are.')
     if saved:
         lines.append(f'Its saved copy target folder {plain(saved)} is removed from the settings. The folder and the '
                      'photos copied into it stay where they are.')
-    else:
+    elif unsaved is None:
         lines.append('Photos copied for it stay where they are.')
     refs = p.get('reference_images', [])
     if refs:
