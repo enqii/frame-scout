@@ -1,8 +1,10 @@
-"""Search profiles: loading and validating them, reading and saving the app's profiles.json (A2)."""
+"""Search profiles: loading and validating them, reading and saving the app's profiles.json (A2, A13)."""
+import hashlib
 import json
 from pathlib import Path
 
 from ._common import _publish_new, _publish_via_temp, _replace_atomically
+from .locks import RunLock
 
 
 def create_from_example(target, example):
@@ -73,7 +75,12 @@ def load_profiles(filename, inline):
 
 def _read_entries(filename):
     """Return the raw profile list of a profiles JSON file; the v3 format is converted."""
-    data = json.loads(filename.read_text(encoding='utf-8-sig'))
+    return _entries_of(filename.read_bytes())
+
+
+def _entries_of(content):
+    """Return the raw profile list of the bytes of a profiles JSON file (see _read_entries)."""
+    data = json.loads(content.decode('utf-8-sig'))
     if isinstance(data, dict) and 'profiles' in data:
         raw = data['profiles']
     elif isinstance(data, dict):  # v3 migration: {name: [prompts, ...]}
@@ -114,16 +121,44 @@ def read_profiles(filename):
     not lose the profiles (A2). Raises ValueError (including json.JSONDecodeError) for a
     file the app cannot represent, so that the app never saves over it.
     """
+    return read_profiles_versioned(filename)[0]
+
+
+def read_profiles_versioned(filename):
+    """Return (profiles, version) of the app's profiles JSON file, read once (A13).
+
+    profiles as read_profiles() returns them (same errors); version identifies the file's
+    exact content (None if it is missing). Pass it to save_profiles(expected=...) so that a
+    save based on these profiles never overwrites a change made to the file since.
+    """
     try:
-        raw = _read_entries(filename)
+        content = filename.read_bytes()
     except FileNotFoundError:
-        return []
+        return [], None
+    raw = _entries_of(content)
     _check_entries(raw)
-    return raw
+    return raw, _version_of(content)
 
 
-def save_profiles(filename, profiles):
+class ProfilesChangedError(ValueError):
+    """save_profiles refused a save: the file changed since the profiles it is based on were read (A13)."""
+
+
+# the default of save_profiles(expected=...): save without comparing versions
+_UNCHECKED = object()
+# seconds save_profiles waits for another session's save
+PROFILES_LOCK_TIMEOUT = 5.0
+
+
+def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES_LOCK_TIMEOUT):
     """Write profiles to filename as {"profiles": [...]} (other top-level keys are kept), with a .bak.
+
+    expected: the version (read_profiles_versioned) of the file the profiles are based on;
+    if the file's content differs from it now (another tab, session or a text editor
+    changed, created or deleted it), nothing is written and ProfilesChangedError is raised
+    (A13). The comparison and the writes happen under a RunLock on <filename>.lock (the
+    file stays, empty), so no other save can come in between; OSError if that lock is not
+    free within lock_timeout seconds. Without expected, the file is saved unchecked.
 
     The previous content is copied byte for byte to <filename>.bak first (replacing an
     older backup, so only the state before the latest save is kept); if that fails,
@@ -131,23 +166,37 @@ def save_profiles(filename, profiles):
     folder, flushed to disk and then renamed, so a crash or power loss leaves a complete
     old or new file, never a half-written one.
     """
+    lock = RunLock(filename.with_name(filename.name + '.lock'))
+    if not lock.acquire(timeout=lock_timeout, poll=0.01):
+        raise OSError(f'{filename.name} is being saved by another session')
     try:
-        previous = filename.read_bytes()
-    except FileNotFoundError:
-        previous = None
-    document = {'profiles': profiles}
-    if previous is not None:
-        _replace_atomically(_backup_path(filename), previous)
         try:
-            old = json.loads(previous.decode('utf-8-sig'))
-        except ValueError:  # unreadable: nothing to keep (the .bak has it)
-            old = None
-        # other top-level keys (e.g. hand-added metadata) are kept in their order; a v3
-        # file, whose keys are profile names, is not merged (review)
-        if isinstance(old, dict) and 'profiles' in old:
-            document = {**old, 'profiles': profiles}
-    text = json.dumps(document, ensure_ascii=False, indent=2) + '\n'
-    _replace_atomically(filename, text.encode('utf-8'))
+            previous = filename.read_bytes()
+        except FileNotFoundError:
+            previous = None
+        if expected is not _UNCHECKED and _version_of(previous) != expected:
+            raise ProfilesChangedError(
+                f'{filename.name} was changed in another tab or session, or by hand, since this page showed it')
+        document = {'profiles': profiles}
+        if previous is not None:
+            _replace_atomically(_backup_path(filename), previous)
+            try:
+                old = json.loads(previous.decode('utf-8-sig'))
+            except ValueError:  # unreadable: nothing to keep (the .bak has it)
+                old = None
+            # other top-level keys (e.g. hand-added metadata) are kept in their order; a v3
+            # file, whose keys are profile names, is not merged (review)
+            if isinstance(old, dict) and 'profiles' in old:
+                document = {**old, 'profiles': profiles}
+        text = json.dumps(document, ensure_ascii=False, indent=2) + '\n'
+        _replace_atomically(filename, text.encode('utf-8'))
+    finally:
+        lock.release()
+
+
+def _version_of(content):
+    """The version of a profiles file's content (bytes, or None for a missing file)."""
+    return None if content is None else hashlib.sha256(content).hexdigest()
 
 
 def _backup_path(filename):

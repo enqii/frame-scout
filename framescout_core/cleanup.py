@@ -37,7 +37,8 @@ CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
 CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': True,
                     'cache_old': True, 'cache_other': False, 'cache_models': False, 'references': False}
 NEVER_DELETED = frozenset({MARKS_FILE, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE, CACHE_FILE,
-                           SETTINGS_FILE, SETTINGS_FILE + '.lock', 'profiles.json', 'profiles.json.bak'})
+                           SETTINGS_FILE, SETTINGS_FILE + '.lock', 'profiles.json', 'profiles.json.bak',
+                           'profiles.json.lock'})
 # seconds clean_up waits for the run lock of the results folder
 CLEANUP_LOCK_TIMEOUT = 1.0
 # the temporary file of ensure_thumbnail (tempfile.mkstemp: <name>.<random>.jpg); a stop
