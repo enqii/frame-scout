@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: Orchestrate the FrameScout roadmap in BACKLOG.md as one pull request per item - reconstruct the current state from git and GitHub, then spawn the implementer or reviewer subagent, relay hold-point questions, and merge only after explicit user approval. Started only by the user typing /roadmap.
+description: Orchestrate the FrameScout roadmap in ROADMAP.md as one pull request per item - reconstruct the current state from git and GitHub, then spawn the implementer or reviewer subagent, relay hold-point questions, and merge only after explicit user approval. Started only by the user typing /roadmap.
 # Deliberately user-invoked only: subagents share this .claude/skills folder in their
 # worktrees, and the orchestrator spawns agents and merges, so the model must never
 # start it on its own (no nested orchestrators).
@@ -37,12 +37,10 @@ Run these as separate, plain commands from the main checkout:
 1. `git fetch origin --prune`
 2. If the main checkout is on `main` and clean: `git merge --ff-only origin/main`.
    Otherwise do not touch it; mention it to the user.
-3. Roadmap: read only the section "## Roadmap (priority)" of `BACKLOG.md` (the last
-   section, about 60 lines), not the whole 85 KB file: find its line with the Grep tool
-   (`^## Roadmap` in `BACKLOG.md`) and Read from that line. If step 2 could not
-   fast-forward `main`, read `git show origin/main:BACKLOG.md` instead. The
-   **next item** is the first unchecked `- [ ]` line, scanning all sections (P0 … P5,
-   including sub-sections such as P4b) top to bottom. Lines marked `- [~]` are deferred by
+3. Roadmap: read `ROADMAP.md` (about 90 lines; not `BACKLOG.md`, which holds the items'
+   details). If step 2 could not fast-forward `main`, read
+   `git show origin/main:ROADMAP.md` instead. The **next item** is the first unchecked
+   `- [ ]` line of the section "Open (priority order)", top to bottom. Lines marked `- [~]` are deferred by
    user decision and are skipped.
 4. Open PRs: `gh pr list --state open --json number,title,headRefName,isDraft,labels,url`.
    A **roadmap PR** is an open PR with an `fs:*` label.

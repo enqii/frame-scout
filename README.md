@@ -14,8 +14,8 @@ matching photos as an HTML gallery.
 - **English search terms:** CLIP understands practically only English, so describe your
   motifs in English (see [Search terms in English](#search-terms-in-english)).
 
-> **Status:** Prototype (v1.1). Open issues and the roadmap are listed in
-> [BACKLOG.md](BACKLOG.md).
+> **Status:** Prototype (v1.1). Open issues are listed in
+> [BACKLOG.md](BACKLOG.md), the roadmap is [ROADMAP.md](ROADMAP.md).
 
 ## Requirements
 
@@ -510,7 +510,7 @@ for the formats. Status: not yet run with real models (E34).
 | `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
 | `.github/` | CI workflow (`workflows/tests.yml`) and pull request template |
 | `Install-FrameScout.bat` / `Start-FrameScout.bat` | Installation and start on Windows |
-| `BACKLOG.md` | Known weaknesses and roadmap |
+| `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md` | Order of work, open items, finished items |
 | `CLAUDE.md` | Rules for Claude Code and the development workflow |
 | `docs/ARCHITECTURE.md` | Architecture and runtime details for contributors |
 | `.claude/` | Claude Code project settings and the `/roadmap` workflow skill |

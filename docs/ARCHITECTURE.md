@@ -309,10 +309,12 @@ Opt-in deletion of user data is I19.
 
 `README.md`: English user guide (GitHub start page).
 
-### `BACKLOG.md`
+### `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`
 
-`BACKLOG.md`: known weaknesses (IDs E/A/I) and the prioritized roadmap that drives the PR
-workflow.
+`ROADMAP.md`: the prioritized roadmap that drives the PR workflow (open items first, the
+next item is the first `- [ ]` line; finished ones under "Done").
+`BACKLOG.md`: open items (IDs E/A/I). `docs/BACKLOG-DONE.md`: finished items with their
+reports; an item moves there unchanged when its PR is merged (I22).
 
 ### `.claude/skills/roadmap/` and `.claude/settings.json`
 
