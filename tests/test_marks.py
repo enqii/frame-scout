@@ -4,8 +4,8 @@ import threading
 
 import pytest
 
-from framescout_core import (MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARKS_FILE, RunLock, delete_marks,
-                             read_marks, rename_marks, save_marks)
+from framescout_core import (MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARKS_FILE, RunLock,
+                             UnknownProfileError, delete_marks, lock_held, read_marks, rename_marks, save_marks)
 
 
 def stored(path):
@@ -199,3 +199,56 @@ def test_deleting_waits_for_the_lock_and_gives_up(tmp_path):
     finally:
         lock.release()
     assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH}}
+
+
+# --- review of A22: no marks for a name that is no profile any more ------------------------
+
+def profiles_file(path, *names):
+    path.write_text(json.dumps({'profiles': [{'name': n} for n in names]}), encoding='utf-8')
+    return path
+
+
+def test_marks_are_saved_only_for_a_profile_of_the_profiles_file(tmp_path):
+    # a gallery drawn before the profile was deleted or renamed (e.g. in another tab) must
+    # not save marks under its old name: a later profile of that name would get them
+    profiles = profiles_file(tmp_path / 'profiles.json', 'Red car')
+    path = tmp_path / MARKS_FILE
+    assert save_marks(path, 'Red car', {'a.jpg': MARK_MATCH}, profiles_file=profiles) == {'a.jpg': MARK_MATCH}
+    profiles_file(profiles, 'Dog')  # Red car deleted since
+    before = path.read_bytes()
+    with pytest.raises(UnknownProfileError, match='Red car'):
+        save_marks(path, 'Red car', {'b.jpg': MARK_MATCH}, profiles_file=profiles)
+    with pytest.raises(UnknownProfileError):
+        save_marks(path, 'Red car', {'a.jpg': MARK_OPEN}, profiles_file=profiles)
+    assert path.read_bytes() == before
+    with pytest.raises(UnknownProfileError):
+        save_marks(tmp_path / 'new' / MARKS_FILE, 'Cat', {'a.jpg': MARK_MATCH}, profiles_file=profiles)
+    assert not (tmp_path / 'new' / MARKS_FILE).exists()
+
+
+def test_an_unreadable_profiles_file_saves_no_marks(tmp_path):
+    profiles = tmp_path / 'profiles.json'
+    profiles.write_text('not json', encoding='utf-8')
+    path = tmp_path / MARKS_FILE
+    with pytest.raises(ValueError):
+        save_marks(path, 'Red car', {'a.jpg': MARK_MATCH}, profiles_file=profiles)
+    assert not path.exists()
+    assert profiles.read_text(encoding='utf-8') == 'not json'
+
+
+def test_the_profile_is_checked_under_the_marks_lock(tmp_path, monkeypatch):
+    # while the lock is held: a deletion saves profiles.json first and then deletes the
+    # marks under the same lock, so a mark saved in between is deleted with them
+    import framescout_core.marks as marks_module
+    profiles = profiles_file(tmp_path / 'profiles.json', 'Red car')
+    path = tmp_path / MARKS_FILE
+    seen = []
+    real = marks_module.require_profile
+
+    def check(filename, name):
+        seen.append(lock_held(tmp_path / (MARKS_FILE + '.lock')))
+        return real(filename, name)
+
+    monkeypatch.setattr(marks_module, 'require_profile', check)
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH}, profiles_file=profiles)
+    assert seen == [True]

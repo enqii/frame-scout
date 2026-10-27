@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from ._common import _path_key, _publish_new, _publish_via_temp, _update_locked
+from .profiles import require_profile
 from .settings import SETTINGS_LOCK_TIMEOUT, _read_settings_file
 
 
@@ -165,15 +166,20 @@ def _update_copy_folders(filename, change, attempts, retry_delay, lock_timeout):
 
 
 def save_copy_folder(filename, profile, folder, default, attempts=5, retry_delay=0.05,
-                     lock_timeout=SETTINGS_LOCK_TIMEOUT):
+                     lock_timeout=SETTINGS_LOCK_TIMEOUT, profiles_file=None):
     """Save the target folder of profile in the app's settings file; the default folder is not stored.
 
     Merged into the file as it is now, like save_settings; the other settings are kept.
-    Raises ValueError for an unreadable file (never replaced) and OSError like save_settings.
+    With profiles_file, profile must be a profile of that file at the time of the write
+    (require_profile, checked under the lock), else UnknownProfileError is raised and
+    nothing is written. Raises ValueError for an unreadable file (never replaced) and
+    OSError like save_settings.
     """
     folder = str(folder).strip()
 
     def change(folders):
+        if profiles_file is not None:
+            require_profile(profiles_file, profile)
         if not folder or folder == str(default):
             folders.pop(profile, None)
         else:

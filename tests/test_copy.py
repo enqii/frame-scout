@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (copy_photos, copy_summary_text, copy_target, default_copy_folder, default_settings,
-                             forget_copy_folder, read_copy_folders, read_settings, rename_copy_folder,
-                             save_copy_folder, save_settings)
+from framescout_core import (UnknownProfileError, copy_photos, copy_summary_text, copy_target, default_copy_folder,
+                             default_settings, forget_copy_folder, lock_held, read_copy_folders, read_settings,
+                             rename_copy_folder, save_copy_folder, save_settings)
 
 
 def photo(path, data=b'photo'):
@@ -227,6 +227,37 @@ def test_forgetting_a_profile_without_a_saved_folder_changes_nothing(tmp_path):
     save_copy_folder(settings, 'Dog', 'D:/dogs', default='x')
     before = settings.read_bytes()
     forget_copy_folder(settings, 'Red car')
+    assert settings.read_bytes() == before
+
+
+def test_a_target_folder_is_saved_only_for_a_profile_of_the_profiles_file(tmp_path, monkeypatch):
+    # review of A22 (and A33): a gallery drawn before the profile was deleted or renamed, or
+    # the gallery of a deleted profile's old results, must not save a folder under that
+    # name; the check runs under the settings lock, before forget/rename_copy_folder
+    import framescout_core.copying as copying_module
+    profiles = tmp_path / 'profiles.json'
+    profiles.write_text(json.dumps({'profiles': [{'name': 'Red car'}]}), encoding='utf-8')
+    settings = tmp_path / 'settings.json'
+    seen = []
+    real = copying_module.require_profile
+
+    def check(filename, name):
+        seen.append(lock_held(tmp_path / 'settings.json.lock'))
+        return real(filename, name)
+
+    monkeypatch.setattr(copying_module, 'require_profile', check)
+    save_copy_folder(settings, 'Red car', 'D:/cars', default='x', profiles_file=profiles)
+    assert read_copy_folders(settings) == {'Red car': 'D:/cars'}
+    assert seen == [True]
+    before = settings.read_bytes()
+    with pytest.raises(UnknownProfileError, match='Dog'):
+        save_copy_folder(settings, 'Dog', 'D:/dogs', default='x', profiles_file=profiles)
+    with pytest.raises(UnknownProfileError):
+        save_copy_folder(settings, 'Dog', '', default='x', profiles_file=profiles)
+    assert settings.read_bytes() == before
+    profiles.write_text('not json', encoding='utf-8')
+    with pytest.raises(ValueError):
+        save_copy_folder(settings, 'Red car', 'D:/other', default='x', profiles_file=profiles)
     assert settings.read_bytes() == before
 
 

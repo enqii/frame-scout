@@ -141,6 +141,30 @@ def read_profiles_versioned(filename, attempts=5, retry_delay=0.05):
     return raw, _version_of(content)
 
 
+class UnknownProfileError(ValueError):
+    """require_profile: the name is not a profile of the profiles file (any more), see there."""
+
+
+def require_profile(filename, name):
+    """Raise UnknownProfileError unless name is the name of a profile in the app's profiles JSON file now.
+
+    Marks and saved copy target folders are keyed by the profile name, so a gallery drawn
+    before its profile was deleted or renamed (e.g. in another tab) must not save them
+    under the old name: a later profile of that name would get them (review of A22, A33).
+    save_marks and save_copy_folder call it under their lock, so a deletion or rename,
+    which saves profiles.json first and then changes those files under the same locks,
+    never misses such a save. Raises ValueError (naming the file) for an unreadable file and
+    OSError like read_profiles.
+    """
+    filename = Path(filename)
+    try:
+        profiles = read_profiles(filename)
+    except ValueError as exc:
+        raise ValueError(f'{filename.name} cannot be read: {exc}') from exc
+    if not any(p.get('name') == name for p in profiles):
+        raise UnknownProfileError(f'"{name}" is no longer one of your search profiles (renamed or deleted)')
+
+
 class ProfilesChangedError(ValueError):
     """save_profiles refused a save: the file changed since the profiles it is based on were read (A13)."""
 
