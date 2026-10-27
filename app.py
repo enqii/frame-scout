@@ -109,7 +109,8 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
     nothing changes: the message is shown, the new files and names made for this save are
     removed again and the caller keeps its unchanged profile list, which still matches
     the file on disk. The save is refused if profiles.json changed since this page showed
-    the profiles the user edited (profiles_shown, A13).
+    the profiles the user edited (profiles_shown, A13): then the page is run again with
+    emptied edit forms and the message at the top of the profile tab.
     """
     written, staged, refs, new_folder = [], [], list(keep), None
     try:
@@ -145,10 +146,16 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
             except OSError:
                 pass
         if isinstance(exc, ProfilesChangedError):
-            st.error(f'Your changes were not saved: {exc}. The page now shows the current search profiles; '
-                     'please make your changes again.')
-        else:
-            st.error(f'Could not save the search profiles: {exc}. Your changes were not saved.')
+            # the profile at this form's place may now be another one: new widget keys, so
+            # that its uploads and "Remove" checkbox are not kept for that profile, and the
+            # message at the top of the tab, since the expander of this form may be redrawn
+            # closed or no longer exist (review)
+            st.session_state.saves = st.session_state.get('saves', 0) + 1
+            st.session_state.profile_error = (
+                f'Your changes were not saved: {exc}. The page now shows the current search profiles: please '
+                'check them and make your changes again. (The input of a new profile is kept.)')
+            st.rerun()
+        st.error(f'Could not save the search profiles: {exc}. Your changes were not saved.')
         return False
     try:
         # profiles.json.bak still lists the old paths: point it to the new names before the
@@ -927,6 +934,8 @@ with p_tab:
     # first, so that a one-shot save notice is not missed below the static hint (review)
     if 'notice' in st.session_state:
         st.warning(st.session_state.pop('notice'))
+    if 'profile_error' in st.session_state:  # a save refused by store() (A13)
+        st.error(st.session_state.pop('profile_error'))
     # hint only, no check of the input (user decision on E3: English search terms only);
     # one box with the call to action on an empty list (review)
     st.info(('Create a search profile first. ' if not profiles else '') +
