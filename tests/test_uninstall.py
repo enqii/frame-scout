@@ -672,6 +672,14 @@ def test_the_uninstaller_falls_back_to_the_python_versions_of_older_installers()
     assert re.search(r'for %%V in \(([\d. ]+)\) do', uninstaller()).group(1) == '3.14 3.13 3.12'
 
 
+def test_the_manual_steps_name_the_private_python():
+    # a .python left without python.exe falls back to the py launcher, which PCs without an
+    # installed Python lack (review)
+    text = uninstaller()
+    manual = text[text.index('if defined PYTHON_VERSION goto installed'):text.index(':installed')]
+    assert f'{PRIVATE_PYTHON},' in manual
+
+
 def test_the_uninstaller_keeps_exclamation_marks_in_paths_and_arguments():
     # with delayed expansion, cmd removes the "!" of a folder like C:\Photos!2026 from %~dp0 and %* (review)
     text = uninstaller()

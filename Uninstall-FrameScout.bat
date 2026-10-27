@@ -28,7 +28,7 @@ for %%V in (3.14 3.13 3.12) do (
 if defined PYTHON_VERSION goto installed
 echo Python 3.12 to 3.14 not found, so the uninstall cannot run.
 echo To delete the environment by hand, close FrameScout and delete the folders .venv,
-echo .cache and .tmp in %CD%
+echo .python, .cache and .tmp in %CD%
 echo (keep .tmp\eval if you labelled photos with the evaluation tool).
 pause
 exit /b 1
