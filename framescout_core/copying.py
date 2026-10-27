@@ -191,3 +191,16 @@ def rename_copy_folder(filename, old, new, attempts=5, retry_delay=0.05, lock_ti
         return folders
 
     _update_copy_folders(filename, change, attempts, retry_delay, lock_timeout)
+
+
+def forget_copy_folder(filename, profile, attempts=5, retry_delay=0.05, lock_timeout=SETTINGS_LOCK_TIMEOUT):
+    """Remove the saved target folder of the deleted profile profile from the app's settings file (A22).
+
+    Only the entry: the folder and the copies in it are never touched. Nothing changes if
+    none is saved. Raises like save_copy_folder.
+    """
+    def change(folders):
+        folders.pop(profile, None)
+        return folders
+
+    _update_copy_folders(filename, change, attempts, retry_delay, lock_timeout)

@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (copy_photos, copy_summary_text, copy_target, default_copy_folder, default_settings,
-                             read_copy_folders, read_settings, rename_copy_folder, save_copy_folder, save_settings)
+                             forget_copy_folder, read_copy_folders, read_settings, rename_copy_folder,
+                             save_copy_folder, save_settings)
 
 
 def photo(path, data=b'photo'):
@@ -190,6 +191,8 @@ def test_an_unreadable_settings_file_is_never_replaced(tmp_path):
         read_copy_folders(settings)
     with pytest.raises(ValueError):
         save_copy_folder(settings, 'Red car', 'D:/cars', default='x')
+    with pytest.raises(ValueError):
+        forget_copy_folder(settings, 'Red car')
     assert settings.read_text(encoding='utf-8') == 'not json'
 
 
@@ -200,6 +203,31 @@ def test_a_renamed_profile_keeps_its_target_folder(tmp_path):
     assert read_copy_folders(settings) == {'Blue car': 'D:/cars'}
     rename_copy_folder(settings, 'Nothing', 'Else')  # no folder saved: no change
     assert read_copy_folders(settings) == {'Blue car': 'D:/cars'}
+
+
+def test_a_deleted_profile_forgets_only_its_target_folder_entry(tmp_path):
+    # A22: only the entry in settings.json; the folder and the copies in it stay
+    settings = tmp_path / 'settings.json'
+    target = photo(tmp_path / 'cars' / 'a.jpg').parent
+    save_settings(settings, {'top': 300}, default_settings(tmp_path))
+    save_copy_folder(settings, 'Red car', str(target), default='x')
+    save_copy_folder(settings, 'Dog', 'D:/dogs', default='x')
+    forget_copy_folder(settings, 'Red car')
+    assert read_copy_folders(settings) == {'Dog': 'D:/dogs'}
+    assert read_settings(settings, default_settings(tmp_path))[0]['top'] == 300
+    assert (target / 'a.jpg').read_bytes() == b'photo'
+    forget_copy_folder(settings, 'Dog')
+    assert 'copy_folders' not in json.loads(settings.read_text(encoding='utf-8'))
+
+
+def test_forgetting_a_profile_without_a_saved_folder_changes_nothing(tmp_path):
+    settings = tmp_path / 'settings.json'
+    forget_copy_folder(settings, 'Red car')  # no settings file: none is created
+    assert not settings.exists()
+    save_copy_folder(settings, 'Dog', 'D:/dogs', default='x')
+    before = settings.read_bytes()
+    forget_copy_folder(settings, 'Red car')
+    assert settings.read_bytes() == before
 
 
 # --- review findings ------------------------------------------------------------------------

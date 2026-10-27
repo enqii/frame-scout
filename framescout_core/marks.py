@@ -106,3 +106,28 @@ def rename_marks(path, old, new, attempts=5, retry_delay=0.05, lock_timeout=MARK
     _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
                    attempts, retry_delay, lock_timeout)
     return bool(changed)
+
+
+def delete_marks(path, profile, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
+    """Delete all marks of the profile profile; return how many there were.
+
+    For a profile the user deleted after a confirmation that names the marks (A22): marks
+    are keyed by the profile name, so a later profile of that name would otherwise get them.
+    Merged into the file as it is now, under the lock of save_marks; nothing happens without
+    a marks file or marks of profile. Raises like save_marks.
+    """
+    path = Path(path)
+    if not path.parent.is_dir():
+        return 0
+    removed = []
+
+    def update(document):
+        marks = document['profiles'].pop(profile, None)
+        if marks is None:
+            return None
+        removed.append(len(marks))
+        return document
+
+    _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
+                   attempts, retry_delay, lock_timeout)
+    return sum(removed)
