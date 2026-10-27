@@ -103,7 +103,9 @@ goto failed
 echo Extracting Python failed. See the error message above, then run the installer again.
 goto failed
 :venv_failed
-echo Creating the virtual environment failed. See the error message above.
+echo Creating the virtual environment failed. See the error message above. If it fails
+echo again, delete the folder .python (the installer downloads it again) and the folder
+echo .venv, if there is one, and run the installer again.
 goto failed
 :failed
 pause
