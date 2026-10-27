@@ -491,20 +491,31 @@ def open_target_folder(key, photo_folders):
     target, _ = copy_target(st.session_state.get(key, ''), photo_folders)
     gallery_action(open_path, target if target is not None and target.is_dir() else None, f'The folder {target}')
 
-def carry_over(old, new):
-    """Give the marks and the saved target folder of the renamed profile old to its new name (A17)."""
-    problems = []
-    for what, action in (('marks', lambda: rename_marks(MARKS, old, new)),
-                         ('saved copy target folder', lambda: rename_copy_folder(SETTINGS, old, new))):
+def add_notice(text, first=''):
+    """Add text to the one-shot notice at the top of the profile tab; first starts a new notice."""
+    # names and error texts (paths) are shown as Markdown: escaped (review)
+    st.session_state.notice = (st.session_state.notice + ' ' if 'notice' in st.session_state else first) + plain(text)
+
+def change_name_data(marks_action, folder_action):
+    """Run the changes of a renamed or deleted profile's marks and saved copy target folder (A17, A22).
+
+    Both run, also if the first fails. Returns (the result of marks_action or None if it
+    failed, the failed parts as text, e.g. "its marks (error)", or '' if none failed).
+    """
+    results, problems = {}, []
+    for what, action in (('marks', marks_action), ('saved copy target folder', folder_action)):
         try:
-            action()
+            results[what] = action()
         except (OSError, ValueError) as exc:
             problems.append(f'its {what} ({exc})')
+    return results.get('marks'), ' and '.join(problems)
+
+def carry_over(old, new):
+    """Give the marks and the saved target folder of the renamed profile old to its new name (A17)."""
+    _, problems = change_name_data(lambda: rename_marks(MARKS, old, new),
+                                   lambda: rename_copy_folder(SETTINGS, old, new))
     if problems:
-        note = f'The profile was renamed, but {" and ".join(problems)} still belong to the old name "{old}".'
-        # the name and the error texts (paths) are shown as Markdown: escaped (review)
-        st.session_state.notice = ((st.session_state.notice + ' ' if 'notice' in st.session_state else 'Saved. ')
-                                   + plain(note))
+        add_notice(f'The profile was renamed, but {problems} still belong to the old name "{old}".', first='Saved. ')
 
 def deletion_consequences(p):
     """Return the Markdown lines of the confirmation of deleting the profile p: what happens to its data (A22)."""
@@ -550,18 +561,10 @@ def forget_profile(name):
     touched. A part that cannot be removed is named in the notice at the top of the tab.
     """
     st.session_state.get('copy_folders_unsaved', {}).pop(name, None)
-    problems = []
-    for what, action in (('marks', lambda: delete_marks(MARKS, name)),
-                         ('saved copy target folder', lambda: forget_copy_folder(SETTINGS, name))):
-        try:
-            action()
-        except (OSError, ValueError) as exc:
-            problems.append(f'its {what} ({exc})')
+    _, problems = change_name_data(lambda: delete_marks(MARKS, name), lambda: forget_copy_folder(SETTINGS, name))
     if problems:
-        note = (f'The profile was deleted, but {" and ".join(problems)} could not be removed: they still belong to '
-                f'the name "{name}" and would pass to a new profile of that name.')
-        st.session_state.notice = ((st.session_state.notice + ' ' if 'notice' in st.session_state else '')
-                                   + plain(note))
+        add_notice(f'The profile was deleted, but {problems} could not be removed: they still belong to the name '
+                   f'"{name}" and would pass to a new profile of that name.')
 
 @st.cache_data(show_spinner=False, max_entries=2)
 def cached_results(path, mtime_ns, size):
