@@ -195,35 +195,6 @@ and discussions.
 
 - [ ] **A6 – Folder count on every rerun:** `rglob` over the whole photo folder on every
       interaction; slow for large folders/network drives.
-- [ ] **A8 – UX gaps:** deleting a profile without confirmation; settings only per session;
-      results without timestamp/reference to the profile state. Since A4 a reload shows a
-      running search again, but the settings and the photo folder it was started with are
-      back at their defaults (the status file does not record them).
-      (partly done 2026-10-21: the settings – photo folder, device, batch size, top,
-      person detection with its maximum and confidence, reference weight – are kept in
-      `settings.json` in the project folder (gitignored), so a reload, a restart, another
-      tab or session shows them, also for a running search. The app reads the file on
-      every rerun (retrying a read that fails while another session replaces it) and
-      saves the values changed in a page run merged into the current file
-      (`framescout_core.read_settings`/`save_settings`); only values that differ from the
-      defaults are written, so the default photo folder follows a moved project folder.
-      The widgets have keys and get the saved values through their session state (passed
-      as `value=`, every save gave them a new identity and dropped the next change, PR #10
-      review; the session-only settings before A8 had the same bug: in a browser every
-      second change of a setting jumped back to the first). `reconcile_settings` tells a
-      change made in a session from another session's save, so the latest action wins;
-      a Start in a page run that took over another session's values is refused once with
-      a note, so a search never runs with settings the user has not seen. Saves hold a
-      lock (`settings.json.lock`) around their read-merge-write, so two sessions saving
-      at the same moment keep both changes (second review). Invalid values fall back to their defaults with a warning
-      and are removed with the next save, an unreadable file is never replaced (the page
-      keeps the settings it shows), and a saved device PyTorch cannot use is used as
-      "auto" but stays saved until another device or "Use auto from now on" is chosen.
-      Still open: deleting a profile without confirmation; results without timestamp or
-      reference to the profile state, see A12.)
-      (2026-10-23, P4 (A): the app shows the date of the search whose results it shows and
-      marks a profile changed, renamed or deleted since, from `results.json` (A12). Still
-      open: deleting a profile without confirmation.)
 - [ ] **A10 – `use_container_width` is deprecated:** in Streamlit 1.66 the `st.button`
       docstring marks it as deprecated in favor of `width="stretch"` (no runtime warning
       yet; it still works). `width` for buttons is newer than the current floor
@@ -275,15 +246,6 @@ and discussions.
       with "the photo no longer exists" when copied. Fix idea: key by the path relative
       to the photo folder and match a moved folder, or offer to carry marks over. Found
       in the PR of A17.
-- [ ] **A22 – Marks of a deleted profile pass to a new profile of the same name:** marks
-      (A17) and the saved copy folder are keyed by the profile name only. Deleting a
-      profile keeps them (FrameScout never deletes user data silently), so a profile
-      created later under the same name shows the old marks and copies them, and a
-      profile renamed to that name gets them merged into its own (`rename_marks`; its own
-      marks win for the same photo). Fix options, each a user decision: delete or archive
-      a profile's marks when it is deleted (asking in the app first), or give profiles a
-      stable id in `profiles.json` (schema change, hold point). Found in the review of
-      PR #16.
 - [ ] **A24 – "Hide photos marked as no match" reflows the pages; mark buttons look
       alike:** user report on 2026-10-25 after A17. Marking the photos of page 1 and then
       ticking the checkbox shows undecided photos of the following pages on page 1.
@@ -366,6 +328,15 @@ and discussions.
       rewrite a `.bak` that another session has just replaced with newer state. Probably
       harmless (it only rewrites paths of the moved folder); not analysed. Found in the
       PR of A13.
+- [ ] **A33 – The gallery of a deleted profile's old results still offers "Copy to folder":**
+      typing a folder there saves it under the deleted name in `settings.json`, so a later
+      profile of that name gets it again (the rest of A22). Fix idea: make the field
+      read-only for a name that is no longer a search profile. Found in the PR of A22.
+- [ ] **A34 – Marks left by profiles deleted before A22 stay in `marks.json`:** they still
+      pass to a new profile of that name, and "Clean up storage" never offers them because
+      `marks.json` is in `NEVER_DELETED`. No migration was done. Idea: offer to delete the
+      marks of names that are no profile (asking first), or show them when such a profile
+      is created. Found in the PR of A22.
 
 ### Installation / project
 

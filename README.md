@@ -127,6 +127,9 @@ starts with the new example profiles.
    images also keep their old names and the app shows a note). Removing reference
    images from a profile or deleting a profile does not delete the files; "Clean up
    storage" can list and delete them (see [Cleaning up storage](#cleaning-up-storage)).
+   "Delete profile" asks for confirmation first. Confirming deletes the profile, its marks
+   and its saved copy target folder setting; the folder, the photos already copied
+   there and the reference images stay on disk.
 3. **Photo source:** enter one or more local image folders, one per line (default:
    `photos` in the project folder). Subfolders are searched as well, and one search
    covers all listed folders, e.g. event folders on several drives. The tab shows the
@@ -280,8 +283,9 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
   search never changes it, and "Clean up storage" never deletes it. It is your data:
   keep it when you clean up the `results` folder by hand (deleting it removes all marks). Marks belong to the full path of a photo, so
   they no longer apply after you move or rename a photo folder.
-  Marks belong to the profile name: deleting a profile keeps its marks, and a new
-  profile with the same name takes them over.
+  Marks belong to the profile name: deleting a profile asks first and then deletes its
+  marks (the question names how many there are); marks of profiles deleted by an earlier
+  version stay in the file and a new profile with the same name takes them over.
 - One HTML gallery per search profile is written to `results/`; the thumbnails are
   stored in `results/thumbnails/`. Clicking a photo opens the original. (Versions
   before the English UI used `results/vorschaubilder/`; that folder is no longer

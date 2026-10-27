@@ -517,6 +517,64 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       save in the app was checked once with Streamlit's `AppTest`, not in two real
       browser tabs.)
 
+- [x] **A8 – UX gaps:** deleting a profile without confirmation; settings only per
+      session; results without timestamp/reference to the profile state.
+      (partly done 2026-10-21: the settings – photo folder, device, batch size, top,
+      person detection with its maximum and confidence, reference weight – are kept in
+      `settings.json` in the project folder (gitignored), so a reload, a restart, another
+      tab or session shows them, also for a running search. The app reads the file on
+      every rerun (retrying a read that fails while another session replaces it) and
+      saves the values changed in a page run merged into the current file
+      (`framescout_core.read_settings`/`save_settings`); only values that differ from the
+      defaults are written, so the default photo folder follows a moved project folder.
+      The widgets have keys and get the saved values through their session state (passed
+      as `value=`, every save gave them a new identity and dropped the next change, PR #10
+      review; the session-only settings before A8 had the same bug: in a browser every
+      second change of a setting jumped back to the first). `reconcile_settings` tells a
+      change made in a session from another session's save, so the latest action wins;
+      a Start in a page run that took over another session's values is refused once with
+      a note, so a search never runs with settings the user has not seen. Saves hold a
+      lock (`settings.json.lock`) around their read-merge-write, so two sessions saving
+      at the same moment keep both changes (second review). Invalid values fall back to
+      their defaults with a warning and are removed with the next save, an unreadable file
+      is never replaced (the page keeps the settings it shows), and a saved device PyTorch
+      cannot use is used as "auto" but stays saved until another device or "Use auto from
+      now on" is chosen.
+      2026-10-23, P4 (A): the app shows the date of the search whose results it shows and
+      marks a profile changed, renamed or deleted since, from `results.json` (A12).
+      done 2026-10-27, P6 (B): the last open part, deleting a profile without
+      confirmation, see A22. Nothing of A8 remains open; what a running search was
+      started with is not recorded in the status file (not pursued).)
+
+- [x] **A22 – Marks of a deleted profile pass to a new profile of the same name:** marks
+      (A17) and the saved copy folder are keyed by the profile name only; deleting a
+      profile kept them, so a profile created later under the same name showed the old
+      marks and copied them, and a profile renamed to that name got them merged into its
+      own (`rename_marks`). Found in the review of PR #16.
+      (done 2026-10-27, P6 (B), user decisions: an inline two-step confirmation (no
+      `st.dialog`), marks deleted after the confirmation with their count named, only the
+      saved copy folder entry of `settings.json` removed (never the folder or the copies),
+      no stable profile id and no schema change. "Delete profile" stores
+      `st.session_state.delete_pending = (name, saves)` and shows a warning below the
+      form (`deletion_consequences`: the number of marks with the match/no-match split or
+      why they cannot be deleted; the copy folder entry goes, folder and copies stay;
+      reference images stay because `profiles.json.bak` still names them and "Clean up
+      storage" can delete them later) with "Delete for good" (primary, disabled while a
+      search runs) and "Cancel". Any save since the click (also one refused by A13) or the
+      profile's disappearance ends the question. After the deletion is saved,
+      `forget_profile` calls `framescout_core.delete_marks` (all marks of the profile
+      under the marks lock like `rename_marks`; returns their count; an unreadable file
+      raises `ValueError` and is never replaced) and `forget_copy_folder` (removes only
+      the `copy_folders[name]` entry under the settings lock, writes nothing without an
+      entry) and drops the session's unsaved copy folder of that name; a part that fails
+      is named in the notice at the top of the profile tab. The gallery hint for a missing
+      profile now says that deleting a profile deletes its marks. `marks.json` stays in
+      `NEVER_DELETED`. No `profiles.json`, CLI or cache change. Tests: 793 passed, 1
+      skipped (`tests/test_marks.py`, `tests/test_copy.py`); the app flow was checked with
+      Streamlit's `AppTest` on a scratch copy, not in a real browser. Remaining: A33
+      (the gallery of a deleted profile's old results can still save a copy folder under
+      its name), A34 (marks of profiles deleted before this change stay in `marks.json`).)
+
 ### Installation / project
 
 - [x] **I1 – No git repository.** (done 2026-10-20)

@@ -144,11 +144,12 @@ the module of its area and to the re-exports in `__init__.py`.
   (the result file of a search and the app's gallery: validation of the file (plain
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
-- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks` (the
-  user's marks, A17).
+- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`
+  (the user's marks, A17; `delete_marks` removes all marks of a deleted profile, A22).
 - `copying.py`:
-  `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`
-  (copying marked matches and their saved target folders in `settings.json`, A17).
+  `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`/`forget_copy_folder`
+  (copying marked matches and their saved target folders in `settings.json`, A17;
+  `forget_copy_folder` removes only the saved entry of a deleted profile, A22).
 - `cleanup.py`:
   `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14).
@@ -781,7 +782,20 @@ drawn on every run of the gallery fragment (no `default=`), so the file is the t
 for other tabs; its `on_change` saves. A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
 that are no longer search profiles cannot be marked, so no marks are written under an old
-name; a deleted profile's marks stay and pass to a later profile of the same name (A22).
+name. Deleting a profile is a two-step action (A22, user decisions 2026-10-27): "Delete
+profile" stores `st.session_state.delete_pending = (name, saves)` and shows a warning
+below the form (`deletion_consequences`: the number of marks with the match/no-match
+split or why they cannot be deleted; the saved copy folder entry goes, the folder and the
+copies stay; reference images stay, since `profiles.json.bak` still names them) with
+"Delete for good" (disabled while a search runs) and "Cancel"; any save since the click
+(also a refused one) or the profile's disappearance ends the question. After the
+deletion was saved, `forget_profile` calls `delete_marks` (under the marks lock; returns
+the count; an unreadable file raises `ValueError` and is never replaced) and
+`forget_copy_folder` (under the settings lock; writes nothing without an entry) and drops
+the session's unsaved copy folder of that name; a part that fails is named in the notice
+at the top of the profile tab. `marks.json` stays in `NEVER_DELETED`. Marks that profiles
+deleted before A22 left behind stay (A34), and the gallery of a deleted profile's old
+results can still save a copy folder under its name (A33).
 `marks.json` and the copy folders are read through `st.cache_data`, keyed by path, mtime,
 size and file id (`version_key`). Copying (`copy_photos`): flat into the target,
 `shutil.copy2` via a temporary file published with `_publish_new` (never replaces a file),
@@ -962,7 +976,8 @@ the app's `profiles.json` and `settings.json`, reference folders, prompt generat
 handling, progress lines (A11), the run lock and status file (A4/A5), thumbnails of the
 export (E6), the cache signature, the pipeline helpers for batching/prefetching (E2), the
 scoring (E4/E5) the result file with the gallery helpers (A12) the marks, copying and copy
-target folders (A17), the versioned read and checked, locked save of `profiles.json` (A13,
+target folders (A17) with their deletion with a profile (A22, `test_marks.py`,
+`test_copy.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
 `test_cleanup.py`, `test_cache_signatures.py`, with real SQLite files) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
@@ -1025,7 +1040,8 @@ second tab, Stop – successful, user report 2026-10-21; closing the `Start-Fram
 window during a run is still not tested; A8's settings widgets were checked with `AppTest`
 and in headless Edge driven over the DevTools protocol – `AppTest` alone is not enough
 evidence for widget behavior, as it does not run the browser frontend; the marks and
-copying of A17 were checked with `AppTest` only (not yet in a browser); the result gallery
+copying of A17 and the deletion confirmation of A22 were checked with `AppTest` only (not
+yet in a browser); the result gallery
 of P4 (A) was checked with `AppTest` and in headless Edge, and its "Open"/"Folder" buttons
 once on Windows 11 with synthetic photos under `.tmp/`); Python 3.14 has been verified for
 one CPU run only; absolute paths/HTML link portability. The UI's dynamic system
