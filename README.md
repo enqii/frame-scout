@@ -129,7 +129,9 @@ starts with the new example profiles.
    storage" can list and delete them (see [Cleaning up storage](#cleaning-up-storage)).
    "Delete profile" asks for confirmation first. Confirming deletes the profile, its marks
    and its saved copy target folder setting; the folder, the photos already copied
-   there and the reference images stay on disk.
+   there and the reference images stay on disk. If photos of the profile are marked or
+   unmarked while the question is open (e.g. in another tab), a note after the deletion
+   names how many marks were actually deleted.
 3. **Photo source:** enter one or more local image folders, one per line (default:
    `photos` in the project folder). Subfolders are searched as well, and one search
    covers all listed folders, e.g. event folders on several drives. The tab shows the
@@ -209,7 +211,9 @@ starts with the new example profiles.
    keeps them; "Hide photos marked as no match" hides the rejected ones. Below the
    gallery, "Copy N marked photos" copies all photos marked as match for that profile into
    the folder in "Copy to folder" (prefilled with `Pictures\FrameScout\red-car` for "Red car";
-   a folder you type is saved per profile). Copying never moves, changes or deletes the
+   a folder you type is saved per profile). For a profile you renamed or deleted since the
+   search, its photos cannot be marked and "Copy to folder" cannot be changed, also in a
+   tab that still shows the gallery from before. Copying never moves, changes or deletes the
    originals and never overwrites a file in the target folder: all copies land directly
    in that folder (no subfolders) with their file date; a file with the same name and
    content counts as "already there", a different photo with the same name is saved as

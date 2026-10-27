@@ -13,7 +13,8 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       more than one backup generation: A30, deferred by user decision: single `.bak` kept)
 - [x] (B) Deleting a profile: ask first, and decide what happens to its marks and copy
       folder (A8, A22; user decision, a stable profile id would be a `profiles.json`
-      schema change = hold point) (done 2026-10-27; open follow-ups: A33, A34)
+      schema change = hold point) (done 2026-10-27, with A33 from its review; open
+      follow-up: A34)
 - [ ] (C) Marks and cache follow the path relative to the photo folder (E8, A21; changes
       cache keys and `marks.json`: a migration and a hold point)
 
