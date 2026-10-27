@@ -11,9 +11,9 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
 ### P6 – Safety of user data (added 2026-10-27 from the open backlog)
 - [x] (A) Concurrent profile edits no longer overwrite each other (A13) (done 2026-10-27;
       more than one backup generation: A30, deferred by user decision: single `.bak` kept)
-- [ ] (B) Deleting a profile: ask first, and decide what happens to its marks and copy
+- [x] (B) Deleting a profile: ask first, and decide what happens to its marks and copy
       folder (A8, A22; user decision, a stable profile id would be a `profiles.json`
-      schema change = hold point)
+      schema change = hold point) (done 2026-10-27; open follow-ups: A33, A34)
 - [ ] (C) Marks and cache follow the path relative to the photo folder (E8, A21; changes
       cache keys and `marks.json`: a migration and a hold point)
 
