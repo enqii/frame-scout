@@ -29,6 +29,14 @@ def block_lines(text):
     return inside
 
 
+def section(text, label):
+    """The commands from :label up to the next label."""
+    lines = [line.strip() for line in text.splitlines()]
+    start = lines.index(f':{label}') + 1
+    end = next((i for i in range(start, len(lines)) if re.match(r':\w', lines[i])), len(lines))
+    return batch_commands('\n'.join(lines[start:end]))
+
+
 def setting(name):
     match = re.search(rf'^set "{name}=([^"]*)"$', installer(), re.MULTILINE)
     assert match, name
@@ -67,9 +75,10 @@ def test_the_download_is_checked_before_it_is_extracted_and_used():
              index(commands, rf'^move "%PYTHON_UNPACKED%" "{re.escape(PRIVATE_PYTHON)}"'),
              index(commands, rf'^"{re.escape(PRIVATE_PYTHON)}\\python\.exe" -I -m venv \.venv$')]
     assert order == sorted(order)
-    # each step stops the installation when it fails
-    for i in (order[0], order[2], order[3], order[4]):
+    # each step stops the installation when it fails (the move is tried again first)
+    for i in (order[0], order[2], order[4]):
         assert commands[i + 1].startswith('if errorlevel 1 goto ')
+    assert commands[order[3] + 1] == 'if not errorlevel 1 goto python_moved'
     assert 'if not "%HASH_RESULT%"=="0" goto checksum_failed' in commands[order[1]:order[2]]
 
 
@@ -89,6 +98,18 @@ def test_the_python_is_extracted_in_tmp_and_moved_as_a_whole():
     # an interrupted extraction must not leave a .python that looks complete
     assert setting('PYTHON_UNPACKED').startswith('.tmp\\')
     assert setting('PYTHON_ZIP').startswith('.tmp\\')
+
+
+def test_the_move_is_tried_again_while_a_virus_scanner_holds_the_new_files():
+    # "Access is denied" for a moment after the extraction (review)
+    retry = section(installer(), 'move_python')
+    assert retry[0] == 'set /a MOVE_TRIES+=1'
+    assert retry[1].startswith('move "%PYTHON_UNPACKED%" ')
+    assert 'if %MOVE_TRIES% geq 5 goto move_failed' in retry
+    # ping waits also when the console input is redirected, timeout does not
+    assert any(re.match(r'^ping -n \d+ 127\.0\.0\.1 >nul$', line) for line in retry)
+    assert retry[-1] == 'goto move_python'
+    assert 'set "MOVE_TRIES=0"' in batch_commands(installer())
 
 
 def test_an_existing_environment_is_kept_without_downloading_python():
