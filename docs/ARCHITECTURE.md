@@ -89,8 +89,15 @@ the module of its area and to the re-exports in `__init__.py`.
   uploads without overwriting).
 - `profiles.py`: `create_from_example` (first-start `profiles.json`), `generic_prompts`
   and `load_profiles` (profile loading/validation, used by the engine),
-  `read_profiles`/`save_profiles` (the app's `profiles.json`: same validation, v3
-  conversion, atomic save with `profiles.json.bak`, A2).
+  `read_profiles`/`read_profiles_versioned`/`save_profiles` (the app's `profiles.json`:
+  same validation, v3 conversion, atomic save with `profiles.json.bak`, A2; versioned
+  read and checked save against concurrent edits, A13: `read_profiles_versioned` returns
+  `(profiles, version)`, the version being the SHA-256 of the file's bytes or `None` for
+  a missing file; `save_profiles(filename, profiles, expected=version)` takes a `RunLock`
+  on `profiles.json.lock` (`PROFILES_LOCK_TIMEOUT` = 5 s, then `OSError`), compares the
+  file's current version with `expected` and raises `ProfilesChangedError` (a
+  `ValueError`) without writing if it differs, also for a file created or deleted since;
+  without `expected` the save is unchecked; the lock file stays, empty).
 - `thumbnails.py`: `thumbnail_name`/`ensure_thumbnail` (gallery thumbnails; a photo
   deleted before the export is skipped, E6), `crop_label`/`FULL_IMAGE_LABEL` (gallery crop
   labels).
@@ -225,7 +232,9 @@ read open_clip's config tables only where open_clip is installed and are skipped
 the example on the first start with `framescout_core.create_from_example`, which never
 replaces an existing file. Every app save keeps the previous file as `profiles.json.bak`
 (one generation, gitignored); a file the app cannot read stops the app instead of being
-saved over (A2). Back it up before overwriting user changes.
+saved over (A2). Back it up before overwriting user changes. A save is refused if the
+file changed since the page showed it (A13); the lock file `profiles.json.lock` is
+gitignored and in `NEVER_DELETED`. More generations: A30.
 
 ### `requirements.txt`
 
@@ -700,6 +709,14 @@ saves the values changed in a page run, merged into the current file
 (`framescout_core.save_settings`). The settings widgets have keys (`setting_<name>`) and
 get the saved values through `st.session_state`; never pass them `value=`/`index=`, which
 gives a widget a new identity after every save and drops the next change (PR #10 review).
+Profile forms (A13): `app.py` reads `profiles.json` with `read_profiles_versioned` on every
+rerun and keeps the version that the forms of the last complete run showed in
+`st.session_state.profiles_shown` (set after the forms are drawn; an interrupted run keeps
+the older version, so a save is refused, not lost). `store()` saves with
+`expected=profiles_shown`; on `ProfilesChangedError` it shows "Your changes were not saved"
+and the next run shows the current profiles. A click on a form that no longer exists after
+another session shortened the list is dropped by Streamlit without a message (A31).
+
 `framescout_core.reconcile_settings` does the sync on every page run with two session
 records: `settings_seen` (the saved value last taken from or written to the file, as
 written, e.g. rounded) and `settings_shown` (the value the widget showed; they differ for
@@ -932,7 +949,8 @@ the app's `profiles.json` and `settings.json`, reference folders, prompt generat
 handling, progress lines (A11), the run lock and status file (A4/A5), thumbnails of the
 export (E6), the cache signature, the pipeline helpers for batching/prefetching (E2), the
 scoring (E4/E5) the result file with the gallery helpers (A12) the marks, copying and copy
-target folders (A17), the cleanup with the cache side table (E7, E11,
+target folders (A17), the versioned read and checked, locked save of `profiles.json` (A13,
+`test_profile_file.py`), the cleanup with the cache side table (E7, E11,
 `test_cleanup.py`, `test_cache_signatures.py`, with real SQLite files) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine

@@ -96,6 +96,10 @@ If `profiles.json` cannot be read (e.g. after editing it by hand), the app shows
 and leaves the file unchanged; fix it in a text editor or restore the backup. The app also
 reads the older format `{"name": ["search text", ...]}` and saves it in the current
 format; the original stays in `profiles.json.bak` only until the second save.
+If you edit `profiles.json` by hand, or in a second browser tab, while the app is open,
+the app does not overwrite that change: it refuses the next save of a page that showed
+the older state, says so, and shows the current profiles, so you make your edit again.
+While saving, the app briefly holds the empty file `profiles.json.lock`; leave it alone.
 
 Checkouts from before the English user interface still have a `profiles.json` that git
 tracks.

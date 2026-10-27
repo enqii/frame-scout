@@ -494,6 +494,25 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       skipped with a note. No cache signature, `ENGINE` or marks change. Same folder by
       another path: A28; junctions: A29.)
 
+- [x] **A13 – Concurrent profile edits are lost** (the concurrent-edit part; more than
+      one backup generation is A30): the app read `profiles.json` on every rerun and saved
+      its whole list, so an edit made in another tab/session (or by hand) between that
+      read and a save was overwritten.
+      (done 2026-10-27: `read_profiles_versioned` returns the profiles and a version (the
+      SHA-256 of the file's bytes; `None` for a missing file); `save_profiles(...,
+      expected=version)` compares it under a `RunLock` on `profiles.json.lock` (waits up
+      to `PROFILES_LOCK_TIMEOUT` = 5 s, then `OSError`) and raises `ProfilesChangedError`
+      without writing anything if the file changed, was created or was deleted since.
+      The app keeps the version its profile forms showed in `st.session_state.profiles_shown`
+      (updated after the forms are drawn, so an interrupted run refuses a save instead of
+      losing one); a refused save shows "Your changes were not saved … make your changes
+      again", and the page then shows the current profiles. Without `expected` a save is
+      unchecked, as before. No format change: `profiles.json` is unchanged, the new empty
+      `profiles.json.lock` is gitignored and in `NEVER_DELETED`. The user kept the single
+      `profiles.json.bak` (hold point), so the generations go to A30; found on the way:
+      A31, A32. Tests: 781 passed, 1 skipped (`tests/test_profile_file.py`); the app
+      path (Streamlit) is not runtime-tested.)
+
 ### Installation / project
 
 - [x] **I1 – No git repository.** (done 2026-10-20)
