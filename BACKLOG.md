@@ -462,7 +462,8 @@ and discussions.
       offered, how it is confirmed). Found on 2026-10-27 in P5 part B.
 - [ ] **I23 – No prebuilt movable bundle:** a user still needs the internet and about
       3 GB (CPU) or 6 GB (CUDA) of downloads, and the FrameScout folder cannot be moved
-      after the installation (`.venv` refers to `.python` by absolute path). Option (c) of
+      after the installation (`.venv` refers to `.python` by absolute path; running the
+      installer again after a move downloads all packages again). Option (c) of
       P5 part C, not implemented by user decision: a ZIP with the private Python, `.venv`
       and all packages that runs from any folder (e.g. a relocatable environment without
       absolute paths in `pyvenv.cfg`, or the embeddable package with `._pth`). Notes for a
@@ -472,8 +473,3 @@ and discussions.
       redistribution), codec libraries bundled in wheels such as x265 in `pillow-heif` (GPL)
       and LibRaw in `rawpy` (LGPL/CDDL); who builds and hosts the bundle. Needs a user
       decision. Found on 2026-10-27 in P5 part C.
-- [ ] **I24 – The installer takes any `.python` with `python.exe` for complete (minor):** a
-      `.python` that lost files in `Lib` (e.g. an interrupted manual delete) makes only the
-      `venv` step fail; the message then says to delete `.python` and `.venv`. Possible fix:
-      check `.python\python.exe -I -c "import venv, ensurepip"` before using it and download
-      the package again otherwise. Found on 2026-10-27 in P5 part C.

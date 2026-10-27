@@ -682,3 +682,16 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       installer uses no delayed expansion, `goto` instead of blocks, and the folder path
       is never used inside parentheses. `tests/test_installer.py` checks both, like the
       uninstaller's test; runtime-checked in a folder `Fo!to (old)\fs`.)
+- [x] **I24 – The installer takes any `.python` with `python.exe` for complete (minor):** a
+      `.python` that lost files in `Lib` (e.g. an interrupted manual delete) makes only the
+      `venv` step fail; the message then says to delete `.python` and `.venv`. Possible fix:
+      check `.python\python.exe -I -c "import venv, ensurepip"` before using it and download
+      the package again otherwise. Found on 2026-10-27 in P5 part C. (Done 2026-10-27 in
+      P5 part C, PR #36, with the review finding that `.python` was reused without checking
+      its version: before reusing `.python`, the installer runs
+      `.python\python.exe -I -c "import sys, platform, venv, ensurepip; ..."` with
+      `PYTHON_VERSION`; if it fails or reports another version, `.python` is deleted and
+      downloaded again. The check runs only when no working `.venv` exists, so a working
+      installation is never changed. Tests: `tests/test_installer.py` (the check's code also
+      runs on the test Python); runtime-checked under `.tmp` with `Lib\venv` removed from
+      the real private Python and with the version 3.14.8 against 3.14.9.)
