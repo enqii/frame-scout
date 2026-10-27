@@ -68,10 +68,21 @@ def test_the_download_is_checked_before_it_is_extracted_and_used():
              index(commands, rf'^"{re.escape(PRIVATE_PYTHON)}\\python\.exe" -I -m venv \.venv$')]
     assert order == sorted(order)
     # each step stops the installation when it fails
-    for i in order:
+    for i in (order[0], order[2], order[3], order[4]):
         assert commands[i + 1].startswith('if errorlevel 1 goto ')
-    # Windows PowerShell started from PowerShell 7 finds no Get-FileHash with the inherited module path
-    assert commands[order[1] - 1] == 'set "PSModulePath="'
+    assert 'if not "%HASH_RESULT%"=="0" goto checksum_failed' in commands[order[1]:order[2]]
+
+
+def test_the_module_path_is_cleared_only_for_the_checksum():
+    # Windows PowerShell started from PowerShell 7 finds no Get-FileHash with the inherited
+    # module path; pip, install_torch.py and their children get the user's value back (review)
+    commands = batch_commands(installer())
+    check = index(commands, r'^powershell\.exe .*Get-FileHash ')
+    assert commands[check - 2:check] == ['set "PSMODULEPATH_SAVED=%PSModulePath%"', 'set "PSModulePath="']
+    assert commands[check + 1:check + 4] == ['set "HASH_RESULT=%errorlevel%"',
+                                             'set "PSModulePath=%PSMODULEPATH_SAVED%"',
+                                             'set "PSMODULEPATH_SAVED="']
+    assert sum('PSModulePath=' in line for line in commands) == 2
 
 
 def test_the_python_is_extracted_in_tmp_and_moved_as_a_whole():
