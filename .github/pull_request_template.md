@@ -4,7 +4,7 @@
 
 ## Backlog IDs
 
-<!-- e.g. A1, A2, E6 – and the roadmap line from BACKLOG.md -->
+<!-- e.g. A1, A2, E6 – and the roadmap line from ROADMAP.md -->
 
 ## Modified files
 
@@ -34,7 +34,7 @@
 - [ ] Commits follow Conventional Commits (English, imperative, lowercase, backlog IDs)
 - [ ] Tests executed and their output included above; not-executed tests listed
 - [ ] CI checks green (`tests` workflow, `gh pr checks <PR>`)
-- [ ] `BACKLOG.md` updated (item/IDs checked off with date)
+- [ ] `ROADMAP.md`/`BACKLOG.md` updated (a finished item moved with its report to `docs/BACKLOG-DONE.md`, checked off with date)
 - [ ] Out-of-scope findings added to `BACKLOG.md` as new items (IDs: …), or none found;
       declined review findings that defer work name their backlog ID (no GitHub issues)
 - [ ] `README.md` updated, or not affected

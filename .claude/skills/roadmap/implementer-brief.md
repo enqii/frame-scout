@@ -28,8 +28,9 @@ commit convention). This brief only adds the procedure and commands. If this bri
 `CLAUDE.md` ever disagree, `CLAUDE.md` wins – mention the conflict in your report.
 
 Read only what the item needs – every token you read is paid again on each later turn:
-- `BACKLOG.md` (85 KB): do not read it whole. Grep for the item's IDs (e.g.
-  `\*\*E7 –`) and Read those entries, and the roadmap section (Grep `^## Roadmap`).
+- `BACKLOG.md` (open items, 39 KB) and `docs/BACKLOG-DONE.md` (finished items, 55 KB):
+  do not read them whole. Grep both for the item's IDs (e.g. `\*\*E7 –`) and Read those
+  entries. `ROADMAP.md` is short (about 90 lines) and may be read whole.
 - `docs/ARCHITECTURE.md`: Grep for the files, functions and IDs you touch and read those
   sections; read it whole only for an item that changes the architecture.
 - The code you are going to touch (search first, then read the relevant parts of large
@@ -38,7 +39,7 @@ Read only what the item needs – every token you read is paid again on each lat
 
 Mode `docs-update` reads only the PR text, the "Docs pending" comment, the code diff
 (`git diff origin/main...HEAD -- . ':!*.md'`) and the doc sections the diff touches
-(Grep `docs/ARCHITECTURE.md`, `README.md`, and `BACKLOG.md` for the IDs); it does not
+(Grep `docs/ARCHITECTURE.md`, `README.md`, `BACKLOG.md` and `docs/BACKLOG-DONE.md` for the IDs); it does not
 read whole files or the code beyond the diff.
 
 For modes other than `new`, also read the PR description, its commits,
@@ -90,14 +91,14 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   `gh pr create --draft --base main --head {BRANCH} --title "<type>(<scope>): <description> (<IDs>)" --body-file <file> --label fs:in-progress`.
   The PR body ends with the line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - Keep the PR description current while you work (`gh pr edit {PR} --body-file <file>`).
-- Documentation (`BACKLOG.md`, `README.md`, `docs/ARCHITECTURE.md`, and `CLAUDE.md` only
+- Documentation (`ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`, `README.md`, `docs/ARCHITECTURE.md`, and `CLAUDE.md` only
   for rule changes; keep it short; out-of-scope findings as new backlog items, no GitHub
   issues) belongs in the same PR. Kind `docs`: write it as part of the work. Kinds
   `code`/`code-risky` in modes `new`/`continue`: **do not write it yourself** (your
   context is large by now). After the last code and test commit is pushed and the tests
   pass, post a PR comment starting with `Docs pending:` that lists the item, the backlog
   IDs, the commit SHAs, behavior and compatibility changes, out-of-scope findings and which
-  docs to update (README, ARCHITECTURE sections, BACKLOG check-offs/new items). Leave the
+  docs to update (README, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md`; new items). Leave the
   label `fs:in-progress` and return; the orchestrator spawns the `docs-update` agent.
 - Wait for CI quietly: `gh pr checks {PR} --watch --interval 60 > /dev/null 2>&1; gh pr checks {PR}`
   (Git Bash; `--watch` reprints the whole table on every poll, so discard it and print
@@ -112,7 +113,7 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
 
 You are a fresh agent on the existing branch. Read the "Docs pending:" comment and the
 code diff, update only the docs it names (plus anything the diff clearly changes), keep
-`BACKLOG.md` check-offs and new IDs correct, commit (`docs: … (<IDs>)`), push, fill in the
+`ROADMAP.md`/`BACKLOG.md`/`docs/BACKLOG-DONE.md` check-offs and new IDs correct, commit (`docs: … (<IDs>)`), push, fill in the
 PR description (modified files, compatibility, tests executed vs. not executed – take the
 test results from the comment, do not rerun the code tests), wait for CI as below, then
 `gh pr ready {PR}` and `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:needs-review`.
