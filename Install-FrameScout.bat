@@ -48,10 +48,15 @@ echo Downloading Python %PYTHON_VERSION% (about 33 MB) from python.org ...
 curl.exe -fL --retry 3 -o "%PYTHON_ZIP%" "%PYTHON_URL%"
 if errorlevel 1 goto download_failed
 rem Windows PowerShell started from PowerShell 7 inherits its module path and then cannot
-rem find Get-FileHash; without the variable it uses its own default.
+rem find Get-FileHash; without the variable it uses its own default. The value is restored
+rem right after the check, so pip and install_torch.py get the user's value (review).
+set "PSMODULEPATH_SAVED=%PSModulePath%"
 set "PSModulePath="
 powershell.exe -NoProfile -NonInteractive -Command "if ((Get-FileHash -Algorithm SHA256 -LiteralPath $env:PYTHON_ZIP).Hash -ne $env:PYTHON_SHA256) { exit 1 }"
-if errorlevel 1 goto checksum_failed
+set "HASH_RESULT=%errorlevel%"
+set "PSModulePath=%PSMODULEPATH_SAVED%"
+set "PSMODULEPATH_SAVED="
+if not "%HASH_RESULT%"=="0" goto checksum_failed
 if exist "%PYTHON_UNPACKED%" rmdir /s /q "%PYTHON_UNPACKED%"
 mkdir "%PYTHON_UNPACKED%"
 tar.exe -xf "%PYTHON_ZIP%" -C "%PYTHON_UNPACKED%"
