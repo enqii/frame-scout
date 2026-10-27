@@ -1055,7 +1055,10 @@ with p_tab:
                             carry_over(p['name'], edit_name)  # its marks and copy folder follow the name (A17)
                         st.rerun()
             if delete:
+                # run again before any question is drawn: a question still open for a profile
+                # above this one would otherwise be shown too in this run (review)
                 st.session_state.delete_pending = (p['name'], saves)
+                st.rerun()
             if st.session_state.get('delete_pending') == (p['name'], saves):
                 st.warning(f'**Delete the profile "{plain(p["name"])}" for good?**\n\n'
                            + '\n'.join('- ' + line for line in deletion_consequences(p)))
