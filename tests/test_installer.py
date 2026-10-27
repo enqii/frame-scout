@@ -1,8 +1,12 @@
 """Install-FrameScout.bat (P5 part C, I21): the private Python of new installations.
 
-The .bat is checked as text; nothing is downloaded or run.
+The .bat is checked as text; nothing is downloaded or run (only the check of an existing
+private Python runs, on the Python of the tests).
 """
+import platform
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 from framescout_core import PRIVATE_PYTHON, PYTHON_SHA256, PYTHON_URL, PYTHON_VERSION
@@ -68,6 +72,8 @@ def test_the_installer_needs_no_installed_python():
 
 
 VENV_CHECK = r'^"\.venv\\Scripts\\python\.exe" -I -c "import pip" >nul 2>&1$'
+PYTHON_CHECK = (rf'^"{re.escape(PRIVATE_PYTHON)}\\python\.exe" -I -c "import sys, platform, venv, ensurepip; '
+                r'sys\.exit\(platform\.python_version\(\) not in sys\.argv\[1:\]\)" %PYTHON_VERSION% >nul 2>&1$')
 VENV_CREATE = rf'^"{re.escape(PRIVATE_PYTHON)}\\python\.exe" -I -m venv --clear \.venv$'
 
 
@@ -147,10 +153,22 @@ def test_a_half_created_environment_is_removed():
     assert section(installer(), 'venv_failed')[0] == 'if exist ".venv" rmdir /s /q ".venv"'
 
 
-def test_an_existing_private_python_is_reused():
+def test_an_existing_private_python_is_reused_only_if_complete_and_pinned():
+    # an older pin or a .python that lost files in Lib is downloaded again (review, I24)
     commands = batch_commands(installer())
-    reuse = index(commands, rf'^if exist "{re.escape(PRIVATE_PYTHON)}\\python\.exe" goto venv$')
-    assert reuse < index(commands, r'^curl\.exe ')
+    missing = index(commands, rf'^if not exist "{re.escape(PRIVATE_PYTHON)}\\python\.exe" goto python_download$')
+    check = index(commands, PYTHON_CHECK)
+    assert missing + 1 == check and commands[check + 1] == 'if not errorlevel 1 goto venv'
+    download = section(installer(), 'python_download')
+    assert download[:2] == [f'if exist "{PRIVATE_PYTHON}" rmdir /s /q "{PRIVATE_PYTHON}"',
+                            f'if exist "{PRIVATE_PYTHON}" goto python_locked']
+    assert download[2].startswith('curl.exe ')
+
+
+def test_the_python_check_accepts_only_the_pinned_version():
+    code = re.search(r'-c "([^"]+)" %PYTHON_VERSION%', installer()).group(1)
+    assert subprocess.run([sys.executable, '-I', '-c', code, platform.python_version()]).returncode == 0
+    assert subprocess.run([sys.executable, '-I', '-c', code, '3.0.0']).returncode == 1
 
 
 def test_the_installer_keeps_exclamation_marks_in_paths_and_arguments():
