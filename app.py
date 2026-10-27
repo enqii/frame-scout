@@ -20,8 +20,9 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              cuda_status, default_copy_folder, default_settings, device_choices, feature_signature,
                              finish_reference_move, lock_held, open_command, openable_photo, page_cards, page_count,
-                             profile_fingerprints, profile_state, read_copy_folders, read_marks, read_profiles,
-                             read_results, read_settings, read_status, reconcile_settings, reference_folder,
+                             profile_fingerprints, profile_state, ProfilesChangedError, read_copy_folders,
+                             read_marks, read_profiles_versioned, read_results, read_settings, read_status,
+                             reconcile_settings, reference_folder,
                              rename_copy_folder, rename_marks, reveal_command, run_active, save_copy_folder,
                              available_decoders, distinct_folders, folder_lines, join_scans, save_marks,
                              save_profiles, save_settings, scan_cleanup, scan_photos,
@@ -107,7 +108,8 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
     i.e. after a rename) plus copies of the uploads. Returns True on success. On an error
     nothing changes: the message is shown, the new files and names made for this save are
     removed again and the caller keeps its unchanged profile list, which still matches
-    the file on disk.
+    the file on disk. The save is refused if profiles.json changed since this page showed
+    the profiles the user edited (profiles_shown, A13).
     """
     written, staged, refs, new_folder = [], [], list(keep), None
     try:
@@ -124,8 +126,10 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
                 suffix = Path(f.name).suffix.lower()
                 if suffix in SUPPORTED:
                     written.append(write_new_file(folder, 'reference', suffix, f.getvalue()))
-        # keeps the previous file as profiles.json.bak (A2)
-        save_profiles(PROFILES, build(refs + [x.relative_to(BASE).as_posix() for x in written]))
+        # keeps the previous file as profiles.json.bak (A2); never overwrites a change made in
+        # another tab, session or by hand since the page showed the edited profiles (A13)
+        save_profiles(PROFILES, build(refs + [x.relative_to(BASE).as_posix() for x in written]),
+                      expected=profiles_shown)
     except (OSError, ValueError) as exc:  # ValueError: e.g. a path that cannot be made relative
         undo_reference_move(staged)
         for x in written:
@@ -138,7 +142,11 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
                 new_folder.rmdir()  # the folder made for this save; only removed if empty
             except OSError:
                 pass
-        st.error(f'Could not save the search profiles: {exc}. Your changes were not saved.')
+        if isinstance(exc, ProfilesChangedError):
+            st.error(f'Your changes were not saved: {exc}. The page now shows the current search profiles; '
+                     'please make your changes again.')
+        else:
+            st.error(f'Could not save the search profiles: {exc}. Your changes were not saved.')
         return False
     try:
         # profiles.json.bak still lists the old paths: point it to the new names before the
@@ -807,12 +815,18 @@ except OSError as exc:  # e.g. a read-only project folder
              'Check that the project folder is writable.')
     st.stop()
 try:
-    profiles = read_profiles(PROFILES)
+    profiles, profiles_version = read_profiles_versioned(PROFILES)
 except (OSError, ValueError) as exc:
     # never save over a file the app cannot read (A2)
     st.error('profiles.json cannot be read, so FrameScout does not change it. Fix it in a text '
              f'editor, or restore the backup profiles.json.bak if there is one.\n\nDetails: {exc}')
     st.stop()
+# A13: the version of profiles.json that the profile forms of the last complete page showed.
+# A form submit reruns the page and reads the file again; store() saves only if the file is
+# still at this version, so an edit based on what the page showed never overwrites a change
+# made in another tab or session or by hand. Updated after the forms are shown (below), so
+# a run interrupted before them keeps the older version: a save is then refused, not lost.
+profiles_shown = st.session_state.get('profiles_shown', profiles_version)
 
 # whether a search runs, also after a reload or in another tab (A4)
 active, run_status = run_state()
@@ -976,6 +990,8 @@ with p_tab:
                 st.rerun()
     st.caption('FrameScout automatically creates several English CLIP search texts from the name, context and features; '
                'it does not translate them. No language model is required.')
+    # the forms above show this version now: the next submit is based on it (A13)
+    st.session_state.profiles_shown = profiles_version
 
 with f_tab:
     st.subheader('Photo collection')
