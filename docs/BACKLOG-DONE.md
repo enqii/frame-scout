@@ -505,13 +505,17 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       without writing anything if the file changed, was created or was deleted since.
       The app keeps the version its profile forms showed in `st.session_state.profiles_shown`
       (updated after the forms are drawn, so an interrupted run refuses a save instead of
-      losing one); a refused save shows "Your changes were not saved … make your changes
-      again", and the page then shows the current profiles. Without `expected` a save is
+      losing one, and by the session's own save to the version `save_profiles` returns);
+      a refused save resets the edit forms (new widget keys) and shows "Your changes were
+      not saved … make your changes again" at the top of the profile tab, and the page
+      then shows the current profiles. Reading and saving `profiles.json` retry a
+      transient Windows `OSError` like the settings file. Without `expected` a save is
       unchecked, as before. No format change: `profiles.json` is unchanged, the new empty
       `profiles.json.lock` is gitignored and in `NEVER_DELETED`. The user kept the single
       `profiles.json.bak` (hold point), so the generations go to A30; found on the way:
-      A31, A32. Tests: 781 passed, 1 skipped (`tests/test_profile_file.py`); the app
-      path (Streamlit) is not runtime-tested.)
+      A31, A32. Tests: 786 passed, 1 skipped (`tests/test_profile_file.py`); the refused
+      save in the app was checked once with Streamlit's `AppTest`, not in two real
+      browser tabs.)
 
 ### Installation / project
 
