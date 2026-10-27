@@ -20,7 +20,8 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
-                             profile_fingerprints, profile_state, ProfilesChangedError, read_copy_folders,
+                             profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
+                             read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
                              reconcile_settings, reference_folder,
                              rename_copy_folder, rename_marks, reveal_command, run_active, save_copy_folder,
@@ -419,7 +420,10 @@ def set_mark(profile, photo, key):
     # no selection (the selected option clicked again) is "open"
     state = MARK_BY_LABEL.get(st.session_state.get(key), MARK_OPEN)
     try:
-        save_marks(MARKS, profile, {photo: state})
+        # only for a profile that still exists: this gallery may have been drawn before it
+        # was deleted or renamed in another tab (review of A22); the run after this
+        # callback then shows it as no longer a search profile
+        save_marks(MARKS, profile, {photo: state}, profiles_file=PROFILES)
     except (OSError, ValueError) as exc:
         # the next run shows the saved mark again
         st.session_state.gallery_notice = f'The mark could not be saved: {exc}'
@@ -438,7 +442,11 @@ def set_copy_folder(profile, key, default):
     """Save the target folder typed into the field key in settings.json (on_change of the field)."""
     unsaved = st.session_state.setdefault('copy_folders_unsaved', {})
     try:
-        save_copy_folder(SETTINGS, profile, st.session_state.get(key, ''), default)
+        # like set_mark: never under the name of a deleted or renamed profile (A22, A33)
+        save_copy_folder(SETTINGS, profile, st.session_state.get(key, ''), default, profiles_file=PROFILES)
+    except UnknownProfileError as exc:
+        unsaved.pop(profile, None)  # not kept for this session either
+        st.session_state.gallery_notice = f'The target folder was not saved: {exc}.'
     except (OSError, ValueError) as exc:
         unsaved[profile] = st.session_state.get(key, '')  # used in this session anyway
         st.session_state.gallery_notice = f'The target folder is used, but could not be saved to {SETTINGS.name}: {exc}'
@@ -636,7 +644,8 @@ def show_results(results, photo_folders):
                 'results may not fit it any more. Start the search again to update them.')
     elif states[name] == 'missing':
         st.info(f'"{plain(name)}" is no longer one of your search profiles (renamed or deleted). These are its '
-                f'results from the search of {run_date(results)}. Its photos cannot be marked here: a renamed '
+                f'results from the search of {run_date(results)}. Its photos cannot be marked here, nor its copy '
+                'target folder changed: a renamed '
                 "profile took its marks along, and they appear with the next search's results; deleting "
                 'a profile deletes its marks too.')
     others = {state: [plain(n) for n in names if n != name and states[n] == state] for state in ('changed', 'missing')}
@@ -707,10 +716,14 @@ def show_results(results, photo_folders):
                     st.segmented_control('Mark', list(MARK_LABELS.values()), key=key, on_change=set_mark,
                                          args=(name, card['path'], key), disabled=not can_mark,
                                          label_visibility='collapsed')
-    show_copy(name, entry, marks, photo_folders)
+    show_copy(name, entry, marks, photo_folders, states[name] != 'missing')
 
-def show_copy(name, entry, marks, photo_folders):
-    """Copying the photos of profile name marked as match to a folder, below its gallery (A17)."""
+def show_copy(name, entry, marks, photo_folders, profile_exists):
+    """Copying the photos of profile name marked as match to a folder, below its gallery (A17).
+
+    The target folder can be changed only for a profile that still exists: it is saved under
+    the profile name, which a later profile could take (A33).
+    """
     st.markdown('**Copy marked matches**')
     matches = [photo for photo, state in marks.items() if state == MARK_MATCH]
     rejected = sum(1 for state in marks.values() if state == MARK_NO_MATCH)
@@ -723,8 +736,11 @@ def show_copy(name, entry, marks, photo_folders):
     key = 'copy_folder_' + widget_id(name)
     st.session_state[key] = copy_folder_value(name, default)
     st.text_input('Copy to folder', key=key, on_change=set_copy_folder, args=(name, key, default),
+                  disabled=not profile_exists,
                   help='Copies only: the originals stay where they are. Files in this folder are never overwritten; '
-                       'a different photo with the same name is saved as "name (2)".')
+                       'a different photo with the same name is saved as "name (2)".'
+                       + ('' if profile_exists else ' It cannot be changed for a profile that is no longer one of '
+                          'your search profiles.'))
     # also not in the folder of a photo to copy, which may be from another photo folder (review)
     target, problem = copy_target(st.session_state[key], photo_folders, matches)
     if problem:
