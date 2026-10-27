@@ -1,7 +1,8 @@
 """Internal helpers that several areas share (not part of the package's interface).
 
 Atomic file writes (_publish_via_temp, _publish_new, _replace_atomically,
-_replace_with_retry), reading a JSON object file with retries (_read_json_object), the
+_replace_with_retry), reading a file (_read_with_retry) or a JSON object file
+(_read_json_object) with retries, the
 save lock of a file (_file_lock), the locked read-change-write of a JSON file
 (_update_locked) and the comparable form of a path (_path_key).
 """
@@ -72,6 +73,24 @@ def _replace_with_retry(target, data, attempts, retry_delay, durable=True):
             time.sleep(retry_delay)
 
 
+def _read_with_retry(read, attempts, retry_delay):
+    """Return read(), trying up to attempts times, retry_delay seconds apart.
+
+    On Windows, reading a file fails for a moment while another session replaces it, so an
+    OSError is retried; FileNotFoundError is passed on at once, the last OSError after the
+    last try.
+    """
+    for attempt in range(max(attempts, 1)):
+        try:
+            return read()
+        except FileNotFoundError:
+            raise
+        except OSError:
+            if attempt + 1 >= attempts:
+                raise
+            time.sleep(retry_delay)
+
+
 def _read_json_object(filename, what, attempts=5, retry_delay=0.05):
     """Return the JSON object of the file filename ({} if it is missing); ValueError if unreadable.
 
@@ -79,16 +98,10 @@ def _read_json_object(filename, what, attempts=5, retry_delay=0.05):
     OSError is retried up to attempts times, retry_delay seconds apart. what names the file
     in the error for a file that is not a JSON object.
     """
-    for attempt in range(max(attempts, 1)):
-        try:
-            text = Path(filename).read_text(encoding='utf-8-sig')
-            break
-        except FileNotFoundError:
-            return {}
-        except OSError:
-            if attempt + 1 >= attempts:
-                raise
-            time.sleep(retry_delay)
+    try:
+        text = _read_with_retry(lambda: Path(filename).read_text(encoding='utf-8-sig'), attempts, retry_delay)
+    except FileNotFoundError:
+        return {}
     data = json.loads(text)
     if not isinstance(data, dict):
         raise ValueError(f'The {what} must be a JSON object.')

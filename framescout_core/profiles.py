@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from ._common import _file_lock, _publish_new, _publish_via_temp, _replace_atomically
+from ._common import _file_lock, _publish_new, _publish_via_temp, _read_with_retry, _replace_with_retry
 
 
 def create_from_example(target, example):
@@ -123,15 +123,17 @@ def read_profiles(filename):
     return read_profiles_versioned(filename)[0]
 
 
-def read_profiles_versioned(filename):
+def read_profiles_versioned(filename, attempts=5, retry_delay=0.05):
     """Return (profiles, version) of the app's profiles JSON file, read once (A13).
 
     profiles as read_profiles() returns them (same errors); version identifies the file's
     exact content (None if it is missing). Pass it to save_profiles(expected=...) so that a
-    save based on these profiles never overwrites a change made to the file since.
+    save based on these profiles never overwrites a change made to the file since. On
+    Windows, reading fails for a moment while another session replaces the file, so an
+    OSError is retried up to attempts times, retry_delay seconds apart (review).
     """
     try:
-        content = filename.read_bytes()
+        content = _read_with_retry(filename.read_bytes, attempts, retry_delay)
     except FileNotFoundError:
         return [], None
     raw = _entries_of(content)
@@ -149,7 +151,8 @@ _UNCHECKED = object()
 PROFILES_LOCK_TIMEOUT = 5.0
 
 
-def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES_LOCK_TIMEOUT):
+def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES_LOCK_TIMEOUT, attempts=5,
+                  retry_delay=0.05):
     """Write profiles to filename as {"profiles": [...]} (other top-level keys are kept), with a .bak.
 
     expected: the version (read_profiles_versioned) of the file the profiles are based on;
@@ -163,11 +166,13 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
     older backup, so only the state before the latest save is kept); if that fails,
     filename is left unchanged. Both files are written to a temporary file in the same
     folder, flushed to disk and then renamed, so a crash or power loss leaves a complete
-    old or new file, never a half-written one.
+    old or new file, never a half-written one. On Windows, reading or replacing a file fails
+    while another session reads it at that moment (every app run reads profiles.json), so
+    each read and replace is tried up to attempts times, retry_delay seconds apart (review).
     """
     with _file_lock(filename, lock_timeout):
         try:
-            previous = filename.read_bytes()
+            previous = _read_with_retry(filename.read_bytes, attempts, retry_delay)
         except FileNotFoundError:
             previous = None
         if expected is not _UNCHECKED and _version_of(previous) != expected:
@@ -175,7 +180,7 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
                 f'{filename.name} was changed in another tab or session, or by hand, since this page showed it')
         document = {'profiles': profiles}
         if previous is not None:
-            _replace_atomically(_backup_path(filename), previous)
+            _replace_with_retry(_backup_path(filename), previous, attempts, retry_delay)
             try:
                 old = json.loads(previous.decode('utf-8-sig'))
             except ValueError:  # unreadable: nothing to keep (the .bak has it)
@@ -185,7 +190,7 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
             if isinstance(old, dict) and 'profiles' in old:
                 document = {**old, 'profiles': profiles}
         text = json.dumps(document, ensure_ascii=False, indent=2) + '\n'
-        _replace_atomically(filename, text.encode('utf-8'))
+        _replace_with_retry(filename, text.encode('utf-8'), attempts, retry_delay)
 
 
 def _version_of(content):

@@ -146,7 +146,7 @@ def test_if_the_backup_fails_the_profiles_file_is_not_changed(tmp_path, monkeypa
 
     monkeypatch.setattr(os, 'replace', replace)
     with pytest.raises(PermissionError):
-        save_profiles(path, [])
+        save_profiles(path, [], retry_delay=0)
     assert path.read_bytes() == original
     assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json', 'profiles.json.lock']
 
@@ -265,6 +265,71 @@ def test_the_version_is_checked_when_the_lock_is_held(tmp_path, monkeypatch):
 
 def test_the_cleanup_never_deletes_the_lock_file():
     assert 'profiles.json.lock' in NEVER_DELETED
+
+
+def test_a_replace_that_fails_for_a_moment_is_retried(tmp_path, monkeypatch):
+    # on Windows, replacing fails while another session reads the file at that moment (review)
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    original = path.read_bytes()
+    real_replace = os.replace
+    calls = []
+
+    def flaky(src, dst):
+        calls.append(Path(dst).name)
+        if calls.count(Path(dst).name) == 1:
+            raise PermissionError('in use')
+        real_replace(src, dst)
+
+    monkeypatch.setattr(os, 'replace', flaky)
+    save_profiles(path, [{'name': 'Cat'}], retry_delay=0)
+    assert calls == ['profiles.json.bak', 'profiles.json.bak', 'profiles.json', 'profiles.json']
+    assert read_profiles(path) == [{'name': 'Cat'}]
+    assert (tmp_path / 'profiles.json.bak').read_bytes() == original
+
+
+def test_a_replace_that_keeps_failing_raises_os_error(tmp_path, monkeypatch):
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    original = path.read_bytes()
+    real_replace = os.replace
+
+    def failing(src, dst):
+        if Path(dst).name == 'profiles.json':
+            raise PermissionError('in use')
+        real_replace(src, dst)
+
+    monkeypatch.setattr(os, 'replace', failing)
+    with pytest.raises(OSError):
+        save_profiles(path, [{'name': 'Cat'}], attempts=3, retry_delay=0)
+    assert path.read_bytes() == original
+
+
+def test_a_transient_read_error_is_retried(tmp_path, monkeypatch):
+    # on Windows, reading fails for a moment while another session replaces the file (review)
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    expected = read_profiles_versioned(path)
+    real_read = Path.read_bytes
+    calls = []
+
+    def flaky(self):
+        calls.append(self)
+        if len(calls) == 1:
+            raise PermissionError('being replaced')
+        return real_read(self)
+
+    monkeypatch.setattr(Path, 'read_bytes', flaky)
+    assert read_profiles_versioned(path, retry_delay=0) == expected
+    assert len(calls) == 2
+
+
+def test_a_read_error_that_persists_raises_os_error(tmp_path, monkeypatch):
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+
+    def failing(self):
+        raise PermissionError('in use')
+
+    monkeypatch.setattr(Path, 'read_bytes', failing)
+    with pytest.raises(OSError):
+        read_profiles_versioned(path, attempts=3, retry_delay=0)
 
 
 def test_without_an_expected_version_the_save_is_not_checked(tmp_path):
