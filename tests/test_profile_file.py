@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import load_profiles, read_profiles, save_profiles
+from framescout_core import (NEVER_DELETED, ProfilesChangedError, RunLock, load_profiles, read_profiles, read_profiles_versioned,
+                             save_profiles)
 
 
 def write(path, data, encoding='utf-8'):
@@ -101,14 +102,15 @@ def test_the_previous_file_is_kept_as_backup(tmp_path):
 
 def test_without_a_previous_file_no_backup_is_written(tmp_path):
     save_profiles(tmp_path / 'profiles.json', [{'name': 'Dog'}])
-    assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json']
+    # the lock file of the save stays (empty), like settings.json.lock (A13)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json', 'profiles.json.lock']
 
 
 def test_no_temporary_file_is_left_behind(tmp_path):
     path = tmp_path / 'profiles.json'
     save_profiles(path, [{'name': 'Dog'}])
     save_profiles(path, [{'name': 'Cat'}])
-    assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json', 'profiles.json.bak']
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json', 'profiles.json.bak', 'profiles.json.lock']
 
 
 def test_both_files_are_flushed_to_disk_before_they_get_their_final_names(tmp_path, monkeypatch):
@@ -146,4 +148,127 @@ def test_if_the_backup_fails_the_profiles_file_is_not_changed(tmp_path, monkeypa
     with pytest.raises(PermissionError):
         save_profiles(path, [])
     assert path.read_bytes() == original
-    assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json']
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json', 'profiles.json.lock']
+
+
+# A13: a save is based on the profiles a page showed; it must not overwrite a change that
+# another tab, session or a text editor made to profiles.json in between
+
+def test_the_version_tells_whether_the_file_changed(tmp_path):
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    profiles, version = read_profiles_versioned(path)
+    assert profiles == [{'name': 'Dog'}] and version
+    assert read_profiles_versioned(path)[1] == version  # unchanged file: same version
+    path.write_bytes(path.read_bytes() + b' ')  # any change counts, even one without effect
+    assert read_profiles_versioned(path)[1] != version
+
+
+def test_a_missing_file_has_no_version(tmp_path):
+    assert read_profiles_versioned(tmp_path / 'profiles.json') == ([], None)
+
+
+def test_the_versioned_read_validates_like_read_profiles(tmp_path):
+    with pytest.raises(ValueError):
+        read_profiles_versioned(write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}, {'name': 'dog'}]}))
+    path = write(tmp_path / 'profiles.json', {'Dog': ['a dog on a meadow']})  # v3 is converted
+    assert read_profiles_versioned(path)[0] == read_profiles(path)
+
+
+def test_a_save_based_on_the_current_file_is_written(tmp_path):
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    _, version = read_profiles_versioned(path)
+    save_profiles(path, [{'name': 'Cat'}], expected=version)
+    assert read_profiles(path) == [{'name': 'Cat'}]
+
+
+def test_a_save_based_on_an_older_file_changes_nothing(tmp_path):
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    (tmp_path / 'profiles.json.bak').write_bytes(b'older backup')
+    _, shown = read_profiles_versioned(path)
+    write(path, {'profiles': [{'name': 'Dog', 'features': 'edited by hand'}]})
+    current = path.read_bytes()
+    with pytest.raises(ProfilesChangedError) as error:
+        save_profiles(path, [{'name': 'Cat'}], expected=shown)
+    assert isinstance(error.value, ValueError)  # handled like any other refused save
+    assert 'profiles.json' in str(error.value)
+    assert path.read_bytes() == current
+    assert (tmp_path / 'profiles.json.bak').read_bytes() == b'older backup'
+
+
+def test_the_second_of_two_sessions_saving_the_same_version_is_refused(tmp_path):
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}, {'name': 'Cat'}]})
+    profiles, version = read_profiles_versioned(path)
+    # session A deletes "Dog", session B, still showing the old list, edits "Cat" (index 1)
+    save_profiles(path, profiles[1:], expected=version)
+    with pytest.raises(ProfilesChangedError):
+        save_profiles(path, [profiles[0], {'name': 'Cat', 'features': 'grey'}], expected=version)
+    assert read_profiles(path) == [{'name': 'Cat'}]
+
+
+def test_a_file_created_since_the_page_showed_none_is_not_overwritten(tmp_path):
+    path = tmp_path / 'profiles.json'
+    _, shown = read_profiles_versioned(path)
+    write(path, {'profiles': [{'name': 'Dog'}]})
+    with pytest.raises(ProfilesChangedError):
+        save_profiles(path, [{'name': 'Cat'}], expected=shown)
+    assert read_profiles(path) == [{'name': 'Dog'}]
+
+
+def test_a_file_missing_when_shown_and_now_is_written(tmp_path):
+    path = tmp_path / 'profiles.json'
+    _, shown = read_profiles_versioned(path)
+    save_profiles(path, [{'name': 'Cat'}], expected=shown)
+    assert read_profiles(path) == [{'name': 'Cat'}]
+
+
+def test_a_file_deleted_since_the_page_showed_it_is_not_created_again(tmp_path):
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    _, shown = read_profiles_versioned(path)
+    path.unlink()
+    with pytest.raises(ProfilesChangedError):
+        save_profiles(path, [{'name': 'Cat'}], expected=shown)
+    assert not path.exists()
+
+
+def test_a_save_waits_for_another_save_and_then_checks_the_version(tmp_path):
+    # the check and the write happen under profiles.json.lock: no other save can write
+    # between them (app sessions are threads of one process; RunLocks conflict there too)
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    _, version = read_profiles_versioned(path)
+    other = RunLock(tmp_path / 'profiles.json.lock')
+    assert other.acquire()
+    try:
+        with pytest.raises(OSError):
+            save_profiles(path, [{'name': 'Cat'}], expected=version, lock_timeout=0)
+    finally:
+        other.release()
+    assert read_profiles(path) == [{'name': 'Dog'}]
+    save_profiles(path, [{'name': 'Cat'}], expected=version, lock_timeout=0)
+    assert read_profiles(path) == [{'name': 'Cat'}]
+
+
+def test_the_version_is_checked_when_the_lock_is_held(tmp_path, monkeypatch):
+    # a change made while this save waits for the lock is noticed, not overwritten
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    _, version = read_profiles_versioned(path)
+    real_acquire = RunLock.acquire
+
+    def acquire(self, *args, **kwargs):
+        write(path, {'profiles': [{'name': 'Dog'}, {'name': 'Bird'}]})  # saved by another session meanwhile
+        return real_acquire(self, *args, **kwargs)
+
+    monkeypatch.setattr(RunLock, 'acquire', acquire)
+    with pytest.raises(ProfilesChangedError):
+        save_profiles(path, [{'name': 'Cat'}], expected=version)
+    assert read_profiles(path) == [{'name': 'Dog'}, {'name': 'Bird'}]
+
+
+def test_the_cleanup_never_deletes_the_lock_file():
+    assert 'profiles.json.lock' in NEVER_DELETED
+
+
+def test_without_an_expected_version_the_save_is_not_checked(tmp_path):
+    # e.g. a script or test that writes the file directly (the app always passes one)
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    save_profiles(path, [{'name': 'Cat'}])
+    assert read_profiles(path) == [{'name': 'Cat'}]

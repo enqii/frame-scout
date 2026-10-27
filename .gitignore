@@ -22,6 +22,7 @@ profiles.tmp
 profiles.json.*.tmp
 profiles.json.bak
 profiles.json.*.bak
+profiles.json.lock
 # the user's app settings (A8); anchored, so .claude/settings.json is not affected
 /settings.json
 /settings.json.*.tmp
