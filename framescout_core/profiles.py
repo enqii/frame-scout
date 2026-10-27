@@ -161,6 +161,8 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
     (A13). The comparison and the writes happen under a RunLock on <filename>.lock (the
     file stays, empty), so no other save can come in between; OSError if that lock is not
     free within lock_timeout seconds. Without expected, the file is saved unchecked.
+    Returns the version of the saved file, the expected version of the next save based on
+    these profiles (review).
 
     The previous content is copied byte for byte to <filename>.bak first (replacing an
     older backup, so only the state before the latest save is kept); if that fails,
@@ -189,8 +191,9 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
             # file, whose keys are profile names, is not merged (review)
             if isinstance(old, dict) and 'profiles' in old:
                 document = {**old, 'profiles': profiles}
-        text = json.dumps(document, ensure_ascii=False, indent=2) + '\n'
-        _replace_with_retry(filename, text.encode('utf-8'), attempts, retry_delay)
+        data = (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+        _replace_with_retry(filename, data, attempts, retry_delay)
+    return _version_of(data)
 
 
 def _version_of(content):

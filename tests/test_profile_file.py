@@ -332,6 +332,16 @@ def test_a_read_error_that_persists_raises_os_error(tmp_path, monkeypatch):
         read_profiles_versioned(path, attempts=3, retry_delay=0)
 
 
+def test_a_save_returns_the_version_of_the_file_it_wrote(tmp_path):
+    # the app's next save is based on its own saved file, not on the one before it (review)
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
+    _, shown = read_profiles_versioned(path)
+    version = save_profiles(path, [{'name': 'Cat'}], expected=shown)
+    assert version == read_profiles_versioned(path)[1] != shown
+    save_profiles(path, [{'name': 'Bird'}], expected=version)
+    assert read_profiles(path) == [{'name': 'Bird'}]
+
+
 def test_without_an_expected_version_the_save_is_not_checked(tmp_path):
     # e.g. a script or test that writes the file directly (the app always passes one)
     path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
