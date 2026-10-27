@@ -127,9 +127,11 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
                 if suffix in SUPPORTED:
                     written.append(write_new_file(folder, 'reference', suffix, f.getvalue()))
         # keeps the previous file as profiles.json.bak (A2); never overwrites a change made in
-        # another tab, session or by hand since the page showed the edited profiles (A13)
-        save_profiles(PROFILES, build(refs + [x.relative_to(BASE).as_posix() for x in written]),
-                      expected=profiles_shown)
+        # another tab, session or by hand since the page showed the edited profiles (A13).
+        # The next save is based on this saved file, also if the rerun that shows it is
+        # interrupted before the forms (review)
+        st.session_state.profiles_shown = save_profiles(
+            PROFILES, build(refs + [x.relative_to(BASE).as_posix() for x in written]), expected=profiles_shown)
     except (OSError, ValueError) as exc:  # ValueError: e.g. a path that cannot be made relative
         undo_reference_move(staged)
         for x in written:
@@ -825,7 +827,8 @@ except (OSError, ValueError) as exc:
 # A form submit reruns the page and reads the file again; store() saves only if the file is
 # still at this version, so an edit based on what the page showed never overwrites a change
 # made in another tab or session or by hand. Updated after the forms are shown (below), so
-# a run interrupted before them keeps the older version: a save is then refused, not lost.
+# a run interrupted before them keeps the older version: a save is then refused, not lost;
+# and by this session's own successful save (store), so that it never refuses the next one.
 profiles_shown = st.session_state.get('profiles_shown', profiles_version)
 
 # whether a search runs, also after a reload or in another tab (A4)
