@@ -1,9 +1,13 @@
 """FrameScout uninstall (P5): deletes what the installer and FrameScout create again.
 
 Uninstall-FrameScout.bat runs it with the Python that created the environment, never with
-the environment's own Python (.venv), which could not delete itself while it runs.
+the environment's own Python (.venv), which could not delete itself while it runs: the
+installer's private Python (.python), or for an older installation an installed Python. The
+private Python cannot delete itself either: when it runs the script, the script deletes
+everything else and ends with PRIVATE_PYTHON_EXIT_CODE, and the .bat deletes .python (I20).
 
-Deleted after a confirmation: the Python environment (.venv), downloaded model weights and
+Deleted after a confirmation: the Python environment (.venv), the private Python (.python),
+downloaded model weights and
 the pip cache (.cache), temporary files (.tmp, except the evaluation tool's .tmp/eval),
 the person detection model and compiled Python files. Never deleted: your photos, reference
 images, results (galleries, cache, marks), profiles, settings and run.log, and nothing
@@ -13,14 +17,18 @@ yourself to remove FrameScout completely.
 
   python framescout_uninstall.py             lists, asks, deletes
   python framescout_uninstall.py --dry-run   only lists
+
+Exit code 0 done, cancelled or only listed; 1 refused or failed; PRIVATE_PYTHON_EXIT_CODE
+done except the private Python that runs the script.
 """
 import argparse
 import os
 import sys
 from pathlib import Path
 
-from framescout_core import (outside_leftovers, programs_in_use, protected_folders, remove_items, search_running,
-                             size_text, uninstall_plan, user_data)
+from framescout_core import (PRIVATE_PYTHON, PRIVATE_PYTHON_EXIT_CODE, outside_leftovers, programs_in_use,
+                             protected_folders, remove_items, running_python, search_running, size_text,
+                             uninstall_plan, user_data)
 
 ROOT = Path(__file__).resolve().parent
 # failed paths shown; the rest is counted
@@ -61,7 +69,8 @@ def _blocked(root, out, confirmed=False):
     return False
 
 
-def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=print):
+def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=print, interpreter=sys.executable):
+    """Run the dialog; interpreter is the Python that runs the script."""
     parser = argparse.ArgumentParser(description='Delete what the FrameScout installer and FrameScout created '
                                      'again (environment, model weights, temporary files); never your data.')
     parser.add_argument('--dry-run', action='store_true', help='only list what would be deleted and kept')
@@ -79,9 +88,14 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
             'Fix the file or move it out of this folder, then run the uninstall again.')
         return 1
     items, skipped = uninstall_plan(root, protected)
+    # an installer before P5 part C used an installed Python, which stays
+    private = os.path.lexists(root / PRIVATE_PYTHON)
+    # the private Python that runs this script: deleted by Uninstall-FrameScout.bat afterwards
+    last = running_python(items, root, interpreter)
     if items:
         out('Deleted (a new installation downloads or creates them again):')
-        _rows([(item.path, item.label, item.size) for item in items], root, out)
+        _rows([(item.path, f'{item.label} (deleted last, when this script has ended)' if item is last else item.label,
+                item.size) for item in items], root, out)
         out(f'  Total: {size_text(sum(item.size for item in items))}')
     elif not skipped:
         out('Nothing to delete: the environment, model weights and temporary files are gone already.')
@@ -122,8 +136,10 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
         return 0
     if _blocked(root, out, confirmed=True):  # FrameScout may have been started while the question waited
         return 1
-    failures = remove_items(items)
+    now = [item for item in items if item is not last]
+    failures = remove_items(now)
     if failures:
+        # the private Python stays, so the uninstall can run again
         out(f'{len(failures)} files or folders could not be deleted:')
         for path, exc in failures[:MAX_FAILURES_SHOWN]:
             out(f'  {path}: {exc}')
@@ -131,10 +147,13 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
             out(f'  … and {len(failures) - MAX_FAILURES_SHOWN} more')
         out('Close FrameScout and other programs that use these files, then run the uninstall again.')
         return 1
-    out(f'Done: {size_text(sum(item.size for item in items))} deleted.')
-    out(f'To remove FrameScout completely, back up the data you want to keep and delete the folder {root}. '
-        'Python itself was installed separately and stays.')
-    return 0
+    out(f'Done: {size_text(sum(item.size for item in now))} deleted.')
+    if last:
+        out(f'The private Python ({_name(last.path, root)}, {size_text(last.size)}) runs this script: '
+            'Uninstall-FrameScout.bat deletes it when this script has ended.')
+    out(f'To remove FrameScout completely, back up the data you want to keep and delete the folder {root}.'
+        + ('' if private else ' Python itself was installed separately and stays.'))
+    return PRIVATE_PYTHON_EXIT_CODE if last else 0
 
 
 if __name__ == '__main__':

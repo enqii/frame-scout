@@ -3,7 +3,9 @@
 It deletes what the installer and FrameScout create again on their own (the Python
 environment, downloaded model weights, temporary and compiled files) and never the
 user's data: photos, reference images, results, profiles and settings stay, and so does
-everything outside the project folder (it is only listed).
+everything outside the project folder (it is only listed). The private Python of the
+installer (P5 part C) is deleted too; when it runs the uninstall, Uninstall-FrameScout.bat
+deletes it after the script has ended (I20).
 """
 import errno
 import os
@@ -14,6 +16,7 @@ from pathlib import Path
 
 from .copying import COPY_FOLDERS_KEY, _inside
 from .locks import lock_held
+from .portable_python import PRIVATE_PYTHON
 from .run_status import RUN_LOCK
 from .settings import (LEGACY_PHOTO_FOLDER, SETTINGS_FILE, _read_settings_file, _setting_value, _with_folder_list,
                        default_settings)
@@ -24,6 +27,7 @@ from .signature import DEFAULT_YOLO_MODEL
 # folder, what it is). Deleted after a confirmation.
 UNINSTALL_ITEMS = (
     ('.venv', 'Python environment with PyTorch and the other packages'),
+    (PRIVATE_PYTHON, 'private Python'),
     ('.cache', 'downloaded model weights and the pip cache'),
     ('.tmp', 'temporary files'),
     (DEFAULT_YOLO_MODEL, 'person detection model'),
@@ -45,12 +49,18 @@ USER_DATA = (
     ('run.log', 'log of the last search'),
     ('.tmp/eval', 'collections of the evaluation tool with your labels'),
 )
-# files deleted before the rest of their folder: without its python.exe, an environment
-# whose removal stopped halfway never looks complete, and the installer creates a new one
-UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe')}
+# files deleted before the rest of their folder: without its python.exe, an environment or
+# private Python whose removal stopped halfway never looks complete, and the installer
+# creates a new one
+UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe'),
+                   PRIVATE_PYTHON: ('python.exe', 'pythonw.exe')}
 # programs of the environment that run while the app or a search runs: Windows does not let
 # anyone open them for writing then, which tells that FrameScout still runs
 ENVIRONMENT_PROGRAMS = tuple(f'.venv/{name}' for name in UNINSTALL_FIRST['.venv'])
+# exit code of framescout_uninstall.py when it deleted everything but the private Python it
+# runs with: Uninstall-FrameScout.bat deletes that one after the script has ended (I20).
+# 0 and 1 are the script's other results, 2 is argparse's usage error.
+PRIVATE_PYTHON_EXIT_CODE = 3
 # Windows error of removing a folder that is not empty
 _ERROR_DIR_NOT_EMPTY = 145
 # Windows: the access right to write a file's data, all sharing modes, and the error of opening
@@ -196,6 +206,21 @@ def uninstall_plan(root, protected):
         first = () if link else UNINSTALL_FIRST.get(relative, ())
         items.append(UninstallItem(path, label, _size(path, keep), keep, first, link))
     return items, skipped
+
+
+def running_python(items, root, interpreter):
+    """Return the item of the private Python (PRIVATE_PYTHON) if interpreter, the Python
+    that runs the uninstall, is inside it; else None.
+
+    Windows does not delete a running program, so the uninstall leaves it to
+    Uninstall-FrameScout.bat, which deletes it after the script has ended (I20). A link is
+    removed by the script itself: that leaves the running Python where the link points to.
+    """
+    folder = Path(root) / PRIVATE_PYTHON
+    for item in items:
+        if item.path == folder and not item.link and _inside(interpreter, folder):
+            return item
+    return None
 
 
 def user_data(root):

@@ -12,8 +12,9 @@ from pathlib import Path
 import pytest
 
 import framescout_uninstall
-from framescout_core import (ENVIRONMENT_PROGRAMS, RunLock, outside_leftovers, programs_in_use, protected_folders,
-                             remove_items, search_running, uninstall_plan, user_data)
+from framescout_core import (ENVIRONMENT_PROGRAMS, PRIVATE_PYTHON, PRIVATE_PYTHON_EXIT_CODE, RunLock,
+                             outside_leftovers, programs_in_use, protected_folders, remove_items, running_python,
+                             search_running, uninstall_plan, user_data)
 from framescout_core import uninstall as uninstall_module
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,6 +36,8 @@ def project(tmp_path):
     write(root / '.venv' / 'Scripts' / 'python.exe', b'p' * 100)
     write(root / '.venv' / 'pyvenv.cfg', b'home = C:\\Python')
     write(root / '.venv' / 'Lib' / 'site-packages' / 'torch' / 'lib.dll', b'd' * 1000)
+    write(root / '.python' / 'python.exe', b'P' * 30)
+    write(root / '.python' / 'Lib' / 'os.py', b'o' * 70)
     write(root / '.cache' / 'huggingface' / 'model.bin', b'm' * 500)
     write(root / '.tmp' / 'pip-build' / 'x.whl', b't' * 10)
     write(root / 'yolo11n.pt', b'y' * 50)
@@ -74,11 +77,12 @@ def names(items, root):
 
 def test_the_plan_lists_the_environment_caches_and_temporary_files(project):
     items, skipped = plan(project)
-    assert names(items, project) == ['.cache', '.tmp', '.venv', '__pycache__', 'framescout_core/__pycache__',
-                                     'yolo11n.pt']
+    assert names(items, project) == ['.cache', '.python', '.tmp', '.venv', '__pycache__',
+                                     'framescout_core/__pycache__', 'yolo11n.pt']
     assert skipped == []
     sizes = {item.path.name: item.size for item in items}
     assert sizes['.venv'] == 100 + len(b'home = C:\\Python') + 1000
+    assert sizes['.python'] == 100
     assert sizes['.cache'] == 500
     assert sizes['.tmp'] == 10  # without .tmp/eval
     assert sizes['yolo11n.pt'] == 50
@@ -176,7 +180,7 @@ def test_nothing_inside_a_photo_folder_is_deleted(project, folder):
     items, skipped = plan(project)
     assert items == []
     assert sorted(path.name for path, _ in skipped) == sorted(
-        ['.cache', '.tmp', '.venv', '__pycache__', '__pycache__', 'yolo11n.pt'])
+        ['.cache', '.python', '.tmp', '.venv', '__pycache__', '__pycache__', 'yolo11n.pt'])
     assert all('inside' in reason for _, reason in skipped)
 
 
@@ -272,6 +276,18 @@ def test_the_environment_python_goes_first(project, monkeypatch):
     assert (project / '.venv' / 'pyvenv.cfg').exists()
 
 
+def test_the_private_python_goes_first(project, monkeypatch):
+    # the installer takes a .python with python.exe for complete
+    def fail(path, failures):
+        failures.append((Path(path), OSError('in use')))
+    monkeypatch.setattr(uninstall_module, '_remove_tree', fail)
+    items = [item for item in plan(project)[0] if item.path.name == '.python']
+    assert items[0].label == 'private Python'
+    assert [path.name for path, _ in remove_items(items)] == ['.python']
+    assert not (project / '.python' / 'python.exe').exists()
+    assert (project / '.python' / 'Lib' / 'os.py').exists()
+
+
 def test_failures_are_reported_and_the_rest_is_removed(project, monkeypatch):
     original = os.remove
 
@@ -339,6 +355,33 @@ def test_a_linked_cache_folder_loses_only_its_link(project, tmp_path):
     assert remove_items([cache]) == []
     assert not os.path.lexists(project / '.cache')
     assert (target / 'huggingface' / 'model.bin').is_file()
+
+
+# --- running_python: the private Python that runs the uninstall ---
+
+def private_python(project):
+    return project / PRIVATE_PYTHON / 'python.exe'
+
+
+def test_the_private_python_running_the_uninstall_is_found(project, tmp_path):
+    items, _ = plan(project)
+    found = running_python(items, project, private_python(project))
+    assert found is not None and found.path == project / PRIVATE_PYTHON
+    assert running_python(items, project, tmp_path / 'Python314' / 'python.exe') is None
+    assert running_python(items, project, project / '.venv' / 'Scripts' / 'python.exe') is None
+    assert running_python([], project, private_python(project)) is None
+
+
+@windows_only
+def test_a_linked_private_python_is_not_left_for_the_batch_file(project, tmp_path):
+    # removing the link leaves the running Python where the link points to
+    import _winapi
+    import shutil
+    target = tmp_path / 'D-drive-python'
+    shutil.move(project / PRIVATE_PYTHON, target)
+    _winapi.CreateJunction(str(target), str(project / PRIVATE_PYTHON))
+    items, _ = plan(project)
+    assert running_python(items, project, private_python(project)) is None
 
 
 # --- running FrameScout blocks the uninstall ---
@@ -426,7 +469,8 @@ def test_cache_variables_are_followed_but_not_into_the_project(project, tmp_path
 
 # --- main: the dialog ---
 
-def run(project, tmp_path, answer=None, argv=()):
+def run(project, tmp_path, answer=None, argv=(), interpreter=None):
+    """Run the dialog; by default with a Python outside the project, like the py launcher's."""
     lines, questions = [], []
 
     def ask(question):
@@ -434,8 +478,9 @@ def run(project, tmp_path, answer=None, argv=()):
         if answer is None:
             raise EOFError
         return answer
+    interpreter = tmp_path / 'Python314' / 'python.exe' if interpreter is None else interpreter
     code = framescout_uninstall.main(list(argv), root=project, environ={}, home=tmp_path / 'home', ask=ask,
-                                     out=lines.append)
+                                     out=lines.append, interpreter=interpreter)
     return code, '\n'.join(lines), questions
 
 
@@ -505,6 +550,64 @@ def test_nothing_to_delete(tmp_path):
     assert code == 0 and 'Nothing to delete' in text and questions == []
 
 
+def test_the_private_python_running_the_script_is_left_for_the_batch_file(project, tmp_path):
+    code, text, _ = run(project, tmp_path, 'yes', interpreter=private_python(project))
+    assert code == PRIVATE_PYTHON_EXIT_CODE
+    assert private_python(project).is_file() and (project / PRIVATE_PYTHON / 'Lib' / 'os.py').is_file()
+    assert not (project / '.venv').exists() and not (project / '.cache').exists()
+    assert_user_data_kept(project)
+    assert 'deletes it when this script has ended' in text
+    assert 'installed separately' not in text
+
+
+def test_the_private_python_is_listed_as_deleted_last(project, tmp_path):
+    code, text, questions = run(project, tmp_path, 'yes', ['--dry-run'], interpreter=private_python(project))
+    assert code == 0 and questions == []
+    assert re.search(r'^\s+\.python\S*\s.*private Python \(deleted last', text, re.MULTILINE)
+    assert private_python(project).is_file()
+
+
+@pytest.mark.parametrize('answer', [None, 'no'])
+def test_a_cancelled_uninstall_never_deletes_the_private_python(project, tmp_path, answer):
+    code, _, _ = run(project, tmp_path, answer, interpreter=private_python(project))
+    assert code == 0 and private_python(project).is_file()
+
+
+def test_after_failures_the_private_python_stays_for_another_try(project, tmp_path, monkeypatch):
+    removed = []
+
+    def remove(items):
+        removed.extend(item.path.name for item in items)
+        return [(project / '.venv', OSError('busy'))]
+    monkeypatch.setattr(framescout_uninstall, 'remove_items', remove)
+    code, _, _ = run(project, tmp_path, 'yes', interpreter=private_python(project))
+    assert code == 1 and '.python' not in removed
+
+
+def test_a_skipped_private_python_is_not_left_for_the_batch_file(project, tmp_path):
+    photos = project / PRIVATE_PYTHON / 'photos'
+    photos.mkdir()
+    (project / 'settings.json').write_text(json.dumps({'photo_folders': [str(photos)]}), encoding='utf-8')
+    code, text, _ = run(project, tmp_path, 'yes', interpreter=private_python(project))
+    assert code == 0 and 'Not deleted: .python' in text
+    assert private_python(project).is_file() and not (project / '.venv').exists()
+
+
+def test_the_private_python_is_deleted_when_another_python_runs_the_script(project, tmp_path):
+    # e.g. the py launcher, when .python lost its python.exe
+    code, text, _ = run(project, tmp_path, 'yes')
+    assert code == 0 and not (project / PRIVATE_PYTHON).exists()
+    assert 'installed separately' not in text
+
+
+def test_an_installed_python_is_named_as_kept(project, tmp_path):
+    # installations of older installers used an installed Python, which stays
+    import shutil
+    shutil.rmtree(project / PRIVATE_PYTHON)
+    code, text, _ = run(project, tmp_path, 'yes')
+    assert code == 0 and 'Python itself was installed separately and stays' in text
+
+
 def test_a_photo_folder_holding_the_project_stops_the_uninstall(project, tmp_path):
     (project / 'settings.json').write_text(json.dumps({'photo_folders': [str(project)]}), encoding='utf-8')
     code, text, questions = run(project, tmp_path, 'yes')
@@ -528,8 +631,40 @@ def uninstaller():
 def test_the_uninstaller_runs_the_script_outside_the_environment():
     commands = batch_commands(uninstaller())
     runs = [line for line in commands if 'framescout_uninstall.py' in line]
-    assert len(runs) == 1 and runs[0].startswith('py -') and runs[0].endswith('%*')
+    assert len(runs) == 2 and all(line.endswith(' -B -E -s framescout_uninstall.py %*') for line in runs)
+    assert runs[0].startswith('py -')  # installations of older installers
+    assert runs[1].startswith(f'"{PRIVATE_PYTHON}\\python.exe" ')
     assert not any('.venv' in line for line in commands)  # .venv's Python cannot delete itself
+
+
+def test_the_uninstaller_prefers_the_private_python():
+    commands = batch_commands(uninstaller())
+    first = commands.index(f'if exist "{PRIVATE_PYTHON}\\python.exe" goto private')
+    assert first < min(i for i, line in enumerate(commands) if line.startswith(('for ', 'py ')))
+
+
+def test_the_uninstaller_deletes_the_private_python_only_after_the_script_asked_for_it():
+    commands = batch_commands(uninstaller())
+    run = next(i for i, line in enumerate(commands) if line.startswith(f'"{PRIVATE_PYTHON}\\python.exe"'))
+    remove = commands.index(f'rmdir /s /q "{PRIVATE_PYTHON}"')
+    assert commands[run + 1] == 'set "EXIT_CODE=%errorlevel%"'
+    assert commands[run + 2] == f'if not "%EXIT_CODE%"=="{PRIVATE_PYTHON_EXIT_CODE}" goto end'
+    assert run + 2 < remove
+    assert sum('rmdir' in line or 'del ' in line for line in commands) == 2  # nothing else is deleted here
+    # python.exe first: a .python whose deletion stopped halfway never looks complete to the installer
+    assert commands[remove - 1].startswith(f'del /f /q "{PRIVATE_PYTHON}\\python.exe"')
+
+
+def test_the_exit_code_for_the_private_python_is_no_other_result():
+    # 0 done, 1 refused or failed, 2 argparse's usage error
+    assert PRIVATE_PYTHON_EXIT_CODE not in (0, 1, 2)
+
+
+def test_the_uninstaller_reports_a_private_python_it_could_not_delete():
+    commands = batch_commands(uninstaller())
+    remove = commands.index(f'rmdir /s /q "{PRIVATE_PYTHON}"')
+    assert commands[remove + 1] == f'if exist "{PRIVATE_PYTHON}" goto python_left'
+    assert 'set "EXIT_CODE=1"' in commands[remove + 1:]
 
 
 def test_the_uninstaller_falls_back_to_the_python_versions_of_older_installers():
