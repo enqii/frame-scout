@@ -460,17 +460,20 @@ and discussions.
       marks, references, profiles and settings, `run.log`, evaluation labels) with its own
       confirmation; photos are never deleted. Needs a user decision (what is
       offered, how it is confirmed). Found on 2026-10-27 in P5 part B.
-- [ ] **I20 – The uninstall script depends on the `py` launcher:** it looks for Python
-      3.14/3.13/3.12 through `py -<version>` and cannot run without it (it prints manual
-      steps). Part C of P5 (portable Python variant) must give it the portable interpreter
-      and decide how a portable build is uninstalled. Found on 2026-10-27 in P5 part B.
-- [ ] **I21 – `Install-FrameScout.bat` breaks in a folder with `!` in its path:** it uses
-      `setlocal EnableDelayedExpansion`, so cmd drops the `!` from `cd /d "%~dp0"` and from
-      every `%CD%` (`TORCH_HOME`, `HF_HOME`, `PIP_CACHE_DIR`, `TMP`, ...): the `cd` fails
-      and the caches point to a folder that does not exist (or another one). Shown for the
-      uninstaller in a dry run on a scratch copy (`Fo!to (old)\fs`: it ran the script of
-      the current directory); `Uninstall-FrameScout.bat` was fixed in PR #34. Fix idea: no
-      delayed expansion in the installer (only `!PYTHON_VERSION!` inside the venv block
-      needs it; move that part out of the block), or enable it only around that block; a
-      test like `test_the_uninstaller_keeps_exclamation_marks_in_paths_and_arguments`.
-      Found on 2026-10-27 in the review of PR #34.
+- [ ] **I23 – No prebuilt movable bundle:** a user still needs the internet and about
+      3 GB (CPU) or 6 GB (CUDA) of downloads, and the FrameScout folder cannot be moved
+      after the installation (`.venv` refers to `.python` by absolute path). Option (c) of
+      P5 part C, not implemented by user decision: a ZIP with the private Python, `.venv`
+      and all packages that runs from any folder (e.g. a relocatable environment without
+      absolute paths in `pyvenv.cfg`, or the embeddable package with `._pth`). Notes for a
+      decision: the size (a CPU build several hundred MB, a CUDA build several GB); the
+      licenses of the redistributed binaries have to be checked and their texts shipped –
+      the CUDA runtime libraries in the CUDA wheels of PyTorch (NVIDIA's terms for
+      redistribution), codec libraries bundled in wheels such as x265 in `pillow-heif` (GPL)
+      and LibRaw in `rawpy` (LGPL/CDDL); who builds and hosts the bundle. Needs a user
+      decision. Found on 2026-10-27 in P5 part C.
+- [ ] **I24 – The installer takes any `.python` with `python.exe` for complete (minor):** a
+      `.python` that lost files in `Lib` (e.g. an interrupted manual delete) makes only the
+      `venv` step fail; the message then says to delete `.python` and `.venv`. Possible fix:
+      check `.python\python.exe -I -c "import venv, ensurepip"` before using it and download
+      the package again otherwise. Found on 2026-10-27 in P5 part C.

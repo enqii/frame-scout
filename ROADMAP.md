@@ -8,11 +8,6 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
 
 ## Open (priority order)
 
-### P5 – Distribution
-- [ ] (C) Portable Python variant (user decision 2026-10-27: first, before P4b; parts A,
-      pinned dependencies (I12), and B, uninstall script (I19, I20, I21), are done, see
-      "Done"; I20 depends on this part)
-
 ### P6 – Safety of user data (added 2026-10-27 from the open backlog)
 - [ ] (A) Concurrent profile edits no longer overwrite each other; more than one backup
       generation (A13; how many generations is a user decision)
@@ -28,7 +23,7 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       duplicate; E33; check the behavior without internet, the first download must still
       work)
 - [ ] (B) Model and config files stay under `.cache/`, also for manual runs (E9, I10; keeps
-      the uninstall clean, relates to I20 and P5 part C)
+      the uninstall clean)
 
 ### P8 – Robust runs and galleries
 - [ ] (A) Skipped photos leave no gaps in the gallery (E12)
@@ -139,3 +134,6 @@ decision in PR #14):
 ### P5 – Distribution
 - [x] (A) Pinned dependencies (I12) (done 2026-10-26)
 - [x] (B) Uninstall script (done 2026-10-27; follow-ups I19, I20, I21)
+- [x] (C) Portable Python variant (done 2026-10-27; a private Python 3.14.9 in `.python\`
+      for new installations, I20 and I21 done; prebuilt movable bundle: I23, installer check
+      of `.python`: I24)
