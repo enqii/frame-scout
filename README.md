@@ -20,8 +20,9 @@ matching photos as an HTML gallery.
 ## Requirements
 
 - Windows 10/11
-- Python **3.14, 3.13 or 3.12** with the `py` launcher (install from python.org)
-- Internet connection for installation and the first search run
+- No Python needed: the installer downloads its own copy (see Installation)
+- Windows 10 version 1803 or later (`curl.exe`, `tar.exe`, Windows PowerShell)
+- Internet connection for installation (including python.org) and the first search run
 - A dedicated GPU is not required; search also runs on the CPU. An NVIDIA GPU with a
   current driver can be used through CUDA (see below).
 
@@ -32,13 +33,19 @@ matching photos as an HTML gallery.
    git clone https://github.com/enqii/frame-scout.git C:\FrameScout
    ```
    (alternatively download the ZIP and extract it)
-2. Double-click `Install-FrameScout.bat`. The installer looks for Python 3.14, 3.13 or
-   3.12 (in that order), creates an isolated `.venv` in the project folder and installs
-   the dependencies in the fixed versions of `constraints.txt` (those of the project's
-   verified runs on Python 3.14; on 3.12 and 3.13 only checked to be installable).
+2. Double-click `Install-FrameScout.bat`. A new installation downloads python.org's
+   Python 3.14.9 (about 33 MB, checked against a fixed SHA-256) into the folder `.python`
+   of the project, so no installed Python is needed and an installed one is not used,
+   creates an isolated `.venv` with it and installs the dependencies in the fixed
+   versions of `constraints.txt` (those of the project's verified runs on Python 3.14).
+   An existing `.venv` from an earlier installer (Python 3.12 to 3.14 installed on the
+   PC) is kept as it is.
 
-If package installation fails with one Python version: delete `.venv`, install another
-supported Python version and run the installer again.
+**Do not move or rename the FrameScout folder after the installation:** `.venv` refers
+to `.python` by its absolute path. To move it, uninstall (see below) and install again in
+the new folder.
+
+If the installation fails, delete `.python` and `.venv` and run the installer again.
 
 ### GPU support (NVIDIA, CUDA)
 
@@ -379,7 +386,7 @@ Double-click `Uninstall-FrameScout.bat` (`Uninstall-FrameScout.bat --dry-run` on
 the lists). Close FrameScout and any running search first. The script lists what it
 will delete and what it keeps, and deletes only after you type `yes`.
 
-- **Deleted:** `.venv` (the Python environment), `.cache` (model weights and pip cache),
+- **Deleted:** `.venv` (the Python environment), `.python` (the private Python), `.cache` (model weights and pip cache),
   `.tmp` (temporary files, except `.tmp\eval`), `yolo11n.pt`, `.pytest_cache` and the
   compiled `__pycache__` folders of the program.
 - **Kept (listed):** `photos\`, `references\`, `results\` (including your marks
@@ -401,10 +408,13 @@ will delete and what it keeps, and deletes only after you type `yes`.
 Afterwards the folder holds the program files and your data. To remove FrameScout
 completely, back up what you want to keep and delete the project folder yourself.
 
-The script needs the Python 3.12 to 3.14 that the installer used (found through the
-`py` launcher); without it, delete `.venv`, `.cache` and `.tmp` by hand. A system-wide
-Python installation remains in place. When you update from a ZIP, extract it into a
-fresh folder instead of over an old one (old files of earlier versions would stay).
+The script runs with the private Python in `.python`, which it deletes last: it ends
+first, and `Uninstall-FrameScout.bat` then removes `.python`. For an installation of an
+older installer (without `.python`) it uses the Python 3.12 to 3.14 that the installer
+used (found through the `py` launcher); without either, delete `.venv`, `.cache` and
+`.tmp` by hand. A Python installed on the PC by yourself remains in place. When you
+update from a ZIP, extract it into a fresh folder instead of over an old one (old files
+of earlier versions would stay).
 
 ## Development
 

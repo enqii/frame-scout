@@ -656,3 +656,29 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       the file was split by state. `BACKLOG.md` holds the open items, `docs/BACKLOG-DONE.md`
       the finished ones with their reports, `ROADMAP.md` the roadmap with the open items
       first. IDs and their text are unchanged; no item was rewritten except for moving it.)
+- [x] **I20 – The uninstall script depends on the `py` launcher:** it looked for Python
+      3.14/3.13/3.12 through `py -<version>` and could not run without it (it printed manual
+      steps). Part C of P5 (portable Python variant) must give it the portable interpreter
+      and decide how a portable build is uninstalled. Found on 2026-10-27 in P5 part B.
+      (Done 2026-10-27 in P5 part C, PR #36: `Uninstall-FrameScout.bat` runs the script with
+      `.python\python.exe` if present, otherwise with the `py` launcher (installations of
+      older installers; manual steps if neither exists). `.python` is an uninstall item
+      ("private Python", `UNINSTALL_FIRST`: `python.exe`, `pythonw.exe`). A running Python
+      cannot delete itself, so `framescout_core.running_python` finds the `.python` item
+      when the interpreter runs from it (not for a link); the script deletes everything
+      else, lists `.python` as "deleted last, when this script has ended" and exits with
+      `PRIVATE_PYTHON_EXIT_CODE` = 3, only after `yes` and not in a dry run, after
+      failures or when `.python` was skipped. The `.bat` then deletes `python.exe`,
+      `pythonw.exe` and `.python` itself (`rmdir /s /q`) and reports a leftover with exit
+      code 1. Tests: `tests/test_uninstall.py`. Runtime-checked under `.tmp` with the real
+      private Python; not against a full installation with PyTorch.)
+- [x] **I21 – `Install-FrameScout.bat` breaks in a folder with `!` in its path:** it used
+      `setlocal EnableDelayedExpansion`, so cmd dropped the `!` from `cd /d "%~dp0"` and from
+      every `%CD%` (`TORCH_HOME`, `HF_HOME`, `PIP_CACHE_DIR`, `TMP`, ...): the `cd` failed
+      and the caches pointed to a folder that did not exist (or another one). Shown for the
+      uninstaller in a dry run on a scratch copy (`Fo!to (old)\fs`: it ran the script of
+      the current directory); `Uninstall-FrameScout.bat` was fixed in PR #34. Found on
+      2026-10-27 in the review of PR #34. (Done 2026-10-27 in P5 part C, PR #36: the
+      installer uses no delayed expansion, `goto` instead of blocks, and the folder path
+      is never used inside parentheses. `tests/test_installer.py` checks both, like the
+      uninstaller's test; runtime-checked in a folder `Fo!to (old)\fs`.)

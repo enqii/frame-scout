@@ -26,7 +26,7 @@ Current baseline: **v1.1, prototype**, with a Streamlit frontend and a separate 
 - Scores are relative search heuristics, never certainty or identification.
 
 ## How to run (Windows)
-1. Clone the repository (or download and extract the ZIP) into a directory you control. Install a compatible Python if needed.
+1. Clone the repository (or download and extract the ZIP) into a directory you control. No Python needs to be installed: the installer downloads a private Python 3.14 into `.python` (the folder cannot be moved afterwards).
 2. Double-click `Install-FrameScout.bat` (prefer keeping all packages inside `.venv`). It offers GPU support if it finds an NVIDIA driver; `Install-FrameScout.bat cpu|cuda` chooses the PyTorch build directly. Never run the `cuda` variant on a development PC without approval: it downloads about 2.5 GB.
 3. Double-click `Start-FrameScout.bat`; local browser URL `http://127.0.0.1:8501`.
 4. In the app, choose an existing local folder (including subfolders), configure search profiles, review AI settings, start the search and open HTML results from `results/`.

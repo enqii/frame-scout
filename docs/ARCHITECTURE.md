@@ -18,7 +18,9 @@ photos, embeddings matching the CPU run; the CUDA install itself, the app on a G
 photos and other GPUs are untested, I11), other Python versions, a fresh install on
 another machine and the edge cases in the backlog are **not** verified. Treat syntax
 checks, unit tests and a real model run as distinct kinds of evidence, and do not call the
-app production-ready.
+app production-ready. The installer's download, extraction and `venv` creation with the private
+Python 3.14.9 (P5 part C) and the uninstall with it were run under `.tmp`; a full installation
+with PyTorch on it is **not runtime-tested**.
 
 Search models (E22, PR #31): CPU smoke runs of all four registered models (default,
 ViT-B/16, ViT-L/14, SigLIP) with `--no-person-detection`, 3 synthetic images and `.tmp/`
@@ -140,8 +142,12 @@ the module of its area and to the re-exports in `__init__.py`.
 - `cleanup.py`:
   `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14).
+- `portable_python.py` (P5 part C):
+  `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
+  the installer downloads into `.python`; constants only, checked against the `.bat` by
+  `tests/test_installer.py`).
 - `uninstall.py` (P5):
-  `UNINSTALL_ITEMS`/`UNINSTALL_KEEP`/`UNINSTALL_FIRST`/`USER_DATA`/`ENVIRONMENT_PROGRAMS`/`UninstallItem`/`protected_folders`/`uninstall_plan`/`user_data`/`outside_leftovers`/`search_running`/`programs_in_use`/`remove_items`
+  `UNINSTALL_ITEMS`/`UNINSTALL_KEEP`/`UNINSTALL_FIRST`/`USER_DATA`/`ENVIRONMENT_PROGRAMS`/`UninstallItem`/`PRIVATE_PYTHON_EXIT_CODE`/`running_python`/`protected_folders`/`uninstall_plan`/`user_data`/`outside_leftovers`/`search_running`/`programs_in_use`/`remove_items`
   (what the uninstall script deletes, keeps and only reports; standard library only.
   `uninstall_plan(root, protected)` returns the existing items to delete and the skipped
   ones: an item that contains a photo or copy folder of `settings.json` (except inside a
@@ -260,8 +266,22 @@ header of the file says this. `tests/test_constraints.py` keeps the file consist
 
 ### `Install-FrameScout.bat`
 
-`Install-FrameScout.bat [cpu|cuda]`: checks installed Python 3.14/3.13/3.12 (in that
-order), creates project-local `.venv`, sets `PIP_CONSTRAINT=constraints.txt` (I18),
+`Install-FrameScout.bat [cpu|cuda]` (P5 part C): needs no installed Python and has no
+search for Python 3.14/3.13/3.12. A new installation downloads python.org's full package
+`python-3.14.9-amd64.zip` (about 33 MB, about 117 MB extracted) with `curl.exe` to `.tmp`,
+checks its SHA-256 with `Get-FileHash` (Windows PowerShell; `PSModulePath` is cleared
+because a PowerShell 7 parent breaks the cmdlet lookup), extracts it with `tar.exe` to
+`.tmp\python-3.14.9`, moves it as a whole to `.python\` and creates `.venv` with
+`.python\python.exe -I -m venv .venv`. The pins are `PYTHON_VERSION`/`PYTHON_URL`/
+`PYTHON_SHA256`/`PRIVATE_PYTHON` in `framescout_core/portable_python.py`; the `.bat` holds
+the same values and `tests/test_installer.py` keeps them in sync. An existing `.venv` (older
+installer, installed Python 3.12-3.14) is kept without a download or migration; a `.python`
+without `python.exe` is removed and downloaded again, while a `.python` with `python.exe`
+is taken for complete (I24); if `venv` fails, the message says to delete `.python` and
+`.venv`. `.venv` refers to `.python` by absolute path, so the folder cannot be moved
+afterwards (prebuilt movable bundle: I23). The script uses no delayed expansion (a `!` in
+the folder path would be dropped from `cd` and `%CD%`), `goto` instead of parenthesized
+blocks and never the folder path inside parentheses (I21). Then it sets `PIP_CONSTRAINT=constraints.txt` (I18),
 installs PyTorch with `install_torch.py` (passing the argument on; torch's dependencies
 come in their pinned versions), then `pip install --no-cache-dir -r requirements.txt -c
 constraints.txt` (on a re-run this moves installed packages to the pinned versions and may
@@ -283,9 +303,10 @@ library only.
 
 ### `Uninstall-FrameScout.bat` and `framescout_uninstall.py`
 
-`Uninstall-FrameScout.bat [--dry-run]` (P5 part B) finds the first of Python 3.14/3.13/3.12
-through the `py` launcher (I20: no launcher, no uninstall; it prints the manual steps) and
-runs `framescout_uninstall.py` with `-B -E -s`, **not** with `.venv`'s Python, which
+`Uninstall-FrameScout.bat [--dry-run]` (P5 part B, I20 in part C) runs
+`framescout_uninstall.py` with `.python\python.exe` if it exists, otherwise (installations
+of older installers) with the first of Python 3.14/3.13/3.12 found through the `py`
+launcher (neither: it prints the manual steps), with `-B -E -s` and **not** with `.venv`'s Python, which
 cannot delete itself while it runs. It sets no cache or `TMP` variables (`.tmp` is
 deleted) and uses no delayed expansion, which would drop a `!` from the folder path and
 the arguments (review: the `cd` then failed and the script of the current directory
@@ -298,8 +319,17 @@ with the reason, the kept user data (`USER_DATA`, listed without sizes, never de
 photos, references, results with `marks.json`, profiles and backup, settings, `run.log`,
 `.tmp/eval`) and the caches outside the folder (listed only, with sizes), and deletes
 after the answer `yes`. `--dry-run` stops after the lists. Exit code 0 done or listed, 1
-refused, all items skipped, or failures. Not deleted: the program files themselves.
-Opt-in deletion of user data is I19.
+refused, all items skipped, or failures, `PRIVATE_PYTHON_EXIT_CODE` = 3 everything was
+deleted except the private Python the script runs with: `framescout_core.running_python`
+finds the `.python` item when the interpreter is inside it (not for a link, which the
+script removes itself); the item is listed as "deleted last, when this script has ended"
+and left out of `remove_items`. Exit code 3 is returned only after `yes`, not in a dry run,
+after failures or when `.python` was skipped. The `.bat` then deletes `python.exe`,
+`pythonw.exe` and `.python` (`rmdir /s /q`) and reports a leftover with exit code 1,
+otherwise exit code 0. The "FrameScout is running" check still looks at the `.venv`
+programs. "Python itself was installed separately and stays" is printed only when there is
+no `.python`. Not deleted: the program files themselves. Opt-in deletion of user data is
+I19.
 
 ### `Start-FrameScout.bat`
 
@@ -912,7 +942,13 @@ non-comment pip line of the installer passes `-r requirements.txt -c constraints
 it sets `PIP_CONSTRAINT=constraints.txt` between the venv and `install_torch.py` (I18);
 the torch pins of both files equal `TORCH_VERSION`/`TORCHVISION_VERSION` in
 `test_torch_install.py`; completeness of the transitive pins is not checkable in CI), and
-the uninstall script (P5, `test_uninstall.py`, 53 tests on `tmp_path` trees: plan, kept
+the installer (P5 part C, `test_installer.py`, text checks of `Install-FrameScout.bat`:
+pins equal `framescout_core.portable_python`, the full package of python.org, no installed
+Python needed, SHA-256 checked before extraction and use, extracted in `.tmp` and moved as
+a whole, an existing `.venv` kept without a download, no delayed expansion, folder path
+never inside a block; the real download, extraction and `venv` creation and the folder
+`Fo!to (old)\fs` were run by hand under `.tmp`, a full install with PyTorch on the private
+Python was not), and the uninstall script (P5, `test_uninstall.py`, tests on `tmp_path` trees: plan, kept
 entries (also in another case, Windows only), protected folders from settings (invalid
 values, read once, photo folder around the project), links and junctions, read-only
 files and folders, unlistable items, failures reported once, user-data and outside
@@ -920,7 +956,9 @@ listings, the run lock, read-only vs. running `python.exe` (Windows only), the d
 `framescout_uninstall.py`, no delayed expansion in the `.bat`; the real `.bat` was run by
 hand on scratch copies, once with `!` and `)` in the folder path as a dry run, not
 against a real installation, not while Streamlit was running and not on a PC without the
-`py` launcher; the running check was tried by hand with a running read-only executable);
+`py` launcher; the private Python's deletion (`running_python`, exit code 3, the `.bat`
+removing `.python`) was run by hand under `.tmp` with the real private Python, not against a
+full installation; the running check was tried by hand with a running read-only executable);
 still missing: cache
 reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
