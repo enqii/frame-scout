@@ -18,8 +18,8 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_running, cleanup_summary_text,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
-                             cuda_status, default_copy_folder, default_settings, device_choices, feature_signature,
-                             finish_reference_move, lock_held, open_command, openable_photo, page_cards, page_count,
+                             cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
+                             feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
                              profile_fingerprints, profile_state, ProfilesChangedError, read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
                              reconcile_settings, reference_folder,
@@ -498,6 +498,63 @@ def carry_over(old, new):
         st.session_state.notice = ((st.session_state.notice + ' ' if 'notice' in st.session_state else 'Saved. ')
                                    + plain(note))
 
+def deletion_consequences(p):
+    """Return the Markdown lines of the confirmation of deleting the profile p: what happens to its data (A22)."""
+    name = p['name']
+    lines = []
+    all_marks, marks_error = load_marks()
+    marks = all_marks.get(name, {})
+    if marks_error:
+        lines.append(f'{MARKS_FILE} cannot be read, so its marks cannot be deleted now: they stay in the file and '
+                     f'would pass to a new profile of the same name ({plain(str(marks_error))}).')
+    elif marks:
+        matches = sum(1 for state in marks.values() if state == MARK_MATCH)
+        lines.append(f'Its {count_text(len(marks), "mark", "marks")} ({matches:,} match, {len(marks) - matches:,} '
+                     f'no match) in {RESULTS.name}/{MARKS_FILE} {"is" if len(marks) == 1 else "are"} deleted with '
+                     'it. This cannot be undone.')
+    else:
+        lines.append('It has no marks.')
+    try:
+        saved = cached_copy_folders(*version_key(SETTINGS)).get(name)
+    except FileNotFoundError:
+        saved = None
+    except (OSError, ValueError) as exc:
+        lines.append(f'{SETTINGS.name} cannot be read, so a saved copy target folder of it cannot be removed now '
+                     f'({plain(str(exc))}).')
+        saved = None
+    if saved:
+        lines.append(f'Its saved copy target folder {plain(saved)} is removed from the settings. The folder and the '
+                     'photos copied into it stay where they are.')
+    else:
+        lines.append('Photos copied for it stay where they are.')
+    refs = p.get('reference_images', [])
+    if refs:
+        lines.append(f'Its {count_text(len(refs), "reference image", "reference images")} '
+                     f'{"stays" if len(refs) == 1 else "stay"} in the references folder, since the backup '
+                     'profiles.json.bak still names the profile; "Clean up storage" can delete '
+                     f'{"it" if len(refs) == 1 else "them"} later.')
+    return lines
+
+def forget_profile(name):
+    """Delete the marks and the saved copy target folder of the deleted profile name (A22).
+
+    Called after the deletion is saved; the folder itself and the copies in it are never
+    touched. A part that cannot be removed is named in the notice at the top of the tab.
+    """
+    st.session_state.get('copy_folders_unsaved', {}).pop(name, None)
+    problems = []
+    for what, action in (('marks', lambda: delete_marks(MARKS, name)),
+                         ('saved copy target folder', lambda: forget_copy_folder(SETTINGS, name))):
+        try:
+            action()
+        except (OSError, ValueError) as exc:
+            problems.append(f'its {what} ({exc})')
+    if problems:
+        note = (f'The profile was deleted, but {" and ".join(problems)} could not be removed: they still belong to '
+                f'the name "{name}" and would pass to a new profile of that name.')
+        st.session_state.notice = ((st.session_state.notice + ' ' if 'notice' in st.session_state else '')
+                                   + plain(note))
+
 @st.cache_data(show_spinner=False, max_entries=2)
 def cached_results(path, mtime_ns, size):
     """read_results, read again only when the file changes (mtime_ns and size are the cache key)."""
@@ -580,7 +637,8 @@ def show_results(results, photo_folders):
     elif states[name] == 'missing':
         st.info(f'"{plain(name)}" is no longer one of your search profiles (renamed or deleted). These are its '
                 f'results from the search of {run_date(results)}. Its photos cannot be marked here: a renamed '
-                "profile took its marks along, and they appear with the next search's results.")
+                "profile took its marks along, and they appear with the next search's results; deleting "
+                'a profile deletes its marks too.')
     others = {state: [plain(n) for n in names if n != name and states[n] == state] for state in ('changed', 'missing')}
     if others['changed'] or others['missing']:
         st.caption(' · '.join(text + ', '.join(found) for text, found in (
@@ -943,6 +1001,10 @@ with p_tab:
             'FrameScout uses understands practically only English: a word in another language, e.g. German '
             '"Schwert" instead of "sword", can find completely different photos.')
     saves = st.session_state.get('saves', 0)
+    # "Delete profile" asks first (A8, A22): the profile name and the save count of the click.
+    # Any save since (also a refused one) or the profile's disappearance ends the question
+    if st.session_state.get('delete_pending') not in [(p['name'], saves) for p in profiles]:
+        st.session_state.pop('delete_pending', None)
     for index, p in enumerate(profiles):
         with st.expander(f"{p['name']}  ·  {p.get('franchise','')}"):
             with st.form(f'edit_{index}_{saves}'):
@@ -973,10 +1035,23 @@ with p_tab:
                         if edit_name != p['name']:
                             carry_over(p['name'], edit_name)  # its marks and copy folder follow the name (A17)
                         st.rerun()
-            # new lists instead of changing profiles in place: after a failed save the page
-            # keeps showing (and the search uses) exactly what is in profiles.json
-            if delete and store(lambda _, index=index: profiles[:index] + profiles[index+1:]):
-                st.rerun()
+            if delete:
+                st.session_state.delete_pending = (p['name'], saves)
+            if st.session_state.get('delete_pending') == (p['name'], saves):
+                st.warning(f'**Delete the profile "{plain(p["name"])}" for good?**\n\n'
+                           + '\n'.join('- ' + line for line in deletion_consequences(p)))
+                c1, c2 = st.columns(2)
+                confirmed = c1.button('Delete for good', type='primary', key=f'delete_yes_{index}_{saves}',
+                                      disabled=active)
+                c2.button('Cancel', key=f'delete_no_{index}_{saves}', on_click=st.session_state.pop,
+                          args=('delete_pending', None))
+                # new lists instead of changing profiles in place: after a failed save the page
+                # keeps showing (and the search uses) exactly what is in profiles.json. A save
+                # refused since profiles.json changed (A13) ends the question: the page shows
+                # the current profiles, and the user decides again
+                if confirmed and store(lambda _, index=index: profiles[:index] + profiles[index+1:]):
+                    forget_profile(p['name'])  # its marks and saved copy folder go with it (A22)
+                    st.rerun()
     st.divider()
     st.subheader('New search profile')
     # the form is emptied only after a successful save, by giving its widgets new keys;
