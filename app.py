@@ -518,7 +518,11 @@ def carry_over(old, new):
         add_notice(f'The profile was renamed, but {problems} still belong to the old name "{old}".', first='Saved. ')
 
 def deletion_consequences(p):
-    """Return the Markdown lines of the confirmation of deleting the profile p: what happens to its data (A22)."""
+    """Return the confirmation of deleting the profile p: what happens to its data (A22).
+
+    Returns (its Markdown lines, the number of marks they name, or None if marks.json
+    cannot be read).
+    """
     name = p['name']
     lines = []
     all_marks, marks_error = load_marks()
@@ -558,16 +562,24 @@ def deletion_consequences(p):
                      f'{"stays" if len(refs) == 1 else "stay"} in the references folder, since the backup '
                      'profiles.json.bak still names the profile; "Clean up storage" can delete '
                      f'{"it" if len(refs) == 1 else "them"} later.')
-    return lines
+    return lines, None if marks_error else len(marks)
 
-def forget_profile(name):
+def forget_profile(name, named):
     """Delete the marks and the saved copy target folder of the deleted profile name (A22).
 
     Called after the deletion is saved; the folder itself and the copies in it are never
-    touched. A part that cannot be removed is named in the notice at the top of the tab.
+    touched. named: the number of marks the confirmation named (None: it could not read
+    them). A different number of deleted marks (marked or unmarked since the question)
+    and a part that cannot be removed are named in the notice at the top of the tab.
     """
     st.session_state.get('copy_folders_unsaved', {}).pop(name, None)
-    _, problems = change_name_data(lambda: delete_marks(MARKS, name), lambda: forget_copy_folder(SETTINGS, name))
+    deleted, problems = change_name_data(lambda: delete_marks(MARKS, name), lambda: forget_copy_folder(SETTINGS, name))
+    if deleted is not None and deleted != (named or 0):
+        add_notice(f'The profile "{name}" was deleted with {count_text(deleted, "mark", "marks")}: '
+                   + (f'{MARKS_FILE} could not be read when you were asked, but could be read again by then.'
+                      if named is None else
+                      f'the question named {named:,}, but photos of it were marked or unmarked after it was shown '
+                      '(in the gallery, another tab or another window).'))
     if problems:
         add_notice(f'The profile was deleted, but {problems} could not be removed: they still belong to the name '
                    f'"{name}" and would pass to a new profile of that name.')
@@ -1066,8 +1078,7 @@ with p_tab:
                 st.session_state.delete_pending = (p['name'], saves)
                 st.rerun()
             if st.session_state.get('delete_pending') == (p['name'], saves):
-                st.warning(f'**Delete the profile "{plain(p["name"])}" for good?**\n\n'
-                           + '\n'.join('- ' + line for line in deletion_consequences(p)))
+                question = st.container()  # filled below the buttons, see there
                 c1, c2 = st.columns(2)
                 confirmed = c1.button('Delete for good', type='primary', key=f'delete_yes_{index}_{saves}',
                                       disabled=active)
@@ -1078,8 +1089,14 @@ with p_tab:
                 # refused since profiles.json changed (A13) ends the question: the page shows
                 # the current profiles, and the user decides again
                 if confirmed and store(lambda _, index=index: profiles[:index] + profiles[index+1:]):
-                    forget_profile(p['name'])  # its marks and saved copy folder go with it (A22)
+                    # its marks and saved copy folder go with it (A22), compared with the number
+                    # of marks the question the user answered named (review)
+                    forget_profile(p['name'], st.session_state.get('delete_marks_named'))
                     st.rerun()
+                # after the click is handled: the number the user saw is the one of the run before
+                lines, st.session_state.delete_marks_named = deletion_consequences(p)
+                question.warning(f'**Delete the profile "{plain(p["name"])}" for good?**\n\n'
+                                 + '\n'.join('- ' + line for line in lines))
     st.divider()
     st.subheader('New search profile')
     # the form is emptied only after a successful save, by giving its widgets new keys;
