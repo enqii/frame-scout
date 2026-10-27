@@ -30,7 +30,7 @@ commit convention). This brief only adds the procedure and commands. If this bri
 Read only what the item needs – every token you read is paid again on each later turn:
 - `BACKLOG.md` (open items, 39 KB) and `docs/BACKLOG-DONE.md` (finished items, 55 KB):
   do not read them whole. Grep both for the item's IDs (e.g. `\*\*E7 –`) and Read those
-  entries. `ROADMAP.md` is short (about 90 lines) and may be read whole.
+  entries. `ROADMAP.md` is short (about 130 lines) and may be read whole.
 - `docs/ARCHITECTURE.md`: Grep for the files, functions and IDs you touch and read those
   sections; read it whole only for an item that changes the architecture.
 - The code you are going to touch (search first, then read the relevant parts of large
