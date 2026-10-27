@@ -51,7 +51,7 @@ from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLE
     CACHE_CATEGORIES, CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, scan_cleanup, cleanup_running, clean_up,
     auto_cleanup, size_text, count_text, cleanup_summary_text)
 from .uninstall import (UNINSTALL_ITEMS, UNINSTALL_KEEP, UNINSTALL_FIRST, USER_DATA, ENVIRONMENT_PROGRAMS,
-    UninstallItem, protected_folders, uninstall_plan, user_data, outside_leftovers, search_running, programs_in_use,
-    remove_items)
+    PRIVATE_PYTHON_EXIT_CODE, UninstallItem, protected_folders, uninstall_plan, running_python, user_data,
+    outside_leftovers, search_running, programs_in_use, remove_items)
 from .evaluation import (SCORES_FORMAT, LABELS_FORMAT, EVAL_K, SCORE_DIGITS, collection_name_problem,
     write_document, read_document, scores_document, write_scores, read_scores, read_labels, save_labels, set_label, average_precision, build_pool)
