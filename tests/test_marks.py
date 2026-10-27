@@ -4,8 +4,8 @@ import threading
 
 import pytest
 
-from framescout_core import (MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARKS_FILE, RunLock, read_marks,
-                             rename_marks, save_marks)
+from framescout_core import (MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARKS_FILE, RunLock, delete_marks,
+                             read_marks, rename_marks, save_marks)
 
 
 def stored(path):
@@ -73,6 +73,8 @@ def test_an_unreadable_file_raises_and_is_never_replaced(tmp_path, content):
         save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
     with pytest.raises(ValueError):
         rename_marks(path, 'Red car', 'Blue car')
+    with pytest.raises(ValueError):
+        delete_marks(path, 'Red car')
     assert path.read_text(encoding='utf-8') == content
 
 
@@ -140,3 +142,60 @@ def test_renaming_a_profile_without_marks_changes_nothing(tmp_path):
     before = path.read_bytes()
     assert rename_marks(path, 'Red car', 'Blue car') is False
     assert path.read_bytes() == before
+
+
+# --- deleting a profile (A22) ------------------------------------------------------------
+
+def test_deleting_a_profile_deletes_only_its_marks(tmp_path):
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH, 'b.jpg': MARK_NO_MATCH})
+    save_marks(path, 'Dog', {'a.jpg': MARK_MATCH})
+    assert delete_marks(path, 'Red car') == 2
+    assert read_marks(path) == {'Dog': {'a.jpg': MARK_MATCH}}
+
+
+def test_a_new_profile_of_a_deleted_name_starts_without_marks(tmp_path):
+    # the bug of A22: marks are keyed by the name, so they must go with the deleted profile
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
+    delete_marks(path, 'Red car')
+    assert read_marks(path).get('Red car', {}) == {}
+    save_marks(path, 'Old', {'b.jpg': MARK_MATCH})
+    save_marks(path, 'New', {'c.jpg': MARK_MATCH})
+    delete_marks(path, 'New')
+    rename_marks(path, 'Old', 'New')  # a rename to the deleted name merges nothing old
+    assert read_marks(path) == {'New': {'b.jpg': MARK_MATCH}}
+
+
+def test_deleting_a_profile_without_marks_changes_nothing(tmp_path):
+    path = tmp_path / 'results' / MARKS_FILE
+    assert delete_marks(path, 'Red car') == 0  # no results folder: nothing is created
+    assert not path.parent.exists()
+    path.parent.mkdir()
+    assert delete_marks(path, 'Red car') == 0
+    assert not path.exists()
+    save_marks(path, 'Dog', {'c.jpg': MARK_MATCH})
+    before = path.read_bytes()
+    assert delete_marks(path, 'Red car') == 0
+    assert path.read_bytes() == before
+
+
+def test_deleting_keeps_unknown_keys_and_changes_of_other_sessions(tmp_path):
+    path = tmp_path / MARKS_FILE
+    path.write_text(json.dumps({'format': 1, 'later': [1], 'profiles': {
+        'Red car': {'a.jpg': MARK_MATCH}, 'Dog': {'b.jpg': MARK_NO_MATCH}}}), encoding='utf-8')
+    assert delete_marks(path, 'Red car') == 1
+    assert stored(path) == {'format': 1, 'later': [1], 'profiles': {'Dog': {'b.jpg': MARK_NO_MATCH}}}
+
+
+def test_deleting_waits_for_the_lock_and_gives_up(tmp_path):
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
+    lock = RunLock(tmp_path / (MARKS_FILE + '.lock'))
+    assert lock.acquire()
+    try:
+        with pytest.raises(OSError):
+            delete_marks(path, 'Red car', lock_timeout=0.05)
+    finally:
+        lock.release()
+    assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH}}
