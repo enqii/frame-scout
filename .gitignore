@@ -1,5 +1,7 @@
 # Python environment and caches
 .venv/
+# the private Python of the installer (P5 part C)
+.python/
 __pycache__/
 *.pyc
 .cache/
