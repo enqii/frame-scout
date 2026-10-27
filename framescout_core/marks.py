@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from ._common import _read_json_object, _update_locked
+from .profiles import require_profile
 
 
 # Marks (A17, P4 (B)): FrameScout ranks candidates, not certain hits; a mark records what the
@@ -44,15 +45,18 @@ def read_marks(path, attempts=5, retry_delay=0.05):
     return _read_marks_document(path, attempts, retry_delay)['profiles']
 
 
-def save_marks(path, profile, changes, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
+def save_marks(path, profile, changes, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT,
+               profiles_file=None):
     """Apply changes ({photo path: state of MARK_STATES}) to the marks of profile; return its marks now.
 
     MARK_OPEN removes a mark, and a profile without marks is removed from the file. The
     changes are merged into the file as it is now (another tab or session may have marked
     other photos), under a lock like save_settings; the file is replaced atomically and its
-    folder is created if needed. Nothing is written if nothing changes. Raises ValueError
-    for an unknown state and for an unreadable file (never replaced), OSError if the lock
-    is not free within lock_timeout seconds or writing keeps failing.
+    folder is created if needed. Nothing is written if nothing changes. With profiles_file,
+    profile must be a profile of that file at the time of the write (require_profile,
+    checked under the lock), else UnknownProfileError is raised and nothing is written.
+    Raises ValueError for an unknown state and for an unreadable file (never replaced),
+    OSError if the lock is not free within lock_timeout seconds or writing keeps failing.
     """
     for photo, state in changes.items():
         if not isinstance(photo, str) or state not in MARK_STATES:
@@ -62,6 +66,8 @@ def save_marks(path, profile, changes, attempts=5, retry_delay=0.05, lock_timeou
     result = {}
 
     def update(document):
+        if profiles_file is not None:
+            require_profile(profiles_file, profile)
         profiles = document['profiles']
         marks = dict(profiles.get(profile, {}))
         for photo, state in changes.items():

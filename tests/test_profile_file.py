@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (NEVER_DELETED, ProfilesChangedError, RunLock, load_profiles, read_profiles, read_profiles_versioned,
-                             save_profiles)
+from framescout_core import (NEVER_DELETED, ProfilesChangedError, RunLock, UnknownProfileError, load_profiles,
+                             read_profiles, read_profiles_versioned, require_profile, save_profiles)
 
 
 def write(path, data, encoding='utf-8'):
@@ -16,6 +16,23 @@ def write(path, data, encoding='utf-8'):
 
 def test_a_missing_file_has_no_profiles(tmp_path):
     assert read_profiles(tmp_path / 'profiles.json') == []
+
+
+def test_require_profile_names_a_name_that_is_no_profile(tmp_path):
+    # the check of save_marks/save_copy_folder (review of A22)
+    path = tmp_path / 'profiles.json'
+    with pytest.raises(UnknownProfileError, match='Red car'):
+        require_profile(path, 'Red car')  # no file: no profiles
+    write(path, {'profiles': [{'name': 'Red car'}, {'name': 'Bär'}]})
+    require_profile(path, 'Red car')
+    require_profile(path, 'Bär')
+    with pytest.raises(UnknownProfileError):
+        require_profile(path, 'red car')  # names are compared exactly, like the marks' keys
+    assert issubclass(UnknownProfileError, ValueError)
+    path.write_text('not json', encoding='utf-8')
+    with pytest.raises(ValueError, match='profiles.json cannot be read') as raised:
+        require_profile(path, 'Red car')
+    assert not isinstance(raised.value, UnknownProfileError)
 
 
 def test_the_current_format_is_read_unchanged_including_unknown_keys(tmp_path):
