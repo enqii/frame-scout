@@ -62,9 +62,20 @@ mkdir "%PYTHON_UNPACKED%"
 tar.exe -xf "%PYTHON_ZIP%" -C "%PYTHON_UNPACKED%"
 if errorlevel 1 goto unpack_failed
 if not exist "%PYTHON_UNPACKED%\python.exe" goto unpack_failed
-rem moved as a whole: an interrupted extraction never leaves a .python that looks complete
+rem Moved as a whole: an interrupted extraction never leaves a .python that looks complete.
+rem A virus scanner that still checks the new files makes the move fail with "Access is
+rem denied" for a moment, so it is tried up to five times (review); ping waits also when
+rem the console input is redirected, timeout does not.
+set "MOVE_TRIES=0"
+:move_python
+set /a MOVE_TRIES+=1
 move "%PYTHON_UNPACKED%" ".python" >nul
-if errorlevel 1 goto unpack_failed
+if not errorlevel 1 goto python_moved
+if %MOVE_TRIES% geq 5 goto move_failed
+echo Trying again in a few seconds ...
+ping -n 4 127.0.0.1 >nul
+goto move_python
+:python_moved
 del "%PYTHON_ZIP%"
 :venv
 echo Creating the Python environment with the private Python in .python
@@ -106,6 +117,10 @@ del "%PYTHON_ZIP%" >nul 2>&1
 goto failed
 :unpack_failed
 echo Extracting Python failed. See the error message above, then run the installer again.
+goto failed
+:move_failed
+echo Moving the extracted Python to .python failed (see the message above), usually because
+echo a virus scanner still checks the new files. Run the installer again in a minute.
 goto failed
 :venv_failed
 echo Creating the virtual environment failed. See the error message above. If it fails
