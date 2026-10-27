@@ -67,13 +67,17 @@ def test_the_installer_needs_no_installed_python():
     assert not any(re.match(r'(?i)py(\.exe)?\s', line) for line in commands)
 
 
+VENV_CHECK = r'^"\.venv\\Scripts\\python\.exe" -I -c "import pip" >nul 2>&1$'
+VENV_CREATE = rf'^"{re.escape(PRIVATE_PYTHON)}\\python\.exe" -I -m venv --clear \.venv$'
+
+
 def test_the_download_is_checked_before_it_is_extracted_and_used():
     commands = batch_commands(installer())
     order = [index(commands, r'^curl\.exe .*"%PYTHON_URL%"'),
              index(commands, r'^powershell\.exe .*Get-FileHash .*\$env:PYTHON_ZIP.*\$env:PYTHON_SHA256'),
              index(commands, r'^tar\.exe -xf "%PYTHON_ZIP%"'),
              index(commands, rf'^move "%PYTHON_UNPACKED%" "{re.escape(PRIVATE_PYTHON)}"'),
-             index(commands, rf'^"{re.escape(PRIVATE_PYTHON)}\\python\.exe" -I -m venv \.venv$')]
+             index(commands, VENV_CREATE)]
     assert order == sorted(order)
     # each step stops the installation when it fails (the move is tried again first)
     for i in (order[0], order[2], order[4]):
@@ -112,11 +116,41 @@ def test_the_move_is_tried_again_while_a_virus_scanner_holds_the_new_files():
     assert 'set "MOVE_TRIES=0"' in batch_commands(installer())
 
 
-def test_an_existing_environment_is_kept_without_downloading_python():
+def test_a_working_environment_is_kept_without_downloading_python():
+    # also one that an older installer created with an installed Python
     commands = batch_commands(installer())
-    keep = index(commands, r'^if exist "\.venv\\Scripts\\python\.exe" goto ')
-    reuse = index(commands, rf'^if exist "{re.escape(PRIVATE_PYTHON)}\\python\.exe" goto ')
-    assert keep < reuse < index(commands, r'^curl\.exe ')
+    new = index(commands, r'^if not exist "\.venv\\Scripts\\python\.exe" goto python$')
+    check = next(i for i, line in enumerate(commands) if re.match(VENV_CHECK, line))
+    assert new < check < index(commands, r'^curl\.exe ')
+    assert commands[check + 1] == 'if not errorlevel 1 goto packages'
+    assert commands[check + 2] == 'set "VENV_BROKEN=1"'
+
+
+def test_an_environment_whose_python_is_back_is_kept():
+    # a .venv of the private Python works again once .python is downloaded again (review)
+    venv = section(installer(), 'venv')
+    assert venv[0] == 'if not defined VENV_BROKEN goto venv_create'
+    assert re.match(VENV_CHECK, venv[1])
+    assert venv[2] == 'if not errorlevel 1 goto packages'
+
+
+def test_a_broken_environment_is_created_again():
+    # its Python is gone (.python deleted, the folder moved) or pip is missing (review);
+    # --clear empties only a .venv that does not work: without python.exe or failing both checks
+    create = section(installer(), 'venv_create')
+    assert any(re.match(VENV_CREATE, line) for line in create)
+    assert create[-1] == 'if errorlevel 1 goto venv_failed'
+
+
+def test_a_half_created_environment_is_removed():
+    # it could pass the check at the top on the next run (review)
+    assert section(installer(), 'venv_failed')[0] == 'if exist ".venv" rmdir /s /q ".venv"'
+
+
+def test_an_existing_private_python_is_reused():
+    commands = batch_commands(installer())
+    reuse = index(commands, rf'^if exist "{re.escape(PRIVATE_PYTHON)}\\python\.exe" goto venv$')
+    assert reuse < index(commands, r'^curl\.exe ')
 
 
 def test_the_installer_keeps_exclamation_marks_in_paths_and_arguments():

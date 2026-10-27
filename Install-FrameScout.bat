@@ -28,9 +28,6 @@ set "XDG_CACHE_HOME=%CD%\.cache"
 set "TMP=%CD%\.tmp"
 set "TEMP=%CD%\.tmp"
 if not exist ".tmp" mkdir ".tmp"
-rem An existing environment is kept, also one that an older installer created with an
-rem installed Python (no migration).
-if exist ".venv\Scripts\python.exe" goto packages
 rem New installations get a private Python in .python (P5 part C): python.org's full
 rem package for Windows, a ZIP, checked against its published SHA-256, so no Python has to
 rem be installed on the PC. framescout_core.portable_python pins the same values (a test).
@@ -40,6 +37,19 @@ set "PYTHON_URL=https://www.python.org/ftp/python/3.14.9/python-3.14.9-amd64.zip
 set "PYTHON_SHA256=874d01bac04b470c6e1422dfccb9e182b9efe90c6a8adc5fc50d66bf84c40191"
 set "PYTHON_ZIP=.tmp\python-3.14.9-amd64.zip"
 set "PYTHON_UNPACKED=.tmp\python-3.14.9"
+set "VENV_BROKEN="
+if not exist ".venv\Scripts\python.exe" goto python
+rem An existing environment that starts and has pip is kept, also one that an older
+rem installer created with an installed Python (no migration).
+".venv\Scripts\python.exe" -I -c "import pip" >nul 2>&1
+if not errorlevel 1 goto packages
+set "VENV_BROKEN=1"
+rem Its Python is gone (.python deleted, the folder moved, an installed Python removed) or
+rem venv stopped before pip was installed (review). Below it is used again if it works with
+rem the private Python, otherwise it is created again.
+echo The Python environment in .venv does not work: its Python or pip is missing. The
+echo installer repairs it.
+:python
 if exist ".python\python.exe" goto venv
 rem a .python without python.exe is a leftover, e.g. of an uninstall that stopped halfway
 if exist ".python" rmdir /s /q ".python"
@@ -78,8 +88,14 @@ goto move_python
 :python_moved
 del "%PYTHON_ZIP%"
 :venv
+if not defined VENV_BROKEN goto venv_create
+rem a .venv of the private Python works again now that .python is complete again
+".venv\Scripts\python.exe" -I -c "import pip" >nul 2>&1
+if not errorlevel 1 goto packages
+:venv_create
 echo Creating the Python environment with the private Python in .python
-".python\python.exe" -I -m venv .venv
+rem --clear: a .venv that gets here does not work (no python.exe, or both checks failed)
+".python\python.exe" -I -m venv --clear .venv
 if errorlevel 1 goto venv_failed
 :packages
 rem constraints.txt pins every package, including the dependencies of the dependencies, to
@@ -123,9 +139,11 @@ echo Moving the extracted Python to .python failed (see the message above), usua
 echo a virus scanner still checks the new files. Run the installer again in a minute.
 goto failed
 :venv_failed
+rem a half-created .venv could pass the check at the top on the next run (review)
+if exist ".venv" rmdir /s /q ".venv"
 echo Creating the virtual environment failed. See the error message above. If it fails
-echo again, delete the folder .python (the installer downloads it again) and the folder
-echo .venv, if there is one, and run the installer again.
+echo again, delete the folder .python (the installer downloads it again) and run the
+echo installer again.
 goto failed
 :failed
 pause
