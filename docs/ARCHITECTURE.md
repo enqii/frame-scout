@@ -100,7 +100,10 @@ the module of its area and to the re-exports in `__init__.py`.
   without `expected` the save is unchecked; the lock file stays, empty; `save_profiles`
   returns the version of the file it wrote; both functions retry a read or replace that
   fails for a moment on Windows while another session reads or replaces the file, 5
-  tries 0.05 s apart, like the settings and marks files).
+  tries 0.05 s apart, like the settings and marks files); `require_profile(filename, name)`
+  raises `UnknownProfileError` (a `ValueError`) unless `name` is a profile of the file now
+  (an unreadable file: `ValueError` naming it), the check of `save_marks` and
+  `save_copy_folder` (review of A22, A33).
 - `thumbnails.py`: `thumbnail_name`/`ensure_thumbnail` (gallery thumbnails; a photo
   deleted before the export is skipped, E6), `crop_label`/`FULL_IMAGE_LABEL` (gallery crop
   labels).
@@ -145,11 +148,13 @@ the module of its area and to the re-exports in `__init__.py`.
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
 - `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`
-  (the user's marks, A17; `delete_marks` removes all marks of a deleted profile, A22).
+  (the user's marks, A17; `delete_marks` removes all marks of a deleted profile, A22;
+  `save_marks(..., profiles_file=...)` saves only for a name that is a profile now).
 - `copying.py`:
   `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`/`forget_copy_folder`
   (copying marked matches and their saved target folders in `settings.json`, A17;
-  `forget_copy_folder` removes only the saved entry of a deleted profile, A22).
+  `forget_copy_folder` removes only the saved entry of a deleted profile, A22;
+  `save_copy_folder(..., profiles_file=...)` like `save_marks`).
 - `cleanup.py`:
   `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14).
@@ -781,21 +786,34 @@ card is an `st.segmented_control` whose session state is set from the file befor
 drawn on every run of the gallery fragment (no `default=`), so the file is the truth also
 for other tabs; its `on_change` saves. A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
-that are no longer search profiles cannot be marked, so no marks are written under an old
-name. Deleting a profile is a two-step action (A22, user decisions 2026-10-27): "Delete
-profile" stores `st.session_state.delete_pending = (name, saves)` and shows a warning
-below the form (`deletion_consequences`: the number of marks with the match/no-match
-split or why they cannot be deleted; the saved copy folder entry goes, the folder and the
-copies stay; reference images stay, since `profiles.json.bak` still names them) with
-"Delete for good" (disabled while a search runs) and "Cancel"; any save since the click
-(also a refused one) or the profile's disappearance ends the question. After the
-deletion was saved, `forget_profile` calls `delete_marks` (under the marks lock; returns
-the count; an unreadable file raises `ValueError` and is never replaced) and
-`forget_copy_folder` (under the settings lock; writes nothing without an entry) and drops
-the session's unsaved copy folder of that name; a part that fails is named in the notice
-at the top of the profile tab. `marks.json` stays in `NEVER_DELETED`. Marks that profiles
-deleted before A22 left behind stay (A34), and the gallery of a deleted profile's old
-results can still save a copy folder under its name (A33).
+that are no longer search profiles cannot be marked and their "Copy to folder" field is
+disabled. A gallery drawn before its profile was renamed or deleted (another tab) still
+has live controls, so the callbacks `set_mark`/`set_copy_folder` pass
+`profiles_file=PROFILES` to `save_marks`/`save_copy_folder`: under their lock,
+`require_profile` raises `UnknownProfileError` (a `ValueError`) for a name that is not in
+`profiles.json` now, nothing is written and the gallery shows the message (the typed
+folder is not kept for the session either). A rename or deletion saves `profiles.json`
+first and then changes these files under the same locks, so a save in between is moved
+or deleted with them (review of A22, A33). Rename and deletion run their two changes
+through `change_name_data` and add a note with `add_notice`. Deleting a profile is a
+two-step action (A22, user decisions 2026-10-27): "Delete profile" stores
+`st.session_state.delete_pending = (name, saves)` and reruns at once (so a question still
+open for a profile above is not drawn in the same run), then shows a warning below the
+form (`deletion_consequences`: the number of marks with the match/no-match split or why
+they cannot be deleted; the saved copy folder entry and a folder typed in this session
+but not saved (`copy_folders_unsaved`) go, the folder and the copies stay; reference
+images stay, since `profiles.json.bak` still names them) with "Delete for good" (disabled
+while a search runs) and "Cancel"; any save since the click (also a refused one) or the
+profile's disappearance ends the question. The warning is drawn into a container after
+the buttons are handled, and the number of marks it names is kept in
+`st.session_state.delete_marks_named`, so a click compares with the number the user saw.
+After the deletion was saved, `forget_profile` calls `delete_marks` (under the marks lock;
+returns how many it deleted; an unreadable file raises `ValueError` and is never
+replaced) and `forget_copy_folder` (under the settings lock; writes nothing without an
+entry) and drops the session's unsaved copy folder of that name; a different number of
+deleted marks (marked or unmarked since the question was shown) and a part that fails
+are named in the notice at the top of the profile tab. `marks.json` stays in
+`NEVER_DELETED`. Marks that profiles deleted before A22 left behind stay (A34).
 `marks.json` and the copy folders are read through `st.cache_data`, keyed by path, mtime,
 size and file id (`version_key`). Copying (`copy_photos`): flat into the target,
 `shutil.copy2` via a temporary file published with `_publish_new` (never replaces a file),
@@ -976,8 +994,9 @@ the app's `profiles.json` and `settings.json`, reference folders, prompt generat
 handling, progress lines (A11), the run lock and status file (A4/A5), thumbnails of the
 export (E6), the cache signature, the pipeline helpers for batching/prefetching (E2), the
 scoring (E4/E5) the result file with the gallery helpers (A12) the marks, copying and copy
-target folders (A17) with their deletion with a profile (A22, `test_marks.py`,
-`test_copy.py`), the versioned read and checked, locked save of `profiles.json` (A13,
+target folders (A17) with their deletion with a profile and no saves for a name that is no
+profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
+`test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
 `test_cleanup.py`, `test_cache_signatures.py`, with real SQLite files) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),

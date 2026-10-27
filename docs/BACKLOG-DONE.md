@@ -569,11 +569,34 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       entry) and drops the session's unsaved copy folder of that name; a part that fails
       is named in the notice at the top of the profile tab. The gallery hint for a missing
       profile now says that deleting a profile deletes its marks. `marks.json` stays in
-      `NEVER_DELETED`. No `profiles.json`, CLI or cache change. Tests: 793 passed, 1
-      skipped (`tests/test_marks.py`, `tests/test_copy.py`); the app flow was checked with
-      Streamlit's `AppTest` on a scratch copy, not in a real browser. Remaining: A33
-      (the gallery of a deleted profile's old results can still save a copy folder under
-      its name), A34 (marks of profiles deleted before this change stay in `marks.json`).)
+      `NEVER_DELETED`. No `profiles.json`, CLI or cache change. Review fixes (same PR):
+      a gallery drawn before the deletion or a rename can no longer save marks or a copy
+      folder under the old name (see A33); clicking "Delete profile" reruns at once, so
+      only one question is shown; the question also names a copy folder typed in this
+      session but not saved (`copy_folders_unsaved`), which is forgotten too; the number
+      of marks the question named is kept (`delete_marks_named`) and a different number
+      deleted is named in the notice; `carry_over` and `forget_profile` share
+      `change_name_data`/`add_notice`. Tests: 798 passed, 1 skipped
+      (`tests/test_marks.py`, `tests/test_copy.py`, `tests/test_profile_file.py`); the app
+      flow was checked with Streamlit's `AppTest` on a scratch copy, not in a real
+      browser. Remaining: A34 (marks of profiles deleted before this change stay in
+      `marks.json`).)
+
+- [x] **A33 – The gallery of a deleted profile's old results still offers "Copy to folder":**
+      typing a folder there saved it under the deleted name in `settings.json`, so a later
+      profile of that name got it again (the rest of A22). The review of the PR of A22
+      found the same for a gallery drawn before its profile was deleted or renamed
+      (another tab): its mark control and copy field were still live and their callbacks
+      wrote under the old name. Found in the PR of A22.
+      (done 2026-10-27 in the PR of A22: `framescout_core.require_profile` raises
+      `UnknownProfileError` for a name that is not in `profiles.json` now;
+      `save_marks`/`save_copy_folder(..., profiles_file=...)` check it under their lock,
+      and the app's `set_mark`/`set_copy_folder` pass `PROFILES`, so nothing is written
+      and the gallery shows why; a deletion or rename saves `profiles.json` first and then
+      changes these files under the same locks, so no save in between is missed. The
+      "Copy to folder" field is disabled for a profile that is no longer a search profile.
+      Tests in `tests/test_marks.py`, `tests/test_copy.py`, `tests/test_profile_file.py`;
+      the stale-tab click itself was not reproduced in a browser.)
 
 ### Installation / project
 

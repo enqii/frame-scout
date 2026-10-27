@@ -328,10 +328,6 @@ and discussions.
       rewrite a `.bak` that another session has just replaced with newer state. Probably
       harmless (it only rewrites paths of the moved folder); not analysed. Found in the
       PR of A13.
-- [ ] **A33 – The gallery of a deleted profile's old results still offers "Copy to folder":**
-      typing a folder there saves it under the deleted name in `settings.json`, so a later
-      profile of that name gets it again (the rest of A22). Fix idea: make the field
-      read-only for a name that is no longer a search profile. Found in the PR of A22.
 - [ ] **A34 – Marks left by profiles deleted before A22 stay in `marks.json`:** they still
       pass to a new profile of that name, and "Clean up storage" never offers them because
       `marks.json` is in `NEVER_DELETED`. No migration was done. Idea: offer to delete the
