@@ -42,7 +42,8 @@ def hub_file_cached(cache, repo, filenames):
     except (OSError, UnicodeDecodeError):
         return False
     snapshots = folder / 'snapshots'
-    if not revision or Path(revision).name != revision:
+    # one folder name inside snapshots: no separator, and not '.' or '..'
+    if revision in ('', '.', '..') or Path(revision).name != revision:
         return False
     return any((snapshots / revision / name).is_file() for name in filenames)
 
