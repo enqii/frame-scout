@@ -311,8 +311,9 @@ def search(args, parser, roots, dropped, output, status):
           f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
     print('Model weights are downloaded the first time a model is used.', flush=True)
     # imported here, offline once the model is cached: no Hugging Face Hub request per search
-    # and no symlink warning (E16, E31, E33); huggingface_hub reads the variables on import
-    open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model)
+    # and no symlink warning (E16, E31, E33); huggingface_hub reads the variables on import,
+    # and its constants are set too if anything imported it earlier
+    open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model, modules=sys.modules)
 
     def load_model():
         model, _, preprocess = open_clip.create_model_and_transforms(search_model.name,

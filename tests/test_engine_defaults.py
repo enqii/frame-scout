@@ -1,6 +1,10 @@
 """The engine's CLI defaults that must match the app's (read from the source: the engine imports torch)."""
 import ast
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 ENGINE = Path(__file__).resolve().parent.parent / 'framescout_engine.py'
 APP = ENGINE.with_name('app.py')
@@ -128,6 +132,22 @@ def test_the_engine_imports_open_clip_only_through_import_open_clip():
     assert len(calls) == 1, 'the engine must import open_clip with import_open_clip'
     assert ast.unparse(calls[0].args[0]) == 'os.environ'
     assert ast.unparse(calls[0].args[1]) == 'importlib.import_module'
+    # an earlier indirect import of huggingface_hub gets the values through sys.modules (review)
+    assert {kw.arg: ast.unparse(kw.value) for kw in calls[0].keywords}.get('modules') == 'sys.modules'
     [fallback] = [node for node in nodes if isinstance(node, ast.Call)
                   and getattr(node.func, 'id', None) == 'load_with_hub_fallback']
     assert 'hub_go_online(os.environ, sys.modules)' in ast.unparse(fallback)
+
+
+def test_importing_the_engine_does_not_import_a_hugging_face_library():
+    # review: the AST test above sees only direct imports; this one sees indirect ones too.
+    # It needs the engine's own imports (torch, Pillow), so it is skipped in CI.
+    pytest.importorskip('torch')
+    pytest.importorskip('PIL')
+    script = ('import sys, framescout_engine\n'
+              "print(sorted(name for name in ('huggingface_hub', 'transformers', 'open_clip', 'timm')"
+              ' if name in sys.modules))')
+    result = subprocess.run([sys.executable, '-c', script], cwd=ENGINE.parent, capture_output=True, text=True,
+                            timeout=300)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == '[]'
