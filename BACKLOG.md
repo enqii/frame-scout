@@ -333,15 +333,14 @@ and discussions.
       is created. Found in the PR of A22.
 - [ ] **A35 – A drive letter now used by another disk counts as reachable:** e.g. a USB
       disk that got the letter of an earlier disk, or a network drive mapped to another
-      share; the photos of the earlier disk then look unbound, and "Cache entries of
-      unbound photos" is selected by default (the rows are only recomputed later; marks
-      are not selected by default). The same on POSIX: the root of every path is `/`,
-      which always exists, so the photos of an unmounted mount (e.g. `/mnt/nas`) look
-      unbound (review of PR #40, findings 1 and 2). Mitigated in PR #40: the category lists
-      its folders with their photo counts and its help asks to check them. Ideas: record
-      the volume serial number (or mount) per root, which changes the cache or a side
-      file (hold point), or do not select the category by default (a product decision).
-      Found in the PR of E8.
+      share; the photos of the earlier disk then look unbound and are offered by "Cache
+      entries of unbound photos" and "Marks of unbound photos". The same on POSIX: the root
+      of every path is `/`, which always exists, so the photos of an unmounted mount (e.g.
+      `/mnt/nas`) look unbound (review of PR #40, findings 1 and 2). Mitigated in PR #40:
+      the category lists its folders with their photo counts and its help asks to check
+      them, and (user decision) neither category is selected by default any more. Idea:
+      record the volume serial number (or mount) per root, which changes the cache or a
+      side file (hold point). Found in the PR of E8.
 
 ### Installation / project
 
