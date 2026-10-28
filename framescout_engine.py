@@ -19,7 +19,6 @@ from urllib.parse import quote
 
 import numpy as np
 import torch
-import open_clip
 from PIL import Image, ImageOps, ImageFile
 
 from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
@@ -27,7 +26,8 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, detection_options, distinct_folders, draft_size, final_status,
-                             ensure_thumbnail, folder_labels, group_batches, import_detector_class,
+                             ensure_thumbnail, folder_labels, group_batches, hub_go_online, import_detector_class,
+                             import_open_clip, load_with_hub_fallback,
                              load_profiles, missing_decoder, missing_folders_message, model_problem,
                              output_folder_problem, photo_name,
                              prefetch,
@@ -310,10 +310,20 @@ def search(args, parser, roots, dropped, output, status):
           f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
           f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
     print('Model weights are downloaded the first time a model is used.', flush=True)
-    model, _, preprocess = open_clip.create_model_and_transforms(search_model.name, pretrained=search_model.pretrained,
-                                                                 device=device)
+    # imported here, offline once the model is cached: no Hugging Face Hub request per search
+    # and no symlink warning (E16, E31, E33); huggingface_hub reads the variables on import
+    open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model)
+
+    def load_model():
+        model, _, preprocess = open_clip.create_model_and_transforms(search_model.name,
+                                                                     pretrained=search_model.pretrained, device=device)
+        return model, preprocess, open_clip.get_tokenizer(search_model.name)
+
+    # an incomplete cache goes online again and downloads what is missing
+    model, preprocess, tokenizer = load_with_hub_fallback(load_model, offline,
+                                                          lambda: hub_go_online(os.environ, sys.modules),
+                                                          lambda text: print(text, flush=True))
     model.eval()
-    tokenizer = open_clip.get_tokenizer(search_model.name)
 
     def embed_pixels(pixels):
         """Embed preprocessed images (one tensor, first dimension = images), batch_size at a time."""
