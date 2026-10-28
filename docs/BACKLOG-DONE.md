@@ -92,6 +92,23 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       `run.lock`, `run-status.json`, `results.json`, the cache file, `settings.json`,
       `profiles.json(.bak)`. Cache rows of photos outside the current photo folder are
       never offered. Other temporary files: E26; other tabs during a cleanup: A23.)
+- [x] **E8 – Cache key = absolute path:** moving the photo folder forces a complete
+      recomputation.
+      (closed 2026-10-28 as won't do – renamed/moved photos count as new; superseded by
+      the unbound-entries cleanup. User decision: "Wenn sich an Dateien/Ordnern etwas
+      ändert (umbenennen, verschieben), dann ist es weg. Dann kann das im Cache enthalten
+      bleiben, falls die Dateien doch wiederhergestellt werden. Die Funktion zum Aufräumen
+      zeigt dann 'ungebundene' Fotos an und man kann die bereinigen." (If files or folders
+      change (rename, move), the entries are gone for the search; they may stay in the
+      cache in case the files come back; the cleanup shows "unbound" photos and the user
+      can clean them up.) No migration, no cache key or `marks.json` change. PR #40
+      (`b238c24`, `2052e39`): "Clean up storage" offers "Cache entries of unbound photos"
+      (every cache row whose photo no longer exists, in any folder; selected by default)
+      and "Marks of unbound photos" (new `framescout_core.remove_marks`; one category
+      checkbox, off by default); photos on an unreachable drive or share are not checked
+      (root probe, 5 s timeout), see `docs/ARCHITECTURE.md` → "Storage cleanup". Tests:
+      811 passed, 1 skipped; `AppTest` smoke run, not a real browser or disconnected
+      drive. Remaining: E37, A35.)
 - [x] **E10 – Duplicate check before `strip()`:** "Joker" and " Joker" are not recognized as
       equal. (done 2026-10-21 in `framescout_core.load_profiles`; such a hand-edited
       `profiles.json` is now rejected instead of merging both profiles into one gallery.)
@@ -581,6 +598,16 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       flow was checked with Streamlit's `AppTest` on a scratch copy, not in a real
       browser. Remaining: A34 (marks of profiles deleted before this change stay in
       `marks.json`).)
+
+- [x] **A21 – Marks follow the absolute photo path:** `results/marks.json` keys a mark by
+      the photo's full path, like the cache (E8). After moving or renaming the photo folder
+      (or a subfolder, or the photo) the old marks no longer apply: they stay in the file
+      but are not shown, are counted as "not among the results of this search" and fail
+      with "the photo no longer exists" when copied. Found in the PR of A17.
+      (closed 2026-10-28 as won't do – renamed/moved photos count as new; superseded by
+      the unbound-entries cleanup, same user decision as E8. Such marks stay in the file
+      until the user selects "Marks of unbound photos" in "Clean up storage", which
+      removes only them. PR #40.)
 
 - [x] **A33 – The gallery of a deleted profile's old results still offers "Copy to folder":**
       typing a folder there saved it under the deleted name in `settings.json`, so a later
