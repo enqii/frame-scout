@@ -311,6 +311,16 @@ def test_rows_on_a_drive_letter_that_is_not_there_are_not_checked(project):
     assert free[-1] + ':\\' in scan['cache_missing']['notes'][0]
 
 
+@pytest.mark.skipif(os.name != 'nt', reason='extended-length paths are a Windows feature')
+def test_an_extended_length_path_has_a_reachable_root(project):
+    # review: \\?\C:\x has the root \\?\C:\, which the probe reaches (the engine itself
+    # writes resolved paths without the prefix)
+    gone = '\\\\?\\' + str(project.photos / 'b.jpg')
+    project.cache([(gone, CURRENT)])
+    scan = project.scan()
+    assert scan['cache_missing']['items'] == [(gone, CURRENT)] and scan['cache_missing']['notes'] == []
+
+
 def test_a_root_probe_that_hangs_counts_as_not_reachable(monkeypatch):
     # a stat on a disconnected network share can hang for a long time
     import threading
