@@ -848,7 +848,9 @@ only orphaned galleries link, deleted with them); `thumbnails` (linked by neithe
 `results.json` nor any HTML file, both thumbnail folders); `cache_missing` (UI label "Cache entries of unbound photos", default on; the internal
 key kept its name: every cache row whose photo no longer exists at its path, in any folder
 searched so far, E8; rows whose photo still exists are not offered, a path that is not
-absolute is never gone); `marks_unbound` ("Marks of unbound photos", **default off**, after
+absolute is never gone; its `names` are the folders with their photo counts, fullest
+first, so that e.g. the folders of an earlier disk whose drive letter another disk got are
+seen before the deletion, A35); `marks_unbound` ("Marks of unbound photos", **default off**, after
 `cache_missing` in `CLEANUP_CATEGORIES`; items are `(profile, photo path)` pairs, names
 `"profile: path"`; it is one category checkbox, marks are not chosen one by one; not
 offered with "Not offered: marks.json cannot be read (...)" if the file is unreadable);
@@ -865,24 +867,29 @@ rows whose recorded engine is that of another registered model, and unrecorded
 The existence check is `cleanup._PathCheck` (standard library only), shared by the
 cache rows and the marks in **one** pass: one probe per drive or share root
 (`os.path.splitdrive(path)[0] + os.sep`, `os.path.isdir`), all roots in parallel daemon
-threads under one shared timeout `ROOT_TIMEOUT` = 5 s (`_reachable_roots`); a root that is
+threads under one shared timeout `ROOT_TIMEOUT` = 5 s (`_reachable_roots`; a root whose
+probe of an earlier call still hangs gets no second thread, that probe is waited for
+again, `_PROBES`); a root that is
 not reachable or does not answer in time is **not checked** (its photos are neither gone
 nor offered) and each category gets a note per root ("<root> is not reachable now ... N
-photos there were not checked"). Photos are grouped by folder: a folder with more than
-`_STAT_UP_TO` = 4 photos is listed once (`os.listdir`, names compared normcased) and a
-name missing from the listing is confirmed by its own `stat`; a folder with at most 4
-photos gets one `stat` per photo; a folder that does not exist makes all its photos gone;
-a folder that cannot be listed (e.g. no permission) keeps them. After the pass the roots
-with gone photos are probed again, and a root that dropped meanwhile makes its photos
-count as not checked. Measured on Windows 11 with 30,000 files in 100 folders: stat
+photos there were not checked"). Photos are grouped by folder (`_gone_in`): a folder with
+more than `_STAT_UP_TO` = 4 photos is listed once (`os.listdir`, names compared
+normcased); of the names missing from the listing the first 4 are confirmed by a `stat`,
+and only if one of them exists (e.g. another Unicode normalization) every missing name
+gets its own `stat`; a folder with at most 4 photos gets one `stat` per photo; a folder
+that does not exist makes all its photos gone; a folder that cannot be listed (e.g. no
+permission) keeps them. After the pass the gone photos are checked once more (a share
+that dropped during the pass and is back shows them again), then their roots are probed
+again, and a root that is still offline makes its photos count as not checked. Measured on Windows 11 with 30,000 files in 100 folders: stat
 0.12-0.21 s vs listing 0.08-0.11 s locally; through the share `\\localhost\C$` (SMB) 13.8 s vs
 0.19 s. `scan_cleanup(results, profiles_file, refs_root, current_signature, *,
 current_model, progress=None)` has no photo folder parameter any more and calls
 `progress(done, total)` per folder (about 100 calls at most; the app draws "Checking which
 photos still exist ... n of m folders"); `clean_up(results, shown, selected, vacuum,
 alive, profiles_file, refs_root, current_signature, lock_timeout=..., *, current_model)`
-re-checks only the rows and marks the shown scan listed, with one `_PathCheck`, the photos
-before the marks lock is taken; its summary has a `marks` count.
+re-checks only the rows and marks the shown scan listed, with a `_PathCheck` of its own
+in each of the two steps (an answer of the cache step, which can include `VACUUM`, may be
+out of date), the photos before the marks lock is taken; its summary has a `marks` count.
 `scan_cleanup` and `clean_up` require `current_model` (keyword-only: the signature, a
 hash, does not tell the model), `CACHE_CATEGORIES` lists the cache categories. Before E22
 rows of any other engine counted as `cache_old` (selected), and an older FrameScout still
@@ -914,7 +921,8 @@ Scan again."; the scan runs only on the "Scan" click, never on a rerun or a sear
 No migration: a renamed or moved photo is analyzed again as a new photo, and its old
 cache row and mark stay until the user cleans them up (user decision 2026-10-28, E8).
 Open: E37 (a hanging folder listing or `stat` is not guarded by a timeout), A35 (a drive
-letter now used by another disk counts as reachable).
+letter now used by another disk, or on POSIX the root `/` of an unmounted mount, counts as
+reachable; only mitigated by naming the folders).
 While `clean_up` holds the lock it registers the results folder in the process
 (`cleanup_running`; app sessions are threads of one process), so other tabs show "The
 storage is being cleaned up" instead of a running search and disable Stop (A23); other
@@ -1036,7 +1044,7 @@ profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
 `test_cleanup.py` also for unbound rows and marks, unreachable roots simulated by patching
-`_probe_root` and a real unused drive letter, and the listing/stat choice, E8;
+`_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
