@@ -271,8 +271,9 @@ class _PathCheck:
     stat per photo, measured about 70 times faster on a network share), and of the names the
     listing does not hold only a few are confirmed by a stat. A folder that does not exist
     makes all its paths gone; one that cannot be listed (e.g. no permission) keeps them. A path that is not
-    absolute is never gone. After the pass, the roots with gone paths are probed again, so a
-    share that dropped during the pass does not make its photos look deleted.
+    absolute is never gone. After the pass, the gone paths are checked once more and then
+    their roots are probed again, so a share that dropped during the pass (and is back, or
+    still offline) does not make its photos look deleted.
     """
 
     def __init__(self, root_timeout=ROOT_TIMEOUT):
@@ -304,7 +305,10 @@ class _PathCheck:
             gone |= _gone_in(folder, members)
             if progress and (done % step == 0 or done == total):
                 progress(done, total)
-        # a share that went offline during the pass makes its folders look missing
+        # a share that went offline during the pass makes its folders look missing: the gone
+        # paths are looked at once more (a share back by now shows them again, review), then
+        # their roots are probed again (a share still offline is not checked)
+        gone = set().union(*(_gone_in(folder, members) for folder, members in _by_folder(gone).items()))
         suspects = {_root_of(p) for p in gone}
         lost = {root for root, up in _reachable_roots(sorted(suspects), self._timeout).items() if not up}
         for path in [p for p in gone if _root_of(p) in lost]:
