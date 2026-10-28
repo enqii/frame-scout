@@ -172,16 +172,16 @@ and discussions.
       re-checks, but the volume would have to be back by then). Idea: run the pass in a
       worker thread with a per-folder timeout, or treat folders on other volumes than
       their root as their own root. Found in the PR of E8.
-- [ ] **E38 – Offline loading of SigLIP and the online fallback are not runtime-tested:**
+- [ ] **E38 – The online fallback and the first download are not runtime-tested:**
       `framescout_core.model_cached` decides from the hub cache whether a model loads
-      offline (E16, P7 A). It was run with the default model only. `transformers` is not
-      installed in the development venv, so it is untested whether the Hugging Face
-      tokenizer of `vit-b-16-siglip` loads offline and whether the files `model_cached`
-      checks (`tokenizer_config.json` plus `tokenizer.json` or `spiece.model`, and the
-      weights) are enough. The fallback after an incomplete cache (`load_with_hub_fallback`)
-      and the first download into an empty cache were covered by unit tests only, since a
-      real run downloads at least 605 MB. Verify on the home PC (P10 A, next to E34) and
-      fix what shows up. Found in the PR of E16.
+      offline (E16, P7 A). An engine search ran with the default model only; SigLIP
+      (`vit-b-16-siglip`) loaded offline with its tokenizer from a complete cache in a
+      Python check (PR #41 review), and with an empty cache the offline errors of open_clip
+      and of the SigLIP tokenizer were checked to take the fallback (`hub_file_error`). The
+      fallback after an incomplete cache (`load_with_hub_fallback` going online and
+      downloading what is missing) and the first download into an empty cache were covered
+      by unit tests only, since a real run downloads at least 605 MB. Verify on the home PC
+      (P10 A, next to E34) and fix what shows up. Found in the PR of E16.
 
 ### App (`app.py`)
 

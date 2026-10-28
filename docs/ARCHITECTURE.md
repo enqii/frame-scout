@@ -40,8 +40,9 @@ search, the page's keyboard and click handling in a real browser (E34), original
 browser cannot display (E35), macOS/Linux.
 
 Offline loading (E16/E31/E33, P7 A): a CPU engine smoke run with the cached default model
-and the network blocked finished without Hub requests. The first download, the fallback
-after an incomplete cache and SigLIP offline are **not runtime-tested** (E38).
+and the network blocked finished without Hub requests; SigLIP (cached, network blocked)
+loaded offline with its tokenizer through `import_open_clip` (no engine run). The first
+download and the fallback after an incomplete cache are **not runtime-tested** (E38).
 
 ## Files and responsibilities
 
@@ -139,7 +140,7 @@ the module of its area and to the re-exports in `__init__.py`.
   default's too. Since E16 each model also names `weights_repo` and `tokenizer_repo`
   (the Hugging Face Hub repositories open_clip loads the weights and a Hugging Face
   tokenizer from; `''` = built-in tokenizer; tested against open_clip's config).
-- `hub.py` (E16/E31/E33): `HUB_QUIET_ENV`/`WEIGHTS_FILES`/`TOKENIZER_FILES`/`OFFLINE_VARIABLES`/`hub_cache_dir`/`hub_file_cached`/`model_cached`/`import_open_clip`/`hub_go_online`/`load_with_hub_fallback`
+- `hub.py` (E16/E31/E33): `HUB_QUIET_ENV`/`WEIGHTS_FILES`/`TOKENIZER_FILES`/`OFFLINE_VARIABLES`/`hub_cache_dir`/`hub_file_cached`/`model_cached`/`import_open_clip`/`hub_go_online`/`hub_file_error`/`load_with_hub_fallback`
   (loading a search model without a Hub request once it is cached; see "Environment
   variables and caches").
 - `signature.py`: `ENGINE_TEMPLATE`/`engine_id`/`ENGINE`/`MODEL_ENGINES`/`feature_signature`
@@ -1057,19 +1058,33 @@ file on every run even when it is cached. The engine imports open_clip only thro
   (`hub_cache_dir`: `HF_HUB_CACHE`, `HUGGINGFACE_HUB_CACHE`, `HF_HOME`, `XDG_CACHE_HOME`,
   `~/.cache`). If the user set `HF_HUB_OFFLINE` or `TRANSFORMERS_OFFLINE` (any value),
   offline mode is left alone.
-- If loading fails in offline mode (an incomplete cache), `load_with_hub_fallback` prints
-  a note, `hub_go_online` switches the environment, `huggingface_hub.constants` and an
-  older transformers' `_is_offline_mode` back online, and loads again, which downloads the
-  missing files. An uncached model is loaded online as before, so the first download is
-  unchanged. The variables apply to app, `.bat`, manual CLI and eval-tool runs alike.
+- If something imported `huggingface_hub` before (it would have read the variables
+  already), `import_open_clip` gets `sys.modules` and sets the same values on
+  `huggingface_hub.constants` (and an older transformers' `_is_offline_mode`).
+  huggingface_hub 2.2 reads these constants on every request
+  (`constants.is_offline_mode()`), transformers 5 calls that function.
+- If loading fails in offline mode because a file is missing (`hub_file_error`: an
+  `OSError` in the exception's `__cause__`/`__context__` chain, e.g. huggingface_hub's
+  `LocalEntryNotFoundError` or `OfflineModeIsEnabled`, transformers' `OSError`, or the
+  `RuntimeError` open_clip raises around its `FileNotFoundError`), `load_with_hub_fallback`
+  prints a note, `hub_go_online` switches the environment and those constants back online,
+  and loads again, which downloads the missing files. Any other error (out of memory, a
+  bad device, a broken weights file) is raised as it is. An uncached model is loaded
+  online as before, so the first download is unchanged. The variables apply to app,
+  `.bat`, manual CLI and eval-tool runs alike and stay set for the rest of the engine
+  process, which runs one search (the YOLO weights come from GitHub, not the Hub).
 
 Checked on the default model (ViT-B/32, cached in the main checkout's `.cache/`, CPU, 3
 synthetic photos): with the network blocked by a dead proxy the search finished without Hub
 lines (3.9 s; 5.8 s with `HF_HUB_OFFLINE=0` forced); with the network, no "HF Hub" or
 symlink line appeared, and with `HF_HUB_OFFLINE=0` forced the unauthenticated-requests
-warning came back. **Not run:** a first download into an empty cache and the fallback after
-an incomplete cache with real files (each downloads at least 605 MB; unit tests only), and
-SigLIP offline (E38).
+warning came back. SigLIP (`vit-b-16-siglip`, cached, network blocked): `model_cached` was
+true and model plus tokenizer loaded offline through `import_open_clip` and
+`load_with_hub_fallback` without the fallback (1.9 s; a Python check, no engine run).
+With an empty cache in offline mode, the open_clip weights error and the SigLIP tokenizer
+error both carry an `OSError` in their chain, so the fallback would be taken. **Not run:**
+a first download into an empty cache and the fallback after an incomplete cache with real
+files (each downloads at least 605 MB; unit tests only, E38).
 
 ## Test coverage and known quirks
 
@@ -1096,11 +1111,12 @@ model registry, the per-model signatures and cleanup category and the `model` se
 `PYTHONIOENCODING` only from their syntax trees, `test_engine_defaults.py`; the app's
 selectbox, its disabled Start, the results note and the dropped cleanup scan are not
 unit-tested), the offline loading of cached models (E16: `test_hub.py` with fake cache
-layouts, environments and a failing loader; the registry's repositories against open_clip's
-config in `test_models.py`, skipped without open_clip; the engine's use of
-`import_open_clip` and the fallback only from its syntax tree in
-`test_engine_defaults.py`; no first download, no fallback with real files, no SigLIP
-offline, E38), and the evaluation tooling (E32: `test_evaluation.py` for the formats, AP@k
+layouts, environments, fake already-imported libraries and a failing loader, plus the
+offline switch of the real huggingface_hub in a subprocess, skipped without it; the
+registry's repositories against open_clip's config in `test_models.py`, skipped without
+open_clip; the engine's use of `import_open_clip` and the fallback from its syntax tree in
+`test_engine_defaults.py`, and that importing the engine imports no Hugging Face library,
+skipped without torch and Pillow; no first download, no fallback with real files, E38), and the evaluation tooling (E32: `test_evaluation.py` for the formats, AP@k
 and the pool; `test_eval_tool.py` for the tool's commands, metrics and labelling server
 with fake scores; the engine's `--scores-file` only from its syntax tree in
 `test_engine_defaults.py`; no real-model run, no browser test), and the pinned
