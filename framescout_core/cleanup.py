@@ -261,7 +261,7 @@ def _by_folder(paths):
 
 
 class _PathCheck:
-    """Tells which photo paths certainly no longer exist ("unbound", E8/A21); one per scan or cleanup.
+    """Tells which photo paths certainly no longer exist ("unbound", E8/A21); one per scan or deletion step.
 
     Each path is checked once (the answer is kept, so the cache rows and the marks of a scan
     share one pass), each drive or share root is probed once (_reachable_roots): the paths
@@ -373,7 +373,7 @@ def _unbound_rows(rows, check, among=None):
 
     Wherever the photo was, also outside the current photo folders (user decision on E8/A21:
     a renamed or moved photo counts as a new one, its old rows are unbound); check: the
-    _PathCheck of this scan or cleanup; among: only these (path, signature) pairs (None: all).
+    _PathCheck of this scan or deletion step; among: only these (path, signature) pairs (None: all).
     """
     if among is not None:
         rows = [row for row in rows if (row[0], row[1]) in among]
@@ -580,14 +580,13 @@ def _delete_unlinked(results, links, listed, allowed, summary):
     _remove_empty_folders(results / LEGACY_THUMBNAILS_DIR, results)
 
 
-def _delete_rows(results, shown, selected, current, current_model, vacuum, summary, check):
+def _delete_rows(results, shown, selected, current, current_model, vacuum, summary):
     """Delete the selected cache rows that the scan shown listed and that still qualify now.
 
-    Only the photos of the unbound rows the scan showed are checked again (check: the
-    _PathCheck of this cleanup), not the whole cache.
+    Only the photos of the unbound rows the scan showed are checked again, not the whole cache.
     """
     among = {tuple(item) for item in shown['cache_missing']['items']} if 'cache_missing' in selected else set()
-    fresh = _cache_categories(_attempt(lambda: _cache_rows(results)), current, current_model, check, among)
+    fresh = _cache_categories(_attempt(lambda: _cache_rows(results)), current, current_model, _PathCheck(), among)
     rows, signatures = [], []
     for key in CACHE_CATEGORIES:
         if key not in selected:
@@ -629,17 +628,19 @@ def _delete_rows(results, shown, selected, current, current_model, vacuum, summa
     summary['freed'] += max(0, before - _file_size(cache))
 
 
-def _delete_marks(results, shown, summary, check):
+def _delete_marks(results, shown, summary):
     """Remove the unbound marks the scan shown listed whose photo is still gone now (E8/A21).
 
-    The photos are checked before the marks lock is taken (a slow check must not block a
-    mark being saved); then only these entries are removed from marks.json, never the file.
+    The photos are checked in this step, with a check of its own (an answer of the cache
+    step, which can include a VACUUM, may be out of date, review), and before the marks lock
+    is taken (a slow check must not block a mark being saved); then only these entries are
+    removed from marks.json, never the file.
     """
     entries = _attempt(lambda: _read_marks_entries(results))
     if isinstance(entries, ValueError):
         summary['skipped'].append(f'Marks were kept: {entries}.')
         return
-    fresh = _unbound_marks(entries, check, {tuple(item) for item in shown['marks_unbound']['items']})
+    fresh = _unbound_marks(entries, _PathCheck(), {tuple(item) for item in shown['marks_unbound']['items']})
     summary['marks'] += remove_marks(results / MARKS_FILE, fresh['items'])
 
 
@@ -727,14 +728,12 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                 if path in allowed and _remove_file(path, summary):
                     _remove_empty_folders(path.parent, refs_root)
 
-        check = _PathCheck()  # the cache rows and the marks check their photos once
         steps = [('Temporary thumbnails', 'temp_thumbnails' in selected, temporary),
                  ('Galleries and thumbnails', bool({'galleries', 'thumbnails'} & selected),
                   lambda: _galleries_and_thumbnails(results, shown, selected, profiles_file, summary)),
                  ('Cache entries', True,
-                  lambda: _delete_rows(results, shown, selected, current_signature, current_model, vacuum, summary,
-                                       check)),
-                 ('Marks', 'marks_unbound' in selected, lambda: _delete_marks(results, shown, summary, check)),
+                  lambda: _delete_rows(results, shown, selected, current_signature, current_model, vacuum, summary)),
+                 ('Marks', 'marks_unbound' in selected, lambda: _delete_marks(results, shown, summary)),
                  ('Reference images', 'references' in selected, references)]
         for name, wanted, step in steps:
             if not wanted:

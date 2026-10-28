@@ -496,6 +496,28 @@ def test_deleting_unbound_marks_removes_only_those_entries(project):
         'Red car': {str(kept): 'match', str(back): 'match'}, 'Dog': {str(late): 'no-match'}}
 
 
+def test_a_mark_of_a_photo_back_since_the_cache_step_is_kept(project, monkeypatch):
+    # the marks step checks the photos again itself: the answer of the cache step, which can
+    # include a VACUUM, may be out of date (review)
+    from framescout_core import cleanup
+    gone = project.photos / 'b.jpg'
+    project.marks({'Red car': {str(gone): 'match'}})
+    project.cache([(gone, CURRENT)])
+    scan = project.scan()
+    real = cleanup._unbound_rows
+
+    def rows_then_restore(*args, **kwargs):
+        found = real(*args, **kwargs)
+        project.photo('b.jpg')  # restored while the cache step runs
+        return found
+
+    monkeypatch.setattr(cleanup, '_unbound_rows', rows_then_restore)
+    summary = project.clean(scan, {'cache_missing', 'marks_unbound'})
+    assert summary['rows'] == 1 and summary['marks'] == 0
+    assert json.loads((project.results / MARKS_FILE).read_text(encoding='utf-8'))['profiles'] == {
+        'Red car': {str(gone): 'match'}}
+
+
 def test_unbound_marks_are_kept_unless_selected(project):
     gone = project.photos / 'b.jpg'
     project.marks({'Red car': {str(gone): 'match'}})
