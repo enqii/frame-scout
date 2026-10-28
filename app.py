@@ -79,9 +79,15 @@ CLEANUP_LABELS = {
     'thumbnails': ('Thumbnails no gallery shows',
                    'Thumbnails that neither the last search nor any HTML gallery in the results folder shows, '
                    'also in the old "vorschaubilder" folder.'),
-    'cache_missing': ('Cache entries of deleted photos',
-                      'Analyses of photos inside the current photo folders that no longer exist there. A listed '
-                      'folder that does not exist (e.g. on a disconnected drive) is left out.'),
+    'cache_missing': ('Cache entries of unbound photos',
+                      'Analyses of photos that no longer exist at their path: deleted, renamed or moved, in any '
+                      'folder searched so far (a renamed or moved photo is analyzed again as a new photo). Photos '
+                      'on a drive or network share that is not reachable now are not checked.'),
+    'marks_unbound': ('Marks of unbound photos',
+                      'Your match/no-match marks of photos that no longer exist at their path (deleted, renamed or '
+                      'moved). They are kept in case the photos come back. Deleting removes only these marks from '
+                      'marks.json, never the file or other marks. Photos on a drive or network share that is not '
+                      'reachable now are not checked.'),
     'cache_old': ('Cache entries of older versions or unknown settings',
                   'Analyses made by an earlier FrameScout version, which are never used again, or with settings '
                   'only the command line offers (e.g. another --yolo-model), which are analyzed again when such a '
@@ -780,21 +786,32 @@ def cleanup_signature():
                              DEFAULT_YOLO_MODEL, model=settings['model'])
 
 def cleanup_inputs():
-    """What a cleanup scan was classified for: a scan of other values is out of date (E22 review)."""
-    return cleanup_signature(), settings['model'], tuple(map(str, search_folders))
+    """What a cleanup scan was classified for: a scan of other values is out of date (E22 review).
+
+    Not the photo folders: unbound photos are looked for wherever they were (E8/A21).
+    """
+    return cleanup_signature(), settings['model']
 
 def cleanup_offered(category):
     return not category['problem'] and bool(category['items'])
 
 def scan_storage():
     """Look for what the cleanup can delete and select the default categories (E7)."""
+    bar = st.progress(0.0, text='Checking which photos still exist …')
+
+    def progress(done, total):
+        # the slow part: one look per folder of the cached and marked photos (E8/A21)
+        bar.progress(done / total, text=f'Checking which photos still exist … {done:,} of {total:,} folders')
+
     try:
         # rows of the other search models are a category of their own, kept by default (E22)
-        scan = scan_cleanup(RESULTS, PROFILES, REFS, search_folders, cleanup_signature(),
-                            current_model=settings['model'])
+        scan = scan_cleanup(RESULTS, PROFILES, REFS, cleanup_signature(), current_model=settings['model'],
+                            progress=progress)
     except OSError as exc:
         st.session_state.cleanup_notice = ('warning', f'The storage could not be scanned: {exc}')
         return
+    finally:
+        bar.empty()
     st.session_state.cleanup_scan = scan
     st.session_state.cleanup_scan_inputs = cleanup_inputs()
     st.session_state.cleanup_confirm = False
@@ -808,7 +825,7 @@ def delete_storage(scan, selected):
     try:
         with st.spinner('Cleaning up …'):
             summary = clean_up(RESULTS, scan, selected, st.session_state.get('cleanup_vacuum', False), engine_alive,
-                               PROFILES, REFS, search_folders, cleanup_signature(), current_model=settings['model'])
+                               PROFILES, REFS, cleanup_signature(), current_model=settings['model'])
     except Exception as exc:
         # clean_up reports the errors of its steps in the summary; this is e.g. the lock file
         # that cannot be opened. The scan is dropped: some files may be gone (review)
@@ -831,10 +848,13 @@ def delete_storage(scan, selected):
 
 def show_cleanup():
     """The expander "Clean up storage": scan, choose categories, delete permanently after a confirmation (E7)."""
-    st.caption('Lists files and cache entries FrameScout no longer needs. Your photos, your marks (marks.json), '
-               'the results of the last search, your profiles and settings are never deleted. Deleting is '
-               'permanent: nothing goes to the Recycle Bin.')
-    if st.button('Scan', disabled=active, help='Only looks; nothing is deleted yet.'):
+    st.caption('Lists files and cache entries FrameScout no longer needs, and marks of photos that no longer exist '
+               'at their path ("unbound": deleted, renamed or moved). Your photos, the marks file (marks.json), '
+               'the results of the last search, your profiles and settings are never deleted; single marks only '
+               'if you select them. Deleting is permanent: nothing goes to the Recycle Bin.')
+    if st.button('Scan', disabled=active,
+                 help='Only looks; nothing is deleted yet. Checks whether every cached or marked photo still '
+                      'exists, which can take a while for a large cache or a network share.'):
         scan_storage()
     if 'cleanup_notice' in st.session_state:
         kind, text = st.session_state.pop('cleanup_notice')
@@ -843,7 +863,7 @@ def show_cleanup():
     if scan and st.session_state.get('cleanup_scan_inputs') != cleanup_inputs():
         # e.g. another search model: the scan would offer the rows of the model chosen now
         st.session_state.pop('cleanup_scan', None)
-        st.caption('The AI settings or photo folders changed since the scan. Scan again.')
+        st.caption('The AI settings changed since the scan. Scan again.')
         return
     if not scan:
         return
@@ -853,13 +873,15 @@ def show_cleanup():
         if category['problem']:
             st.caption(f"{label}: {plain(category['problem'])}")
             continue
-        # e.g. a listed photo folder on a disconnected drive, left out (A25)
+        # e.g. a drive or network share that is not reachable now, not checked (E8/A21)
         notes = ' '.join(category.get('notes', []))
         if not cleanup_offered(category):
             st.caption(f'{label}: nothing to clean up.' + (f' {plain(notes)}' if notes else ''))
             continue
         if key.startswith('cache_'):
             amount = f"{count_text(category['rows'], 'entry', 'entries')} · about {size_text(category['size'])}"
+        elif key == 'marks_unbound':
+            amount = count_text(len(category['items']), 'mark', 'marks')
         else:
             amount = f"{count_text(len(category['items']), 'file', 'files')} · {size_text(category['size'])}"
         st.checkbox(f'{label} – {amount}', key='cleanup_' + key, help=explanation, disabled=active)

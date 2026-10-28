@@ -89,16 +89,16 @@ class Project:
         path.write_bytes(b'photo')
         return path
 
-    def scan(self, photo_folders='default', current=CURRENT, current_model=DEFAULT_MODEL):
-        return scan_cleanup(self.results, self.profiles, self.refs,
-                            [self.photos] if photo_folders == 'default' else photo_folders, current,
-                            current_model=current_model)
+    def scan(self, current=CURRENT, current_model=DEFAULT_MODEL, **options):
+        return scan_cleanup(self.results, self.profiles, self.refs, current, current_model=current_model, **options)
 
     def clean(self, scan, selected, vacuum=False, alive=lambda pid, status: False, current=CURRENT,
-              photo_folders='default', current_model=DEFAULT_MODEL, **options):
-        return clean_up(self.results, scan, selected, vacuum, alive, self.profiles, self.refs,
-                        [self.photos] if photo_folders == 'default' else photo_folders, current,
+              current_model=DEFAULT_MODEL, **options):
+        return clean_up(self.results, scan, selected, vacuum, alive, self.profiles, self.refs, current,
                         current_model=current_model, **options)
+
+    def marks(self, profiles):
+        (self.results / MARKS_FILE).write_text(json.dumps({'format': 1, 'profiles': profiles}), encoding='utf-8')
 
 
 @pytest.fixture
@@ -207,81 +207,233 @@ def test_galleries_and_thumbnails_are_not_offered_without_readable_profiles(proj
 
 # cache rows (E7, E11)
 
-def test_rows_of_deleted_photos_inside_the_photo_folder(project):
+def test_rows_of_photos_that_no_longer_exist_anywhere_are_unbound(project):
+    # E8/A21 (user decision): a renamed, moved or deleted photo is "unbound", in whatever
+    # folder it was; a photo of an earlier search's folder that still exists is not
     kept = project.photo('a.jpg')
     gone = project.photos / 'sub' / 'b.jpg'
-    outside = project.base / 'elsewhere' / 'c.jpg'  # another photo folder: never looked at
-    project.cache([(kept, CURRENT), (gone, CURRENT), (gone, OLD), (outside, CURRENT)])
+    elsewhere = project.base / 'elsewhere'
+    elsewhere.mkdir()
+    earlier = elsewhere / 'c.jpg'  # another folder searched earlier: still there
+    earlier.write_bytes(b'photo')
+    moved = elsewhere / 'd.jpg'  # its photo was moved away
+    vanished = project.base / 'renamed folder' / 'e.jpg'  # the whole folder was renamed
+    project.cache([(kept, CURRENT), (gone, CURRENT), (gone, OLD), (earlier, CURRENT), (moved, OTHER),
+                   (vanished, CURRENT)])
     scan = project.scan()
-    assert sorted(scan['cache_missing']['items']) == sorted([(str(gone), CURRENT), (str(gone), OLD)])
-    assert scan['cache_missing']['rows'] == 2 and scan['cache_missing']['default'] is True
+    assert sorted(scan['cache_missing']['items']) == sorted(
+        [(str(gone), CURRENT), (str(gone), OLD), (str(moved), OTHER), (str(vanished), CURRENT)])
+    assert scan['cache_missing']['rows'] == 4 and scan['cache_missing']['default'] is True
+    assert scan['cache_missing']['problem'] is None and scan['cache_missing']['notes'] == []
+    summary = project.clean(scan, {'cache_missing'})
+    assert summary['rows'] == 4 and project.rows() == sorted([(str(kept), CURRENT), (str(earlier), CURRENT)])
 
 
-def test_rows_of_deleted_photos_need_an_existing_photo_folder(project):
-    project.cache([(project.base / 'gone' / 'b.jpg', CURRENT)])
-    scan = project.scan(photo_folders=[project.base / 'gone'])  # e.g. a disconnected drive
-    assert scan['cache_missing']['items'] == [] and 'does not exist' in scan['cache_missing']['problem']
-    for none in (None, [], ['', '  ']):
-        scan = project.scan(photo_folders=none)
-        assert scan['cache_missing']['items'] == [] and scan['cache_missing']['problem']
-    scan = project.scan(photo_folders=[project.base / 'gone', project.base / 'gone too'])
-    assert scan['cache_missing']['items'] == [] and 'None of the photo folders' in scan['cache_missing']['problem']
+def unreachable(*roots):
+    """A _probe_root for the monkeypatch: the roots (normcased) are not reachable, every other root is."""
+    from framescout_core import cleanup
+    real = cleanup._probe_root
+    keys = {os.path.normcase(root) for root in roots}
+    return lambda root: False if os.path.normcase(root) in keys else real(root)
 
 
-def test_rows_of_deleted_photos_in_every_listed_photo_folder(project):
-    # several photo folders per search (A25): each listed folder counts
-    second = project.base / 'second'
-    second.mkdir()
-    gone1, gone2 = project.photos / 'a.jpg', second / 'sub' / 'b.jpg'
-    outside = project.base / 'elsewhere' / 'c.jpg'
-    project.cache([(gone1, CURRENT), (gone2, CURRENT), (outside, CURRENT)])
-    scan = project.scan(photo_folders=[project.photos, second])
-    assert sorted(scan['cache_missing']['items']) == sorted([(str(gone1), CURRENT), (str(gone2), CURRENT)])
-    assert scan['cache_missing']['notes'] == []
+def root_of(path):
+    return os.path.splitdrive(str(path))[0] + os.sep
 
 
-def test_a_missing_listed_folder_is_skipped_with_a_note(project):
-    # e.g. a disconnected drive: its rows are never offered, the other folders still are
-    gone_drive = project.base / 'drive'
-    gone1, on_drive = project.photos / 'a.jpg', gone_drive / 'b.jpg'
-    project.cache([(gone1, CURRENT), (on_drive, CURRENT)])
-    scan = project.scan(photo_folders=[project.photos, gone_drive])
-    assert scan['cache_missing']['items'] == [(str(gone1), CURRENT)] and scan['cache_missing']['problem'] is None
+def test_rows_on_a_root_that_is_not_reachable_are_not_checked(project, monkeypatch):
+    # e.g. a disconnected USB disk or an offline network share: the photos are only offline
+    from framescout_core import cleanup
+    gone = project.photos / 'b.jpg'
+    project.cache([(gone, CURRENT), (project.photos / 'c.jpg', OLD)])
+    monkeypatch.setattr(cleanup, '_probe_root', unreachable(root_of(project.photos)))
+    scan = project.scan()
+    assert scan['cache_missing']['items'] == [] and scan['cache_missing']['problem'] is None
     notes = scan['cache_missing']['notes']
-    assert len(notes) == 1 and str(gone_drive) in notes[0] and 'does not exist' in notes[0]
-    summary = project.clean(scan, {'cache_missing'}, photo_folders=[project.photos, gone_drive])
-    assert summary['rows'] == 1 and project.rows() == [(str(on_drive), CURRENT)]
+    assert len(notes) == 1 and root_of(project.photos) in notes[0] and '2 photos' in notes[0]
+    assert 'not reachable' in notes[0]
 
 
-def test_a_missing_folder_listed_twice_gets_one_note(project):
-    # review: the app's list may name a folder twice, or with another case on Windows
-    gone_drive = project.base / 'drive'
-    listed = [gone_drive, project.photos, gone_drive, Path(str(gone_drive).upper()) if os.name == 'nt' else gone_drive]
-    scan = project.scan(photo_folders=listed)
-    assert len(scan['cache_missing']['notes']) == 1
-    scan = project.scan(photo_folders=[gone_drive, gone_drive])
-    assert 'None of the photo folders' not in scan['cache_missing']['problem']
-    assert 'does not exist' in scan['cache_missing']['problem']
-
-
-def test_rows_of_a_folder_that_disappeared_since_the_scan_are_kept(project):
-    second = project.base / 'second'
-    second.mkdir()
-    gone = second / 'b.jpg'
+def test_rows_whose_root_went_offline_since_the_scan_are_kept(project, monkeypatch):
+    from framescout_core import cleanup
+    gone = project.photos / 'b.jpg'
     project.cache([(gone, CURRENT)])
-    scan = project.scan(photo_folders=[project.photos, second])
+    scan = project.scan()
     assert scan['cache_missing']['items'] == [(str(gone), CURRENT)]
-    second.rmdir()  # the drive is disconnected before the deletion
-    summary = project.clean(scan, {'cache_missing'}, photo_folders=[project.photos, second])
+    monkeypatch.setattr(cleanup, '_probe_root', unreachable(root_of(project.photos)))
+    summary = project.clean(scan, {'cache_missing'})
     assert summary['rows'] == 0 and project.rows() == [(str(gone), CURRENT)]
 
 
-def test_nested_listed_folders_count_a_row_once(project):
-    gone = project.photos / 'sub' / 'a.jpg'
-    (project.photos / 'sub').mkdir()
+def test_a_root_that_goes_offline_during_the_check_is_not_checked(project, monkeypatch):
+    # a share that drops during the pass makes its folders look missing: the root is
+    # probed again for the paths found gone
+    from framescout_core import cleanup
+    project.cache([(project.photos / 'b.jpg', CURRENT)])
+    answers = iter([True, False])
+    monkeypatch.setattr(cleanup, '_probe_root', lambda root: next(answers))
+    scan = project.scan()
+    assert scan['cache_missing']['items'] == [] and len(scan['cache_missing']['notes']) == 1
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='drive letters are a Windows feature')
+def test_rows_on_a_drive_letter_that_is_not_there_are_not_checked(project):
+    free = [letter for letter in 'QRSTUVWXYZ' if not os.path.exists(letter + ':\\')]
+    if not free:
+        pytest.skip('every drive letter Q-Z is in use')
+    offline = free[-1] + ':\\Photos\\a.jpg'
+    project.cache([(offline, CURRENT), (project.photos / 'b.jpg', CURRENT)])
+    scan = project.scan()
+    assert scan['cache_missing']['items'] == [(str(project.photos / 'b.jpg'), CURRENT)]
+    assert free[-1] + ':\\' in scan['cache_missing']['notes'][0]
+
+
+def test_a_root_probe_that_hangs_counts_as_not_reachable(monkeypatch):
+    # a stat on a disconnected network share can hang for a long time
+    import threading
+    import time
+    from framescout_core import cleanup
+    release = threading.Event()
+    monkeypatch.setattr(cleanup, '_probe_root', lambda root: release.wait(5) or root == 'fast')
+    start = time.monotonic()
+    try:
+        assert cleanup._reachable_roots(['slow', 'fast', 'slower'], timeout=0.2) == {
+            'slow': False, 'fast': False, 'slower': False}
+    finally:
+        release.set()
+    assert time.monotonic() - start < 2  # one timeout for all roots, not one per root
+    monkeypatch.setattr(cleanup, '_probe_root', lambda root: root == 'up')
+    assert cleanup._reachable_roots(['up', 'down'], timeout=1) == {'up': True, 'down': False}
+
+
+def test_a_folder_with_many_rows_is_listed_once(project, monkeypatch):
+    # one listing per folder instead of one stat per photo (much faster on a network share)
+    from framescout_core import cleanup
+    names = [f'IMG_{n}.jpg' for n in range(10)]
+    for name in names[:8]:
+        project.photo(name)
+    project.cache([(project.photos / name, CURRENT) for name in names])
+    listed, stated = [], []
+    real_listdir, real_missing = os.listdir, cleanup._missing
+    monkeypatch.setattr(os, 'listdir', lambda path: listed.append(path) or real_listdir(path))
+    monkeypatch.setattr(cleanup, '_missing', lambda path: stated.append(path) or real_missing(path))
+    scan = project.scan()
+    assert sorted(scan['cache_missing']['items']) == [(str(project.photos / n), CURRENT) for n in names[8:]]
+    assert [os.path.normcase(p) for p in listed].count(os.path.normcase(str(project.photos))) == 1
+    # a name the listing does not hold is confirmed by its own stat
+    assert sorted(stated) == [str(project.photos / n) for n in names[8:]]
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows file names ignore case')
+def test_a_listed_name_of_another_case_exists(project):
+    names = [f'IMG_{n}.jpg' for n in range(6)]
+    for name in names:
+        project.photo(name)
+    project.cache([(project.photos / name.upper(), CURRENT) for name in names])
+    assert project.scan()['cache_missing']['items'] == []
+
+
+def test_rows_of_a_whole_missing_folder_need_no_stat_each(project, monkeypatch):
+    from framescout_core import cleanup
+    gone = project.base / 'renamed' / 'event'
+    project.cache([(gone / f'IMG_{n}.jpg', CURRENT) for n in range(10)])
+    stated = []
+    real = cleanup._missing
+    monkeypatch.setattr(cleanup, '_missing', lambda path: stated.append(path) or real(path))
+    assert project.scan()['cache_missing']['rows'] == 10
+    assert stated == []
+
+
+def test_rows_of_a_folder_that_cannot_be_listed_are_kept(project, monkeypatch):
+    # e.g. no permission: nothing tells that the photos are gone
+    names = [f'IMG_{n}.jpg' for n in range(6)]
+    project.cache([(project.photos / name, CURRENT) for name in names])
+    real = os.listdir
+
+    def listdir(path):
+        if os.path.normcase(str(path)) == os.path.normcase(str(project.photos)):
+            raise PermissionError('access denied')
+        return real(path)
+
+    monkeypatch.setattr(os, 'listdir', listdir)
+    assert project.scan()['cache_missing']['items'] == []
+
+
+def test_a_relative_path_is_never_unbound(project):
+    project.cache([('relative\\a.jpg' if os.name == 'nt' else 'relative/a.jpg', CURRENT), ('', CURRENT)])
+    assert project.scan()['cache_missing']['items'] == []
+
+
+def test_the_check_reports_its_progress_once_for_rows_and_marks(project):
+    project.cache([(project.base / f'folder {n}' / 'a.jpg', CURRENT) for n in range(3)])
+    project.marks({'Red car': {str(project.base / 'folder 3' / 'a.jpg'): 'match'}})
+    seen = []
+    project.scan(progress=lambda done, total: seen.append((done, total)))
+    # one pass over the folders of the cache rows and of the marks together
+    assert seen[-1] == (4, 4) and all(0 <= done <= total == 4 for done, total in seen)
+
+
+# marks of photos that no longer exist (E8/A21)
+
+def test_marks_of_photos_that_no_longer_exist_are_offered_unselected(project):
+    kept = project.photo('a.jpg')
+    gone = project.photos / 'b.jpg'
+    relative = 'c.jpg'  # not an absolute path: never checked
+    project.marks({'Red car': {str(kept): 'match', str(gone): 'no-match', relative: 'match'},
+                   'Dog': {str(gone): 'match'}})
+    scan = project.scan()
+    category = scan['marks_unbound']
+    assert category['items'] == [('Dog', str(gone)), ('Red car', str(gone))]
+    assert category['default'] is False and category['problem'] is None and category['notes'] == []
+    assert category['names'] == [f'Dog: {gone}', f'Red car: {gone}']
+
+
+def test_marks_on_a_root_that_is_not_reachable_are_not_offered(project, monkeypatch):
+    from framescout_core import cleanup
+    project.marks({'Red car': {str(project.photos / 'b.jpg'): 'match'}})
+    monkeypatch.setattr(cleanup, '_probe_root', unreachable(root_of(project.photos)))
+    category = project.scan()['marks_unbound']
+    assert category['items'] == [] and len(category['notes']) == 1 and '1 photo ' in category['notes'][0]
+
+
+def test_no_or_an_unreadable_marks_file(project):
+    assert project.scan()['marks_unbound']['items'] == []
+    assert not (project.results / MARKS_FILE).exists()  # the scan creates no marks file
+    (project.results / MARKS_FILE).write_text('{broken', encoding='utf-8')
+    category = project.scan()['marks_unbound']
+    assert category['items'] == [] and MARKS_FILE in category['problem']
+    summary = project.clean({**project.scan(), 'marks_unbound': {**category, 'items': [('Red car', 'x')]}},
+                            {'marks_unbound'})
+    assert (project.results / MARKS_FILE).read_text(encoding='utf-8') == '{broken'
+    assert summary['marks'] == 0 and MARKS_FILE in ' '.join(summary['skipped'])
+
+
+def test_deleting_unbound_marks_removes_only_those_entries(project):
+    kept = project.photo('a.jpg')
+    gone, back = project.photos / 'b.jpg', project.photos / 'c.jpg'
+    project.marks({'Red car': {str(kept): 'match', str(gone): 'no-match', str(back): 'match'},
+                   'Dog': {str(gone): 'match'}})
+    scan = project.scan()
+    assert len(scan['marks_unbound']['items']) == 3
+    project.photo('c.jpg')  # back since the scan: its mark stays
+    late = project.photos / 'd.jpg'  # unbound, but not shown by the scan
+    from framescout_core import save_marks
+    save_marks(project.results / MARKS_FILE, 'Dog', {str(late): 'no-match'})
+    summary = project.clean(scan, {'marks_unbound'})
+    assert summary['marks'] == 2 and summary['files'] == 0
+    assert json.loads((project.results / MARKS_FILE).read_text(encoding='utf-8'))['profiles'] == {
+        'Red car': {str(kept): 'match', str(back): 'match'}, 'Dog': {str(late): 'no-match'}}
+
+
+def test_unbound_marks_are_kept_unless_selected(project):
+    gone = project.photos / 'b.jpg'
+    project.marks({'Red car': {str(gone): 'match'}})
     project.cache([(gone, CURRENT)])
-    scan = project.scan(photo_folders=[project.photos, project.photos / 'sub', project.photos])
-    assert scan['cache_missing']['items'] == [(str(gone), CURRENT)] and scan['cache_missing']['rows'] == 1
+    scan = project.scan()
+    summary = project.clean(scan, {'cache_missing'})
+    assert summary['rows'] == 1 and summary['marks'] == 0
+    assert json.loads((project.results / MARKS_FILE).read_text(encoding='utf-8'))['profiles'] == {
+        'Red car': {str(gone): 'match'}}
 
 
 def test_rows_of_old_engines_and_other_settings(project):
@@ -332,11 +484,11 @@ def test_the_search_model_must_be_named(project):
     # E22 review: the signature alone does not tell the model, and a default would sort the
     # rows of a non-default signature into the wrong categories without an error
     with pytest.raises(TypeError, match='current_model'):
-        scan_cleanup(project.results, project.profiles, project.refs, [project.photos], CURRENT)
+        scan_cleanup(project.results, project.profiles, project.refs, CURRENT)
     scan = project.scan()
     with pytest.raises(TypeError, match='current_model'):
         clean_up(project.results, scan, set(), False, lambda pid, status: False, project.profiles, project.refs,
-                 [project.photos], CURRENT)
+                 CURRENT)
 
 
 def test_no_cache_means_nothing_to_clean(project):
@@ -388,7 +540,6 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
     keep = {name: project.results / name for name in
             (MARKS_FILE, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE)}
     project.write_results([('Red car', 'red-car.html', [T1])])
-    (project.results / MARKS_FILE).write_text('{"format": 1, "profiles": {}}', encoding='utf-8')
     for name in (MARKS_FILE + '.lock', RUN_LOCK):
         (project.results / name).write_bytes(b'')
     (project.results / RUN_STATUS).write_text('{"phase": "finished", "pid": 1}', encoding='utf-8')
@@ -401,12 +552,16 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
     temp_thumbnail(project.thumbs, T4)
     photo = project.photo('a.jpg')
     project.cache([(photo, CURRENT), (photo, OLD), (photo, OTHER), (project.photos / 'gone.jpg', CURRENT)])
+    # the only mark is unbound: the entry goes, the file stays
+    project.marks({'Red car': {str(project.photos / 'gone.jpg'): 'match'}})
     (project.refs / 'old.jpg').write_bytes(b'image')
     scan = project.scan()
     summary = project.clean(scan, everything(scan), vacuum=True)
     assert summary['refused'] is None and summary['failed'] == []
     for path in keep.values():
         assert path.exists(), path.name
+    assert json.loads(keep[MARKS_FILE].read_text(encoding='utf-8')) == {'format': 1, 'profiles': {}}
+    assert summary['marks'] == 1
     assert (project.base / 'settings.json').exists() and project.profiles.exists()
     assert sorted(p.name for p in project.results.iterdir()) == sorted(
         [*keep, CACHE_FILE, 'red-car.html', 'thumbnails'])
@@ -562,6 +717,9 @@ def test_cleanup_summary_text():
                                  'failed': [], 'skipped': []}) == (
         'Deleted 0 files and 1 cache entry · 0 B freed; cache.sqlite3 was not compacted, so it keeps its size and '
         'reuses the space for new analyses')
+    assert cleanup_summary_text({'refused': None, 'files': 2, 'rows': 0, 'marks': 1, 'freed': 10,
+                                 'compacted': False, 'failed': [], 'skipped': []}) == (
+        'Deleted 2 files, 0 cache entries and 1 mark · 10 B freed')
 
 
 def test_rows_deleted_without_compacting_are_reported_as_not_compacted(project):

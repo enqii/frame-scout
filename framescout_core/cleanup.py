@@ -2,14 +2,15 @@
 import os
 import re
 import sqlite3
+import threading
+import time
 from pathlib import Path
 from urllib.parse import quote
 
 from ._common import _path_key
 from .locks import RunLock
-from .marks import MARKS_FILE
+from .marks import MARKS_FILE, read_marks, remove_marks
 from .names import EXT, profile_slugs
-from .photos import _folder_key, _inside_prefix
 from .profiles import _backup_path, _read_entries, read_profiles
 from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
 from .run_status import RUN_LOCK, RUN_STATUS, read_status, run_active
@@ -21,21 +22,32 @@ from .signature import CACHE_FILE, classify_signatures, engine_id
 # "Clean up storage" lists what FrameScout no longer needs per category and deletes the
 # selected categories permanently after a confirmation, holding the run lock of the
 # results folder; at the end of every search the engine itself removes the harmless part
-# (temporary and unreferenced thumbnails, auto_cleanup). Never deleted: the user's marks,
-# the run, status and result files, the cache file itself, settings and profiles.
+# (temporary and unreferenced thumbnails, auto_cleanup). Never deleted: the marks file
+# (only single marks of photos that no longer exist, if the user selects them), the run,
+# status and result files, the cache file itself, settings and profiles.
+# Unbound entries (E8/A21, user decision 2026-10-28): cache rows and marks stay keyed by the
+# absolute photo path, so a renamed or moved photo counts as a new one; the old rows and
+# marks stay until the cleanup offers them as "unbound" (photo gone, its drive reachable).
 THUMBNAILS_DIR = 'thumbnails'
 # the thumbnail folder of versions before I7: no longer written, still linked by their galleries
 LEGACY_THUMBNAILS_DIR = 'vorschaubilder'
 # every gallery the engine has written (also v1.1) has this title
 GALLERY_MARKER = '<title>FrameScout – '
-CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missing', 'cache_old', 'cache_other',
-                      'cache_models', 'references')
+CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missing', 'marks_unbound', 'cache_old',
+                      'cache_other', 'cache_models', 'references')
 # the categories of cache rows (deleted by signature, except cache_missing: by path and signature)
 CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
-# selected when a scan is shown; reference images, rows of other current settings and rows of
-# other search models (E22) are not
+# selected when a scan is shown; marks of unbound photos (user data), reference images, rows
+# of other current settings and rows of other search models (E22) are not
 CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': True,
-                    'cache_old': True, 'cache_other': False, 'cache_models': False, 'references': False}
+                    'marks_unbound': False, 'cache_old': True, 'cache_other': False, 'cache_models': False,
+                    'references': False}
+# seconds the reachability probe of the drive and share roots may take (all roots together); a
+# stat on a disconnected network share can hang much longer
+ROOT_TIMEOUT = 5.0
+# a folder with at most this many photos to check gets one stat per photo, a fuller one is
+# listed once (see _PathCheck)
+_STAT_UP_TO = 4
 NEVER_DELETED = frozenset({MARKS_FILE, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE, CACHE_FILE,
                            SETTINGS_FILE, SETTINGS_FILE + '.lock', 'profiles.json', 'profiles.json.bak',
                            'profiles.json.lock'})
@@ -156,6 +168,131 @@ def _missing(path):
     return False
 
 
+def _root_of(path):
+    """The drive or share root of the absolute path, e.g. C:\\ or \\\\server\\share\\ (/ on POSIX)."""
+    return os.path.splitdrive(path)[0] + os.sep
+
+
+def _probe_root(root):
+    """True if the drive or share root can be reached now (a disconnected drive or offline share cannot)."""
+    return os.path.isdir(root)
+
+
+def _reachable_roots(roots, timeout=ROOT_TIMEOUT):
+    """Return {root: reachable now} for the drive or share roots, probed in parallel.
+
+    A stat on a disconnected network share can hang for a long time, so each probe runs in a
+    daemon thread, and a root whose probe has not answered within timeout seconds (one
+    timeout for all roots) counts as not reachable; its thread ends on its own later.
+    """
+    answers = {}
+
+    def probe(root):
+        try:
+            answers[root] = bool(_probe_root(root))
+        except Exception:  # any failure: not reachable
+            answers[root] = False
+
+    threads = [threading.Thread(target=probe, args=(root,), daemon=True, name='FrameScout root probe')
+               for root in roots]
+    for thread in threads:
+        thread.start()
+    deadline = time.monotonic() + timeout
+    for thread in threads:
+        thread.join(max(0.0, deadline - time.monotonic()))
+    return {root: answers.get(root, False) for root in roots}
+
+
+def _folder_names(folder):
+    """The normcased names in folder; False if it certainly does not exist, None if it cannot be listed."""
+    try:
+        return {os.path.normcase(name) for name in os.listdir(folder)}
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except (OSError, ValueError):
+        return None
+
+
+class _PathCheck:
+    """Tells which photo paths certainly no longer exist ("unbound", E8/A21); one per scan or cleanup.
+
+    Each path is checked once (the answer is kept, so the cache rows and the marks of a scan
+    share one pass), each drive or share root is probed once (_reachable_roots): the paths
+    under a root that is not reachable now are not checked, as their photos may only be
+    offline. Paths are grouped by folder: a folder with at most _STAT_UP_TO paths gets one
+    stat per path, a fuller one is listed once (one directory listing instead of a stat per
+    photo, measured about 70 times faster on a network share), and a name the listing does
+    not hold is confirmed by its own stat. A folder that does not exist makes all its paths
+    gone; one that cannot be listed (e.g. no permission) keeps them. A path that is not
+    absolute is never gone. After the pass, the roots with gone paths are probed again, so a
+    share that dropped during the pass does not make its photos look deleted.
+    """
+
+    def __init__(self, root_timeout=ROOT_TIMEOUT):
+        self._timeout = root_timeout
+        self._gone = set()
+        self._checked = set()  # paths with an answer: gone, there or never gone
+        self._unreachable = {}  # path -> its root that was not reachable
+
+    def check(self, paths, progress=None):
+        """Check the paths not checked yet; progress(done, total) is called per folder."""
+        todo = {p for p in paths if p not in self._checked and p not in self._unreachable}
+        absolute = {p for p in todo if os.path.isabs(p)}
+        self._checked |= todo - absolute
+        roots = {}
+        for path in absolute:
+            roots.setdefault(_root_of(path), []).append(path)
+        reachable = _reachable_roots(sorted(roots), self._timeout) if roots else {}
+        folders = {}
+        for root, members in roots.items():
+            if not reachable[root]:
+                self._unreachable.update(dict.fromkeys(members, root))
+                continue
+            for path in members:
+                folders.setdefault(os.path.dirname(path), []).append(path)
+        gone = set()
+        total = len(folders)
+        step = max(1, total // 100)
+        for done, (folder, members) in enumerate(sorted(folders.items()), 1):
+            if len(members) <= _STAT_UP_TO:
+                gone.update(p for p in members if _missing(p))
+            else:
+                names = _folder_names(folder)
+                if names is False:
+                    gone.update(members)
+                elif names is not None:
+                    gone.update(p for p in members if os.path.normcase(os.path.basename(p)) not in names
+                                and _missing(p))
+            if progress and (done % step == 0 or done == total):
+                progress(done, total)
+        # a share that went offline during the pass makes its folders look missing
+        suspects = {_root_of(p) for p in gone}
+        lost = {root for root, up in _reachable_roots(sorted(suspects), self._timeout).items() if not up}
+        for path in [p for p in gone if _root_of(p) in lost]:
+            gone.discard(path)
+            self._unreachable[path] = _root_of(path)
+        self._gone |= gone
+        self._checked |= {p for p in absolute if p not in self._unreachable}
+
+    def result(self, paths):
+        """Return (the paths of paths that are gone, {root: number of paths not checked}); checks them first."""
+        paths = set(paths)
+        self.check(paths)
+        unchecked = {}
+        for path in paths:
+            if path in self._unreachable:
+                root = self._unreachable[path]
+                unchecked[root] = unchecked.get(root, 0) + 1
+        return paths & self._gone, unchecked
+
+
+def _unchecked_notes(unchecked):
+    """The notes of the roots that were not reachable ({root: number of photos})."""
+    return [f'{root} is not reachable now (e.g. a disconnected drive or an offline network share), so '
+            f'{count_text(count, "photo", "photos")} there {"was" if count == 1 else "were"} not checked.'
+            for root, count in sorted(unchecked.items())]
+
+
 def _read_only_uri(path):
     """Return the SQLite URI that opens the existing file path read-only (never creating it).
 
@@ -188,55 +325,45 @@ def _read_cache(cache):
     return rows, recorded
 
 
-def _photo_folder_list(photo_folders):
-    """The non-empty entries of photo_folders (None: none) as resolved Paths, each folder once (review)."""
-    folders, seen = [], set()
-    for entry in photo_folders or ():
-        if not str(entry).strip():
-            continue
-        folder = Path(entry).resolve()
-        if _folder_key(folder) not in seen:
-            seen.add(_folder_key(folder))
-            folders.append(folder)
-    return folders
+def _unbound_rows(rows, check, among=None):
+    """The cache_missing category: the rows [(path, signature, size)] whose photo no longer exists (E7, E8).
 
-
-def _missing_rows(rows, photo_folders):
-    """The cache_missing category of the cache rows [(path, signature, size)] (E7, A25)."""
-    folders = _photo_folder_list(photo_folders)
-    if not folders:
-        return _category('cache_missing', problem='No photo folder is set.', rows=0, notes=[])
-    existing = [f for f in folders if f.is_dir()]
-    absent = [f for f in folders if f not in existing]
-    if not existing:
-        named = (f'The photo folder {absent[0]} does not exist' if len(absent) == 1 else
-                 'None of the photo folders exists (' + '; '.join(str(f) for f in absent) + ')')
-        return _category('cache_missing', rows=0, notes=[],
-                         problem=f'{named} (e.g. a disconnected drive), so cache entries of deleted photos are not '
-                                 'looked for.')
-    # only inside the listed photo folders that exist (user decisions on E7 and A25): rows
-    # of other folders may belong to a drive that is not connected now
-    # compared as photos.distinct_folders compares folders; one normcase per row (review)
-    prefixes = tuple(_inside_prefix(_folder_key(folder)) for folder in existing)
-    # each photo is looked at once, however many signatures it has (review), and once
-    # however many listed folders hold it
-    inside = {path for path, _, _ in rows if os.path.normcase(path).startswith(prefixes)}
-    gone = {path for path in inside if _missing(path)}
+    Wherever the photo was, also outside the current photo folders (user decision on E8/A21:
+    a renamed or moved photo counts as a new one, its old rows are unbound); check: the
+    _PathCheck of this scan or cleanup; among: only these (path, signature) pairs (None: all).
+    """
+    if among is not None:
+        rows = [row for row in rows if (row[0], row[1]) in among]
+    # each photo is looked at once, however many signatures it has (review)
+    gone, unchecked = check.result({path for path, _, _ in rows})
     dead = [(path, signature, size or 0) for path, signature, size in rows if path in gone]
-    notes = [f'The photo folder {f} does not exist (e.g. a disconnected drive), so cache entries of deleted photos '
-             'are not looked for there.' for f in absent]
     return _category('cache_missing', sorted((p, s) for p, s, _ in dead), sum(size for *_, size in dead),
-                     rows=len(dead), notes=notes)
+                     rows=len(dead), notes=_unchecked_notes(unchecked))
 
 
-def _cache_categories(results, photo_folders, current, current_model):
-    """The cache categories (CACHE_CATEGORIES) of the cache in results; current_model: the search model key."""
-    keys = CACHE_CATEGORIES
+def _attempt(read):
+    """Return read(), or the ValueError it raised (e.g. an unreadable file, shown as the reason)."""
     try:
-        read = _read_cache(results / CACHE_FILE)
+        return read()
     except ValueError as exc:
-        return {key: _category(key, problem=f'Not offered: {exc}.', rows=0) for key in keys}
-    rows, recorded = read if read else ([], {})
+        return exc
+
+
+def _cache_rows(results):
+    """Return (rows, recorded) of the cache in results ([] and {} without a cache); ValueError if unreadable."""
+    read = _read_cache(results / CACHE_FILE)
+    return read if read else ([], {})
+
+
+def _cache_categories(cache, current, current_model, check, among=None):
+    """The cache categories (CACHE_CATEGORIES); current_model: the search model key.
+
+    cache: _attempt(_cache_rows) of the results folder; check, among: as for _unbound_rows.
+    """
+    keys = CACHE_CATEGORIES
+    if isinstance(cache, ValueError):
+        return {key: _category(key, problem=f'Not offered: {cache}.', rows=0) for key in keys}
+    rows, recorded = cache
     found = {}
     classes = (classify_signatures({signature for _, signature, _ in rows}, recorded, current,
                                    current_engine=engine_id(current_model)) if rows else {})
@@ -244,8 +371,34 @@ def _cache_categories(results, photo_folders, current, current_model):
         chosen = {signature for signature, kind in classes.items() if kind == wanted}
         sizes = [size or 0 for _, signature, size in rows if signature in chosen]
         found[key] = _category(key, sorted(chosen), sum(sizes), rows=len(sizes))
-    found['cache_missing'] = _missing_rows(rows, photo_folders)
+    found['cache_missing'] = _unbound_rows(rows, check, among)
     return {key: found[key] for key in keys}
+
+
+def _read_marks_entries(results):
+    """The (profile, photo path) pairs of the marks file in results; ValueError if it cannot be read."""
+    try:
+        marks = read_marks(results / MARKS_FILE)
+    except (OSError, ValueError) as exc:
+        raise ValueError(f'{MARKS_FILE} cannot be read ({exc})') from None
+    return [(profile, photo) for profile, photos in marks.items() for photo in photos]
+
+
+def _unbound_marks(entries, check, among=None):
+    """The marks_unbound category: the marks of photos that no longer exist (E8/A21).
+
+    Kept by default (user decision): the photo may come back. entries:
+    _attempt(_read_marks_entries) of the results folder; check, among: as for _unbound_rows.
+    """
+    if isinstance(entries, ValueError):
+        return _category('marks_unbound', problem=f'Not offered: {entries}.', notes=[])
+    if among is not None:
+        entries = [entry for entry in entries if entry in among]
+    gone, unchecked = check.result({photo for _, photo in entries})
+    items = sorted(entry for entry in entries if entry[1] in gone)
+    category = _category('marks_unbound', items, notes=_unchecked_notes(unchecked))
+    category['names'] = [f'{profile}: {photo}' for profile, photo in items]
+    return category
 
 
 def _referenced_files(profiles_file, profiles):
@@ -282,23 +435,22 @@ def _unreferenced_references(refs_root, profiles_file, profiles=None):
                   if p.suffix.lower() in EXT and p.is_file() and _path_key(p) not in used)
 
 
-def scan_cleanup(results, profiles_file, refs_root, photo_folders, current_signature, *, current_model):
+def scan_cleanup(results, profiles_file, refs_root, current_signature, *, current_model, progress=None):
     """Return {category: dict} of what the cleanup can delete; nothing is changed (E7).
 
     results: the results folder; profiles_file: the app's profiles.json; refs_root: the
-    references folder; photo_folders: the current photo folders (None or empty if none is
-    set; A25): cache entries of deleted photos are looked for in those that exist;
-    current_signature: the cache signature of the current settings (never offered);
-    current_model: the search model key of the current settings (E22; required, as the
-    signature, a hash, does not tell it): rows of the other registered models are
-    cache_models, not cache_old.
+    references folder; current_signature: the cache signature of the current settings
+    (never offered); current_model: the search model key of the current settings (E22;
+    required, as the signature, a hash, does not tell it): rows of the other registered
+    models are cache_models, not cache_old; progress(done, total): called while the photos
+    of the cache rows and marks are checked (one pass, per folder; the slow part).
     Each category of CLEANUP_CATEGORIES has items (paths; (path, signature) rows for
-    cache_missing; the signatures for cache_old/cache_other/cache_models), size (bytes), default,
-    problem (why it is not offered, else None) and names (file names to show); the cache
-    categories have rows; cache_missing has notes (the listed folders that do not exist,
-    e.g. on a disconnected drive, and were left out); galleries has
-    thumbnails/thumbnails_size: the thumbnails only the orphaned galleries link, deleted
-    together with them.
+    cache_missing; the signatures for cache_old/cache_other/cache_models; (profile, photo
+    path) pairs for marks_unbound), size (bytes), default, problem (why it is not offered,
+    else None) and names (to show); the cache categories have rows; cache_missing and
+    marks_unbound have notes (the drive or share roots that were not reachable and how many
+    photos there were not checked); galleries has thumbnails/thumbnails_size: the
+    thumbnails only the orphaned galleries link, deleted together with them.
     """
     results, refs_root = Path(results), Path(refs_root)
     temps = _temp_thumbnails(results)
@@ -322,7 +474,14 @@ def scan_cleanup(results, profiles_file, refs_root, photo_folders, current_signa
                                        thumbnails=extra, thumbnails_size=sum(_file_size(p) for p in extra))
         found['galleries']['names'] = [p.name for p in found['galleries']['items']]
         found['thumbnails'] = _category('thumbnails', free, sum(_file_size(p) for p in free))
-    found.update(_cache_categories(results, photo_folders, current_signature, current_model))
+    # one existence pass over the photos of the cache rows and of the marks (E8/A21)
+    cache = _attempt(lambda: _cache_rows(results))
+    entries = _attempt(lambda: _read_marks_entries(results))
+    check = _PathCheck()
+    check.check({path for path, _, _ in ([] if isinstance(cache, ValueError) else cache[0])} |
+                {photo for _, photo in ([] if isinstance(entries, ValueError) else entries)}, progress)
+    found.update(_cache_categories(cache, current_signature, current_model, check))
+    found['marks_unbound'] = _unbound_marks(entries, check)
     try:
         refs = _unreferenced_references(refs_root, profiles_file, profiles)
     except ValueError as exc:
@@ -363,7 +522,8 @@ def _remove_empty_folders(folder, stop):
 
 
 def _new_summary():
-    return {'refused': None, 'files': 0, 'rows': 0, 'freed': 0, 'compacted': False, 'failed': [], 'skipped': []}
+    return {'refused': None, 'files': 0, 'rows': 0, 'marks': 0, 'freed': 0, 'compacted': False, 'failed': [],
+            'skipped': []}
 
 
 def _delete_unlinked(results, links, listed, allowed, summary):
@@ -377,9 +537,14 @@ def _delete_unlinked(results, links, listed, allowed, summary):
     _remove_empty_folders(results / LEGACY_THUMBNAILS_DIR, results)
 
 
-def _delete_rows(results, shown, selected, photo_folders, current, current_model, vacuum, summary):
-    """Delete the selected cache rows that the scan shown listed and that still qualify now."""
-    fresh = _cache_categories(results, photo_folders, current, current_model)
+def _delete_rows(results, shown, selected, current, current_model, vacuum, summary, check):
+    """Delete the selected cache rows that the scan shown listed and that still qualify now.
+
+    Only the photos of the unbound rows the scan showed are checked again (check: the
+    _PathCheck of this cleanup), not the whole cache.
+    """
+    among = {tuple(item) for item in shown['cache_missing']['items']} if 'cache_missing' in selected else set()
+    fresh = _cache_categories(_attempt(lambda: _cache_rows(results)), current, current_model, check, among)
     rows, signatures = [], []
     for key in CACHE_CATEGORIES:
         if key not in selected:
@@ -421,6 +586,20 @@ def _delete_rows(results, shown, selected, photo_folders, current, current_model
     summary['freed'] += max(0, before - _file_size(cache))
 
 
+def _delete_marks(results, shown, summary, check):
+    """Remove the unbound marks the scan shown listed whose photo is still gone now (E8/A21).
+
+    The photos are checked before the marks lock is taken (a slow check must not block a
+    mark being saved); then only these entries are removed from marks.json, never the file.
+    """
+    entries = _attempt(lambda: _read_marks_entries(results))
+    if isinstance(entries, ValueError):
+        summary['skipped'].append(f'Marks were kept: {entries}.')
+        return
+    fresh = _unbound_marks(entries, check, {tuple(item) for item in shown['marks_unbound']['items']})
+    summary['marks'] += remove_marks(results / MARKS_FILE, fresh['items'])
+
+
 # results folders a clean_up of this process works on now: the app's sessions are threads of
 # one process, so another tab can tell a cleanup holding the run lock from a search (review)
 _CLEANING = set()
@@ -452,11 +631,13 @@ def _galleries_and_thumbnails(results, shown, selected, profiles_file, summary):
     _delete_unlinked(results, links, listed, allowed_thumbnails, summary)
 
 
-def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, photo_folders, current_signature,
+def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, current_signature,
              lock_timeout=CLEANUP_LOCK_TIMEOUT, *, current_model):
     """Delete the selected categories of the scan shown (scan_cleanup) permanently; return a summary (E7).
 
     current_model: the search model key of the current settings, as for scan_cleanup (E22).
+    Unbound cache rows and marks are deleted only if their photo is still gone now and its
+    drive or share is reachable (E8/A21); of marks.json only those entries are removed.
 
     Holds the run lock of results, so it is refused while a search runs (also one being
     started: alive(pid, status) tells whether the process of a "starting" status runs) and
@@ -466,7 +647,7 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     thumbnail a gallery links since. Deleting the orphaned galleries also deletes the
     thumbnails only they linked. vacuum compacts the cache file after rows were deleted.
     The summary has refused (why nothing was done, else None), files, rows, freed (bytes),
-    compacted (VACUUM done), failed [(name, error)] and skipped (steps that could not be
+    marks (marks removed), compacted (VACUUM done), failed [(name, error)] and skipped (steps that could not be
     done). An error in one step (e.g. a folder that cannot be listed) ends only that step and
     is listed in skipped, so the summary always tells what was deleted (review).
     """
@@ -503,12 +684,14 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                 if path in allowed and _remove_file(path, summary):
                     _remove_empty_folders(path.parent, refs_root)
 
+        check = _PathCheck()  # the cache rows and the marks check their photos once
         steps = [('Temporary thumbnails', 'temp_thumbnails' in selected, temporary),
                  ('Galleries and thumbnails', bool({'galleries', 'thumbnails'} & selected),
                   lambda: _galleries_and_thumbnails(results, shown, selected, profiles_file, summary)),
                  ('Cache entries', True,
-                  lambda: _delete_rows(results, shown, selected, photo_folders, current_signature, current_model,
-                                       vacuum, summary)),
+                  lambda: _delete_rows(results, shown, selected, current_signature, current_model, vacuum, summary,
+                                       check)),
+                 ('Marks', 'marks_unbound' in selected, lambda: _delete_marks(results, shown, summary, check)),
                  ('Reference images', 'references' in selected, references)]
         for name, wanted, step in steps:
             if not wanted:
@@ -566,8 +749,10 @@ def count_text(count, one, many):
 
 def cleanup_summary_text(summary):
     """Return the line the app shows after a cleanup, e.g. "Deleted 3 files and 1,200 cache entries · 2 KB freed"."""
-    text = (f"Deleted {count_text(summary['files'], 'file', 'files')} and "
-            f"{count_text(summary['rows'], 'cache entry', 'cache entries')} · {size_text(summary['freed'])} freed")
+    parts = [count_text(summary['files'], 'file', 'files'), count_text(summary['rows'], 'cache entry', 'cache entries')]
+    if summary.get('marks'):
+        parts.append(count_text(summary['marks'], 'mark', 'marks'))
+    text = f"Deleted {', '.join(parts[:-1])} and {parts[-1]} · {size_text(summary['freed'])} freed"
     if summary['rows'] and not summary.get('compacted'):
         # SQLite keeps the file size until VACUUM (review)
         text += f'; {CACHE_FILE} was not compacted, so it keeps its size and reuses the space for new analyses'
