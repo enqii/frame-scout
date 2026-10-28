@@ -5,7 +5,8 @@ import threading
 import pytest
 
 from framescout_core import (MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARKS_FILE, RunLock,
-                             UnknownProfileError, delete_marks, lock_held, read_marks, rename_marks, save_marks)
+                             UnknownProfileError, delete_marks, lock_held, read_marks, remove_marks, rename_marks,
+                             save_marks)
 
 
 def stored(path):
@@ -196,6 +197,51 @@ def test_deleting_waits_for_the_lock_and_gives_up(tmp_path):
     try:
         with pytest.raises(OSError):
             delete_marks(path, 'Red car', lock_timeout=0.05)
+    finally:
+        lock.release()
+    assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH}}
+
+
+# --- removing single marks (unbound photos, E8/A21) ---------------------------------------
+
+def test_removing_marks_removes_only_the_named_entries(tmp_path):
+    path = tmp_path / MARKS_FILE
+    path.write_text(json.dumps({'format': 1, 'later': [1], 'profiles': {
+        'Red car': {'a.jpg': MARK_MATCH, 'b.jpg': MARK_NO_MATCH}, 'Dog': {'a.jpg': MARK_MATCH}}}), encoding='utf-8')
+    # ('Cat', 'x.jpg') and ('Dog', 'b.jpg') have no mark: nothing happens for them
+    assert remove_marks(path, {('Red car', 'a.jpg'), ('Cat', 'x.jpg'), ('Dog', 'b.jpg')}) == 1
+    assert stored(path) == {'format': 1, 'later': [1], 'profiles': {
+        'Red car': {'b.jpg': MARK_NO_MATCH}, 'Dog': {'a.jpg': MARK_MATCH}}}
+    # a profile left without marks is removed from the file, as by save_marks
+    assert remove_marks(path, [('Red car', 'b.jpg')]) == 1
+    assert read_marks(path) == {'Dog': {'a.jpg': MARK_MATCH}}
+
+
+def test_removing_no_mark_changes_nothing(tmp_path):
+    path = tmp_path / 'results' / MARKS_FILE
+    assert remove_marks(path, {('Red car', 'a.jpg')}) == 0  # no results folder: nothing is created
+    assert not path.parent.exists()
+    path.parent.mkdir()
+    assert remove_marks(path, {('Red car', 'a.jpg')}) == 0 and not path.exists()
+    save_marks(path, 'Dog', {'c.jpg': MARK_MATCH})
+    before = path.read_bytes()
+    assert remove_marks(path, {('Red car', 'a.jpg')}) == 0 and remove_marks(path, set()) == 0
+    assert path.read_bytes() == before
+
+
+def test_removing_marks_never_replaces_an_unreadable_file_and_waits_for_the_lock(tmp_path):
+    path = tmp_path / MARKS_FILE
+    path.write_text('{broken', encoding='utf-8')
+    with pytest.raises(ValueError):
+        remove_marks(path, {('Red car', 'a.jpg')})
+    assert path.read_text(encoding='utf-8') == '{broken'
+    save_marks(path.with_name('other.json'), 'Red car', {'a.jpg': MARK_MATCH})
+    path = path.with_name('other.json')
+    lock = RunLock(tmp_path / 'other.json.lock')
+    assert lock.acquire()
+    try:
+        with pytest.raises(OSError):
+            remove_marks(path, {('Red car', 'a.jpg')}, lock_timeout=0.05)
     finally:
         lock.release()
     assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH}}

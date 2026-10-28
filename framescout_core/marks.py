@@ -138,3 +138,35 @@ def delete_marks(path, profile, attempts=5, retry_delay=0.05, lock_timeout=MARKS
     _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
                    attempts, retry_delay, lock_timeout)
     return removed
+
+
+def remove_marks(path, entries, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
+    """Remove the marks entries ((profile name, photo path) pairs) names; return how many were removed.
+
+    For the cleanup of marks of photos that no longer exist (unbound, E8/A21): only these
+    entries go, never the file or other marks; a profile left without marks is removed from
+    the file, as by save_marks. Merged into the file as it is now, under the lock of
+    save_marks; nothing happens without a marks file or without one of the entries. Raises
+    like save_marks.
+    """
+    path = Path(path)
+    entries = set(entries)
+    if not entries or not path.parent.is_dir():
+        return 0
+    removed = 0
+
+    def update(document):
+        nonlocal removed
+        profiles = document['profiles']
+        for profile, photo in entries:
+            marks = profiles.get(profile)
+            if marks is not None and photo in marks:
+                del marks[photo]
+                removed += 1
+                if not marks:
+                    del profiles[profile]
+        return document if removed else None
+
+    _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
+                   attempts, retry_delay, lock_timeout)
+    return removed
