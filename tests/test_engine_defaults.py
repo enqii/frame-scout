@@ -113,3 +113,21 @@ def test_the_engine_can_write_the_raw_scores_for_the_evaluation():
     [search] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'search']
     source = ast.unparse(search)
     assert source.index('write_scores(') < source.index("thumbs = output / 'thumbnails'")
+
+
+def test_the_engine_imports_open_clip_only_through_import_open_clip():
+    # E16, E33: huggingface_hub reads its offline and warning variables when it is imported,
+    # so neither open_clip nor a library that imports huggingface_hub may be imported before
+    nodes = list(ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8'))))
+    hub_users = {'open_clip', 'huggingface_hub', 'transformers', 'timm'}
+    direct = [node.lineno for node in nodes
+              if (isinstance(node, ast.ImportFrom) and (node.module or '').split('.')[0] in hub_users)
+              or (isinstance(node, ast.Import) and any(a.name.split('.')[0] in hub_users for a in node.names))]
+    assert direct == [], f'framescout_engine.py imports a Hugging Face library directly on line(s) {direct}'
+    calls = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'import_open_clip']
+    assert len(calls) == 1, 'the engine must import open_clip with import_open_clip'
+    assert ast.unparse(calls[0].args[0]) == 'os.environ'
+    assert ast.unparse(calls[0].args[1]) == 'importlib.import_module'
+    [fallback] = [node for node in nodes if isinstance(node, ast.Call)
+                  and getattr(node.func, 'id', None) == 'load_with_hub_fallback']
+    assert 'hub_go_online(os.environ, sys.modules)' in ast.unparse(fallback)
