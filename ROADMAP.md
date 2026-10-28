@@ -20,10 +20,10 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       (done 2026-10-28)
 
 ### P7 – Offline and nothing outside the project folder
-- [ ] (A) No Hugging Face Hub request per search once the weights are cached, no symlink
+- [x] (A) No Hugging Face Hub request per search once the weights are cached, no symlink
       warning in `run.log` (E16 and E31 describe the same problem: close one as a
       duplicate; E33; check the behavior without internet, the first download must still
-      work)
+      work) (done 2026-10-28; open follow-up: E38)
 - [ ] (B) Model and config files stay under `.cache/`, also for manual runs (E9, I10; keeps
       the uninstall clean)
 

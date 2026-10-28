@@ -315,6 +315,46 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       `PIL.Image.open` back after the import, so an unreadable file no longer triggers the
       `pi-heif` install. An already installed `pi_heif` stays in an existing venv; it is
       unused and goes with the venv.)
+- [x] **E16 – Every engine start contacts the Hugging Face Hub:** the log shows
+      "You are sending unauthenticated requests to the HF Hub" on each run although the
+      CLIP weights are in `.cache/huggingface`: OpenCLIP checks the hub for a newer file.
+      No image data is sent, but the run needs (or waits for) the network, which is
+      surprising for a local tool. Fix idea: set `HF_HUB_OFFLINE=1` once the weights are
+      cached (or try offline first and fall back to a download), in the engine or the
+      `.bat` files; check the behavior without internet access.
+      (Done 2026-10-28, PR #41, roadmap P7 (A): the engine imports open_clip only through
+      `framescout_core.import_open_clip`, which sets `HF_HUB_OFFLINE=1` before the import
+      when `model_cached` finds every Hub file of the model in the cache (the weights and,
+      for SigLIP, the tokenizer files in the snapshot of `refs/main`) and the user set
+      neither `HF_HUB_OFFLINE` nor `TRANSFORMERS_OFFLINE`. If loading fails offline,
+      `load_with_hub_fallback` prints a note, goes online and loads again; an uncached model
+      loads online as before. The variables are set in the engine process, so the `.bat`
+      files and `app.py` are unchanged. Checked with the default model, CPU, network blocked
+      by a dead proxy: no Hub lines. Not run: the first download, the fallback with real
+      files and SigLIP offline (E38). See `docs/ARCHITECTURE.md` → "Environment variables
+      and caches".)
+- [x] **E31 – Every search contacts the Hugging Face Hub:** loading the CLIP weights with
+      open_clip goes through `huggingface_hub`, which asks the Hub for the model files on
+      every run even when they are in `.cache/huggingface` (the log shows "You are sending
+      unauthenticated requests to the HF Hub"). No images or paths are sent, but it is a
+      network request per search (with a user agent naming library versions) and makes
+      the search fail or wait without a network. Fix idea: once the weights are cached,
+      set `HF_HUB_OFFLINE=1` (and `HF_HUB_DISABLE_TELEMETRY=1`) for the engine, keeping the
+      first-run download; check how open_clip behaves offline. Found in the E27/E28 PR.
+      Since E22 (PR #31) this applies to every search model, including the SigLIP
+      tokenizer.
+      (Closed 2026-10-28 as a duplicate of E16, fixed together with it in PR #41;
+      `HF_HUB_DISABLE_TELEMETRY=1` is set as well.)
+- [x] **E33 – Hugging Face warning about symlinks in `run.log` on Windows:** without
+      Windows Developer Mode, `huggingface_hub` prints a long "cache-system uses symlinks"
+      `UserWarning` into `run.log` at the first download of each model and stores the files
+      without symlinks (more disk space). Fix idea: set `HF_HUB_DISABLE_SYMLINKS_WARNING=1`
+      in the `.bat` files and the engine's environment and mention it in the README. Found
+      in the E22 smoke runs.
+      (Done 2026-10-28, PR #41: `import_open_clip` sets `HF_HUB_DISABLE_SYMLINKS_WARNING=1`
+      with `setdefault` in the engine process, so manual runs need no setting and the
+      `.bat` files are unchanged; the files are still stored as copies without Developer
+      Mode. Mentioned in the README.)
 
 ### App (`app.py`)
 

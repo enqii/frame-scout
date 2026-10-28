@@ -146,7 +146,12 @@ starts with the new example profiles.
    package installs of Ultralytics (the person detection library) for every search, also
    from a manual command line (the search sets `YOLO_OFFLINE=true` and
    `YOLO_AUTOINSTALL=false` for itself, overriding values you set; the person detection
-   model is still downloaded on first use).
+   model is still downloaded on first use). Likewise, once a search model's files have
+   been downloaded, searches with it run without internet access and without asking the
+   Hugging Face Hub (no "unauthenticated requests" line in `run.log`); the search turns the
+   Hub's symlink warning off on Windows as well. If the files in `.cache` are incomplete,
+   the search says so and downloads the missing ones. Set `HF_HUB_OFFLINE=0` (or `1`) for
+   a manual run if you want to decide this yourself.
 4. **AI settings:** the **search model** is the AI model that turns photos and search
    terms into comparable numbers. The default, OpenAI CLIP ViT-B/32, is the fastest and
    the one FrameScout's settings are tuned for. Three optional models are offered:

@@ -31,13 +31,6 @@ and discussions.
       would speed up the decoding of large photos (≥ ~10 MP), but changes the person crops
       and needs an evaluation with group photos (search quality) and possibly scaling the
       minimum crop size of 35×70 px with the draft factor.
-- [ ] **E16 – Every engine start contacts the Hugging Face Hub:** the log shows
-      "You are sending unauthenticated requests to the HF Hub" on each run although the
-      CLIP weights are in `.cache/huggingface`: OpenCLIP checks the hub for a newer file.
-      No image data is sent, but the run needs (or waits for) the network, which is
-      surprising for a local tool. Fix idea: set `HF_HUB_OFFLINE=1` once the weights are
-      cached (or try offline first and fall back to a download), in the engine or the
-      `.bat` files; check the behavior without internet access.
 - [ ] **E17 – Thread counts are not tuned for small CPUs:** PyTorch uses up to 12 threads
       (`torch.set_num_threads(min(12, …))`, from the logical core count, also when the
       process may use fewer cores), and since E2 up to four decoding threads (two with
@@ -134,16 +127,6 @@ and discussions.
       skipped RAW file instead (the scan already lists them in `PhotoScan.raw_pairs`); the
       cache and the gallery would then show the RAW path for that shot. Found in the PR #26
       review.
-- [ ] **E31 – Every search contacts the Hugging Face Hub:** loading the CLIP weights with
-      open_clip goes through `huggingface_hub`, which asks the Hub for the model files on
-      every run even when they are in `.cache/huggingface` (the log shows "You are sending
-      unauthenticated requests to the HF Hub"). No images or paths are sent, but it is a
-      network request per search (with a user agent naming library versions) and makes
-      the search fail or wait without a network. Fix idea: once the weights are cached,
-      set `HF_HUB_OFFLINE=1` (and `HF_HUB_DISABLE_TELEMETRY=1`) for the engine, keeping the
-      first-run download; check how open_clip behaves offline. Found in the E27/E28 PR.
-      Since E22 (PR #31) this applies to every search model, including the SigLIP
-      tokenizer.
 - [ ] **E32 – The offered search models are not evaluated:** E22 offers ViT-B/16 and
       ViT-L/14 (DataComp-XL) and SigLIP B/16 next to the default, marked "not evaluated"
       (`SearchModel.evaluated`), because their search quality has not been measured.
@@ -159,12 +142,6 @@ and discussions.
       not run with real models yet (E34). A key trimmed from the registry falls back to the default with
       a warning in a user's `settings.json` (`read_settings`); its cache rows then count as
       "older version" in the cleanup. Search quality is a hold point.
-- [ ] **E33 – Hugging Face warning about symlinks in `run.log` on Windows:** without
-      Windows Developer Mode, `huggingface_hub` prints a long "cache-system uses symlinks"
-      `UserWarning` into `run.log` at the first download of each model and stores the files
-      without symlinks (more disk space). Fix idea: set `HF_HUB_DISABLE_SYMLINKS_WARNING=1`
-      in the `.bat` files and the engine's environment and mention it in the README. Found
-      in the E22 smoke runs.
 - [ ] **E34 – The evaluation tool is not runtime-tested with real models:**
       `framescout_eval.py run` and the engine's `--scores-file` (E32, PR #32) were checked
       by unit tests, the syntax tree and `py_compile` only (no real-model run without
@@ -195,6 +172,16 @@ and discussions.
       re-checks, but the volume would have to be back by then). Idea: run the pass in a
       worker thread with a per-folder timeout, or treat folders on other volumes than
       their root as their own root. Found in the PR of E8.
+- [ ] **E38 – Offline loading of SigLIP and the online fallback are not runtime-tested:**
+      `framescout_core.model_cached` decides from the hub cache whether a model loads
+      offline (E16, P7 A). It was run with the default model only. `transformers` is not
+      installed in the development venv, so it is untested whether the Hugging Face
+      tokenizer of `vit-b-16-siglip` loads offline and whether the files `model_cached`
+      checks (`tokenizer_config.json` plus `tokenizer.json` or `spiece.model`, and the
+      weights) are enough. The fallback after an incomplete cache (`load_with_hub_fallback`)
+      and the first download into an empty cache were covered by unit tests only, since a
+      real run downloads at least 605 MB. Verify on the home PC (P10 A, next to E34) and
+      fix what shows up. Found in the PR of E16.
 
 ### App (`app.py`)
 
