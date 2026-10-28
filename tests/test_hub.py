@@ -77,6 +77,18 @@ def test_an_unreadable_ref_or_a_path_outside_the_snapshots_is_not_cached(tmp_pat
     assert not hub_file_cached(tmp_path, 'org/model', ('w',))
 
 
+@pytest.mark.parametrize('ref', ['..', '.'])
+def test_a_dot_ref_is_not_cached(tmp_path, ref):
+    # review: Path('..').name == '..', so the name check alone lets it through
+    folder = tmp_path / 'models--org--model'
+    (folder / 'refs').mkdir(parents=True)
+    (folder / 'snapshots').mkdir()
+    (folder / 'refs' / 'main').write_text(ref, encoding='utf-8')
+    (folder / 'w').write_bytes(b'w')  # snapshots/.. is the repo folder itself
+    (folder / 'snapshots' / 'w').write_bytes(b'w')  # snapshots/. is the snapshots folder
+    assert not hub_file_cached(tmp_path, 'org/model', ('w',))
+
+
 def test_the_default_model_is_cached_with_its_safetensors_or_bin_weights(tmp_path):
     assert not model_cached(DEFAULT, tmp_path)
     cache_file(tmp_path, DEFAULT.weights_repo, 'open_clip_pytorch_model.bin')
