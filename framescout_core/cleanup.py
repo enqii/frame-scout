@@ -37,9 +37,10 @@ CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missi
                       'cache_other', 'cache_models', 'references')
 # the categories of cache rows (deleted by signature, except cache_missing: by path and signature)
 CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
-# selected when a scan is shown; marks of unbound photos (user data), reference images, rows
+# selected when a scan is shown; cache rows and marks of unbound photos (any folder searched so
+# far; a drive letter another disk got makes photos look unbound, A35), reference images, rows
 # of other current settings and rows of other search models (E22) are not
-CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': True,
+CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': False,
                     'marks_unbound': False, 'cache_old': True, 'cache_other': False, 'cache_models': False,
                     'references': False}
 # seconds the reachability probe of the drive and share roots may take (all roots together); a

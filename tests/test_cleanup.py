@@ -223,7 +223,9 @@ def test_rows_of_photos_that_no_longer_exist_anywhere_are_unbound(project):
     scan = project.scan()
     assert sorted(scan['cache_missing']['items']) == sorted(
         [(str(gone), CURRENT), (str(gone), OLD), (str(moved), OTHER), (str(vanished), CURRENT)])
-    assert scan['cache_missing']['rows'] == 4 and scan['cache_missing']['default'] is True
+    # not selected by default: it covers every folder searched so far, and a drive letter
+    # another disk got since makes the earlier disk's photos look unbound (A35, user decision)
+    assert scan['cache_missing']['rows'] == 4 and scan['cache_missing']['default'] is False
     assert scan['cache_missing']['problem'] is None and scan['cache_missing']['notes'] == []
     # the folders are named before the deletion, fullest first (review, A35: e.g. a drive
     # letter another disk got since)
