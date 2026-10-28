@@ -326,12 +326,14 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       `framescout_core.import_open_clip`, which sets `HF_HUB_OFFLINE=1` before the import
       when `model_cached` finds every Hub file of the model in the cache (the weights and,
       for SigLIP, the tokenizer files in the snapshot of `refs/main`) and the user set
-      neither `HF_HUB_OFFLINE` nor `TRANSFORMERS_OFFLINE`. If loading fails offline,
+      neither `HF_HUB_OFFLINE` nor `TRANSFORMERS_OFFLINE` (also on the constants of an
+      already imported huggingface_hub). If loading fails offline because a cache file is
+      missing (`hub_file_error`; other errors are raised as they are),
       `load_with_hub_fallback` prints a note, goes online and loads again; an uncached model
       loads online as before. The variables are set in the engine process, so the `.bat`
       files and `app.py` are unchanged. Checked with the default model, CPU, network blocked
-      by a dead proxy: no Hub lines. Not run: the first download, the fallback with real
-      files and SigLIP offline (E38). See `docs/ARCHITECTURE.md` → "Environment variables
+      by a dead proxy: no Hub lines; SigLIP loaded offline from the cache in a Python check.
+      Not run: the first download and the fallback with real files (E38). See `docs/ARCHITECTURE.md` → "Environment variables
       and caches".)
 - [x] **E31 – Every search contacts the Hugging Face Hub:** loading the CLIP weights with
       open_clip goes through `huggingface_hub`, which asks the Hub for the model files on
