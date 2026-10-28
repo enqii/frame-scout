@@ -137,3 +137,27 @@ def test_a_hugging_face_tokenizer_is_declared_as_an_extra_package(key):
     model = MODELS[key]
     uses_hf = bool(open_clip.get_model_config(model.name)['text_cfg'].get('hf_tokenizer_name'))
     assert ('transformers' in model.requires) == uses_hf
+
+
+def test_every_model_names_its_hub_repositories():
+    # the engine checks them in the cache to load the model without a Hub request (E16)
+    for model in MODELS.values():
+        assert re.fullmatch(r'[\w.-]+/[\w.-]+', model.weights_repo), model.key
+        assert model.tokenizer_repo == '' or re.fullmatch(r'[\w.-]+/[\w.-]+', model.tokenizer_repo), model.key
+
+
+@pytest.mark.parametrize('key', MODEL_KEYS)
+def test_the_hub_repositories_match_the_open_clip_config(key):
+    open_clip = open_clip_or_skip()
+    from open_clip.pretrained import get_pretrained_cfg
+    model = MODELS[key]
+    # a trailing "/" means open_clip's default weights file names (framescout_core.WEIGHTS_FILES)
+    assert get_pretrained_cfg(model.name, model.pretrained)['hf_hub'] == model.weights_repo + '/'
+    assert open_clip.get_model_config(model.name)['text_cfg'].get('hf_tokenizer_name', '') == model.tokenizer_repo
+
+
+def test_the_weights_file_names_are_the_ones_of_open_clip():
+    open_clip_or_skip()
+    from open_clip.constants import HF_SAFE_WEIGHTS_NAME, HF_WEIGHTS_NAME
+    from framescout_core import WEIGHTS_FILES
+    assert WEIGHTS_FILES == (HF_SAFE_WEIGHTS_NAME, HF_WEIGHTS_NAME)
