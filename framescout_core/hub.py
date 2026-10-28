@@ -56,36 +56,51 @@ def model_cached(model, cache):
                                            for names in TOKENIZER_FILES)
 
 
-def import_open_clip(environ, import_module, model, cache=None):
+def _set_hub_constants(modules, values):
+    """Set the huggingface_hub constants values (name: bool) if huggingface_hub is imported already.
+
+    huggingface_hub reads its constants on every request (constants.is_offline_mode(),
+    constants.HF_HUB_DISABLE_SYMLINKS_WARNING); older transformers versions keep their own
+    copy of the offline flag (_is_offline_mode), which is switched as well when it exists.
+    """
+    constants = modules.get('huggingface_hub.constants')
+    if constants is not None:
+        for name, value in values.items():
+            setattr(constants, name, value)
+    transformers_hub = modules.get('transformers.utils.hub')
+    if 'HF_HUB_OFFLINE' in values and transformers_hub is not None and hasattr(transformers_hub, '_is_offline_mode'):
+        transformers_hub._is_offline_mode = values['HF_HUB_OFFLINE']
+
+
+def import_open_clip(environ, import_module, model, cache=None, modules=None):
     """Import open_clip, offline when the model is cached; return (open_clip, offline).
 
     environ is os.environ, import_module is importlib.import_module and model the SearchModel
     to load; cache is the Hub cache folder (default: the one of environ). Offline mode is
     turned on only if the user set neither HF_HUB_OFFLINE nor TRANSFORMERS_OFFLINE; then
     offline is True and a failed load may go online again (load_with_hub_fallback).
+    modules is sys.modules: if something imported huggingface_hub before, it has read the
+    variables already, so its constants are set as well.
     """
+    values = {}
     for name, value in HUB_QUIET_ENV.items():
-        environ.setdefault(name, value)
+        if name not in environ:
+            environ[name] = value
+            values[name] = True
     offline = (not any(name in environ for name in OFFLINE_VARIABLES)
                and model_cached(model, hub_cache_dir(environ) if cache is None else cache))
     if offline:
         environ['HF_HUB_OFFLINE'] = '1'
+        values['HF_HUB_OFFLINE'] = True
+    if modules is not None:
+        _set_hub_constants(modules, values)
     return import_module('open_clip'), offline
 
 
 def hub_go_online(environ, modules):
-    """Turn offline mode off again in environ and in the imported libraries (modules is sys.modules).
-
-    huggingface_hub checks its constant on every request; older transformers versions keep
-    their own copy, which is switched as well when it exists.
-    """
+    """Turn offline mode off again in environ and in the imported libraries (modules is sys.modules)."""
     environ['HF_HUB_OFFLINE'] = '0'
-    constants = modules.get('huggingface_hub.constants')
-    if constants is not None:
-        constants.HF_HUB_OFFLINE = False
-    transformers_hub = modules.get('transformers.utils.hub')
-    if transformers_hub is not None and hasattr(transformers_hub, '_is_offline_mode'):
-        transformers_hub._is_offline_mode = False
+    _set_hub_constants(modules, {'HF_HUB_OFFLINE': False})
 
 
 def hub_file_error(exc):

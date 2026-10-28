@@ -1,14 +1,18 @@
 """Hugging Face Hub access of the search models: offline once cached, no symlink warning (E16, E33)."""
+import subprocess
+import sys
+import textwrap
 import types
 from pathlib import Path
 
 import pytest
 
-from framescout_core import (HUB_QUIET_ENV, MODELS, hub_cache_dir, hub_file_cached, hub_go_online,
+from framescout_core import (HUB_QUIET_ENV, MODELS, OFFLINE_VARIABLES, hub_cache_dir, hub_file_cached, hub_go_online,
                              hub_file_error, import_open_clip, load_with_hub_fallback, model_cached)
 
 DEFAULT = MODELS['vit-b-32-openai']
 SIGLIP = MODELS['vit-b-16-siglip']
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def cache_file(cache, repo, filename, revision='abc123', ref=True):
@@ -157,6 +161,52 @@ def test_the_cache_folder_defaults_to_the_one_of_the_environment(tmp_path):
     environ = {'HF_HOME': str(tmp_path)}
     _, offline = import_open_clip(environ, lambda name: importer(name, environ), DEFAULT)
     assert offline
+
+
+def test_a_hub_library_imported_before_gets_the_values_as_well(tmp_path):
+    # review: huggingface_hub reads the variables on import, so an earlier import would ignore them
+    cache_file(tmp_path, DEFAULT.weights_repo, 'open_clip_model.safetensors')
+    hub = types.SimpleNamespace(HF_HUB_OFFLINE=False, HF_HUB_DISABLE_SYMLINKS_WARNING=False,
+                                HF_HUB_DISABLE_TELEMETRY=False)
+    transformers_hub = types.SimpleNamespace(_is_offline_mode=False)
+    modules = {'huggingface_hub.constants': hub, 'transformers.utils.hub': transformers_hub}
+    environ = {'HF_HUB_DISABLE_TELEMETRY': '0'}
+    _, offline = import_open_clip(environ, lambda name: types.SimpleNamespace(), DEFAULT, cache=tmp_path,
+                                  modules=modules)
+    assert offline and hub.HF_HUB_OFFLINE is True and transformers_hub._is_offline_mode is True
+    assert hub.HF_HUB_DISABLE_SYMLINKS_WARNING is True
+    assert hub.HF_HUB_DISABLE_TELEMETRY is False  # the user set it
+
+
+def test_an_online_import_leaves_the_offline_flag_of_an_imported_hub_alone(tmp_path):
+    hub = types.SimpleNamespace(HF_HUB_OFFLINE=False)
+    _, offline = import_open_clip({}, lambda name: types.SimpleNamespace(), DEFAULT, cache=tmp_path,
+                                  modules={'huggingface_hub.constants': hub})
+    assert not offline and hub.HF_HUB_OFFLINE is False
+
+
+def test_the_real_huggingface_hub_follows_the_offline_switch(tmp_path):
+    # review: checks that the installed huggingface_hub reads the flags that are switched
+    # (skipped without huggingface_hub, e.g. in CI); a fresh process keeps os.environ clean
+    pytest.importorskip('huggingface_hub')
+    cache_file(tmp_path, DEFAULT.weights_repo, 'open_clip_model.safetensors')
+    script = textwrap.dedent(f'''
+        import os, sys, types
+        for name in {OFFLINE_VARIABLES!r} + ('HF_HUB_DISABLE_SYMLINKS_WARNING',):
+            os.environ.pop(name, None)
+        from huggingface_hub import constants
+        from framescout_core import MODELS, import_open_clip, hub_go_online
+        assert not constants.is_offline_mode()
+        model = MODELS['vit-b-32-openai']
+        _, offline = import_open_clip(os.environ, lambda name: types.SimpleNamespace(), model,
+                                      cache={str(tmp_path)!r}, modules=sys.modules)
+        assert offline and constants.is_offline_mode() and constants.HF_HUB_DISABLE_SYMLINKS_WARNING
+        hub_go_online(os.environ, sys.modules)
+        assert not constants.is_offline_mode()
+        print('ok')
+    ''')
+    result = subprocess.run([sys.executable, '-c', script], cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0 and result.stdout.strip() == 'ok', result.stderr
 
 
 # --- falling back to a download ---
