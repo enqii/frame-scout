@@ -82,7 +82,9 @@ CLEANUP_LABELS = {
     'cache_missing': ('Cache entries of unbound photos',
                       'Analyses of photos that no longer exist at their path: deleted, renamed or moved, in any '
                       'folder searched so far (a renamed or moved photo is analyzed again as a new photo). Photos '
-                      'on a drive or network share that is not reachable now are not checked.'),
+                      'on a drive or network share that is not reachable now are not checked. Check the folders '
+                      'listed below: if a drive letter now belongs to another disk, the photos of the earlier disk '
+                      'look unbound too.'),
     'marks_unbound': ('Marks of unbound photos',
                       'Your match/no-match marks of photos that no longer exist at their path (deleted, renamed or '
                       'moved). They are kept in case the photos come back. Deleting removes only these marks from '

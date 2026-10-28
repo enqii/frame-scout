@@ -380,8 +380,24 @@ def _unbound_rows(rows, check, among=None):
     # each photo is looked at once, however many signatures it has (review)
     gone, unchecked = check.result({path for path, _, _ in rows})
     dead = [(path, signature, size or 0) for path, signature, size in rows if path in gone]
-    return _category('cache_missing', sorted((p, s) for p, s, _ in dead), sum(size for *_, size in dead),
-                     rows=len(dead), notes=_unchecked_notes(unchecked))
+    category = _category('cache_missing', sorted((p, s) for p, s, _ in dead), sum(size for *_, size in dead),
+                         rows=len(dead), notes=_unchecked_notes(unchecked))
+    category['names'] = _gone_folders({path for path, _, _ in dead})
+    return category
+
+
+def _gone_folders(photos):
+    """The folders of photos, fullest first, e.g. "D:\\Photos\\2020 (1,234 photos)".
+
+    Shown before the deletion, so that e.g. the folders of an earlier disk whose drive
+    letter another disk got are seen before their rows are deleted (review, A35).
+    """
+    counts = {}
+    for photo in photos:
+        folder = os.path.dirname(photo)
+        counts[folder] = counts.get(folder, 0) + 1
+    return [f'{folder} ({count_text(count, "photo", "photos")})'
+            for folder, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))]
 
 
 def _attempt(read):
