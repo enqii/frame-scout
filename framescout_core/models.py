@@ -14,7 +14,11 @@ class SearchModel:
     edge in pixels (tested against the OpenCLIP config; the engine's fallback for the draft
     size); requires: Python packages (import names) the model needs beyond
     requirements.txt of v1.1; multilingual: understands search terms in other languages
-    than English (none yet, E21); evaluated: its search quality was measured (E20).
+    than English (none yet, E21); evaluated: its search quality was measured (E20);
+    weights_repo and tokenizer_repo: the Hugging Face Hub repositories open_clip loads the
+    weights and a Hugging Face tokenizer from ('' = open_clip's built-in tokenizer; tested
+    against the OpenCLIP config), which the engine checks in the cache to load the model
+    offline (E16).
     """
     key: str
     name: str
@@ -26,6 +30,8 @@ class SearchModel:
     requires: tuple = ()
     multilingual: bool = False
     evaluated: bool = False
+    weights_repo: str = ''
+    tokenizer_repo: str = ''
 
 
 # The default comes first. User decisions: the default stays OpenAI CLIP ViT-B/32 (PR #13);
@@ -34,13 +40,14 @@ class SearchModel:
 # trained with QuickGELU, so the "-quickgelu" config (E1).
 MODELS = {model.key: model for model in (
     SearchModel('vit-b-32-openai', 'ViT-B-32-quickgelu', 'openai', 'ViT-B/32 · OpenAI CLIP', '605 MB', '1×',
-                224, evaluated=True),
+                224, evaluated=True, weights_repo='timm/vit_base_patch32_clip_224.openai'),
     SearchModel('vit-b-16-datacomp', 'ViT-B-16', 'datacomp_xl_s13b_b90k', 'ViT-B/16 · DataComp-XL', '599 MB', '~4×',
-                224),
+                224, weights_repo='laion/CLIP-ViT-B-16-DataComp.XL-s13B-b90K'),
     SearchModel('vit-l-14-datacomp', 'ViT-L-14', 'datacomp_xl_s13b_b90k', 'ViT-L/14 · DataComp-XL', '1.71 GB', '~18×',
-                224),
+                224, weights_repo='laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K'),
     SearchModel('vit-b-16-siglip', 'ViT-B-16-SigLIP', 'webli', 'ViT-B/16 · SigLIP WebLI', '813 MB', '~4×',
-                224, requires=('transformers',)),
+                224, requires=('transformers',), weights_repo='timm/ViT-B-16-SigLIP',
+                tokenizer_repo='timm/ViT-B-16-SigLIP'),
 )}
 DEFAULT_MODEL = 'vit-b-32-openai'
 # the choices of --model and of the app's selectbox, the default first
