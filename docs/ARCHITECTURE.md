@@ -39,6 +39,10 @@ run:** `framescout_eval.py run` with real models, the engine's `--scores-file` i
 search, the page's keyboard and click handling in a real browser (E34), originals that a
 browser cannot display (E35), macOS/Linux.
 
+Offline loading (E16/E31/E33, P7 A): a CPU engine smoke run with the cached default model
+and the network blocked finished without Hub requests. The first download, the fallback
+after an incomplete cache and SigLIP offline are **not runtime-tested** (E38).
+
 ## Files and responsibilities
 
 ### `app.py`
@@ -132,7 +136,12 @@ the module of its area and to the re-exports in `__init__.py`.
   weights, label, download size, CPU factor, image size, `requires`, `multilingual`
   (for E21; none is), `evaluated`; `results_model` reads the model key of a search from
   its `results.json` settings). The only place of the models' OpenCLIP names, the
-  default's too.
+  default's too. Since E16 each model also names `weights_repo` and `tokenizer_repo`
+  (the Hugging Face Hub repositories open_clip loads the weights and a Hugging Face
+  tokenizer from; `''` = built-in tokenizer; tested against open_clip's config).
+- `hub.py` (E16/E31/E33): `HUB_QUIET_ENV`/`WEIGHTS_FILES`/`TOKENIZER_FILES`/`OFFLINE_VARIABLES`/`hub_cache_dir`/`hub_file_cached`/`model_cached`/`import_open_clip`/`hub_go_online`/`load_with_hub_fallback`
+  (loading a search model without a Hub request once it is cached; see "Environment
+  variables and caches").
 - `signature.py`: `ENGINE_TEMPLATE`/`engine_id`/`ENGINE`/`MODEL_ENGINES`/`feature_signature`
   (the engine id per search model and the feature cache signature, E1/E22),
   `CACHE_FILE`/`DEFAULT_YOLO_MODEL`/`prepare_cache`/`known_signatures`/`SLIDER_NOISE_ULPS`/`classify_signatures`
@@ -467,8 +476,9 @@ weights need QuickGELU, plain `ViT-B-32` would run them with GELU, E1). Optional
 evaluated** (E32): `vit-b-16-datacomp` (`ViT-B-16`, `datacomp_xl_s13b_b90k`),
 `vit-l-14-datacomp` (`ViT-L-14`, same weights) and `vit-b-16-siglip` (`ViT-B-16-SigLIP`,
 `webli`; needs `transformers` for its tokenizer, `SearchModel.requires`). The engine
-checks `model_problem` before the scan (`parser.error`), loads the model and the tokenizer
-of that name, takes the draft size from `model.visual.image_size` (falling back to the
+checks `model_problem` before the scan (`parser.error`), imports open_clip through
+`import_open_clip` (offline when the model is cached, E16; no module-level import), loads
+the model and the tokenizer of that name through `load_with_hub_fallback`, takes the draft size from `model.visual.image_size` (falling back to the
 registry's `image_size`) and logs `search model: <label> (<name>/<pretrained>)`. Its
 stdout/stderr escape characters they cannot encode (`errors='backslashreplace'`, e.g. the
 "·" of a label on a redirected cp932 stdout; E22 review). The
@@ -1031,6 +1041,36 @@ imported, which happens on `import ultralytics`). The variables stay set for the
 the engine process; the engine starts no subprocesses that would inherit them. A later Ultralytics version may rename these switches; check them when
 raising its minimum version.
 
+**Search models without a Hub request once cached (E16, E31, E33):** open_clip loads the
+weights (and SigLIP its tokenizer) through `huggingface_hub`, which asks the Hub for the
+file on every run even when it is cached. The engine imports open_clip only through
+`framescout_core.import_open_clip` (a test checks there is no direct import of open_clip,
+`huggingface_hub`, `transformers` or `timm` in `framescout_engine.py`), because
+`huggingface_hub` reads its variables when it is imported:
+- `HF_HUB_DISABLE_SYMLINKS_WARNING=1` and `HF_HUB_DISABLE_TELEMETRY=1` are set with
+  `setdefault` (a value the user set wins): no "cache-system uses symlinks" warning in
+  `run.log` on Windows without Developer Mode (the files are stored as copies either way).
+- `HF_HUB_OFFLINE=1` is set when `model_cached` finds every Hub file of the model in the
+  cache: the snapshot that `refs/main` names holds the weights (`WEIGHTS_FILES`,
+  safetensors or bin) and, for SigLIP, `tokenizer_config.json` plus `tokenizer.json` or
+  `spiece.model`. The cache folder is found like `huggingface_hub.constants` does
+  (`hub_cache_dir`: `HF_HUB_CACHE`, `HUGGINGFACE_HUB_CACHE`, `HF_HOME`, `XDG_CACHE_HOME`,
+  `~/.cache`). If the user set `HF_HUB_OFFLINE` or `TRANSFORMERS_OFFLINE` (any value),
+  offline mode is left alone.
+- If loading fails in offline mode (an incomplete cache), `load_with_hub_fallback` prints
+  a note, `hub_go_online` switches the environment, `huggingface_hub.constants` and an
+  older transformers' `_is_offline_mode` back online, and loads again, which downloads the
+  missing files. An uncached model is loaded online as before, so the first download is
+  unchanged. The variables apply to app, `.bat`, manual CLI and eval-tool runs alike.
+
+Checked on the default model (ViT-B/32, cached in the main checkout's `.cache/`, CPU, 3
+synthetic photos): with the network blocked by a dead proxy the search finished without Hub
+lines (3.9 s; 5.8 s with `HF_HUB_OFFLINE=0` forced); with the network, no "HF Hub" or
+symlink line appeared, and with `HF_HUB_OFFLINE=0` forced the unauthenticated-requests
+warning came back. **Not run:** a first download into an empty cache and the fallback after
+an incomplete cache with real files (each downloads at least 605 MB; unit tests only), and
+SigLIP offline (E38).
+
 ## Test coverage and known quirks
 
 ### Test coverage
@@ -1055,7 +1095,12 @@ model registry, the per-model signatures and cleanup category and the `model` se
 (E22, `test_models.py`; the engine's `--model`, its `stdout.reconfigure` and the app's
 `PYTHONIOENCODING` only from their syntax trees, `test_engine_defaults.py`; the app's
 selectbox, its disabled Start, the results note and the dropped cleanup scan are not
-unit-tested), and the evaluation tooling (E32: `test_evaluation.py` for the formats, AP@k
+unit-tested), the offline loading of cached models (E16: `test_hub.py` with fake cache
+layouts, environments and a failing loader; the registry's repositories against open_clip's
+config in `test_models.py`, skipped without open_clip; the engine's use of
+`import_open_clip` and the fallback only from its syntax tree in
+`test_engine_defaults.py`; no first download, no fallback with real files, no SigLIP
+offline, E38), and the evaluation tooling (E32: `test_evaluation.py` for the formats, AP@k
 and the pool; `test_eval_tool.py` for the tool's commands, metrics and labelling server
 with fake scores; the engine's `--scores-file` only from its syntax tree in
 `test_engine_defaults.py`; no real-model run, no browser test), and the pinned
