@@ -225,6 +225,10 @@ def test_rows_of_photos_that_no_longer_exist_anywhere_are_unbound(project):
         [(str(gone), CURRENT), (str(gone), OLD), (str(moved), OTHER), (str(vanished), CURRENT)])
     assert scan['cache_missing']['rows'] == 4 and scan['cache_missing']['default'] is True
     assert scan['cache_missing']['problem'] is None and scan['cache_missing']['notes'] == []
+    # the folders are named before the deletion, fullest first (review, A35: e.g. a drive
+    # letter another disk got since)
+    assert scan['cache_missing']['names'] == [
+        f'{elsewhere} (1 photo)', f'{project.photos / "sub"} (1 photo)', f'{vanished.parent} (1 photo)']
     summary = project.clean(scan, {'cache_missing'})
     assert summary['rows'] == 4 and project.rows() == sorted([(str(kept), CURRENT), (str(earlier), CURRENT)])
 
@@ -375,6 +379,7 @@ def test_many_names_a_listing_does_not_hold_need_only_a_few_stats(project, monke
     monkeypatch.setattr(cleanup, '_missing', lambda path: stated.append(path) or real(path))
     assert project.scan()['cache_missing']['rows'] == 29
     assert len(stated) == 2 * cleanup._STAT_UP_TO  # the pass and the second look at the gone photos
+    assert project.scan()['cache_missing']['names'] == [f'{project.photos} (29 photos)']
 
 
 def test_a_listing_that_spells_names_differently_is_checked_by_a_stat_each(project, monkeypatch):
