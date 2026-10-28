@@ -276,6 +276,25 @@ def test_a_root_that_goes_offline_during_the_check_is_not_checked(project, monke
     assert scan['cache_missing']['items'] == [] and len(scan['cache_missing']['notes']) == 1
 
 
+def test_a_share_that_drops_during_the_check_and_is_back_keeps_its_photos(project, monkeypatch):
+    # the folder listing fails while the share is away; by the second probe it is back (review)
+    names = [f'IMG_{n}.jpg' for n in range(6)]
+    for name in names:
+        project.photo(name)
+    project.cache([(project.photos / name, CURRENT) for name in names])
+    real, failures = os.listdir, [1]
+
+    def listdir(path):
+        if failures and os.path.normcase(str(path)) == os.path.normcase(str(project.photos)):
+            failures.pop()
+            raise FileNotFoundError('the network path was not found')
+        return real(path)
+
+    monkeypatch.setattr(os, 'listdir', listdir)
+    scan = project.scan()
+    assert not failures and scan['cache_missing']['items'] == [] and scan['cache_missing']['notes'] == []
+
+
 @pytest.mark.skipif(os.name != 'nt', reason='drive letters are a Windows feature')
 def test_rows_on_a_drive_letter_that_is_not_there_are_not_checked(project):
     free = [letter for letter in 'QRSTUVWXYZ' if not os.path.exists(letter + ':\\')]
@@ -339,8 +358,9 @@ def test_a_folder_with_many_rows_is_listed_once(project, monkeypatch):
     scan = project.scan()
     assert sorted(scan['cache_missing']['items']) == [(str(project.photos / n), CURRENT) for n in names[8:]]
     assert [os.path.normcase(p) for p in listed].count(os.path.normcase(str(project.photos))) == 1
-    # a name the listing does not hold is confirmed by its own stat
-    assert sorted(stated) == [str(project.photos / n) for n in names[8:]]
+    # a name the listing does not hold is confirmed by its own stat (once more after the
+    # pass, as it is gone)
+    assert sorted(stated) == sorted([str(project.photos / n) for n in names[8:]] * 2)
 
 
 def test_many_names_a_listing_does_not_hold_need_only_a_few_stats(project, monkeypatch):
@@ -354,7 +374,7 @@ def test_many_names_a_listing_does_not_hold_need_only_a_few_stats(project, monke
     real = cleanup._missing
     monkeypatch.setattr(cleanup, '_missing', lambda path: stated.append(path) or real(path))
     assert project.scan()['cache_missing']['rows'] == 29
-    assert len(stated) == cleanup._STAT_UP_TO
+    assert len(stated) == 2 * cleanup._STAT_UP_TO  # the pass and the second look at the gone photos
 
 
 def test_a_listing_that_spells_names_differently_is_checked_by_a_stat_each(project, monkeypatch):
@@ -827,7 +847,7 @@ def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, mo
     real = framescout_core.cleanup._missing
     monkeypatch.setattr(framescout_core.cleanup, '_missing', lambda path: calls.append(path) or real(path))
     assert project.scan()['cache_missing']['rows'] == 3
-    assert calls == [str(gone)]
+    assert calls == [str(gone)] * 2  # once in the pass, once more as it is gone
 
 
 def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):
