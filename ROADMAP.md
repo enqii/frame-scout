@@ -15,8 +15,9 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       folder (A8, A22; user decision, a stable profile id would be a `profiles.json`
       schema change = hold point) (done 2026-10-27, with A33 from its review; open
       follow-up: A34)
-- [ ] (C) Marks and cache follow the path relative to the photo folder (E8, A21; changes
-      cache keys and `marks.json`: a migration and a hold point)
+- [x] (C) Clean up unbound cache rows and marks (E8, A21; user decision 2026-10-28:
+      renamed/moved photos count as new, no migration; open follow-ups: E37, A35)
+      (done 2026-10-28)
 
 ### P7 – Offline and nothing outside the project folder
 - [ ] (A) No Hugging Face Hub request per search once the weights are cached, no symlink

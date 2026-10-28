@@ -284,9 +284,11 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
   its path in that folder, e.g. `Event2024\sub\img.jpg`; folders with the same name get
   more of their path. A search of one folder shows only the path in that folder.
 - `results/marks.json` holds your marks (Match / No match per profile and photo); the
-  search never changes it, and "Clean up storage" never deletes it. It is your data:
-  keep it when you clean up the `results` folder by hand (deleting it removes all marks). Marks belong to the full path of a photo, so
-  they no longer apply after you move or rename a photo folder.
+  search never changes it, and "Clean up storage" never deletes the file (it removes only
+  marks of photos that no longer exist, and only if you select "Marks of unbound photos").
+  It is your data: keep it when you clean up the `results` folder by hand (deleting it
+  removes all marks). Marks belong to the full path of a photo, so they no longer apply
+  after you move or rename a photo or folder (it counts as a new photo).
   Marks belong to the profile name: deleting a profile asks first and then deletes its
   marks (the question names how many there are); marks of profiles deleted by an earlier
   version stay in the file and a new profile with the same name takes them over.
@@ -326,14 +328,20 @@ images you removed from profiles are never deleted silently. **Search & results 
 Clean up storage** lists them: click **Scan** (it only looks), check the categories
 you want to delete, click **Delete selected** and confirm. Deleting is **permanent**:
 nothing goes to the Recycle Bin. Scanning and deleting are not possible while a search
-runs, and no search can start while the cleanup deletes.
+runs, and no search can start while the cleanup deletes. The scan checks which photos
+still exist, which can take a while with many photos (a progress bar shows it).
+
+Renaming or moving photos or folders counts as new photos: they are analyzed again, and
+the old analyses and marks no longer apply. They stay in case the files come back, and
+the cleanup lists them as "unbound".
 
 | Category | Selected after a scan | What it is |
 |---|---|---|
 | Temporary thumbnail files | yes | Left by a search stopped while it wrote the galleries |
 | Galleries of renamed or deleted profiles | yes | FrameScout HTML galleries in `results/` that belong neither to a current profile nor to the last search (the file names are listed) |
 | Thumbnails no gallery shows | yes | Thumbnails neither the last search nor a kept gallery shows, also in the old `vorschaubilder/` folder; those only the galleries above show go together with them |
-| Cache entries of deleted photos | yes | Analyses of photos inside the **current** photo folders that no longer exist; only in listed folders that exist, so a disconnected drive is never cleaned (it is named in a note) |
+| Cache entries of unbound photos | yes | Analyses of photos that no longer exist at their path (deleted, renamed or moved), in any folder searched so far. Photos on a drive or network share that is not reachable now are not checked (named in a note) |
+| Marks of unbound photos | no | Your match/no-match marks of photos that no longer exist at their path. Deleting removes only these marks, never `marks.json` itself or other marks; the whole category is one checkbox, you cannot pick single marks |
 | Cache entries of older versions or unknown settings | yes | Analyses of an earlier FrameScout version (never used again) or of settings only the command line offers (e.g. another `--yolo-model`) |
 | Cache entries of other AI settings | no | Analyses with other person detection settings; they are used again when you switch back, so deleting them means analyzing those photos again then |
 | Cache entries of other search models | no | Analyses made with another search model than the selected one; they are used again when you switch back, so deleting them means analyzing those photos again then |
@@ -341,7 +349,7 @@ runs, and no search can start while the cleanup deletes.
 
 "Compact cache.sqlite3 afterwards" (on by default) shrinks the cache file after
 entries were deleted; without it the file keeps its size and reuses the space. After
-changing the AI settings or photo folders, scan again. Caution with an older FrameScout
+changing the AI settings, scan again. Caution with an older FrameScout
 version (before the search model choice) on the same `results/` folder, e.g. an older copy
 on another PC: its cleanup counts the analyses of the optional search models as "older
 versions" and selects them, so clear that box there if you want to keep them. Only
@@ -349,7 +357,7 @@ what the scan listed and is still unused at the moment of deleting is deleted: e
 reference image a profile uses since the scan stays. Galleries and thumbnails are not
 offered while `results.json` or `profiles.json` cannot be read, reference images not
 while `profiles.json` or `profiles.json.bak` cannot be read. Never deleted:
-`results/marks.json` (your marks), `results.json`, `run.lock`, `run-status.json`, the
+`results/marks.json` (the file; only the marks of unbound photos in it, when you select that category), `results.json`, `run.lock`, `run-status.json`, the
 cache file itself, `settings.json`, `profiles.json` and `profiles.json.bak`, and of
 course your photos. While the cleanup deletes, another open tab says so and cannot
 start a search. If a step fails (e.g. a folder that cannot be read), the summary names

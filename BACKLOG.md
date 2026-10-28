@@ -16,8 +16,6 @@ and discussions.
 
 ### Engine (`framescout_engine.py`)
 
-- [ ] **E8 – Cache key = absolute path:** moving the photo folder forces a complete
-      recomputation.
 - [ ] **E9 – `yolo11n.pt` ends up in the project root** instead of `.cache/`; not documented.
 - [ ] **E12 – Skipped photos leave gaps in the gallery:** a photo whose thumbnail fails
       (deleted since scoring, unreadable) is skipped after the top-N cut, so the gallery
@@ -190,6 +188,13 @@ and discussions.
       the README asks for a new profile name instead. Fix idea: store each profile's
       context, features and reference images in `labels.json` when a label is set and warn
       in `pool`/`metrics` when they differ. Found in the review of PR #32 (E32).
+- [ ] **E37 – The unbound check guards only the root probe with a timeout:** a folder
+      listing or `stat` on a share that hangs during the pass stalls the scan (the page
+      run) until the OS gives up; a junction or mount point inside a reachable root that
+      leads to a disconnected volume can make its photos look gone (the deletion
+      re-checks, but the volume would have to be back by then). Idea: run the pass in a
+      worker thread with a per-folder timeout, or treat folders on other volumes than
+      their root as their own root. Found in the PR of E8.
 
 ### App (`app.py`)
 
@@ -239,13 +244,6 @@ and discussions.
       marked as no match as "not this" examples of a profile, e.g. by lowering the score
       of photos similar to the rejects. This changes search quality, so it needs a local
       evaluation set first (hold point). Out of scope of P4 (B) (user decision on A17).
-- [ ] **A21 – Marks follow the absolute photo path:** `results/marks.json` keys a mark by
-      the photo's full path, like the cache (E8). After moving or renaming the photo folder
-      (or a subfolder, or the photo) the old marks no longer apply: they stay in the file
-      but are not shown, are counted as "not among the results of this search" and fail
-      with "the photo no longer exists" when copied. Fix idea: key by the path relative
-      to the photo folder and match a moved folder, or offer to carry marks over. Found
-      in the PR of A17.
 - [ ] **A24 – "Hide photos marked as no match" reflows the pages; mark buttons look
       alike:** user report on 2026-10-25 after A17. Marking the photos of page 1 and then
       ticking the checkbox shows undecided photos of the following pages on page 1.
@@ -333,6 +331,12 @@ and discussions.
       `marks.json` is in `NEVER_DELETED`. No migration was done. Idea: offer to delete the
       marks of names that are no profile (asking first), or show them when such a profile
       is created. Found in the PR of A22.
+- [ ] **A35 – A drive letter now used by another disk counts as reachable:** e.g. a USB
+      disk that got the letter of an earlier disk, or a network drive mapped to another
+      share; the photos of the earlier disk then look unbound, and "Cache entries of
+      unbound photos" is selected by default (the rows are only recomputed later; marks
+      are not selected by default). Idea: record the volume serial number per root, or
+      name the roots in the confirmation. Found in the PR of E8.
 
 ### Installation / project
 

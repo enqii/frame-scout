@@ -147,8 +147,9 @@ the module of its area and to the re-exports in `__init__.py`.
   (the result file of a search and the app's gallery: validation of the file (plain
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
-- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`
+- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`
   (the user's marks, A17; `delete_marks` removes all marks of a deleted profile, A22;
+  `remove_marks(path, entries)` removes single `(profile, photo path)` marks for the cleanup, E8;
   `save_marks(..., profiles_file=...)` saves only for a name that is a profile now).
 - `copying.py`:
   `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`/`forget_copy_folder`
@@ -156,8 +157,8 @@ the module of its area and to the re-exports in `__init__.py`.
   `forget_copy_folder` removes only the saved entry of a deleted profile, A22;
   `save_copy_folder(..., profiles_file=...)` like `save_marks`).
 - `cleanup.py`:
-  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
-  (the storage cleanup, E7/E11/E13/E23/A14).
+  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`ROOT_TIMEOUT`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
+  (the storage cleanup, E7/E11/E13/E23/A14/E8; the unbound-photo check is the private `_PathCheck`).
 - `portable_python.py` (P5 part C):
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
   the installer downloads into `.python`; constants only, checked against the `.bat` by
@@ -517,12 +518,12 @@ lists. The tab shows the count per existing folder (each scanned once per page r
 before: A6), the notes of `distinct_folders` and a warning per missing folder. "Start
 search" needs one existing folder (from that scan, no second `is_dir`) and passes all
 distinct folders. The copy target check takes the folders of `results.json` and the
-current list; the cleanup takes the distinct resolved list (see "Storage cleanup").
+current list; the cleanup does not depend on the list (E8, see "Storage cleanup").
 Checked in PR #28 with one CPU engine smoke run on synthetic photos under `.tmp/` (two
 folders of the same name, a nested and a missing one; one folder; none existing; output
 equal to a folder; after the review folders between options and a folder inside the
 output folder) and the app with Streamlit's `AppTest` (old `settings.json`, format 1
-`results.json`, editing the list, the cleanup scan with a missing folder listed twice),
+`results.json`, editing the list, the cleanup scan of that time with a missing folder listed twice),
 not in a browser.
 
 ### Photo formats
@@ -777,11 +778,15 @@ the same lock (`_update_locked`, shared with `save_settings`) and ignored by
 
 Marks and copying (A17, user decisions 2026-10-25): `results/marks.json` (`{"format": 1,
 "profiles": {name: {photo path: "match"|"no-match"}}}`; "open" is the absence of a mark)
-is keyed by profile name and the photo path of `results.json` (absolute, A21) and kept
+is keyed by profile name and the photo path of `results.json` (absolute) and kept
 across searches. `save_marks` merges a change into the current file under a `RunLock` on
 `marks.json.lock` and replaces it atomically; an unreadable file is never replaced and the
 app then shows no marks. The file is user data in the results folder: the engine never
-writes it, and a future cleanup (E7/E11/A14) must never delete it. The control on each
+writes it, and the cleanup never deletes the file (`NEVER_DELETED`); it removes single marks of
+unbound photos only when the user selects that category (E8, `remove_marks`: under the
+same marks lock as `save_marks`, a profile left without marks is dropped, an unreadable
+file is never replaced). A21 (marks follow the absolute path) is closed as won't do: a
+renamed or moved photo counts as a new photo, its old mark stays until cleaned up. The control on each
 card is an `st.segmented_control` whose session state is set from the file before it is
 drawn on every run of the gallery fragment (no `default=`), so the file is the truth also
 for other tabs; its `on_change` saves. A rename in the profile tab calls `rename_marks`
@@ -813,7 +818,9 @@ replaced) and `forget_copy_folder` (under the settings lock; writes nothing with
 entry) and drops the session's unsaved copy folder of that name; a different number of
 deleted marks (marked or unmarked since the question was shown) and a part that fails
 are named in the notice at the top of the profile tab. `marks.json` stays in
-`NEVER_DELETED`. Marks that profiles deleted before A22 left behind stay (A34).
+`NEVER_DELETED`. Marks that profiles deleted before A22 left behind stay (A34); marks of
+photos that no longer exist at their path are removed only on request by the cleanup
+category `marks_unbound` (`remove_marks`, see "Storage cleanup").
 `marks.json` and the copy folders are read through `st.cache_data`, keyed by path, mtime,
 size and file id (`version_key`). Copying (`copy_photos`): flat into the target,
 `shutil.copy2` via a temporary file published with `_publish_new` (never replaces a file),
@@ -828,21 +835,24 @@ elsewhere). Using marks as search feedback: A20.
 
 ### Storage cleanup
 
-Cleanup (E7, E11, E13, E23, A14; user decisions at the PR #18 hold point): the expander
+Cleanup (E7, E11, E13, E23, A14, E8; user decisions at the PR #18 hold point): the expander
 "Clean up storage" at the end of the "Search & results" tab. "Scan" (disabled while a
-search runs) calls `scan_cleanup(RESULTS, PROFILES, REFS, photo folders (a list), signature
-of the current settings)` and keeps the result in the session; each category of
+search runs) calls `scan_cleanup(RESULTS, PROFILES, REFS, signature
+of the current settings, `current_model=`)` and keeps the result in the session; each category of
 `CLEANUP_CATEGORIES` is a checkbox (key `cleanup_<category>`, set from `CLEANUP_DEFAULTS`
 at the scan, no `value=`) with count and size, or a caption with the reason it is not
 offered. Categories: `temp_thumbnails`; `galleries` (`*.html` in `results/` with
 `GALLERY_MARKER` in its first 4 KB, neither listed in `results.json` nor `profile_slugs`
 of the current profiles; other HTML files are kept; its `thumbnails` are the thumbnails
 only orphaned galleries link, deleted with them); `thumbnails` (linked by neither
-`results.json` nor any HTML file, both thumbnail folders); `cache_missing` (rows whose
-path is inside one of the current photo folders that exist, compared normcased, and
-certainly does not exist, each path checked once; a listed folder that does not exist is
-left out with a note in the category's `notes`, shown as a caption, and its rows are never
-offered (A25); not offered without an existing photo folder); `cache_old` and
+`results.json` nor any HTML file, both thumbnail folders); `cache_missing` (UI label "Cache entries of unbound photos", default on; the internal
+key kept its name: every cache row whose photo no longer exists at its path, in any folder
+searched so far, E8; rows whose photo still exists are not offered, a path that is not
+absolute is never gone); `marks_unbound` ("Marks of unbound photos", **default off**, after
+`cache_missing` in `CLEANUP_CATEGORIES`; items are `(profile, photo path)` pairs, names
+`"profile: path"`; it is one category checkbox, marks are not chosen one by one; not
+offered with "Not offered: marks.json cannot be read (...)" if the file is unreadable);
+`cache_old` and
 `cache_other` and `cache_models` (`classify_signatures(..., current_engine=)`: the side
 table decides, otherwise `known_signatures`, i.e. the signatures of the default engine id
 of every `max_persons` and every
@@ -852,6 +862,27 @@ with `DEFAULT_YOLO_MODEL`, plus the no-detection signature; the current signatur
 offered). `cache_models` ("Cache entries of other search models", default off, E22) holds
 rows whose recorded engine is that of another registered model, and unrecorded
 `known_signatures` rows when another model is current (those can only be the default's);
+The existence check is `cleanup._PathCheck` (standard library only), shared by the
+cache rows and the marks in **one** pass: one probe per drive or share root
+(`os.path.splitdrive(path)[0] + os.sep`, `os.path.isdir`), all roots in parallel daemon
+threads under one shared timeout `ROOT_TIMEOUT` = 5 s (`_reachable_roots`); a root that is
+not reachable or does not answer in time is **not checked** (its photos are neither gone
+nor offered) and each category gets a note per root ("<root> is not reachable now ... N
+photos there were not checked"). Photos are grouped by folder: a folder with more than
+`_STAT_UP_TO` = 4 photos is listed once (`os.listdir`, names compared normcased) and a
+name missing from the listing is confirmed by its own `stat`; a folder with at most 4
+photos gets one `stat` per photo; a folder that does not exist makes all its photos gone;
+a folder that cannot be listed (e.g. no permission) keeps them. After the pass the roots
+with gone photos are probed again, and a root that dropped meanwhile makes its photos
+count as not checked. Measured on Windows 11 with 30,000 files in 100 folders: stat
+0.12-0.21 s vs listing 0.08-0.11 s locally; through the share `\\localhost\C$` (SMB) 13.8 s vs
+0.19 s. `scan_cleanup(results, profiles_file, refs_root, current_signature, *,
+current_model, progress=None)` has no photo folder parameter any more and calls
+`progress(done, total)` per folder (about 100 calls at most; the app draws "Checking which
+photos still exist ... n of m folders"); `clean_up(results, shown, selected, vacuum,
+alive, profiles_file, refs_root, current_signature, lock_timeout=..., *, current_model)`
+re-checks only the rows and marks the shown scan listed, with one `_PathCheck`, the photos
+before the marks lock is taken; its summary has a `marks` count.
 `scan_cleanup` and `clean_up` require `current_model` (keyword-only: the signature, a
 hash, does not tell the model), `CACHE_CATEGORIES` lists the cache categories. Before E22
 rows of any other engine counted as `cache_old` (selected), and an older FrameScout still
@@ -868,16 +899,22 @@ for a confirmation; `clean_up` takes `results/run.lock` (1 s; refused if held, o
 deletes only items that the shown scan lists and the fresh scan still has: galleries first
 (with the thumbnails only they showed), then thumbnails computed from the links of the
 galleries left on disk (read once), cache rows in one transaction and an optional
-`VACUUM`, then references (profiles read again) with emptied folders below `references/`;
+`VACUUM`, unbound marks (`remove_marks`; a failure goes to "Marks were kept: ..."), then references (profiles read again) with emptied folders below `references/`;
 an emptied `vorschaubilder/` is removed. `_remove_file` refuses every name of
 `NEVER_DELETED` as a guard. All deletes are permanent (no Recycle Bin). Each step
-(temporary thumbnails, galleries and thumbnails, cache rows, references) ends on its own
+(temporary thumbnails, galleries and thumbnails, cache rows, marks, references) ends on its own
 `OSError`/`ValueError`/`sqlite3.Error`, which goes to `skipped`, so the summary always
 counts what was deleted; `delete_storage` also catches what `clean_up` raises. The summary
-(`cleanup_summary_text`: files, cache entries, freed bytes, a note when rows were deleted
+(`cleanup_summary_text`: files, cache entries, marks, freed bytes, a note when rows were deleted
 without `VACUUM`, failures, skipped steps) is shown after a rerun; a Start drops the scan,
 and so does a change of what it was classified for (`cleanup_inputs`: the current
-signature, the search model and the photo folders), with the note "Scan again".
+signature and the search model; the photo folders are not part of it any more, so editing
+the folder list keeps the scan), with the note "The AI settings changed since the scan.
+Scan again."; the scan runs only on the "Scan" click, never on a rerun or a search.
+No migration: a renamed or moved photo is analyzed again as a new photo, and its old
+cache row and mark stay until the user cleans them up (user decision 2026-10-28, E8).
+Open: E37 (a hanging folder listing or `stat` is not guarded by a timeout), A35 (a drive
+letter now used by another disk counts as reachable).
 While `clean_up` holds the lock it registers the results folder in the process
 (`cleanup_running`; app sessions are threads of one process), so other tabs show "The
 storage is being cleaned up" instead of a running search and disable Stop (A23); other
@@ -998,10 +1035,12 @@ target folders (A17) with their deletion with a profile and no saves for a name 
 profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py`, `test_cache_signatures.py`, with real SQLite files) and the photo scan
+`test_cleanup.py` also for unbound rows and marks, unreachable roots simulated by patching
+`_probe_root` and a real unused drive letter, and the listing/stat choice, E8;
+`test_cache_signatures.py`, with real SQLite files) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
-read from its syntax tree, settings migration, results format 1/2, cleanup per folder) are
+read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search
 model registry, the per-model signatures and cleanup category and the `model` setting
 (E22, `test_models.py`; the engine's `--model`, its `stdout.reconfigure` and the app's
@@ -1049,7 +1088,7 @@ and rawpy, which CI does not install). Add a small integration smoke test for re
 Potential current quirks to investigate rather than assume solved (most are tracked in
 `BACKLOG.md`): "Clean up storage" was checked with `AppTest` only (not in a browser), and
 `auto_cleanup` in one CPU smoke run with synthetic photos under `.tmp/`; marks follow the
-absolute photo path (A21); the app saves its whole profile list, so a save based on a
+absolute photo path, a renamed or moved photo counts as new (A21 closed as won't do, E8); the app saves its whole profile list, so a save based on a
 file that another session changed in between is refused and has to be made again (A13);
 the engine still takes an empty folder
 argument as its working directory (the app no longer passes one, A16); result file downloads do not contain thumbnails (ZIP export: P4
