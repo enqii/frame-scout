@@ -845,7 +845,8 @@ offered. Categories: `temp_thumbnails`; `galleries` (`*.html` in `results/` with
 `GALLERY_MARKER` in its first 4 KB, neither listed in `results.json` nor `profile_slugs`
 of the current profiles; other HTML files are kept; its `thumbnails` are the thumbnails
 only orphaned galleries link, deleted with them); `thumbnails` (linked by neither
-`results.json` nor any HTML file, both thumbnail folders); `cache_missing` (UI label "Cache entries of unbound photos", default on; the internal
+`results.json` nor any HTML file, both thumbnail folders); `cache_missing` (UI label "Cache entries of unbound photos", **default off** since the review of PR #40,
+user decision, A35; the internal
 key kept its name: every cache row whose photo no longer exists at its path, in any folder
 searched so far, E8; rows whose photo still exists are not offered, a path that is not
 absolute is never gone; its `names` are the folders with their photo counts, fullest

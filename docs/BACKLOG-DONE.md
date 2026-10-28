@@ -103,7 +103,7 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       cache in case the files come back; the cleanup shows "unbound" photos and the user
       can clean them up.) No migration, no cache key or `marks.json` change. PR #40
       (`b238c24`, `2052e39`): "Clean up storage" offers "Cache entries of unbound photos"
-      (every cache row whose photo no longer exists, in any folder; selected by default)
+      (every cache row whose photo no longer exists, in any folder; off by default since the review, user decision)
       and "Marks of unbound photos" (new `framescout_core.remove_marks`; one category
       checkbox, off by default); photos on an unreachable drive or share are not checked
       (root probe, 5 s timeout), see `docs/ARCHITECTURE.md` → "Storage cleanup". Tests:
