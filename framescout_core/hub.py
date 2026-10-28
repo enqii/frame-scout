@@ -88,17 +88,36 @@ def hub_go_online(environ, modules):
         transformers_hub._is_offline_mode = False
 
 
-def load_with_hub_fallback(load, offline, go_online, out):
-    """Return load(); if it fails in offline mode, call go_online(), say so with out(text) and load again.
+def hub_file_error(exc):
+    """Return whether the exception exc comes from a file missing in the cache (an OSError in its chain).
 
-    Without offline mode an error is raised as it is (e.g. no network at the first download).
+    huggingface_hub raises LocalEntryNotFoundError (a FileNotFoundError) or OfflineModeIsEnabled
+    (a ConnectionError) offline, transformers an OSError; open_clip wraps the weights error in a
+    RuntimeError raised while handling it, so the whole __cause__/__context__ chain counts.
+    """
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        if isinstance(exc, OSError):
+            return True
+        seen.add(id(exc))
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
+def load_with_hub_fallback(load, offline, go_online, out):
+    """Return load(); if a cache file is missing in offline mode, call go_online(), say so with out(text) and load again.
+
+    Without offline mode, and for any other error (e.g. out of memory, a broken weights file),
+    the error is raised as it is.
     """
     if not offline:
         return load()
     try:
         return load()
     except Exception as exc:
+        if not hub_file_error(exc):
+            raise
         out('The model files in the cache are incomplete or could not be loaded offline '
             f'({type(exc).__name__}: {exc}); they are downloaded again (needs internet access).')
         go_online()
-        return load()
+        return load()  # an error here keeps the offline one as its context in the traceback

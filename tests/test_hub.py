@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (HUB_QUIET_ENV, MODELS, hub_cache_dir, hub_file_cached, hub_go_online,
-                             import_open_clip, load_with_hub_fallback, model_cached)
+                             hub_file_error, import_open_clip, load_with_hub_fallback, model_cached)
 
 DEFAULT = MODELS['vit-b-32-openai']
 SIGLIP = MODELS['vit-b-16-siglip']
@@ -173,6 +173,48 @@ def test_a_failed_offline_load_goes_online_and_loads_again():
     assert load_with_hub_fallback(load, True, lambda: online.append(1), notes.append) == 'model'
     assert calls == [0, 1] and online == [1]
     assert len(notes) == 1 and 'download' in notes[0] and 'not in the cache' in notes[0]
+
+
+def open_clip_weights_error():
+    """The chain open_clip 3.3 raises offline without the weights (RuntimeError around FileNotFoundError)."""
+    try:
+        try:
+            raise FileNotFoundError('Failed to download file (open_clip_pytorch_model.bin)')
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"Failed to download weights for tag 'x': {exc}")
+    except RuntimeError as exc:
+        return exc
+
+
+def test_a_missing_cache_file_is_told_apart_from_other_load_errors():
+    # review: only a missing file goes online again; OOM, a bad device or a broken file do not
+    assert hub_file_error(open_clip_weights_error())
+    assert hub_file_error(ConnectionError('offline mode is enabled'))
+    assert hub_file_error(OSError("can't load tokenizer"))
+    assert not hub_file_error(RuntimeError('CUDA out of memory'))
+    assert not hub_file_error(ValueError('broken state dict'))
+    looped = RuntimeError('loop')
+    looped.__context__ = looped
+    assert not hub_file_error(looped)
+
+
+def test_a_wrapped_missing_weights_file_goes_online():
+    online = []
+
+    def load():
+        if not online:
+            raise open_clip_weights_error()
+        return 'model'
+
+    assert load_with_hub_fallback(load, True, lambda: online.append(1), lambda text: None) == 'model'
+
+
+def test_another_offline_load_error_is_not_retried_online():
+    def load():
+        raise RuntimeError('CUDA out of memory')
+
+    with pytest.raises(RuntimeError, match='out of memory'):
+        load_with_hub_fallback(load, True, lambda: pytest.fail('went online'), lambda text: pytest.fail(text))
 
 
 def test_an_online_load_error_is_not_retried():
