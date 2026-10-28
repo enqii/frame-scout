@@ -178,29 +178,46 @@ def _probe_root(root):
     return os.path.isdir(root)
 
 
+class _Probe:
+    """One reachability probe of a root in a daemon thread; answer stays None until it returns."""
+
+    def __init__(self, root):
+        self.answer = None
+        self.thread = threading.Thread(target=self._run, args=(root,), daemon=True, name='FrameScout root probe')
+        self.thread.start()
+
+    def _run(self, root):
+        try:
+            self.answer = bool(_probe_root(root))
+        except Exception:  # any failure: not reachable
+            self.answer = False
+
+
+# the latest probe per root: a probe that still hangs is waited for again instead of starting
+# another thread, so the threads of a dead share do not pile up over the scans (review)
+_PROBES = {}
+_PROBES_LOCK = threading.Lock()
+
+
 def _reachable_roots(roots, timeout=ROOT_TIMEOUT):
     """Return {root: reachable now} for the drive or share roots, probed in parallel.
 
     A stat on a disconnected network share can hang for a long time, so each probe runs in a
     daemon thread, and a root whose probe has not answered within timeout seconds (one
-    timeout for all roots) counts as not reachable; its thread ends on its own later.
+    timeout for all roots) counts as not reachable; its thread ends on its own later. A root
+    whose earlier probe still runs gets no second thread: that probe is waited for again.
     """
-    answers = {}
-
-    def probe(root):
-        try:
-            answers[root] = bool(_probe_root(root))
-        except Exception:  # any failure: not reachable
-            answers[root] = False
-
-    threads = [threading.Thread(target=probe, args=(root,), daemon=True, name='FrameScout root probe')
-               for root in roots]
-    for thread in threads:
-        thread.start()
+    probes = {}
+    with _PROBES_LOCK:
+        for root in roots:
+            probe = _PROBES.get(root)
+            if probe is None or not probe.thread.is_alive():
+                probe = _PROBES[root] = _Probe(root)
+            probes[root] = probe
     deadline = time.monotonic() + timeout
-    for thread in threads:
-        thread.join(max(0.0, deadline - time.monotonic()))
-    return {root: answers.get(root, False) for root in roots}
+    for probe in probes.values():
+        probe.thread.join(max(0.0, deadline - time.monotonic()))
+    return {root: probes[root].answer is True for root in roots}
 
 
 def _folder_names(folder):

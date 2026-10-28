@@ -306,6 +306,25 @@ def test_a_root_probe_that_hangs_counts_as_not_reachable(monkeypatch):
     assert cleanup._reachable_roots(['up', 'down'], timeout=1) == {'up': True, 'down': False}
 
 
+def test_a_root_probe_that_still_hangs_gets_no_second_thread(monkeypatch):
+    # every scan probes a dead share again: its hanging threads must not pile up (review)
+    import threading
+    from framescout_core import cleanup
+    release, calls = threading.Event(), []
+    monkeypatch.setattr(cleanup, '_probe_root', lambda root: calls.append(root) or release.wait(5))
+    try:
+        assert cleanup._reachable_roots(['dead share'], timeout=0.1) == {'dead share': False}
+        assert cleanup._reachable_roots(['dead share'], timeout=0.1) == {'dead share': False}
+        assert calls == ['dead share']
+    finally:
+        release.set()
+    cleanup._PROBES['dead share'].thread.join(5)
+    # the earlier probe has answered: the next call probes again
+    monkeypatch.setattr(cleanup, '_probe_root', lambda root: calls.append(root) or True)
+    assert cleanup._reachable_roots(['dead share'], timeout=1) == {'dead share': True}
+    assert calls == ['dead share', 'dead share']
+
+
 def test_a_folder_with_many_rows_is_listed_once(project, monkeypatch):
     # one listing per folder instead of one stat per photo (much faster on a network share)
     from framescout_core import cleanup
