@@ -230,17 +230,47 @@ def _folder_names(folder):
         return None
 
 
+def _gone_in(folder, members):
+    """The paths of members (all in folder) that certainly no longer exist.
+
+    At most _STAT_UP_TO paths: one stat each. More: one listing of the folder; a folder that
+    does not exist makes them all gone, one that cannot be listed keeps them. The names the
+    listing does not hold are gone; the first _STAT_UP_TO of them are confirmed by a stat in
+    case the listing spells a name differently (e.g. another Unicode normalization), and if
+    one of those exists, every absent name gets its own stat (review: not one stat per
+    photo of a renamed folder of 50,000 photos).
+    """
+    if len(members) <= _STAT_UP_TO:
+        return {p for p in members if _missing(p)}
+    names = _folder_names(folder)
+    if names is False:
+        return set(members)
+    if names is None:
+        return set()
+    absent = sorted(p for p in members if os.path.normcase(os.path.basename(p)) not in names)
+    if all(_missing(p) for p in absent[:_STAT_UP_TO]):
+        return set(absent)
+    return {p for p in absent if _missing(p)}
+
+
+def _by_folder(paths):
+    folders = {}
+    for path in paths:
+        folders.setdefault(os.path.dirname(path), []).append(path)
+    return folders
+
+
 class _PathCheck:
     """Tells which photo paths certainly no longer exist ("unbound", E8/A21); one per scan or cleanup.
 
     Each path is checked once (the answer is kept, so the cache rows and the marks of a scan
     share one pass), each drive or share root is probed once (_reachable_roots): the paths
     under a root that is not reachable now are not checked, as their photos may only be
-    offline. Paths are grouped by folder: a folder with at most _STAT_UP_TO paths gets one
-    stat per path, a fuller one is listed once (one directory listing instead of a stat per
-    photo, measured about 70 times faster on a network share), and a name the listing does
-    not hold is confirmed by its own stat. A folder that does not exist makes all its paths
-    gone; one that cannot be listed (e.g. no permission) keeps them. A path that is not
+    offline. Paths are grouped by folder (_gone_in): a folder with at most _STAT_UP_TO paths
+    gets one stat per path, a fuller one is listed once (one directory listing instead of a
+    stat per photo, measured about 70 times faster on a network share), and of the names the
+    listing does not hold only a few are confirmed by a stat. A folder that does not exist
+    makes all its paths gone; one that cannot be listed (e.g. no permission) keeps them. A path that is not
     absolute is never gone. After the pass, the roots with gone paths are probed again, so a
     share that dropped during the pass does not make its photos look deleted.
     """
@@ -260,26 +290,18 @@ class _PathCheck:
         for path in absolute:
             roots.setdefault(_root_of(path), []).append(path)
         reachable = _reachable_roots(sorted(roots), self._timeout) if roots else {}
-        folders = {}
+        checked = []
         for root, members in roots.items():
-            if not reachable[root]:
+            if reachable[root]:
+                checked += members
+            else:
                 self._unreachable.update(dict.fromkeys(members, root))
-                continue
-            for path in members:
-                folders.setdefault(os.path.dirname(path), []).append(path)
+        folders = _by_folder(checked)
         gone = set()
         total = len(folders)
         step = max(1, total // 100)
         for done, (folder, members) in enumerate(sorted(folders.items()), 1):
-            if len(members) <= _STAT_UP_TO:
-                gone.update(p for p in members if _missing(p))
-            else:
-                names = _folder_names(folder)
-                if names is False:
-                    gone.update(members)
-                elif names is not None:
-                    gone.update(p for p in members if os.path.normcase(os.path.basename(p)) not in names
-                                and _missing(p))
+            gone |= _gone_in(folder, members)
             if progress and (done % step == 0 or done == total):
                 progress(done, total)
         # a share that went offline during the pass makes its folders look missing

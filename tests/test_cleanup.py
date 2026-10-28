@@ -343,6 +343,38 @@ def test_a_folder_with_many_rows_is_listed_once(project, monkeypatch):
     assert sorted(stated) == [str(project.photos / n) for n in names[8:]]
 
 
+def test_many_names_a_listing_does_not_hold_need_only_a_few_stats(project, monkeypatch):
+    # e.g. a folder whose 50,000 photos were moved away: the listing is trusted once a few
+    # of the absent names are confirmed (review)
+    from framescout_core import cleanup
+    names = [f'IMG_{n:02}.jpg' for n in range(30)]
+    project.photo(names[0])
+    project.cache([(project.photos / name, CURRENT) for name in names])
+    stated = []
+    real = cleanup._missing
+    monkeypatch.setattr(cleanup, '_missing', lambda path: stated.append(path) or real(path))
+    assert project.scan()['cache_missing']['rows'] == 29
+    assert len(stated) == cleanup._STAT_UP_TO
+
+
+def test_a_listing_that_spells_names_differently_is_checked_by_a_stat_each(project, monkeypatch):
+    # e.g. another Unicode normalization: a confirmed name exists, so no absent name is trusted
+    names = [f'IMG_{n:02}.jpg' for n in range(10)]
+    for name in names:
+        project.photo(name)
+    project.cache([(project.photos / name, CURRENT) for name in names])
+    real = os.listdir
+
+    def listdir(path):
+        found = real(path)
+        if os.path.normcase(str(path)) == os.path.normcase(str(project.photos)):
+            return [name.replace('IMG', 'img_x') for name in found]
+        return found
+
+    monkeypatch.setattr(os, 'listdir', listdir)
+    assert project.scan()['cache_missing']['items'] == []
+
+
 @pytest.mark.skipif(os.name != 'nt', reason='Windows file names ignore case')
 def test_a_listed_name_of_another_case_exists(project):
     names = [f'IMG_{n}.jpg' for n in range(6)]
