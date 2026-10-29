@@ -357,6 +357,14 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       with `setdefault` in the engine process, so manual runs need no setting and the
       `.bat` files are unchanged; the files are still stored as copies without Developer
       Mode. Mentioned in the README.)
+- [x] **E9 – `yolo11n.pt` ends up in the project root** instead of `.cache/`; not documented.
+      (Done 2026-10-29, PR #42, roadmap P7 (B): the detector is created with
+      `YOLO(framescout_core.yolo_weights(name, <engine folder>, cwd))`: a path or URL as
+      given; a bare name from `.cache/ultralytics/<name>` if present; an old `yolo11n.pt`
+      (default name only) in the project folder is moved there once, used in place if the move
+      fails; a file of that name in the working folder is used as before; otherwise the cache
+      path, where Ultralytics downloads it. The cache signature still gets `--yolo-model`
+      unchanged, so nothing is invalidated. Unit-tested; no run with real models.)
 
 ### App (`app.py`)
 
@@ -868,3 +876,21 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       installation is never changed. Tests: `tests/test_installer.py` (the check's code also
       runs on the test Python); runtime-checked under `.tmp` with `Lib\venv` removed from
       the real private Python and with the version 3.14.8 against 3.14.9.)
+- [x] **I10 – Manual runs leave files in the user profile:** importing Ultralytics without
+      `YOLO_CONFIG_DIR` writes `%APPDATA%\Ultralytics\settings.json` (seen in PR #8 when a
+      development command imported it). The `.bat` files and the app set the variable, but
+      the manual engine command in `README.md` and `CLAUDE.md` does not, and the same
+      applies to `TORCH_HOME`, `HF_HOME` and `XDG_CACHE_HOME` (model downloads land in the
+      user profile). This is a gap for a clean uninstall. Fix idea: the engine sets these
+      variables to the project's `.cache/` when they are unset (`os.environ.setdefault`
+      before importing torch, open_clip and ultralytics), or a documented PowerShell snippet.
+      (Done 2026-10-29, PR #42, roadmap P7 (B): `framescout_core.default_cache_env` fills
+      `TORCH_HOME`, `HF_HOME`, `XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` with the project's
+      `.cache/` subfolders when they are unset or empty, at module level in
+      `framescout_engine.py` before numpy/torch/open_clip/Ultralytics are imported; a value
+      the user set is kept. The `.bat` files and the app still set them themselves (the app
+      overrides, the engine only fills gaps); `app.py` takes the paths from
+      `cache_paths`. Manual runs no longer use the user profile's `.cache` or
+      `%APPDATA%\Ultralytics`; weights downloaded there earlier are not reused or touched.
+      Follow-ups: E39, I25. Unit-tested; engine-import subprocess tests ran locally with
+      torch; no run with real models.)

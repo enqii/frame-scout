@@ -140,6 +140,9 @@ the module of its area and to the re-exports in `__init__.py`.
   default's too. Since E16 each model also names `weights_repo` and `tokenizer_repo`
   (the Hugging Face Hub repositories open_clip loads the weights and a Hugging Face
   tokenizer from; `''` = built-in tokenizer; tested against open_clip's config).
+- `cache_dirs.py` (E9/I10): `CACHE_DIR`/`cache_paths`/`default_cache_env`/`yolo_weights`
+  (the project's `.cache/` folders and the engine's defaults for them; see "Environment
+  variables and caches").
 - `hub.py` (E16/E31/E33): `HUB_QUIET_ENV`/`WEIGHTS_FILES`/`TOKENIZER_FILES`/`OFFLINE_VARIABLES`/`hub_cache_dir`/`hub_file_cached`/`model_cached`/`import_open_clip`/`hub_go_online`/`hub_file_error`/`load_with_hub_fallback`
   (loading a search model without a Hub request once it is cached; see "Environment
   variables and caches").
@@ -415,7 +418,7 @@ app's settings and the lock of their saves, A8), `photos/` (default input), `ref
 `results/results.json` (the last finished search, A12), `results/marks.json` and
 `results/marks.json.lock` (the user's marks, A17: user data, never written by the engine
 and never deleted by the cleanup, E7), `profiles.json`, `run.log`, `.cache/`, `.tmp/`,
-`.venv/`, `yolo11n.pt`; `.tmp/eval/<collection>/` of the evaluation tool (below).
+`.venv/`, `yolo11n.pt` (older installs; now `.cache/ultralytics/`); `.tmp/eval/<collection>/` of the evaluation tool (below).
 
 ### Model evaluation tool
 
@@ -587,7 +590,12 @@ reference image of such a format fails with the reason (`missing_decoder`).
 Optional Ultralytics `yolo11n.pt` person detection (`classes=[0]`) extracts individual
 person crops **in addition to the full original image**. Detection is deliberately
 optional for non-person motifs; the detector runs on the CLIP device (E14), one photo per
-call under a lock (several photos per call: E18).
+call under a lock (several photos per call: E18). The detector is created with
+`YOLO(yolo_weights(args.yolo_model, <engine folder>, cwd))` (E9): a path or URL as given;
+a bare name from `.cache/ultralytics/<name>` if present; an old `yolo11n.pt` (default
+name only) in the project folder is moved there once (used in place if the move fails);
+a file of that name in the working folder as before; otherwise the cache path, where
+Ultralytics downloads it. The cache signature still receives `--yolo-model` unchanged.
 
 ### Analysis pipeline
 
@@ -1004,8 +1012,18 @@ cuda` and start it again, since the running app keeps the loaded torch and the c
 
 The Windows batch scripts set cache/temp environment variables under the project directory
 (`TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `TMP`, `TEMP`), aiming for
-easy cleanup. Some dependencies may still leave user-level caches (e.g. Ultralytics writes
-`%APPDATA%\Ultralytics\settings.json` when imported without `YOLO_CONFIG_DIR`, I10; the
+easy cleanup. Since E9/I10 the engine also fills `TORCH_HOME`, `HF_HOME`,
+`XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` itself when they are unset or empty
+(`default_cache_env(os.environ, <engine folder>)`, module level in `framescout_engine.py`
+after the `framescout_core` import and before numpy/torch/Pillow, so before
+huggingface_hub, open_clip and Ultralytics; a user's value is kept, no folder is created).
+The app's `cache_env` still overrides them, built from `cache_paths(BASE)`. A worktree
+engine therefore defaults to the worktree's own `.cache/`: smoke runs there still point the
+variables at the main checkout's `.cache/` to avoid a new download. Open: open_clip's URL
+download path ignores the variables (E39); `framescout_eval.py` builds its own paths
+(I25). Some dependencies may still leave user-level caches (e.g. Ultralytics writes
+`%APPDATA%\Ultralytics\settings.json` when imported without `YOLO_CONFIG_DIR`, which
+the app, the `.bat` files and (since I10) the engine's defaults prevent; the
 uninstall script lists these folders but never deletes them); do
 not promise perfect portability or no residual files.
 
@@ -1101,7 +1119,10 @@ profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
 `test_cleanup.py` also for unbound rows and marks, unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
-`test_cache_signatures.py`, with real SQLite files) and the photo scan
+`test_cache_signatures.py`, with real SQLite files), the cache folders and the `yolo11n.pt`
+location (E9/I10: `test_cache_dirs.py`; the engine's defaults call and its `yolo_weights`
+use from its syntax tree plus a subprocess import, skipped without torch, in
+`test_engine_defaults.py`; no run with real models) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are

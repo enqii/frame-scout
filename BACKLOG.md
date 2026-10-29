@@ -16,7 +16,6 @@ and discussions.
 
 ### Engine (`framescout_engine.py`)
 
-- [ ] **E9 – `yolo11n.pt` ends up in the project root** instead of `.cache/`; not documented.
 - [ ] **E12 – Skipped photos leave gaps in the gallery:** a photo whose thumbnail fails
       (deleted since scoring, unreadable) is skipped after the top-N cut, so the gallery
       shows e.g. #2, #3, #4 and fewer than `--top` cards although lower-ranked photos
@@ -182,6 +181,11 @@ and discussions.
       downloading what is missing) and the first download into an empty cache were covered
       by unit tests only, since a real run downloads at least 605 MB. Verify on the home PC
       (P10 A, next to E34) and fix what shows up. Found in the PR of E16.
+- [ ] **E39 – open_clip's URL download path ignores the cache variables (minor):** a model
+      without an `hf_hub` config would be fetched by `download_pretrained_from_url` into
+      `~/.cache/clip` regardless of `TORCH_HOME`/`XDG_CACHE_HOME`. Not hit today: every
+      `framescout_core.MODELS` entry downloads through the Hugging Face Hub. A future model
+      without `hf_hub` would need `cache_dir=` passed to open_clip. Found in the PR of E9/I10.
 
 ### App (`app.py`)
 
@@ -367,17 +371,6 @@ and discussions.
       the SHAs. Options: periodic manual bump, or Dependabot for `github-actions`.
       Dependabot opens its own PRs outside the one-PR-per-roadmap-item workflow, so
       this is a workflow decision → hold point.
-- [ ] **I10 – Manual runs leave files in the user profile:** importing Ultralytics without
-      `YOLO_CONFIG_DIR` writes `%APPDATA%\Ultralytics\settings.json` (seen in PR #8 when a
-      development command imported it). The `.bat` files and the app set the variable, but
-      the manual engine command in `README.md` and `CLAUDE.md` does not, and the same
-      applies to `TORCH_HOME`, `HF_HOME` and `XDG_CACHE_HOME` (model downloads land in the
-      user profile). This is a gap for a clean uninstall. Fix idea: the engine sets these
-      variables to the project's `.cache/` when they are unset (`os.environ.setdefault`
-      before importing torch, open_clip and ultralytics), or a documented PowerShell snippet.
-      (2026-10-27, P5 part B: `Uninstall-FrameScout.bat` now lists these folders outside
-      the project but never deletes them; the engine still sets no variables, so this
-      stays open.)
 - [ ] **I11 – The CUDA path has run on a GPU only once:** the development PC had no NVIDIA GPU,
       so the CUDA install (`cu130`/`cu126` choice, about 2.5 GB), CLIP and YOLO on CUDA
       (E14), the app's device choice with a CUDA build (A7) and the speed gain are
@@ -448,3 +441,7 @@ and discussions.
       redistribution), codec libraries bundled in wheels such as x265 in `pillow-heif` (GPL)
       and LibRaw in `rawpy` (LGPL/CDDL); who builds and hosts the bundle. Needs a user
       decision. Found on 2026-10-27 in P5 part C.
+- [ ] **I25 – `framescout_eval.py` builds the cache paths itself (minor):** `engine_env`
+      derives the same four variables from `--cache-dir`; it takes a cache folder, not the
+      project folder, so it was left alone in E9/I10. It could share
+      `framescout_core.cache_paths`. Found in the PR of E9/I10.
