@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 import framescout_core
-from framescout_core import ensure_thumbnail, thumbnail_name
+from framescout_core import ensure_thumbnail, gallery_cards, thumbnail_name
 
 
 def make_photo(folder, name='photo.jpg', mtime_ns=1_700_000_000_000_000_000):
@@ -128,3 +128,22 @@ def test_a_photo_that_cannot_be_rendered_is_skipped(tmp_path):
     log = []
     assert ensure_thumbnail(photo, thumbs, tmp_path / 'vorschaubilder', render, log.append) is None
     assert log == [f'Thumbnail not possible ({photo}): cannot identify image file']
+
+
+def test_gallery_cards_rank_only_photos_with_a_thumbnail_and_fill_up_to_top():
+    # a skipped photo leaves no gap in the ranks, and lower-ranked photos fill up (E12)
+    tried = []
+
+    def thumbnail(photo):
+        tried.append(photo)
+        return None if photo in ('b', 'd') else photo + '.jpg'
+
+    cards = list(gallery_cards(['a', 'b', 'c', 'd', 'e', 'f'], 3, thumbnail))
+    assert cards == [(1, 'a', 'a.jpg'), (2, 'c', 'c.jpg'), (3, 'e', 'e.jpg')]
+    assert tried == ['a', 'b', 'c', 'd', 'e']  # stops as soon as the gallery is full
+
+
+def test_gallery_cards_show_fewer_cards_when_too_few_photos_have_a_thumbnail():
+    cards = list(gallery_cards(['a', 'b', 'c'], 5, lambda photo: None if photo == 'a' else photo + '.jpg'))
+    assert cards == [(1, 'b', 'b.jpg'), (2, 'c', 'c.jpg')]
+    assert list(gallery_cards([], 5, lambda photo: 'x.jpg')) == []
