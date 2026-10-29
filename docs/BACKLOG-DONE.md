@@ -895,3 +895,15 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       `%APPDATA%\Ultralytics`; weights downloaded there earlier are not reused or touched.
       Follow-ups: E39, I25. Unit-tested; engine-import subprocess tests ran locally with
       torch; no run with real models.)
+- [x] **I26 – Review comments could be lost, worktrees piled up:** a reviewer whose `/code-review`
+      returned only a findings list posted nothing yet set `fs:review-done`, and leftover
+      worktrees and `worktree-agent-*` branches had to be cleaned up by hand. Found on
+      2026-10-29 in the PR workflow. (Done 2026-10-29, user decision in chat: the reviewer
+      checks that the findings are on the PR and otherwise posts them itself as one numbered
+      comment, never runs a second review, and swaps the label only afterwards; the
+      orchestrator treats "not posted" as not done and posts the reported findings itself;
+      `address-review` answers a numbered comment in one comment. `/roadmap` has a fixed
+      worktree cleanup step (clean, fully pushed worktrees are removed, dead locks are
+      unlocked, merged `worktree-agent-*` branches are deleted with `-d`). Markdown only,
+      nothing executed; `.claude/settings.json` is unchanged, so `git worktree remove` and
+      `git branch -D` still ask. Follow-ups: I27, I28, I29.)

@@ -186,6 +186,29 @@ and discussions.
       `~/.cache/clip` regardless of `TORCH_HOME`/`XDG_CACHE_HOME`. Not hit today: every
       `framescout_core.MODELS` entry downloads through the Hugging Face Hub. A future model
       without `hf_hub` would need `cache_dir=` passed to open_clip. Found in the PR of E9/I10.
+- [ ] **E40 – A `yolo_weights` test only holds on Windows (minor):** `test_yolo_weights_paths_and_urls_are_used_as_given`
+      passes `r'models\w.pt'` and expects it back unchanged; on Linux/macOS `Path(name).name`
+      is the whole string, so `yolo_weights` treats it as a bare name and the test fails
+      (CI runs on Windows only). Fix: check the backslash case with `PureWindowsPath` or skip
+      it off Windows. Review of PR #42, finding 6.
+- [ ] **E41 – A user's own `yolo11n.pt` in the working folder is ignored once a cached copy
+      exists:** `yolo_weights` looks in the cache folder first and in the working folder only
+      afterwards, so the "used as before" file of the working folder loses against any copy in
+      `.cache/ultralytics/`. Decide which one should win (a copy the user put next to the run
+      is arguably more deliberate) and document it. Review of PR #42, finding 7.
+- [ ] **E42 – The engine sets the cache variables when it is imported:** `default_cache_env`
+      runs at module level in `framescout_engine.py` (so it precedes the torch import), which
+      changes `HF_HOME`, `TORCH_HOME` and `XDG_CACHE_HOME` for every importer of the module and
+      means models cached in the user profile are no longer found by a manual run (documented
+      consequence of E9/I10). Decide whether to move it into `main()` (the heavy imports are
+      lazy or must be reordered; `tests/test_engine_defaults.py` pins the module-level call)
+      and whether a note or an opt-out is needed for users who keep models elsewhere. Review of
+      PR #42, findings 8 and 9.
+- [ ] **E43 – `yolo_weights` returns a path in `.cache/ultralytics/` without creating the folder
+      (not verified):** Ultralytics should create the parent folder when it downloads to that
+      path, but this was not run; if it does not, the first download fails. Check on the first
+      download into an empty cache (P10 A, next to E38) or create the folder in
+      `yolo_weights`/the engine. Review of PR #42, finding 10.
 
 ### App (`app.py`)
 
@@ -332,6 +355,12 @@ and discussions.
       them, and (user decision) neither category is selected by default any more. Idea:
       record the volume serial number (or mount) per root, which changes the cache or a
       side file (hold point). Found in the PR of E8.
+- [ ] **A36 – The app overwrites cache variables a user set, the engine keeps them:**
+      `cache_env()` in `app.py` assigns all of `cache_paths(BASE)` to the engine's environment,
+      while `default_cache_env` keeps a value that is set. A search from the app therefore
+      ignores e.g. a `HF_HOME` the user exported, a manual run honours it. Probably intended
+      (the app keeps the install self-contained), but undecided and undocumented; decide and
+      document, or use `default_cache_env` in the app too. Review of PR #42, finding 12.
 
 ### Installation / project
 
@@ -445,3 +474,18 @@ and discussions.
       derives the same four variables from `--cache-dir`; it takes a cache folder, not the
       project folder, so it was left alone in E9/I10. It could share
       `framescout_core.cache_paths`. Found in the PR of E9/I10.
+- [ ] **I27 – Routine worktree commands still ask for approval:** `/roadmap` cleans up
+      worktrees and `worktree-agent-*` branches as a fixed step (I26), but
+      `.claude/settings.json` does not pre-approve `git worktree unlock *`,
+      `git branch -d worktree-agent-*` and `git worktree remove .claude/worktrees/*`. Proposal:
+      allow these three and keep `-f`/`--force` removals and `git branch -D` on "ask". Needs the
+      user's explicit decision (a permission change). Found in the PR of I26.
+- [ ] **I28 – The reviewer posts one comment for all findings (optional):** when
+      `/code-review` posts nothing, the reviewer posts one numbered comment (I26), so
+      `address-review` can only answer in one comment. One comment per finding (numbered,
+      `file:line`) would allow a reply on each thread. Found in the PR of I26.
+- [ ] **I29 – The briefs hard-code the commit trailer's model name:** `implementer-brief.md`
+      prescribes `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`, which
+      conflicts with the attribution the session gives a subagent (a Sonnet implementer
+      noticed). Take the trailer from the session's attribution instead and drop the literal
+      line. Found in the PR of I26.
