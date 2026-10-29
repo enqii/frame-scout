@@ -15,7 +15,8 @@ import streamlit as st
 from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
                              FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_FILE,
                              PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
-                             SETTINGS_FILE, RunLock, StatusReporter, clean_up, cleanup_running, cleanup_summary_text,
+                             SETTINGS_FILE, RunLock, StatusReporter, cache_paths, clean_up, cleanup_running,
+                             cleanup_summary_text,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
@@ -922,9 +923,7 @@ def show_cleanup():
 
 def cache_env():
     env = os.environ.copy()
-    paths = {'TORCH_HOME': BASE/'.cache'/'torch', 'HF_HOME': BASE/'.cache'/'huggingface',
-             'YOLO_CONFIG_DIR': BASE/'.cache'/'ultralytics', 'XDG_CACHE_HOME': BASE/'.cache',
-             'TMP': BASE/'.tmp', 'TEMP': BASE/'.tmp'}
+    paths = {**cache_paths(BASE), 'TMP': BASE/'.tmp', 'TEMP': BASE/'.tmp'}
     for k,p in paths.items():
         p.mkdir(parents=True, exist_ok=True)
         env[k] = str(p)
