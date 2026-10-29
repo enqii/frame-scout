@@ -17,15 +17,12 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-import numpy as np
-import torch
-from PIL import Image, ImageOps, ImageFile
-
 from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
                              DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RAW_EXT, RESULTS_FILE,
                              RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
-                             cuda_hint, detection_options, distinct_folders, draft_size, final_status,
+                             cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
+                             final_status, yolo_weights,
                              ensure_thumbnail, folder_labels, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
                              load_profiles, missing_decoder, missing_folders_message, model_problem,
@@ -35,6 +32,16 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
                              store_group, supported_extensions, write_results, write_scores)
+
+# model downloads and library config files go to the project's .cache folder, as with the
+# .bat files and the app, also for a manual run; a variable the user set is kept (I10).
+# Before torch, huggingface_hub and Ultralytics are imported: they read them on import.
+default_cache_env(os.environ, Path(__file__).resolve().parent)
+
+import numpy as np
+import torch
+from PIL import Image, ImageOps, ImageFile
+
 from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
 
 # AVIF, HEIC/HEIF and camera RAW photos (E25). pillow-heif and rawpy are in
@@ -358,7 +365,9 @@ def search(args, parser, roots, dropped, output, status):
     if not args.no_person_detection:
         # without Ultralytics' usage analytics and run-time pip installs (E27, E28)
         YOLO = import_detector_class(os.environ, importlib.import_module, Image)
-        detector = YOLO(args.yolo_model)
+        # downloaded into .cache on first use, not into the working folder (E9); the cache
+        # signature below keeps the name as given
+        detector = YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd()))
     con = sqlite3.connect(output / CACHE_FILE)
     # also records which engine version and settings the signature stands for (E11)
     signature = prepare_cache(con, not args.no_person_detection, args.max_persons, args.person_confidence,

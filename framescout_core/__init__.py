@@ -27,6 +27,7 @@ from .signature import (ENGINE_TEMPLATE, engine_id, ENGINE, MODEL_ENGINES,
     DEFAULT_YOLO_MODEL, prepare_cache, SLIDER_NOISE_ULPS, known_signatures, classify_signatures)
 from .hub import (HUB_QUIET_ENV, WEIGHTS_FILES, TOKENIZER_FILES, OFFLINE_VARIABLES, hub_cache_dir,
     hub_file_cached, model_cached, import_open_clip, hub_go_online, hub_file_error, load_with_hub_fallback)
+from .cache_dirs import (CACHE_DIR, cache_paths, default_cache_env, yolo_weights)
 from .torch_build import (TORCH_VERSION, TORCHVISION_VERSION, TORCH_INDEX, CUDA_BUILDS,
     parse_gpu_query, unsupported_gpus, cuda_build, driver_text, torch_requirements,
     installed_build_matches, installed_cuda_build, torch_index_url)

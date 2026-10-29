@@ -1,5 +1,6 @@
 """The engine's CLI defaults that must match the app's (read from the source: the engine imports torch)."""
 import ast
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -137,6 +138,46 @@ def test_the_engine_imports_open_clip_only_through_import_open_clip():
     [fallback] = [node for node in nodes if isinstance(node, ast.Call)
                   and getattr(node.func, 'id', None) == 'load_with_hub_fallback']
     assert 'hub_go_online(os.environ, sys.modules)' in ast.unparse(fallback)
+
+
+def test_the_engine_sets_the_cache_folders_before_the_model_libraries_are_imported():
+    # I10: a manual run keeps the model downloads and config files under the project's .cache
+    tree = ast.parse(ENGINE.read_text(encoding='utf-8'))
+    calls = [node for node in tree.body if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+             and getattr(node.value.func, 'id', None) == 'default_cache_env']
+    assert len(calls) == 1, 'the engine must call default_cache_env once at module level'
+    assert ast.unparse(calls[0].value) == 'default_cache_env(os.environ, Path(__file__).resolve().parent)'
+    third_party = [node.lineno for node in tree.body
+                   if (isinstance(node, ast.Import) and any(a.name.split('.')[0] not in sys.stdlib_module_names
+                                                            for a in node.names))
+                   or (isinstance(node, ast.ImportFrom) and (node.module or '').split('.')[0]
+                       not in sys.stdlib_module_names | {'framescout_core'})]
+    assert third_party and calls[0].lineno < min(third_party)
+
+
+def test_the_engine_loads_the_detector_weights_from_the_cache():
+    # E9: YOLO('yolo11n.pt') downloads into the working folder; the cache signature keeps the name
+    nodes = list(ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8'))))
+    [detector] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'YOLO']
+    assert ast.unparse(detector) == 'YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd()))'
+    [prepare] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'prepare_cache']
+    assert 'args.yolo_model' in [ast.unparse(arg) for arg in prepare.args]
+
+
+def test_importing_the_engine_sets_the_unset_cache_variables():
+    # needs the engine's own imports (torch, Pillow), so it is skipped in CI
+    pytest.importorskip('torch')
+    pytest.importorskip('PIL')
+    names = ('TORCH_HOME', 'HF_HOME', 'YOLO_CONFIG_DIR', 'XDG_CACHE_HOME')
+    env = {k: v for k, v in os.environ.items() if k not in names}
+    env['HF_HOME'] = str(ENGINE.parent / '.tmp' / 'own-hf')  # set by the user: kept
+    script = f'import os, framescout_engine\nprint([os.environ[n] for n in {names!r}])'
+    result = subprocess.run([sys.executable, '-c', script], cwd=ENGINE.parent, capture_output=True, text=True,
+                            timeout=300, env=env)
+    assert result.returncode == 0, result.stderr
+    cache = ENGINE.parent / '.cache'
+    assert result.stdout.strip().splitlines()[-1] == repr(
+        [str(cache / 'torch'), env['HF_HOME'], str(cache / 'ultralytics'), str(cache)])
 
 
 def test_importing_the_engine_does_not_import_a_hugging_face_library():
