@@ -367,7 +367,8 @@ def search(args, parser, roots, dropped, output, status):
         YOLO = import_detector_class(os.environ, importlib.import_module, Image)
         # downloaded into .cache on first use, not into the working folder (E9); the cache
         # signature below keeps the name as given
-        detector = YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd()))
+        detector = YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), os.environ,
+                                     lambda text: print(text, flush=True)))
     con = sqlite3.connect(output / CACHE_FILE)
     # also records which engine version and settings the signature stands for (E11)
     signature = prepare_cache(con, not args.no_person_detection, args.max_persons, args.person_confidence,

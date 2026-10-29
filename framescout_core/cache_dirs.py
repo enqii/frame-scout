@@ -34,18 +34,21 @@ def default_cache_env(environ, base):
     return added
 
 
-def yolo_weights(name, base, cwd, replace=os.replace):
+def yolo_weights(name, base, cwd, environ, log=None, replace=os.replace):
     """The path the detector loads its weights from, and downloads them to on first use (E9).
 
     Ultralytics downloads an official weights file given by its bare name into the working
     folder, which put yolo11n.pt into the project folder. A bare name is therefore looked up
-    in base/.cache/ultralytics; the default file an older version downloaded into base is
-    moved there once (kept and used where it is if it cannot be moved). A file of that name
-    in the working folder cwd is used as before; any other path or URL is used as given.
+    in the folder of YOLO_CONFIG_DIR in environ (base/.cache/ultralytics if unset; a value
+    the user set is kept, review); the default file an older version downloaded into base is
+    moved there once, unless a copy is there already (kept and used where it is if it cannot
+    be moved; log, if given, gets a line about it). A file of that name in the working folder
+    cwd is used as before; any other path or URL is used as given.
     """
     if Path(name).name != name:
         return name
-    cached = cache_paths(base)['YOLO_CONFIG_DIR'] / name
+    folder = environ.get('YOLO_CONFIG_DIR') or cache_paths(base)['YOLO_CONFIG_DIR']
+    cached = Path(folder) / name
     if cached.is_file():
         return str(cached)
     legacy = Path(base) / name
@@ -53,9 +56,12 @@ def yolo_weights(name, base, cwd, replace=os.replace):
         try:
             cached.parent.mkdir(parents=True, exist_ok=True)
             replace(legacy, cached)
-        except OSError:
-            # e.g. in use, or another search moved it meanwhile
-            return str(cached) if cached.is_file() or not legacy.is_file() else str(legacy)
+        except OSError as exc:
+            if cached.is_file() or not legacy.is_file():  # another search moved it meanwhile
+                return str(cached)
+            if log:
+                log(f'Could not move {legacy} to {cached}, using it where it is: {exc}')
+            return str(legacy)
         return str(cached)
     if (Path(cwd) / name).is_file():
         return name
