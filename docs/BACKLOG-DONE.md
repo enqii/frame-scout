@@ -359,10 +359,11 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       Mode. Mentioned in the README.)
 - [x] **E9 – `yolo11n.pt` ends up in the project root** instead of `.cache/`; not documented.
       (Done 2026-10-29, PR #42, roadmap P7 (B): the detector is created with
-      `YOLO(framescout_core.yolo_weights(name, <engine folder>, cwd))`: a path or URL as
-      given; a bare name from `.cache/ultralytics/<name>` if present; an old `yolo11n.pt`
-      (default name only) in the project folder is moved there once, used in place if the move
-      fails; a file of that name in the working folder is used as before; otherwise the cache
+      `YOLO(framescout_core.yolo_weights(name, <engine folder>, cwd, os.environ, log))`: a
+      path or URL as given; a bare name from the `YOLO_CONFIG_DIR` folder (default
+      `.cache/ultralytics/`) if present; an old `yolo11n.pt` (default name only) in the
+      project folder is moved there once unless a copy is there already, used in place with a
+      log line if the move fails; a file of that name in the working folder is used as before; otherwise the cache
       path, where Ultralytics downloads it. The cache signature still gets `--yolo-model`
       unchanged, so nothing is invalidated. Unit-tested; no run with real models.)
 

@@ -591,11 +591,13 @@ Optional Ultralytics `yolo11n.pt` person detection (`classes=[0]`) extracts indi
 person crops **in addition to the full original image**. Detection is deliberately
 optional for non-person motifs; the detector runs on the CLIP device (E14), one photo per
 call under a lock (several photos per call: E18). The detector is created with
-`YOLO(yolo_weights(args.yolo_model, <engine folder>, cwd))` (E9): a path or URL as given;
-a bare name from `.cache/ultralytics/<name>` if present; an old `yolo11n.pt` (default
-name only) in the project folder is moved there once (used in place if the move fails);
-a file of that name in the working folder as before; otherwise the cache path, where
-Ultralytics downloads it. The cache signature still receives `--yolo-model` unchanged.
+`YOLO(yolo_weights(args.yolo_model, <engine folder>, cwd, os.environ, log))` (E9): a path
+or URL as given; a bare name from the folder of `YOLO_CONFIG_DIR` (a user's value is kept,
+as in `default_cache_env`; else `.cache/ultralytics/`) if present; an old `yolo11n.pt`
+(default name only) in the project folder is moved there once unless a copy is there
+already (then it stays for the uninstall; used in place with a `run.log` line if the move
+fails); a file of that name in the working folder as before; otherwise the cache path,
+where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged.
 
 ### Analysis pipeline
 
@@ -1120,7 +1122,8 @@ profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
 `test_cleanup.py` also for unbound rows and marks, unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the cache folders and the `yolo11n.pt`
-location (E9/I10: `test_cache_dirs.py`; the engine's defaults call and its `yolo_weights`
+location (E9/I10: `test_cache_dirs.py`, also that importing `framescout_core` loads no
+third-party module, so the engine may fill the variables after it; the engine's defaults call and its `yolo_weights`
 use from its syntax tree plus a subprocess import, skipped without torch, in
 `test_engine_defaults.py`; no run with real models) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),

@@ -462,9 +462,11 @@ Manual start after installation:
 
 A manual run needs no environment variables: unless you have set them yourself, the engine
 puts the model weights and the Ultralytics settings under the project's `.cache\` (and
-the `yolo11n.pt` person detector under `.cache\ultralytics\`), like the `.bat` files do.
-An older `yolo11n.pt` in the project folder is moved there on the next search with person
-detection. Weights that earlier manual runs downloaded to your user profile are not reused
+the `yolo11n.pt` person detector under `.cache\ultralytics\`, or in your own
+`YOLO_CONFIG_DIR`), like the `.bat` files do. An older `yolo11n.pt` in the project folder
+is moved there on the next search with person detection; if a copy is there already, the
+older file stays where it is (the uninstall deletes it), and if it cannot be moved, it is
+used where it is and `run.log` says so. Weights that earlier manual runs downloaded to your user profile are not reused
 or touched.
 
 The engine takes one or more photo folders, e.g.
