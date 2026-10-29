@@ -51,3 +51,21 @@ def ensure_thumbnail(path, thumbs, legacy_thumbs, render, log):
     except Exception as exc:
         log(f'Thumbnail not possible ({path}): {exc}')
         return None
+
+
+def gallery_cards(ranked, top, thumbnail):
+    """Yield (rank, item, thumbnail name) for the first top items of ranked that get a thumbnail.
+
+    ranked is the full ranking of a gallery, best first; thumbnail(item) returns the
+    thumbnail's file name or None for a photo that is skipped (see ensure_thumbnail).
+    Ranks count only the photos shown, so a skipped photo leaves no gap, and lower-ranked
+    photos fill the gallery up to top cards (E12). Stops trying as soon as it is full.
+    """
+    rank = 0
+    for item in ranked:
+        if rank >= top:
+            return
+        name = thumbnail(item)
+        if name is not None:
+            rank += 1
+            yield rank, item, name

@@ -34,7 +34,7 @@ from .torch_build import (TORCH_VERSION, TORCHVISION_VERSION, TORCH_INDEX, CUDA_
 from .portable_python import (PYTHON_VERSION, PYTHON_URL, PYTHON_SHA256, PRIVATE_PYTHON)
 from .devices import (device_choices, cuda_hint, cuda_status, DETECTION_IMAGE_SIZE,
     detection_options, ULTRALYTICS_ENV, import_detector_class)
-from .thumbnails import (FULL_IMAGE_LABEL, crop_label, thumbnail_name, ensure_thumbnail)
+from .thumbnails import (FULL_IMAGE_LABEL, crop_label, thumbnail_name, ensure_thumbnail, gallery_cards)
 from .pipeline import (progress_line, progress_due, DRAFT_REDUCING_GAP, DRAFT_DECODING, draft_size,
     group_batches, store_group, prefetch)
 from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINAL_PHASES,
