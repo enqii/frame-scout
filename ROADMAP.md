@@ -24,8 +24,8 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       warning in `run.log` (E16 and E31 describe the same problem: close one as a
       duplicate; E33; check the behavior without internet, the first download must still
       work) (done 2026-10-28; open follow-up: E38)
-- [ ] (B) Model and config files stay under `.cache/`, also for manual runs (E9, I10; keeps
-      the uninstall clean)
+- [x] (B) Model and config files stay under `.cache/`, also for manual runs (E9, I10; keeps
+      the uninstall clean) (done 2026-10-29)
 
 ### P8 – Robust runs and galleries
 - [ ] (A) Skipped photos leave no gaps in the gallery (E12)

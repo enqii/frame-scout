@@ -416,7 +416,7 @@ the lists). Close FrameScout and any running search first. The script lists what
 will delete and what it keeps, and deletes only after you type `yes`.
 
 - **Deleted:** `.venv` (the Python environment), `.python` (the private Python), `.cache` (model weights and pip cache),
-  `.tmp` (temporary files, except `.tmp\eval`), `yolo11n.pt`, `.pytest_cache` and the
+  `.tmp` (temporary files, except `.tmp\eval`), `yolo11n.pt` (only left in the project folder by older versions), `.pytest_cache` and the
   compiled `__pycache__` folders of the program.
 - **Kept (listed):** `photos\`, `references\`, `results\` (including your marks
   in `marks.json`), `profiles.json` and its backup, `settings.json`, `run.log`, the
@@ -459,6 +459,13 @@ Manual start after installation:
 
 `profiles.json` exists once the app has been started; on a fresh clone use
 `--profiles .\profiles.example.json` instead.
+
+A manual run needs no environment variables: unless you have set them yourself, the engine
+puts the model weights and the Ultralytics settings under the project's `.cache\` (and
+the `yolo11n.pt` person detector under `.cache\ultralytics\`), like the `.bat` files do.
+An older `yolo11n.pt` in the project folder is moved there on the next search with person
+detection. Weights that earlier manual runs downloaded to your user profile are not reused
+or touched.
 
 The engine takes one or more photo folders, e.g.
 `framescout_engine.py D:\Event2024 E:\Holiday --profiles .\profiles.json --output .\results`.
@@ -554,4 +561,4 @@ for the formats. Status: not yet run with real models (E34).
 | `docs/ARCHITECTURE.md` | Architecture and runtime details for contributors |
 | `.claude/` | Claude Code project settings and the `/roadmap` workflow skill |
 | `profiles.json`, `settings.json`, `photos/`, `references/`, `results/`, `run.log` | User data and runtime output (not in the repo) |
-| `.venv/`, `.cache/`, `.tmp/`, `yolo11n.pt` | Environment, caches and model weights (not in the repo) |
+| `.venv/`, `.cache/`, `.tmp/` | Environment, caches and model weights, including `.cache/ultralytics/yolo11n.pt` (not in the repo) |
