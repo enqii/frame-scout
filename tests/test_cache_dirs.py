@@ -1,7 +1,11 @@
 """Model and config files stay under the project's .cache folder, also for manual runs (E9, I10)."""
+import subprocess
+import sys
 from pathlib import Path
 
 from framescout_core import DEFAULT_YOLO_MODEL, cache_paths, default_cache_env, yolo_weights
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_cache_paths_are_under_the_project_cache(tmp_path):
@@ -27,6 +31,17 @@ def test_default_cache_env_keeps_variables_a_user_set(tmp_path):
     # an empty value is not a folder: it counts as unset
     assert environ['TORCH_HOME'] == str(tmp_path / '.cache' / 'torch')
     assert 'HF_HOME' not in added and 'TORCH_HOME' in added
+
+
+def test_importing_framescout_core_imports_no_third_party_module():
+    # review: the engine calls default_cache_env after importing framescout_core, which is safe
+    # only while framescout_core loads nothing that reads the cache variables on import
+    script = ('import sys\nbefore = set(sys.modules)\nimport framescout_core\n'
+              'new = {m.split(".")[0] for m in set(sys.modules) - before}\n'
+              'print(sorted(new - set(sys.stdlib_module_names) - {"framescout_core"}))')
+    result = subprocess.run([sys.executable, '-c', script], cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == '[]'
 
 
 def test_yolo_weights_default_goes_to_the_cache(tmp_path):
