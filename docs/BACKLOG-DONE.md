@@ -65,7 +65,7 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
 - [x] **E6 – `path.stat()` outside `try`** in the export (line ~264): a file deleted in the
       meantime aborts the entire HTML export.
       (done 2026-10-21: `framescout_core.ensure_thumbnail` logs "Thumbnail not possible"
-      and the photo is skipped; thumbnail names are unchanged. Rank gaps: E12.)
+      and the photo is skipped; thumbnail names are unchanged. Rank gaps: fixed by E12.)
 - [x] **E7 – No cleanup:** `thumbnails/`, `cache.sqlite3` (deleted files, old
       signatures) and HTML files of renamed/deleted profiles grow without bound. Since
       I7 the thumbnail folder of older versions, `vorschaubilder/`, is no longer written
@@ -366,6 +366,27 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       log line if the move fails; a file of that name in the working folder is used as before; otherwise the cache
       path, where Ultralytics downloads it. The cache signature still gets `--yolo-model`
       unchanged, so nothing is invalidated. Unit-tested; no run with real models.)
+- [x] **E12 – Skipped photos leave gaps in the gallery:** a photo whose thumbnail fails
+      (deleted since scoring, unreadable) is skipped after the top-N cut, so the gallery
+      shows e.g. #2, #3, #4 and fewer than `--top` cards although lower-ranked photos
+      exist. Fix idea: rank only the photos that got a card and fill up to `--top`.
+      Also: `ensure_thumbnail` repeats the `stat()` done during scoring; the mtime could
+      be kept with the score (PR #6 review). Since P4 (A) the app's result gallery shows
+      the same gaps: `results.json` keeps the ranks of the HTML gallery.
+      (Done 2026-10-29, PR #44, roadmap P8 (A): `framescout_core.gallery_cards(ranked, top,
+      thumbnail)` yields `(rank, item, thumbnail name)` for the first `top` photos that get
+      a thumbnail; ranks count only shown photos, lower-ranked photos fill up, and it stops
+      trying once the gallery is full. The engine export passes the full sorted ranking
+      (no `[:args.top]` cut) through it, so HTML galleries and `results.json` have
+      contiguous ranks and still show `--top` cards if enough photos exist. Export progress
+      keeps the total `sum(min(--top, photos))`; a profile with too few photos that get a
+      thumbnail jumps to its planned count so the total is still reached. Not done: the
+      "Also" part (reuse the scoring mtime instead of the `stat()` in `ensure_thumbnail`):
+      that `stat()` is what detects a photo deleted since scoring; without it an existing
+      or legacy thumbnail would still produce a card for a deleted photo. No CLI,
+      `profiles.json`, cache signature or `results.json` format change. Unit-tested; engine
+      smoke run with a simulated thumbnail failure of the best photo gave cards #1–#5 for
+      `--top 5`.)
 
 ### App (`app.py`)
 

@@ -110,7 +110,8 @@ the module of its area and to the re-exports in `__init__.py`.
   (an unreadable file: `ValueError` naming it), the check of `save_marks` and
   `save_copy_folder` (review of A22, A33).
 - `thumbnails.py`: `thumbnail_name`/`ensure_thumbnail` (gallery thumbnails; a photo
-  deleted before the export is skipped, E6), `crop_label`/`FULL_IMAGE_LABEL` (gallery crop
+  deleted before the export is skipped, E6), `gallery_cards` (the first `top` photos of a
+  ranking that get a thumbnail, with ranks counting only shown photos, E12), `crop_label`/`FULL_IMAGE_LABEL` (gallery crop
   labels).
 - `pipeline.py`: `progress_line`/`progress_due` (the progress line the engine logs for
   people, A11), `prefetch`/`group_batches`/`store_group`/`draft_size`/`DRAFT_DECODING`
@@ -665,7 +666,11 @@ storage" after the user's selection (E7, E11).
 Outputs one ranked `.html` file per profile (`<slug>.html` from
 `framescout_core.profile_slugs`: ASCII transliteration, `-2`, `-3`, … on collisions in
 profile order, hash fallback), with separate JPEG thumbnails in `results/thumbnails/` and
-`file://` links to originals. Keep the output folder intact; exporting an HTML file on its
+`file://` links to originals. The export walks the full sorted ranking of a profile through
+`gallery_cards`: a photo whose thumbnail fails (E6) is skipped, lower-ranked photos fill up
+to `--top`, so ranks in the galleries and in `results.json` are contiguous (E12). The
+export progress total is `sum(min(--top, photos))`; a profile with too few photos that get
+a thumbnail jumps to its planned count. Keep the output folder intact; exporting an HTML file on its
 own does **not** embed thumbnails. After `results.json` is written, still holding the run
 lock, the engine calls `auto_cleanup`: it removes temporary thumbnails
 (`<hash>.jpg.<random>.jpg`, left by a stop during the export, E13) and thumbnails (both

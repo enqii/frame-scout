@@ -16,13 +16,6 @@ and discussions.
 
 ### Engine (`framescout_engine.py`)
 
-- [ ] **E12 – Skipped photos leave gaps in the gallery:** a photo whose thumbnail fails
-      (deleted since scoring, unreadable) is skipped after the top-N cut, so the gallery
-      shows e.g. #2, #3, #4 and fewer than `--top` cards although lower-ranked photos
-      exist. Fix idea: rank only the photos that got a card and fill up to `--top`.
-      Also: `ensure_thumbnail` repeats the `stat()` done during scoring; the mtime could
-      be kept with the score (PR #6 review). Since P4 (A) the app's result gallery shows
-      the same gaps: `results.json` keeps the ranks of the HTML gallery.
 - [ ] **E15 – No `Image.draft` with person detection:** since E2 photos are decoded at
       reduced scale only without person detection; with detection they keep full
       resolution, because a person crop in a group photo can be smaller than CLIP's
