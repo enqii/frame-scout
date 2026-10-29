@@ -161,9 +161,10 @@ For every worktree under `.claude/worktrees/` (`git worktree list`):
 
 1. If `git -C <path> status --porcelain` is empty and `git -C <path> log --oneline origin/<branch>..HEAD`
    is empty (fully pushed; without a remote branch: `origin/main..HEAD`), the worktree holds
-   nothing: `git worktree remove <path>`. If it is locked, unlock it first
-   (`git worktree unlock <path>`) when the lock reason names a pid that no longer runs
-   (`Get-Process -Id <pid>` in PowerShell fails) or the agent that holds it has finished.
+   nothing: `git worktree remove <path>`. With a detached HEAD there is no branch: skip the
+   worktree and report it. If it is locked, unlock it first (`git worktree unlock <path>`)
+   when the lock reason names a pid that no longer runs (Bash: `ps -p <pid>` fails;
+   PowerShell: `Get-Process -Id <pid>` fails) or the agent that holds it has finished.
 2. Then delete leftover `worktree-agent-*` branches without a worktree with
    `git branch -d <branch>` when `git log --oneline origin/main..<branch>` is empty.
 3. Uncommitted or unpushed work is never removed: first row of the state machine (report).
@@ -263,4 +264,9 @@ neither is a PR labeled `fs:review-done` without findings on it. Check
 `gh pr view <n> --json comments --jq '.comments | length'`. If the findings are not there,
 post the findings from the reviewer's report yourself as one numbered comment
 (`gh pr comment <n> --body-file <file>`: number, `file:line`, severity, issue) and set
-`fs:review-done`. Do not rerun the review (one review round).
+`fs:review-done`. Do not rerun `/code-review` (one review round).
+
+The orchestrator is stateless: if the report is gone (new session), read the findings from
+the reviewer's output file when its path is known. Otherwise ask the user to choose between
+accepting the PR without review findings and a fresh reviewer that only reads the PR and
+posts its own numbered findings (no `/code-review` run).

@@ -32,9 +32,9 @@ nothing, by you as below) and the label change.
    comment.
 3. Only after the findings (or the "no findings" comment) are on the PR, swap the state label:
    `gh pr edit {PR} --remove-label fs:needs-review --add-label fs:review-done`
-   (if `gh` is not on `PATH`, use the path given in `CLAUDE.md` -> "Git and commits").
+   (if `gh` is not on `PATH`, use the path given in `CLAUDE.md` → "Git and commits").
 4. Return a short summary to the orchestrator: number of findings by severity, one line
-   per finding (file:line - issue), whether any finding looks like a blocker, and where the
+   per finding (file:line – issue), whether any finding looks like a blocker, and where the
    comments are (inline, or your numbered comment). Do not paste the full review.
 
 Review against `CLAUDE.md` as well: project language English, Conventional Commits,

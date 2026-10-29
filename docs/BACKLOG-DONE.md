@@ -906,4 +906,4 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       worktree cleanup step (clean, fully pushed worktrees are removed, dead locks are
       unlocked, merged `worktree-agent-*` branches are deleted with `-d`). Markdown only,
       nothing executed; `.claude/settings.json` is unchanged, so `git worktree remove` and
-      `git branch -D` still ask. Follow-ups: I27, I28, I29.)
+      `git branch -D` still ask. Follow-ups: I27, I28, I29. E40–E43 and A36 in the same PR are PR #42's out-of-round findings.)
