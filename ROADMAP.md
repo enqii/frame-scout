@@ -8,6 +8,11 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
 
 ## Open (priority order)
 
+### P5b – Workflow (added 2026-10-29, user decision in chat)
+- [x] Review comments are verified on the PR and posted by the reviewer if the skill posted
+      nothing; worktrees and `worktree-agent-*` branches are cleaned up as a fixed step of
+      `/roadmap` (I26; open follow-ups: I27, I28, I29) (done 2026-10-29)
+
 ### P6 – Safety of user data (added 2026-10-27 from the open backlog)
 - [x] (A) Concurrent profile edits no longer overwrite each other (A13) (done 2026-10-27;
       more than one backup generation: A30, deferred by user decision: single `.bak` kept)

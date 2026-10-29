@@ -135,7 +135,9 @@ second review follows your fixes):
    reply when they do not make a statement wrong. If you decline because the work is valid but out of scope, add it to
    `BACKLOG.md` as a new item (see `CLAUDE.md`) and name the new ID in the reply. Reply to inline review comments with
    `gh api repos/enqii/frame-scout/pulls/{PR}/comments/<comment_id>/replies -f body=...`
-   (or `-F body=@<file>`); reply to general PR comments with `gh pr comment {PR}`.
+   (or `-F body=@<file>`); reply to general PR comments with `gh pr comment {PR}`. If the reviewer
+   posted its findings as one numbered general comment, answer them in one `gh pr comment`
+   that repeats each number with its outcome.
 3. Add a section "Review: addressed / declined" to the PR description listing each
    finding with its outcome, and post the same summary as a PR comment.
 4. Re-run the tests locally, wait quietly for CI on the latest push as above (every
