@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 import framescout_core
-from framescout_core import ensure_thumbnail, gallery_cards, thumbnail_name
+from framescout_core import SkippedPhotos, ensure_thumbnail, gallery_cards, thumbnail_name
 
 
 def make_photo(folder, name='photo.jpg', mtime_ns=1_700_000_000_000_000_000):
@@ -147,3 +147,33 @@ def test_gallery_cards_show_fewer_cards_when_too_few_photos_have_a_thumbnail():
     cards = list(gallery_cards(['a', 'b', 'c'], 5, lambda photo: None if photo == 'a' else photo + '.jpg'))
     assert cards == [(1, 'b', 'b.jpg'), (2, 'c', 'c.jpg')]
     assert list(gallery_cards([], 5, lambda photo: 'x.jpg')) == []
+
+
+def test_a_skipped_photo_is_tried_and_logged_once_per_export(tmp_path):
+    # a photo that ranks in several galleries is not decoded and logged again (review of E12)
+    thumbs = tmp_path / 'thumbnails'
+    thumbs.mkdir()
+    good, missing = make_photo(tmp_path, 'good.jpg'), tmp_path / 'missing.jpg'
+    calls, log = [], []
+    skipped = SkippedPhotos(log.append)
+    for _ in range(3):
+        assert skipped.thumbnail(missing, thumbs, tmp_path / 'vorschaubilder', renderer(calls)) is None
+        assert skipped.thumbnail(good, thumbs, tmp_path / 'vorschaubilder', renderer(calls)) == \
+            thumbnail_name(good, good.stat().st_mtime_ns)
+    assert len(log) == 1 and log[0].startswith(f'Thumbnail not possible ({missing}): ')
+    assert [path for path, _ in calls] == [good]
+    assert skipped.summary() is None
+
+
+def test_only_the_first_skipped_photos_are_logged_then_a_summary(tmp_path):
+    # a vanished photo folder must not flood run.log with one line per photo and gallery
+    thumbs = tmp_path / 'thumbnails'
+    thumbs.mkdir()
+    log = []
+    skipped = SkippedPhotos(log.append, limit=2)
+    for name in ('a.jpg', 'b.jpg', 'c.jpg', 'd.jpg'):
+        assert skipped.thumbnail(tmp_path / name, thumbs, tmp_path / 'vorschaubilder', renderer([])) is None
+    assert [line.split(': ')[0] for line in log] == [f'Thumbnail not possible ({tmp_path / "a.jpg"})',
+                                                    f'Thumbnail not possible ({tmp_path / "b.jpg"})']
+    assert skipped.summary() == ('4 photos got no thumbnail and are left out of the galleries; '
+                                 'only the first 2 are listed above.')
