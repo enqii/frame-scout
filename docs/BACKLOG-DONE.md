@@ -1052,16 +1052,20 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       Streamlit's `AppTest` (a junction between two listed folders; not part of the test
       suite, so the `app.py` change has no automated test); the folder symlink test is
       skipped without privilege.)
+- [x] **A6 – Folder count on every rerun:** `rglob` over the whole photo folder on every
+      interaction; slow for large folders/network drives.
+      (closed 2026-10-30 as a duplicate of A27, fixed in PR #53)
 - [x] **A27 – The photo folder is scanned on every rerun:** the "Photo source" tab counted
       the photos at module level, so every widget interaction walked the whole photo tree
       again. Found in the PR #26 review.
-      (done 2026-10-30 in PR #53; A6 was the same problem, see below. The count is
+      (done 2026-10-30 in PR #53; A6 was the same problem, see above. The count is
       remembered per browser session: `framescout_core.remembered_scans` (stdlib only)
       keeps the `scan_each_folder` result in `st.session_state['photo_count']`, keyed on
       the folder paths, the readable formats and the output folder, and scans again only
       when that key changes, on the new "Recount" button, or in a new session. The
       existing folders are still checked with `is_dir` on every run, so a reconnected
-      drive recounts. UX choice (needs the user's confirmation at merge): no automatic
+      drive recounts, and with no existing folder the remembered count is dropped, so
+      the same folder is counted again when it is back (review). UX choice: no automatic
       refresh within a session; the caption "Counted at HH:MM:SS" shows the age and
       "Recount" refreshes it. The search itself always scans again, so a stale count
       never affects results. Alternatives not chosen: recount after a fixed age (a TTL),
@@ -1069,6 +1073,3 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       CLI, `ENGINE` or results. Tested with unit tests of `remembered_scans` and one
       Streamlit `AppTest` run; not tested in a real browser or on a large/network
       folder.)
-- [x] **A6 – Folder count on every rerun:** `rglob` over the whole photo folder on every
-      interaction; slow for large folders/network drives.
-      (closed 2026-10-30 as a duplicate of A27, fixed in PR #53)
