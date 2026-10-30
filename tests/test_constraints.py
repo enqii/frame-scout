@@ -6,6 +6,7 @@ exactly. Standard library only, like the rest of the suite in CI. Whether constr
 every transitive dependency needs the packages' metadata and is checked when the lock is
 refreshed (pip install --dry-run --report), not here.
 """
+import ast
 import re
 from pathlib import Path
 
@@ -153,5 +154,8 @@ def test_streamlit_floor_allows_the_width_parameter():
     specifiers = requirements('requirements.txt')['streamlit']
     floors = [wanted for op, wanted in specifiers if op == '>=']
     assert floors and all(version_key(wanted) >= version_key('1.48') for wanted in floors)
-    source = (ROOT / 'app.py').read_text(encoding='utf-8')
-    assert 'use_container_width' not in source, 'use width="stretch" instead (A10)'
+    # only call keywords count, so a comment or string that names the old parameter does not
+    # fail the test (A10, review)
+    tree = ast.parse((ROOT / 'app.py').read_text(encoding='utf-8'))
+    keywords = {node.arg for node in ast.walk(tree) if isinstance(node, ast.keyword)}
+    assert 'use_container_width' not in keywords, 'use width="stretch" instead (A10)'
