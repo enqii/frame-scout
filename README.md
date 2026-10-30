@@ -279,7 +279,8 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
 - `results/results.json` lists what the galleries of the last finished search show
   (date, photo folders, settings and, per profile, the ranked photos with their scores and
   thumbnails); the app reads it to show the results. It is replaced at the end of every
-  search that finishes, so a stopped search keeps showing the previous results. Results
+  search that finishes, together with the galleries (they are written to temporary files
+  first), so a stopped search keeps both the previous results and galleries. Results
   folders of earlier versions have no such file: the app then lists their HTML files by
   name until the next search. Since several photo folders per search, the file has
   format 2 (`photo_folders`, a list, instead of `photo_folder`); the app still reads
@@ -304,7 +305,8 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
   kept gallery links them.)
 - At the end of every finished search FrameScout removes, by itself, the thumbnails that
   neither the last search nor any HTML file in `results/` shows (e.g. of photos that
-  dropped out of the results) and temporary thumbnail files a stopped search left behind.
+  dropped out of the results) and temporary thumbnail and result files a stopped search
+  left behind (only files older than a minute).
 - The gallery file is named after the profile in plain ASCII, e.g. "Red car" →
   `red-car.html`, "Bär" → `baer.html`; names that would collide get `-2`, `-3`, … in
   profile order, and names without Latin letters or digits (e.g. "猫") get a short hash.

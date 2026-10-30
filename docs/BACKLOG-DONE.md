@@ -392,6 +392,39 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       `--top 5`; after the review a second smoke run with five failing photos, two profiles
       and a log limit of 1 gave two full `Top 5` galleries with ranks 1–5, one logged
       photo plus the count line, and export progress 1–10 of 10.)
+- [x] **E24 – An interrupted export leaves galleries newer than `results.json`:** the
+      engine writes `results.json` only after all galleries, so a search stopped while it
+      writes the galleries has already replaced some HTML files, while the app still shows
+      the previous complete search (its date is shown, and the status says that the last
+      run did not finish). Opening such a gallery from the app shows the newer, partial
+      result. Fix idea: write the galleries under temporary names and publish them
+      together with `results.json` at the end. Found in PR #14.
+      (Done 2026-10-30, PR #45, roadmap P8 (B): the engine keeps each gallery's HTML in
+      memory and calls `framescout_core.publish_export(output, pages, document)` at the
+      end. It writes all galleries and `results.json` in full to `<name>.<random>.tmp`
+      (fsync), then renames them in profile order, `results.json` last
+      (`_common._publish_together`, each rename retried 40 x 50 ms). A stop or failure while
+      writing leaves the previous galleries and `results.json`. The gallery path lines in
+      the log now come after the export. Galleries are written as bytes: `\n` line ends on
+      Windows too. Residual window of the renames: E45. No CLI, `profiles.json`, cache or
+      `results.json` format change. Unit-tested; CPU engine smoke run with 4 synthetic
+      photos and 2 profiles; a real stop during the export was not reproduced.)
+- [x] **E26 – Other temporary files of a stopped run stay in `results/`:** the atomic
+      writes of `run-status.json` and `results.json` (and of `marks.json` by the app) go
+      through `<name>.<random>.tmp`; `terminate()`/`kill()` during such a write leaves that
+      file behind, like the thumbnails of E13. They are small and rare, and the cleanup
+      of E7 does not remove them (an app session may be writing `marks.json` at that
+      moment). Fix idea: remove `run-status.json.*.tmp` and `results.json.*.tmp` older than
+      a minute in `auto_cleanup`. Found in PR #18.
+      (Done 2026-10-30, PR #45, roadmap P8 (B): `auto_cleanup(results, now=None)` also
+      removes `run-status.json.*.tmp`, `results.json.*.tmp`, `marks.json.*.tmp` and
+      `<gallery>.html.*.tmp` (random part exactly 8 chars of `[a-z0-9_]`) that are at least
+      `STALE_TEMP_AGE` = 60 s old, even if `results.json` cannot be read; the age limit
+      protects a write an app session is doing right now. The summary gets `temporary`; the
+      engine log line reads "Removed N unused thumbnails or temporary files (size)". The
+      app's "Clean up storage" is unchanged. Temporary files of the app's writes in the
+      project folder: E44. Unit-tested; the same smoke run removed two stale temporary
+      files and kept a fresh one.)
 
 ### App (`app.py`)
 
