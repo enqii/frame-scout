@@ -170,3 +170,14 @@ def remove_marks(path, entries, attempts=5, retry_delay=0.05, lock_timeout=MARKS
     _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
                    attempts, retry_delay, lock_timeout)
     return removed
+
+
+def hide_no_match(cards, marks):
+    """Return (the cards not marked as no match, how many were left out) (A24).
+
+    cards are result cards with a "path", marks one profile's marks of read_marks. The app
+    applies it to the cards of one gallery page, after paginating the whole ranked list, so
+    hiding the rejects of a page never pulls photos of the following pages up into it.
+    """
+    kept = [card for card in cards if marks.get(card['path']) != MARK_NO_MATCH]
+    return kept, len(cards) - len(kept)

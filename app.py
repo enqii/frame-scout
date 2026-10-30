@@ -21,7 +21,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
-                             feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
+                             feature_signature, finish_reference_move, forget_copy_folder, hide_no_match, lock_held, open_command, openable_photo, page_cards, page_count,
                              profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
@@ -704,18 +704,25 @@ def show_results(results, photo_folders):
                    f'change the file. Fix or remove it in the results folder.\n\nDetails: {plain(str(marks_error))}')
     marks = all_marks.get(name, {})
     can_mark = marks_error is None and states[name] != 'missing'
-    hide = st.checkbox('Hide photos marked as no match', key='hide_rejected')
-    cards = [c for c in entry['cards'] if not (hide and marks.get(c['path']) == MARK_NO_MATCH)]
-    if hide and len(cards) < len(entry['cards']):
-        st.caption(f"{len(entry['cards']) - len(cards):,} photos marked as no match are hidden.")
-    pages = page_count(len(cards), GALLERY_PAGE_SIZE)
+    hide = st.checkbox('Hide photos marked as no match', key='hide_rejected',
+                       help='Hides them on the page shown; every page keeps its photos, so the ranks of a page '
+                            'stay the same.')
+    # the whole ranked list is paginated and the rejects are hidden within the page shown
+    # (A24): filtering first pulled the photos of the following pages up into this one
+    pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
     page = 1
     if pages > 1:
         key = 'results_page_' + name
         if st.session_state.get(key, 1) not in range(1, pages + 1):
             st.session_state.pop(key, None)  # a page of a longer list of an earlier search
         page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key)
-    shown = page_cards(cards, page, GALLERY_PAGE_SIZE)
+    shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
+    if hidden and not shown:
+        st.caption(f"All {hidden:,} photos of this page are marked as no match and hidden."
+                   + (' The next page may hold photos still to check.' if page < pages else ''))
+    elif hidden:
+        st.caption(f"{hidden:,} photo{'s' if hidden != 1 else ''} of this page marked as no match "
+                   f"{'are' if hidden != 1 else 'is'} hidden.")
     st.caption('"Open" and "Folder" use the programs of the computer FrameScout runs on. Mark each photo you have '
                'checked as Match or No match; marks are kept for this profile across searches.')
     mark_keys = {}
