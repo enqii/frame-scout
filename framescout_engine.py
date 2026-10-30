@@ -22,7 +22,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
                              final_status, yolo_weights,
-                             SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
+                             RawFallback, SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
                              load_profiles, missing_decoder, missing_folders_message, model_problem,
                              output_folder_problem, photo_name,
@@ -301,6 +301,8 @@ def search(args, parser, roots, dropped, output, status):
     search_model = MODELS[args.model]
     scan = scan_folders(roots, supported_extensions(DECODERS), exclude=output)
     paths = scan.paths
+    # the RAW file of a JPEG/HEIC partner that cannot be decoded is analyzed instead (E30)
+    raw_fallback = RawFallback(scan)
     # files that are not analyzed are named, not skipped without a note (E25); a missing
     # decoder is named only if the folder has files of it (review)
     for line in skipped_lines(scan, DECODERS):
@@ -402,15 +404,39 @@ def search(args, parser, roots, dropped, output, status):
         # the status file is written at most once a second, the last photo always (A5)
         status.update(done=done, new=fresh, cached=reused, errors=errors, force=done == len(paths))
 
+    def cached(path):
+        """True if the cache has the features of path with its current modification time and size."""
+        stat = path.stat()
+        record = con.execute('SELECT mtime_ns,size FROM features WHERE path=? AND signature=?', (str(path), signature)).fetchone()
+        return record == (stat.st_mtime_ns, stat.st_size)
+
     def prepared(todo, pool, ahead):
-        """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped."""
+        """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped.
+
+        A JPEG/HEIC that fails with a RAW file of the same shot skipped for it is replaced
+        by that RAW file (E30): it is taken from the cache or decoded here, in this thread,
+        and counts for the shot instead of the failure.
+        """
         for path, future in prefetch(lambda item: pool.submit(prepare, item), todo, ahead):
             try:
                 stat, labels, pixels = future.result()
             except Exception as exc:
                 print(f'ERROR {path}: {exc}', flush=True)
-                finished(failed=1)
-                continue
+                raw = raw_fallback.take(path)
+                if raw is None:
+                    finished(failed=1)
+                    continue
+                print(f'Analyzing its RAW file instead: {raw}', flush=True)
+                try:
+                    if cached(raw):
+                        finished(cached=1)
+                        continue
+                    stat, labels, pixels = prepare(raw)
+                except Exception as raw_exc:
+                    print(f'ERROR {raw}: {raw_exc}', flush=True)
+                    finished(failed=1)
+                    continue
+                path = raw
             yield path, stat, labels, pixels
 
     def store(group):
@@ -436,13 +462,12 @@ def search(args, parser, roots, dropped, output, status):
         todo = []
         for path in paths:
             try:
-                stat = path.stat()
-                record = con.execute('SELECT mtime_ns,size FROM features WHERE path=? AND signature=?', (str(path), signature)).fetchone()
+                hit = cached(path)
             except Exception as exc:
                 print(f'ERROR {path}: {exc}', flush=True)
                 finished(failed=1)
                 continue
-            if record == (stat.st_mtime_ns, stat.st_size):
+            if hit:
                 finished(cached=1)
             else:
                 todo.append(path)
@@ -472,8 +497,10 @@ def search(args, parser, roots, dropped, output, status):
     scored, crop_labels, mtimes = [], [], []
     text_scores = {p['name']: [] for p in profiles}
     visual_scores = {p['name']: [] for p in profiles}
-    for number, path in enumerate(paths, 1):
-        status.update(done=number, force=number == len(paths))
+    # a RAW file analyzed for its broken partner is scored and shown in its place (E30)
+    analyzed = raw_fallback.photos(paths)
+    for number, path in enumerate(analyzed, 1):
+        status.update(done=number, force=number == len(analyzed))
         try:
             stat = path.stat()
             record = con.execute('SELECT mtime_ns,size,labels,vectors FROM features WHERE path=? AND signature=?',
