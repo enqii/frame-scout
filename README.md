@@ -308,8 +308,9 @@ A multilingual model may become an option later ([BACKLOG.md](BACKLOG.md), E21).
 - The gallery file is named after the profile in plain ASCII, e.g. "Red car" →
   `red-car.html`, "Bär" → `baer.html`; names that would collide get `-2`, `-3`, … in
   profile order, and names without Latin letters or digits (e.g. "猫") get a short hash.
-- A photo that is deleted or moved while a search runs is left out of the galleries;
-  the log names it ("Thumbnail not possible").
+- A photo that is deleted or moved while a search runs is left out of the galleries,
+  and the next photo of the ranking takes its place; the log names it ("Thumbnail not
+  possible"), after 50 such photos it only counts the rest.
 - Keep the `results` folder together: an HTML file exported on its own contains no
   thumbnails, and the links to the originals only work on this computer.
 - While a search runs, `results/run.lock` marks it as running and
