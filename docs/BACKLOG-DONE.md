@@ -1085,3 +1085,69 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       CLI, `ENGINE` or results. Tested with unit tests of `remembered_scans` and one
       Streamlit `AppTest` run; not tested in a real browser or on a large/network
       folder.)
+- [x] **A24 – "Hide photos marked as no match" reflows the pages; mark buttons look
+      alike:** user report on 2026-10-25 after A17. Marking the photos of page 1 and then
+      ticking the checkbox shows undecided photos of the following pages on page 1.
+      Cause (`app.py`, the result gallery): the cards are filtered first and paginated
+      afterwards (`cards` → `page_count` → `page_cards`), so hiding the rejects of page 1
+      pulls the next undecided photos up into it, and every page after it shifts too. The
+      page selector then no longer matches the ranks the user just worked through. Fix
+      idea: paginate the full ranked list and hide the no-match photos only within the
+      shown page (caption "N photos of this page marked as no match are hidden"); the
+      drawback is a page that is empty when everything on it was rejected. Alternative
+      (user decision): a filter "Show: all / undecided only / matches" over the whole list
+      with its own pages, which also serves "what is left to check". Second request: a
+      different color per state. `st.segmented_control` has no per-option colors; idea
+      (not run in a browser): wrap the control in a container with a key naming the state
+      (`markstate_match`, `markstate_nomatch`, `markstate_open`) and color the selected
+      segment from the global `<style>` block through `.st-key-markstate_…` and
+      `[data-testid="stBaseButton-segmented_controlActive"]` (Streamlit 1.66.1 internals,
+      so check it after upgrades; keep contrast in the dark theme). The marks and
+      `marks.json` stay unchanged. Found after PR #16.
+      (done 2026-10-30 in PR #55: the gallery paginates the whole ranked list and
+      `framescout_core.hide_no_match(cards, marks)` (stdlib only) hides the rejects within
+      the shown page only, with the caption "N photos of this page marked as no match are
+      hidden"; a page where everything was rejected says "All N photos of this page are
+      marked as no match and hidden" and points to the next page. The checkbox got a help
+      text. The selected mark option is colored per state (match green, no match red,
+      undecided unchanged) by one `<style>` block per page from `mark_colors` in `app.py`,
+      targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]` with
+      `!important` to beat Streamlit's own rule for the selected button (Streamlit 1.66
+      internals: check it after upgrades). The alternative "Show: all / undecided only /
+      matches" filter over the whole list was not built. Not verified: the colors in a real
+      browser or in the dark theme (only the generated style block and an `AppTest` run).
+      Tested with unit tests of `hide_no_match`. No change to `marks.json`, `results.json`,
+      `settings.json` or the CLI.)
+- [x] **A26 – No way back to the default AI settings:** user request on 2026-10-25. Once a
+      value of the AI settings tab is changed (compute device, batch size, maximum matches,
+      person detection, maximum persons, minimum confidence, reference weight), nothing
+      shows what the default was or restores it; only the saved device has "Use auto from
+      now on". The defaults live in `framescout_core.default_settings` and are not shown
+      anywhere except the reference weight's help text. Fix idea: a "Reset to defaults"
+      button (disabled while a search runs) that sets the widgets' `setting_<name>` session
+      state to `DEFAULT_SETTINGS` for these settings only, not the photo folder, which is
+      the user's data location and sits in the other tab (user decision whether it
+      belongs in). `save_settings` already writes only values that differ from the
+      defaults, so the next save drops them from `settings.json`. The values are set before
+      the widgets are drawn, never as `value=` (CLAUDE.md gotcha, PR #10), and
+      `reconcile_settings` must treat the reset as a change made in this session, so
+      another session's saved values do not win. Also show the default next to each
+      setting (e.g. in its help text, built from `DEFAULT_SETTINGS` so it cannot drift) and
+      mark a changed value. Not a search-quality change, since the defaults stay as they
+      are.
+      (done 2026-10-30 in PR #55: a "Reset to defaults" button on the AI settings tab,
+      disabled while a search runs or when every AI setting already has its default. It
+      resets `framescout_core.AI_SETTINGS` (model, device, batch size, maximum matches,
+      person detection, maximum persons, minimum confidence, reference weight), not the
+      photo folders, through an `on_click` callback that writes the `setting_<name>`
+      session state and records `st.session_state.settings_reset`. `reconcile_settings(...,
+      reset=())` treats those settings as changed in this session, so another session's
+      saved value or a substituted device does not win; the pending reset is cleared after
+      a successful save (or when nothing changed). The next save drops the reset values
+      from `settings.json`. Every AI setting's help text ends with "Default: ..."
+      (`setting_text`, built from `DEFAULT_SETTINGS`), and a caption lists the settings
+      that differ (`changed_from_defaults`) or says all have their defaults. The search
+      model is included in the reset although this entry predates the model selector
+      (E22), since it sits on the same tab. Tested with unit tests of `reconcile_settings`
+      with `reset`, `changed_from_defaults`, `setting_text` and `AI_SETTINGS`; the button
+      itself was run with Streamlit's `AppTest` only, not in a real browser.)

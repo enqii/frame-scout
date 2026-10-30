@@ -162,18 +162,21 @@ the module of its area and to the re-exports in `__init__.py`.
   (the cache tables with the `signatures` side table, and which engine version and
   settings a cached row belongs to, E11).
 - `settings.py`:
-  `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`DEVICES`/`LEGACY_PHOTO_FOLDER`/`default_settings`/`folder_lines`/`read_settings`/`save_settings`/`reconcile_settings`
+  `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`AI_SETTINGS`/`DEVICES`/`LEGACY_PHOTO_FOLDER`/`default_settings`/`folder_lines`/`read_settings`/`save_settings`/`reconcile_settings`/`changed_from_defaults`/`setting_text`
   (the app's `settings.json`, the ranges of its widgets, the engine's `--device` choices,
-  and the sync of the widgets with the file, A8).
+  the sync of the widgets with the file, A8, and the settings of the AI tab with the
+  "Default: …" texts and the reset, A26).
 - `results.py`:
   `RESULTS_FILE`/`RESULTS_FORMAT`/`result_card`/`results_document`/`publish_export`/`read_results`/`search_fingerprint`/`profile_fingerprints`/`profile_state`/`GALLERY_PAGE_SIZE`/`page_count`/`page_cards`/`openable_photo`/`open_command`/`reveal_command`
   (the result file of a search and the app's gallery: validation of the file (plain
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
-- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`
+- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`hide_no_match`
   (the user's marks, A17; `delete_marks` removes all marks of a deleted profile, A22;
   `remove_marks(path, entries)` removes single `(profile, photo path)` marks for the cleanup, E8;
-  `save_marks(..., profiles_file=...)` saves only for a name that is a profile now).
+  `save_marks(..., profiles_file=...)` saves only for a name that is a profile now;
+  `hide_no_match(cards, marks)` returns the cards not marked as no match and how many it
+  left out, applied to the cards of one gallery page, A24).
 - `copying.py`:
   `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`/`forget_copy_folder`
   (copying marked matches and their saved target folders in `settings.json`, A17;
@@ -858,7 +861,16 @@ records: `settings_seen` (the saved value last taken from or written to the file
 written, e.g. rounded) and `settings_shown` (the value the widget showed; they differ for
 slider noise and for the device substitute). A widget that differs from `settings_shown`
 was changed in this session and is saved; a saved value that differs from `settings_seen`
-came from another session and is shown, so the latest action wins. A Start in a page run
+came from another session and is shown, so the latest action wins. The "Reset to defaults" button of the AI settings tab (A26,
+disabled while a search runs or when `changed_from_defaults` is empty) resets
+`AI_SETTINGS` (the model included, the photo folders not) in an `on_click` callback that
+writes the `setting_<name>` session state (before the widgets are drawn, never `value=`)
+and sets `st.session_state.settings_reset`; `reconcile_settings(..., reset=)` counts those
+settings as changed in this session, so another session's saved value or a substituted
+device does not win, and the key is cleared after a successful save or when nothing
+changed. `save_settings` then drops the default values from the file. The help text of each
+setting ends with "Default: …" (`setting_text` on `DEFAULT_SETTINGS`) and a caption lists the
+settings that differ. A Start in a page run
 that took over such values is refused once with a note. `save_settings` holds a `RunLock`
 on `settings.json.lock` around its read-merge-write (sessions are threads of one process).
 The widgets take their ranges from `SETTING_RANGES`; `system_info` (which imports torch)
@@ -905,7 +917,13 @@ file is never replaced). A21 (marks follow the absolute path) is closed as won't
 renamed or moved photo counts as a new photo, its old mark stays until cleaned up. The control on each
 card is an `st.segmented_control` whose session state is set from the file before it is
 drawn on every run of the gallery fragment (no `default=`), so the file is the truth also
-for other tabs; its `on_change` saves. A rename in the profile tab calls `rename_marks`
+for other tabs; its `on_change` saves. The gallery paginates the whole ranked list and
+"Hide photos marked as no match" (`hide_no_match`) then hides the rejects within the shown
+page only, so ranks and pages stay stable (A24; a page of only rejects says so). The
+selected option is colored by state (green match, red no match) by one `<style>` block per
+page from `mark_colors`, targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]`
+with `!important`; this relies on Streamlit 1.66 internals, so check it after Streamlit
+upgrades (not verified in a real browser or the dark theme). A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
 that are no longer search profiles cannot be marked and their "Copy to folder" field is
 disabled. A gallery drawn before its profile was renamed or deleted (another tab) still
@@ -1239,6 +1257,10 @@ listed folder, repeated file ids, link loops without file ids and an unreadable 
 A29, `test_photos.py`),
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
+hiding no-match photos per page (`hide_no_match`, `test_marks.py`) and the AI settings reset
+(`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
+`test_settings.py`; A24, A26; the buttons and the mark colors were run with `AppTest`/the
+generated style only, not in a browser),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search

@@ -237,42 +237,6 @@ and discussions.
       marked as no match as "not this" examples of a profile, e.g. by lowering the score
       of photos similar to the rejects. This changes search quality, so it needs a local
       evaluation set first (hold point). Out of scope of P4 (B) (user decision on A17).
-- [ ] **A24 – "Hide photos marked as no match" reflows the pages; mark buttons look
-      alike:** user report on 2026-10-25 after A17. Marking the photos of page 1 and then
-      ticking the checkbox shows undecided photos of the following pages on page 1.
-      Cause (`app.py`, the result gallery): the cards are filtered first and paginated
-      afterwards (`cards` → `page_count` → `page_cards`), so hiding the rejects of page 1
-      pulls the next undecided photos up into it, and every page after it shifts too. The
-      page selector then no longer matches the ranks the user just worked through. Fix
-      idea: paginate the full ranked list and hide the no-match photos only within the
-      shown page (caption "N photos of this page marked as no match are hidden"); the
-      drawback is a page that is empty when everything on it was rejected. Alternative
-      (user decision): a filter "Show: all / undecided only / matches" over the whole list
-      with its own pages, which also serves "what is left to check". Second request: a
-      different color per state. `st.segmented_control` has no per-option colors; idea
-      (not run in a browser): wrap the control in a container with a key naming the state
-      (`markstate_match`, `markstate_nomatch`, `markstate_open`) and color the selected
-      segment from the global `<style>` block through `.st-key-markstate_…` and
-      `[data-testid="stBaseButton-segmented_controlActive"]` (Streamlit 1.66.1 internals,
-      so check it after upgrades; keep contrast in the dark theme). The marks and
-      `marks.json` stay unchanged. Found after PR #16.
-- [ ] **A26 – No way back to the default AI settings:** user request on 2026-10-25. Once a
-      value of the AI settings tab is changed (compute device, batch size, maximum matches,
-      person detection, maximum persons, minimum confidence, reference weight), nothing
-      shows what the default was or restores it; only the saved device has "Use auto from
-      now on". The defaults live in `framescout_core.default_settings` and are not shown
-      anywhere except the reference weight's help text. Fix idea: a "Reset to defaults"
-      button (disabled while a search runs) that sets the widgets' `setting_<name>` session
-      state to `DEFAULT_SETTINGS` for these settings only, not the photo folder, which is
-      the user's data location and sits in the other tab (user decision whether it
-      belongs in). `save_settings` already writes only values that differ from the
-      defaults, so the next save drops them from `settings.json`. The values are set before
-      the widgets are drawn, never as `value=` (CLAUDE.md gotcha, PR #10), and
-      `reconcile_settings` must treat the reset as a change made in this session, so
-      another session's saved values do not win. Also show the default next to each
-      setting (e.g. in its help text, built from `DEFAULT_SETTINGS` so it cannot drift) and
-      mark a changed value. Not a search-quality change, since the defaults stay as they
-      are.
 
 - [ ] **A30 – Only one backup generation of `profiles.json`:** the user chose a single
       `profiles.json.bak` in PR #6 and again in the PR of A13 (hold point), so the backup is
