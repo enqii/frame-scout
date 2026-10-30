@@ -100,6 +100,31 @@ def _identity(path):
     return (stat.st_dev, stat.st_ino) if stat.st_ino else None
 
 
+def _file_identity(path):
+    """The identity of a photo file: _identity with its size and modification time (review).
+
+    Hard links and file links share all four. Including size and time keeps two different
+    photos apart on a file system whose file ids are not unique.
+    """
+    try:
+        stat = os.stat(path)
+    except (OSError, ValueError):
+        return None
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns) if stat.st_ino else None
+
+
+def _real_path_key(path):
+    """The key of a folder or file without an identity: its path with all links resolved (review).
+
+    A link loop on a file system without file ids then still ends at a folder walked before.
+    """
+    try:
+        path = os.path.realpath(path)
+    except (OSError, ValueError):
+        pass
+    return 'path', _folder_key(path)
+
+
 def _is_link(entry):
     """True if the directory entry is a symbolic link or a junction (Windows), not a real folder."""
     try:
@@ -131,26 +156,38 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
     folders, or a loop, adds nothing. All real subfolders of all folders are walked before
     any link, so a photo reached both ways is found by its real path, in the folder it is
     really in. A photo found twice by another path (a hard link, a file link) counts once,
-    for the first path in that order. A folder or file whose identity cannot be read is
-    compared by its path only, as before.
+    for the first path in that order (photos are the same when their identity, size and
+    modification time are: _file_identity). A folder or file whose identity cannot be read
+    is compared by its path with all links resolved (_real_path_key).
+
+    The output folder exclude is left out wherever it is reached: as one of folders or
+    inside one (by path), or through a link or another path (by identity). A folder that
+    cannot be read through one path is tried again through another (review).
     """
-    excluded = None if exclude is None else (Path(exclude), _identity(exclude))
+    exclude_path = None if exclude is None else Path(exclude)
+    exclude_id = None if exclude is None else _identity(exclude)
     found = [[] for _ in folders]
     unsupported = [collections.Counter() for _ in folders]
     seen_folders, seen_files = set(), set()
     real = collections.deque((index, Path(folder)) for index, folder in enumerate(folders))
     links = collections.deque()
 
+    def excluded(folder, identity):
+        if exclude_path is None:
+            return False
+        return (folder == exclude_path or exclude_path in folder.parents
+                or (exclude_id is not None and identity == exclude_id))
+
     def walk(index, folder):
-        identity = _identity(folder) or ('path', _folder_key(folder))
-        if identity in seen_folders:
+        identity = _identity(folder) or _real_path_key(folder)
+        if identity in seen_folders or excluded(folder, identity):
             return
-        seen_folders.add(identity)
         try:
             with os.scandir(folder) as listing:
                 entries = sorted(listing, key=lambda entry: entry.name)
         except (OSError, ValueError):
             return  # missing or not readable: nothing found, as with Path.rglob
+        seen_folders.add(identity)
         for entry in entries:
             path = folder / entry.name
             try:
@@ -159,16 +196,13 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
             except OSError:
                 continue
             if is_dir:
-                if excluded is not None and (path == excluded[0] or (excluded[1] is not None
-                                                                     and _identity(path) == excluded[1])):
-                    continue
                 (links if _is_link(entry) else real).append((index, path))
             elif is_file:
                 suffix = path.suffix.lower()
                 if suffix not in extensions:
                     unsupported[index][suffix] += 1
                     continue
-                file_identity = _identity(path) or ('path', _folder_key(path))
+                file_identity = _file_identity(path) or _real_path_key(path)
                 if file_identity not in seen_files:
                     seen_files.add(file_identity)
                     found[index].append(path)
@@ -283,8 +317,12 @@ def distinct_folders(folders, identity=_identity):
     drive letter and the UNC path of one share, a subst drive or a junction, is recognized
     too, and so is a folder whose parent folder is another listed folder by another path.
     A folder without an identity (e.g. a missing one) is compared by its path only.
+
+    identity is called once per listed folder, and for the parent folders of a folder only
+    when it and at least one other listed folder have an identity, so an unreachable
+    network folder is not asked again for each of its parent folders (review).
     """
-    unique, dropped, seen = [], [], {}
+    unique, unique_ids, dropped, seen = [], [], [], {}
     for folder in folders:
         key, folder_id = _folder_key(folder), identity(folder)
         first = seen.get(key) or (seen.get(folder_id) if folder_id is not None else None)
@@ -297,16 +335,13 @@ def distinct_folders(folders, identity=_identity):
         if folder_id is not None:
             seen[folder_id] = folder
         unique.append(folder)
+        unique_ids.append(folder_id)
     keys = [_folder_key(f) for f in unique]
-    ids = {}
-    for folder in unique:
-        folder_id = identity(folder)
-        if folder_id is not None:
-            ids[folder_id] = folder
+    ids = {folder_id: folder for folder, folder_id in zip(unique, unique_ids) if folder_id is not None}
     kept = []
-    for folder, key in zip(unique, keys):
+    for folder, key, folder_id in zip(unique, keys, unique_ids):
         parent = next((f for f, k in zip(unique, keys) if _inside_key(key, k)), None)
-        if parent is None and ids:
+        if parent is None and folder_id is not None and len(ids) > 1:
             # a parent folder of folder that is another listed folder by another path
             parent = next((ids[i] for i in map(identity, folder.parents)
                            if i is not None and i in ids and ids[i] is not folder), None)

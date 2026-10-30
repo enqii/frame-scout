@@ -1,6 +1,7 @@
 """The photos of a search: supported extensions, RAW+JPEG pairs, skipped files and RAW previews (E25)."""
 import collections
 import os
+import types
 from pathlib import Path
 
 import pytest
@@ -548,6 +549,76 @@ def test_scan_leaves_out_the_excluded_folder_through_a_link(tmp_path):
     touch(root / 'results' / 'thumb.jpg')
     link_folder(root / 'aa-results', root / 'results')
     assert scan_photos(root, exclude=root / 'results').paths == [photo]
+
+
+def test_scan_leaves_out_a_listed_folder_that_is_or_is_inside_the_excluded_folder(tmp_path):
+    # as the old "exclude in path.parents" check did, and also through a link to it (review)
+    results = tmp_path / 'results'
+    touch(results / 'thumbnails' / 'thumb.jpg')
+    link = link_folder(tmp_path / 'link', results)
+    empty = PhotoScan([], [], collections.Counter())
+    for root in (results, results / 'thumbnails', link):
+        assert scan_photos(root, exclude=results) == empty
+
+
+def test_scan_keeps_different_photos_apart_on_a_file_system_with_repeated_file_ids(tmp_path, monkeypatch):
+    # some file systems give different files the same non-zero file id (review)
+    import framescout_core.photos as photos
+    a = touch(tmp_path / 'a.jpg')
+    b = tmp_path / 'b.jpg'
+    b.write_bytes(b'xy')
+    c = touch(tmp_path / 'c.jpg')
+    os.utime(c, ns=(1_000_000_000, 1_000_000_000))
+    real_stat = os.stat
+
+    def stat(path, *args, **kwargs):
+        result = real_stat(path, *args, **kwargs)
+        return types.SimpleNamespace(st_dev=result.st_dev, st_ino=7, st_size=result.st_size,
+                                     st_mtime_ns=result.st_mtime_ns)
+    monkeypatch.setattr(photos.os, 'stat', stat)
+    assert scan_photos(tmp_path).paths == [a, b, c]
+
+
+def test_scan_ends_a_link_loop_on_a_file_system_without_file_ids(tmp_path, monkeypatch):
+    # without identities the folders are compared by their real paths, so a loop still ends (review)
+    import framescout_core.photos as photos
+    monkeypatch.setattr(photos, '_identity', lambda path: None)
+    monkeypatch.setattr(photos, '_file_identity', lambda path: None)
+    root = tmp_path / 'photos'
+    photo = touch(root / 'sub' / 'a.jpg')
+    link_folder(root / 'sub' / 'loop', root)
+    link_folder(root / 'aa-link', root / 'sub')
+    assert scan_photos(root).paths == [photo]
+
+
+def test_scan_tries_a_folder_again_through_another_path(tmp_path, monkeypatch):
+    # a folder that cannot be read once is not marked as walked (review)
+    import framescout_core.photos as photos
+    root = tmp_path / 'photos'
+    touch(root / 'zz-event' / 'a.jpg')
+    link_folder(root / 'aa-link', root / 'zz-event')
+    real_scandir, failed = os.scandir, []
+
+    def scandir(path):
+        if Path(path) == root / 'zz-event' and not failed:
+            failed.append(path)
+            raise PermissionError(path)
+        return real_scandir(path)
+    monkeypatch.setattr(photos.os, 'scandir', scandir)
+    assert scan_photos(root).paths == [root / 'aa-link' / 'a.jpg']
+    assert failed
+
+
+def test_distinct_folders_do_not_ask_the_parents_of_a_folder_without_identity(tmp_path):
+    # e.g. an unreachable network folder: each parent could block for a timeout (review)
+    gone, here = Path('//server/share/event'), tmp_path / 'here'
+    calls = []
+
+    def identity(path):
+        calls.append(path)
+        return None if path == gone else ('id', os.path.normcase(str(path)))
+    assert distinct_folders([gone, here], identity=identity) == ([gone, here], [])
+    assert calls == [gone, here]
 
 
 def test_scan_of_a_missing_folder_is_empty(tmp_path):
