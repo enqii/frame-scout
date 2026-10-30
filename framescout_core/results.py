@@ -1,10 +1,11 @@
 """The results file of a run (results.json), gallery paging and opening photos."""
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
-from ._common import _replace_with_retry
+from ._common import _publish_together, _replace_with_retry
 from .names import EXT
 from .profiles import load_profiles, read_profiles
 
@@ -12,8 +13,9 @@ from .profiles import load_profiles, read_profiles
 # The result of a search (A12, P4): besides the HTML galleries, the engine writes what it
 # ranked to RESULTS_FILE in the output folder, so the app shows the galleries of the last
 # search under the profile names they were made for, with their date, instead of deriving
-# file names from the current profile list. Written once at the end of the export: an
-# interrupted export leaves the file of the previous complete search.
+# file names from the current profile list. Written once at the end of the export, together
+# with the galleries (publish_export, E24): an interrupted export leaves the galleries and
+# the file of the previous complete search.
 RESULTS_FILE = 'results.json'
 # format 2 lists the photo folders of the search ("photo_folders", A25); format 1 had one
 # ("photo_folder") and is still read. App versions before A25 reject format 2.
@@ -91,10 +93,32 @@ def results_document(started, finished, folders, settings, photos, profiles):
             'profiles': profiles}
 
 
+def _results_bytes(document):
+    return (json.dumps(document, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
+
+
 def write_results(path, document):
     """Replace the result file path with document atomically (retried while the app reads it)."""
-    data = (json.dumps(document, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
-    _replace_with_retry(path, data, attempts=40, retry_delay=0.05)
+    _replace_with_retry(path, _results_bytes(document), attempts=40, retry_delay=0.05)
+
+
+def publish_export(folder, galleries, document, replace=os.replace, attempts=40, retry_delay=0.05):
+    """Publish the HTML galleries of an export together with its result file (E24).
+
+    galleries: [(file name, HTML text)] in folder; document: the content of RESULTS_FILE
+    (results_document). All files are written in full to temporary files
+    (<name>.<random>.tmp) first; only then are the galleries renamed into place, and
+    RESULTS_FILE last, so a search stopped or failing while it writes leaves the galleries
+    and the result file of the previous search. Only the few renames are not one step: a
+    kill between them can still leave a gallery newer than RESULTS_FILE. Renames are retried
+    while another process has a file open (replace, attempts and retry_delay: for tests).
+    Raises OSError; the temporary files are removed (left only by a killed process, which
+    auto_cleanup removes after a later search, E26).
+    """
+    folder = Path(folder)
+    files = [(folder / name, text.encode('utf-8')) for name, text in galleries]
+    files.append((folder / RESULTS_FILE, _results_bytes(document)))
+    _publish_together(files, attempts, retry_delay, replace)
 
 
 def _is_number(value):

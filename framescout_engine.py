@@ -18,8 +18,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
-                             DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RAW_EXT, RESULTS_FILE,
-                             RUN_LOCK,
+                             DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RAW_EXT, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
                              final_status, yolo_weights,
@@ -28,10 +27,10 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              load_profiles, missing_decoder, missing_folders_message, model_problem,
                              output_folder_problem, photo_name,
                              prefetch,
-                             prepare_cache, profile_slugs, progress_due,
+                             prepare_cache, profile_slugs, progress_due, publish_export,
                              progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
-                             store_group, supported_extensions, write_results, write_scores)
+                             store_group, supported_extensions, write_scores)
 
 # model downloads and library config files go to the project's .cache folder, as with the
 # .bat files and the app, also for a manual run; a variable the user set is kept (I10).
@@ -551,6 +550,7 @@ def search(args, parser, roots, dropped, output, status):
     skipped = SkippedPhotos(log)
     progress = 0
     results = []  # the content of results.json: what each gallery shows (A12)
+    pages = []  # [(file name, HTML)]: published together with results.json at the end (E24)
     for p in profiles:
         name = p['name']; ranked = rankings[name]
         cards, entries = [], []
@@ -582,19 +582,22 @@ def search(args, parser, roots, dropped, output, status):
                 + (SCORE_NOTE if normalized[name] else RAW_NOTE) +
                 ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original. '
                 f'Search model: {html.escape(search_model.label)}.</p><main>' + ''.join(cards) + '</main></html>')
-        target = output / (slugs[name] + '.html'); target.write_text(page, encoding='utf-8')
-        print(f'{name}: {target}', flush=True)
-        results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': target.name,
+        gallery = slugs[name] + '.html'
+        pages.append((gallery, page))
+        results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': gallery,
                         'normalized': normalized[name], 'cards': entries})
     if skipped.summary():
         log(skipped.summary())
-    # after all galleries, so the file always describes a complete export (A12)
+    # results.json is published after all galleries, so the file always describes a complete
+    # export (A12); a run stopped before leaves the galleries of the previous search (E24)
     settings = {'device': device, 'batch_size': args.batch_size, 'top': args.top,
                 'person_detection': not args.no_person_detection, 'max_persons': args.max_persons,
                 'person_confidence': args.person_confidence, 'reference_weight': args.reference_weight,
                 'model': args.model}
-    write_results(output / RESULTS_FILE, results_document(status.state['started'],
-                  datetime.now().astimezone().isoformat(timespec='seconds'), roots, settings, len(paths), results))
+    publish_export(output, pages, results_document(status.state['started'],
+                   datetime.now().astimezone().isoformat(timespec='seconds'), roots, settings, len(paths), results))
+    for (gallery, _), p in zip(pages, profiles):
+        print(f"{p['name']}: {output / gallery}", flush=True)
     # the harmless part of the cleanup (E7, E13): temporary thumbnails of a stopped export
     # and thumbnails neither results.json nor any HTML file in the output folder links;
     # the run lock is still held, so no other search writes thumbnails meanwhile

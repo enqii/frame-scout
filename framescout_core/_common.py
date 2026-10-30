@@ -1,7 +1,7 @@
 """Internal helpers that several areas share (not part of the package's interface).
 
 Atomic file writes (_publish_via_temp, _publish_new, _replace_atomically,
-_replace_with_retry), reading a file (_read_with_retry) or a JSON object file
+_replace_with_retry, _publish_together for several files), reading a file (_read_with_retry) or a JSON object file
 (_read_json_object) with retries, the
 save lock of a file (_file_lock), the locked read-change-write of a JSON file
 (_update_locked) and the comparable form of a path (_path_key).
@@ -21,6 +21,21 @@ def _path_key(path):
     return os.path.normcase(path.resolve())
 
 
+def _temp_path(target, suffix='.tmp'):
+    """Create an empty temporary file <target name>.<random><suffix> in target's folder; return its path.
+
+    The random part is tempfile's: 8 characters of a-z, 0-9 and _ (auto_cleanup relies on it).
+    """
+    fd, name = tempfile.mkstemp(dir=target.parent, prefix=target.name + '.', suffix=suffix)
+    os.close(fd)
+    return Path(name)
+
+
+def _flush_to_disk(path):
+    with open(path, 'r+b') as handle:
+        os.fsync(handle.fileno())
+
+
 def _publish_via_temp(target, write, publish, suffix='.tmp', durable=True):
     """Create target from a complete temporary file; never leave a partial target behind.
 
@@ -30,17 +45,46 @@ def _publish_via_temp(target, write, publish, suffix='.tmp', durable=True):
     gives it the final name (os.replace, or _publish_new to never replace a file). The
     temporary file is removed whatever happens.
     """
-    fd, name = tempfile.mkstemp(dir=target.parent, prefix=target.name + '.', suffix=suffix)
-    os.close(fd)
-    tmp = Path(name)
+    tmp = _temp_path(target, suffix)
     try:
         write(tmp)
         if durable:
-            with open(tmp, 'r+b') as handle:
-                os.fsync(handle.fileno())
+            _flush_to_disk(tmp)
         publish(tmp, target)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def _publish_together(files, attempts, retry_delay, replace=os.replace):
+    """Replace several files at once as far as a file system allows; files: [(target Path, bytes)].
+
+    Every file is first written in full to its own temporary file (see _temp_path) and
+    flushed to disk; only then are they given their names, in the order of files, each
+    rename tried up to attempts times retry_delay seconds apart (Windows refuses to replace
+    a file another process has open). An error or a stop while writing therefore leaves every
+    target as it was; only the renames themselves are not one step. The temporary files are
+    removed whatever happens (a process killed meanwhile leaves them, see auto_cleanup).
+    Raises the OSError of a write or of a rename that failed every try.
+    """
+    temps = []
+    try:
+        for target, data in files:
+            tmp = _temp_path(target)
+            temps.append(tmp)
+            tmp.write_bytes(data)
+            _flush_to_disk(tmp)
+        for (target, _), tmp in zip(files, temps):
+            for attempt in range(max(attempts, 1)):
+                try:
+                    replace(tmp, target)
+                    break
+                except OSError:
+                    if attempt + 1 >= attempts:
+                        raise
+                    time.sleep(retry_delay)
+    finally:
+        for tmp in temps:
+            tmp.unlink(missing_ok=True)
 
 
 def _publish_new(tmp, target):
