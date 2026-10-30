@@ -448,11 +448,13 @@ def remembered_scans(memory, folders, extensions=EXT, exclude=None, recount=Fals
     extensions and the output folder are the ones it was counted for, and scanned again when
     one of them changes or recount is true (the "Recount" button). A photo added or removed
     in a folder meanwhile is therefore counted only after a recount; counted_at (clock() of
-    the count, None without folders) lets the page say how old the count is. The search
-    itself always scans the folders again.
+    the count, None without folders) lets the page say how old the count is. Without folders
+    (e.g. the only folder's drive disconnected) memory is cleared, so the same folder is
+    counted again when it is back (review). The search itself always scans the folders again.
     """
     folders = list(folders)
     if not folders:
+        memory.clear()
         return [], None
     key = (tuple(str(f) for f in folders), frozenset(extensions), None if exclude is None else str(exclude))
     if recount or memory.get('key') != key:
