@@ -42,8 +42,9 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       (done 2026-10-30)
 
 ### P9 – App polish
-- [ ] (A) The photo folder is not scanned on every rerun (A6 and A27 are the same
+- [x] (A) The photo folder is not scanned on every rerun (A6 and A27 are the same
       problem: close one as a duplicate; how stale a count may be is a UX decision)
+      (done 2026-10-30)
 - [ ] (B) Raise the Streamlit minimum and switch to `width="stretch"` (A10)
 - [ ] (C) "Hide no match" keeps the pages stable, "Reset to defaults" for the AI settings
       (A24, A26)

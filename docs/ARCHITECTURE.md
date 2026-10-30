@@ -88,7 +88,8 @@ the module of its area and to the re-exports in `__init__.py`.
 - `photos.py` (E25): `available_decoders` (`Decoders`: whether AVIF, HEIC/HEIF and RAW
   can be read here), `supported_extensions` (`EXT` without the extensions of a missing
   decoder), `missing_decoder`, `scan_each_folder` (one `PhotoScan` per folder, A28/A29) and `scan_photos` (the photos
-  of one folder as a `PhotoScan`, built on it), `skipped_lines` (the log lines about skipped files),
+  of one folder as a `PhotoScan`, built on it), `remembered_scans` (A27: `scan_each_folder` result kept in a
+  caller-owned dict, scanned again only when the folders, extensions or output folder change or on `recount`), `skipped_lines` (the log lines about skipped files),
   `distinct_folders`/`output_folder_problem`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
   (several photo folders per search, A25; see "Several photo folders"),
   `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
@@ -563,8 +564,13 @@ The app: the "Photo source" tab has a text area (`setting_photo_folders`, one fo
 line). `settings.json` stores the list `photo_folders`; `setting_of_widget` /
 `widget_of_setting` in `app.py` convert between the text and the list (`folder_lines`:
 the non-empty lines, stripped), so `reconcile_settings` and `save_settings` work on
-lists. The tab shows the count per existing folder (one `scan_each_folder` call over the distinct folders per page run, so a link into another
-listed folder is not counted twice; as before: A6), the notes of `distinct_folders` and a warning per missing folder. "Start
+lists. The tab shows the count per existing folder (one `scan_each_folder` call over the distinct folders, so a link into another
+listed folder is not counted twice). The scan is remembered per browser session via
+`remembered_scans` in `st.session_state['photo_count']` (A27, A6): it runs again only when the existing
+folders (`is_dir` is still checked every run), `SUPPORTED` or the output folder change, on the
+"Recount" button (flag `recount_photos`, set by its `on_click`) or in a new session; a
+"Counted at HH:MM:SS" caption shows its age. No automatic refresh; the engine still scans on every
+search. The tab also shows the notes of `distinct_folders` and a warning per missing folder. "Start
 search" needs one existing folder (from that scan, no second `is_dir`) and passes all
 distinct folders. The copy target check takes the folders of `results.json` and the
 current list; the cleanup does not depend on the list (E8, see "Storage cleanup").
@@ -622,8 +628,8 @@ reference image of such a format fails with the reason (`missing_decoder`).
 - **Skipped files:** the log names the RAW files skipped for a partner (count and one
   example), the files of a missing decoder with the reason (only if the folder has such
   files), and the files of other extensions by extension (`skipped_lines`); the app's
-  "Photo folder" tab shows the same lines. The app scans the folder on every rerun, as
-  it counted the photos before E25 (A27).
+  "Photo folder" tab shows the same lines. The app remembers the
+  count per session instead of scanning on every rerun (A27).
 - **Cache:** the new extensions only add rows, so the cache signature and `ENGINE` did not
   change. A change of the RAW decoding (e.g. `RAW_PREVIEW_MIN_EDGE`) changes the embeddings
   of RAW photos and needs an `ENGINE` bump.
@@ -1229,6 +1235,8 @@ and joined folders, and the deferred decision (`raw_fallbacks`, `RawFallback`, E
 the identity-based dedup and link-safe scan, including the output folder as or inside a
 listed folder, repeated file ids, link loops without file ids and an unreadable path (A28,
 A29, `test_photos.py`),
+the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
+no folders; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search
