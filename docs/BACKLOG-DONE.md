@@ -431,6 +431,25 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       app's "Clean up storage" is unchanged. Temporary files of the app's writes in the
       project folder: E44. Unit-tested; the same smoke run removed two stale temporary
       files and kept a fresh one.)
+- [x] **E30 – A RAW file is lost when its JPEG partner is broken:** E25 skips a RAW file
+      when a JPEG/HEIC of the same name is in the same folder, by names only. If that
+      JPEG cannot be decoded (e.g. a corrupt file; a merely truncated one usually still
+      decodes, see E46), the engine logs it as an
+      `ERROR` and the shot is missing from the search, although its RAW file is fine
+      (documented in the README). Fix idea: when a partner fails to decode, analyze its
+      skipped RAW file instead (the scan already lists them in `PhotoScan.raw_pairs`); the
+      cache and the gallery would then show the RAW path for that shot. Found in the PR #26
+      review.
+      (Done 2026-10-30, PR #46, roadmap P8 (C): `raw_fallbacks(scan)` and `RawFallback`
+      in `framescout_core/photos.py` map a partner to its skipped RAW file (first in
+      sorted order if several). When a partner fails to decode, the engine logs the
+      `ERROR` and "Analyzing its RAW file instead", takes the RAW file from the cache or
+      decodes it synchronously in the main thread, and counts the shot once. Cache row,
+      gallery card, thumbnail, link and `--scores-file` use the RAW path; a repaired JPEG
+      wins again on the next run. Only decode failures fall back, not cache-scan or
+      embedding errors; truncated JPEGs: E46. No cache, CLI or profiles change.
+      Unit-tested (6 tests in `test_photos.py`); the engine side is **not
+      runtime-tested** (no RAW sample locally).)
 
 ### App (`app.py`)
 

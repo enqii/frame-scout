@@ -97,14 +97,6 @@ and discussions.
       want them optional later). Idea: a separate requirements file, a question in
       `Install-FrameScout.bat`, and the engine's existing fallback (formats without their
       package are skipped with a note). Roadmap candidate, not scheduled.
-- [ ] **E30 – A RAW file is lost when its JPEG partner is broken:** E25 skips a RAW file
-      when a JPEG/HEIC of the same name is in the same folder, by names only. If that
-      JPEG is truncated or corrupt (e.g. a card or transfer error), the engine logs it as an
-      `ERROR` and the shot is missing from the search, although its RAW file is fine
-      (documented in the README). Fix idea: when a partner fails to decode, analyze its
-      skipped RAW file instead (the scan already lists them in `PhotoScan.raw_pairs`); the
-      cache and the gallery would then show the RAW path for that shot. Found in the PR #26
-      review.
 - [ ] **E32 – The offered search models are not evaluated:** E22 offers ViT-B/16 and
       ViT-L/14 (DataComp-XL) and SigLIP B/16 next to the default, marked "not evaluated"
       (`SearchModel.evaluated`), because their search quality has not been measured.
@@ -199,6 +191,13 @@ and discussions.
       restores the files renamed before it, but if a restore fails too, they stay new.
       Idea, if it ever matters: a versioned gallery subfolder that `results.json` names.
       Found in PR #45.
+- [ ] **E46 – A merely truncated JPEG partner does not trigger the RAW fallback:** the
+      engine sets `ImageFile.LOAD_TRUNCATED_IMAGES = True`, so a JPEG with an intact header
+      but missing data decodes without an error (the missing part gray) and the E30
+      fallback never runs; only partners that fail to decode (corrupt header, unreadable
+      file, broken HEIC) fall back. Idea: for partners of a RAW file, detect truncation
+      (Pillow's truncation warning, or a decode with `LOAD_TRUNCATED_IMAGES` off) and
+      prefer the RAW file then. Found in PR #46.
 
 ### App (`app.py`)
 

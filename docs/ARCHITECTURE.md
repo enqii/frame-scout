@@ -92,7 +92,8 @@ the module of its area and to the re-exports in `__init__.py`.
   `distinct_folders`/`output_folder_problem`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
   (several photo folders per search, A25; see "Several photo folders"),
   `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
-  (the engine's RAW decoding; see "Photo formats").
+  (the engine's RAW decoding; see "Photo formats"), `raw_fallbacks`/`RawFallback` (E30:
+  the RAW file of a partner that fails to decode; see "RAW+JPEG pairs").
 - `references.py`: `reference_folder` (one reference folder per profile, A1),
   `stage_reference_move`/`update_backup_references`/`finish_reference_move`/`undo_reference_move`
   (a renamed profile's references follow its name, A1), `write_new_file` (reference
@@ -573,8 +574,22 @@ reference image of such a format fails with the reason (`missing_decoder`).
   (`raw_preview_transpose`), never by both.
 - **RAW+JPEG pairs:** a RAW file is skipped if a supported `.jpg`/`.jpeg`/`.heic`/`.heif`
   file of the same name (ignoring case) is in the same folder (`RAW_PARTNER_EXT`). The
-  rule looks at names only: if that JPEG/HEIC cannot be decoded, the engine logs it as an
-  `ERROR` and the shot is missing from the search (falling back to the RAW file: E30).
+  rule looks at names only. Fallback (E30): `raw_fallbacks(scan)` maps every partner in
+  `scan.paths` to its RAW file from `scan.raw_pairs` (same folder, same name ignoring case;
+  several RAW files: the first in sorted order). If a partner fails to decode in `prepare`
+  (decoding thread), the engine logs `ERROR <partner>: <reason>` and `Analyzing its RAW
+  file instead: <raw>`. `RawFallback.take(partner)` hands out each RAW file once (None if
+  there is none or it was taken, e.g. by the HEIC of the same shot); the RAW file comes
+  from the cache if its row matches (counts as cached, via the shared `cached(path)`
+  helper), otherwise it is decoded synchronously in the main thread (counts as new). If
+  it fails too, `ERROR <raw>: ...` and the shot counts as one failure. The shot is counted
+  once (progress total unchanged). Scoring and the gallery iterate
+  `RawFallback.photos(paths)`, which names each taken RAW file in its partner's place, so
+  cache row, card, thumbnail, link and `--scores-file` use the RAW path. The partner has
+  no cache row, so every run retries it first and a repaired JPEG wins again. Only decode
+  failures fall back, not `stat`/SQLite errors of the cache scan or `store_failed`; and
+  because the engine sets `ImageFile.LOAD_TRUNCATED_IMAGES = True`, a merely truncated JPEG
+  usually decodes and does not fall back (E46).
 - **Skipped files:** the log names the RAW files skipped for a partner (count and one
   example), the files of a missing decoder with the reason (only if the folder has such
   files), and the files of other extensions by extension (`skipped_lines`); the app's
@@ -1179,6 +1194,8 @@ third-party module, so the engine may fill the variables after it; the engine's 
 use from its syntax tree plus a subprocess import, skipped without torch, in
 `test_engine_defaults.py`; no run with real models) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
+the RAW fallback's mapping and hand-out (`raw_fallbacks`, `RawFallback`, E30, `test_photos.py`; the
+engine side of the fallback is not runtime-tested),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search
