@@ -9,7 +9,7 @@ import pytest
 from framescout_core import (ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
                              RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, RawFallback, available_decoders, distinct_folders,
                              folder_labels, join_scans, missing_decoder, missing_folders_message,
-                             output_folder_problem, photo_name, raw_fallbacks, raw_preview_transpose, raw_preview_usable, scan_each_folder, scan_folders, scan_photos,
+                             output_folder_problem, photo_name, raw_fallbacks, remembered_scans, raw_preview_transpose, raw_preview_usable, scan_each_folder, scan_folders, scan_photos,
                              skipped_lines,
                              supported_extensions)
 
@@ -709,3 +709,78 @@ def test_raw_flip_transpose_matches_exif_orientations():
 ])
 def test_raw_preview_transpose(orientation, flip, expected):
     assert raw_preview_transpose(orientation, flip) == expected
+
+
+# --- remembered_scans (A27) ---
+
+class CountingScan:
+    """A scan_each_folder stand-in that counts its calls and returns one empty PhotoScan per folder."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, folders, extensions, exclude):
+        self.calls.append((list(folders), extensions, exclude))
+        return [PhotoScan([Path(f) / 'a.jpg'], [], collections.Counter()) for f in folders]
+
+
+def test_remembered_scans_scans_once_for_the_same_folders(tmp_path):
+    memory, scan = {}, CountingScan()
+    folders = [tmp_path / 'one', tmp_path / 'two']
+    first, counted_at = remembered_scans(memory, folders, EXT, tmp_path / 'results', scan=scan, clock=lambda: 10.0)
+    again, again_at = remembered_scans(memory, list(folders), EXT, tmp_path / 'results', scan=scan,
+                                       clock=lambda: 99.0)
+    assert len(scan.calls) == 1
+    assert scan.calls[0] == (folders, EXT, tmp_path / 'results')
+    assert again == first == [PhotoScan([f / 'a.jpg'], [], collections.Counter()) for f in folders]
+    assert counted_at == again_at == 10.0  # the time of the count shown, not of the rerun
+
+
+@pytest.mark.parametrize('change', [
+    lambda tmp, f, e, x: ([f[0]], e, x),  # a folder removed, e.g. a disconnected drive
+    lambda tmp, f, e, x: (f + [tmp / 'three'], e, x),  # a folder added or reconnected
+    lambda tmp, f, e, x: (list(reversed(f)), e, x),  # another order: another first folder for a photo
+    lambda tmp, f, e, x: (f, supported_extensions(NO_HEIF), x),  # a decoder installed or lost
+    lambda tmp, f, e, x: (f, e, tmp / 'other-results'),  # another output folder
+    lambda tmp, f, e, x: (f, e, None),
+])
+def test_remembered_scans_scans_again_when_what_is_counted_changes(tmp_path, change):
+    memory, scan = {}, CountingScan()
+    folders = [tmp_path / 'one', tmp_path / 'two']
+    remembered_scans(memory, folders, EXT, tmp_path / 'results', scan=scan)
+    folders2, extensions2, exclude2 = change(tmp_path, folders, EXT, tmp_path / 'results')
+    scans, _ = remembered_scans(memory, folders2, extensions2, exclude2, scan=scan)
+    assert len(scan.calls) == 2
+    assert scan.calls[1] == (folders2, extensions2, exclude2)
+    assert len(scans) == len(folders2)
+
+
+def test_remembered_scans_scans_again_on_recount(tmp_path):
+    memory, scan = {}, CountingScan()
+    times = iter([1.0, 2.0])
+    remembered_scans(memory, [tmp_path], EXT, None, scan=scan, clock=lambda: next(times))
+    _, counted_at = remembered_scans(memory, [tmp_path], EXT, None, recount=True, scan=scan,
+                                     clock=lambda: next(times))
+    assert len(scan.calls) == 2
+    assert counted_at == 2.0
+    # and remembers the new count
+    remembered_scans(memory, [tmp_path], EXT, None, scan=scan, clock=lambda: 3.0)
+    assert len(scan.calls) == 2
+
+
+def test_remembered_scans_of_no_folder_needs_no_scan(tmp_path):
+    memory, scan = {}, CountingScan()
+    assert remembered_scans(memory, [], EXT, None, scan=scan) == ([], None)
+    assert scan.calls == []
+
+
+def test_remembered_scans_finds_new_photos_only_on_recount(tmp_path):
+    # the real scan: a photo added later is counted after a recount (or another folder list)
+    (tmp_path / 'a.jpg').write_bytes(b'x')
+    memory = {}
+    scans, _ = remembered_scans(memory, [tmp_path], EXT, None)
+    assert scans[0].paths == [tmp_path / 'a.jpg']
+    (tmp_path / 'b.jpg').write_bytes(b'x')
+    assert remembered_scans(memory, [tmp_path], EXT, None)[0][0].paths == [tmp_path / 'a.jpg']
+    assert remembered_scans(memory, [tmp_path], EXT, None, recount=True)[0][0].paths == [
+        tmp_path / 'a.jpg', tmp_path / 'b.jpg']
