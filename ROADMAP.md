@@ -45,7 +45,8 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
 - [x] (A) The photo folder is not scanned on every rerun (A6 and A27 are the same
       problem: close one as a duplicate; how stale a count may be is a UX decision)
       (done 2026-10-30)
-- [ ] (B) Raise the Streamlit minimum and switch to `width="stretch"` (A10)
+- [x] (B) Raise the Streamlit minimum and switch to `width="stretch"` (A10)
+      (done 2026-10-30)
 - [ ] (C) "Hide no match" keeps the pages stable, "Reset to defaults" for the AI settings
       (A24, A26)
 

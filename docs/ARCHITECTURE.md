@@ -278,7 +278,8 @@ gitignored and in `NEVER_DELETED`. More generations: A30.
 
 `requirements.txt`: `torch==2.14.1` and `torchvision==0.29.1` pinned (same values as
 `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, checked by a test; change them
-together); Streamlit `>=1.40` (A10); `transformers>=5.21.0` (the SigLIP tokenizer, E22;
+together); Streamlit `>=1.66.1` (A10; the version of the verified runs, like the other packages;
+`app.py` needs at least 1.48 for `width='stretch'` on buttons); `transformers>=5.21.0` (the SigLIP tokenizer, E22;
 torch and huggingface-hub unchanged, `pip check` clean); numpy, Pillow, open_clip_torch, ultralytics and
 psutil with the versions of the verified runs as minimum, no upper bounds (user decision);
 the installer pins the versions of the verified runs with `constraints.txt` (I12). `pillow-heif` and `rawpy` (E25, required by user decision;
@@ -1260,6 +1261,8 @@ without local label, hash or duplicate, sorted by name; every requirement of
 `requirements.txt` and the pinned numpy of `requirements-dev.txt` has an allowed pin; a
 non-comment pip line of the installer passes `-r requirements.txt -c constraints.txt`, and
 it sets `PIP_CONSTRAINT=constraints.txt` between the venv and `install_torch.py` (I18);
+the Streamlit floor is at least 1.48 and `app.py` no longer uses `use_container_width`,
+A10);
 the torch pins of both files equal `TORCH_VERSION`/`TORCHVISION_VERSION` in
 `test_torch_install.py`; completeness of the transitive pins is not checkable in CI), and
 the installer (P5 part C, `test_installer.py`, text checks of `Install-FrameScout.bat`:
