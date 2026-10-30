@@ -86,7 +86,8 @@ The roadmap is implemented semi-autonomously, **one pull request per roadmap ite
 - **Permissions:** `.claude/settings.json` pre-approves the routine git/gh/pytest commands; pushes only as `git push [-u] origin <type>/…`; `gh pr merge`, bulk staging and engine smoke runs ask; force pushes, pushes naming `main` and `git reset --hard` are denied. The rules steer the agent but are **not** a security boundary (details: `docs/ARCHITECTURE.md` → "Workflow permissions"). Personal overrides go into `.claude/settings.local.json` (gitignored).
 
 ## Git and commits
-- Repository: private GitHub repo `enqii/frame-scout`, default branch `main`.
+- Repository: public GitHub repo `enqii/frame-scout` (AGPL-3.0), default branch `main`.
+- Everything pushed or posted is public: commits, PR texts, review comments and pasted test output must not contain local paths with user names, machine details or other personal data; write paths relative to the checkout (or `%USERPROFILE%`, `<worktree>`).
 - Git identity: repo-local `enqii <24801755+enqii@users.noreply.github.com>` (`git config user.name` / `user.email` in the repository). Never commit with the global (work) identity; check `git config user.email` in new clones and worktrees.
 - GitHub CLI: `C:\Program Files\GitHub CLI\gh.exe` (may not be on `PATH`; in Git Bash use `"/c/Program Files/GitHub CLI/gh.exe"`).
 - Commit messages **must** follow the [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) specification: `<type>[optional scope][!]: <description>`, optional body, optional footers.
