@@ -27,7 +27,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              reconcile_settings, reference_folder,
                              rename_copy_folder, rename_marks, reveal_command, run_active, save_copy_folder,
                              available_decoders, distinct_folders, folder_lines, join_scans, save_marks,
-                             save_profiles, save_settings, scan_cleanup, scan_photos,
+                             save_profiles, save_settings, scan_cleanup, scan_each_folder,
                              size_text, skipped_lines, stage_reference_move, started_in_time, status_fraction,
                              status_text, stopped_status, supported_extensions, undo_reference_move,
                              update_backup_references, write_new_file, write_status)
@@ -1153,15 +1153,13 @@ with f_tab:
     st.text_area('Local photo folders (one per line, including subfolders)', key=setting_key('photo_folders'),
                  disabled=active, help='One search covers all listed folders, e.g. event folders on several '
                                        'drives. A folder inside another listed folder is searched as part of it.')
-    # per listed folder (A25): its photo count, or why it is not searched on its own. Each
-    # folder is scanned once per page run, as the engine scans it (E25), so the numbers
-    # match its log.
-    folder_scans, missing_folders = [], []
-    for folder in search_folders:
-        if folder.is_dir():
-            folder_scans.append((folder, scan_photos(folder, SUPPORTED, exclude=RESULTS)))
-        else:
-            missing_folders.append(folder)
+    # per listed folder (A25): its photo count, or why it is not searched on its own. The
+    # folders are scanned together once per page run, as the engine scans them (E25), so
+    # the numbers match its log; a photo reached through a link into another listed folder
+    # counts once, for the folder it is really in (A29).
+    existing = [folder for folder in search_folders if folder.is_dir()]
+    missing_folders = [folder for folder in search_folders if folder not in existing]
+    folder_scans = list(zip(existing, scan_each_folder(existing, SUPPORTED, exclude=RESULTS)))
     photo_scan = join_scans([scan for _, scan in folder_scans])
     if len(search_folders) == 1 and folder_scans:
         st.success(f'{len(photo_scan.paths):,} supported image files found.')
