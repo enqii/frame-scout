@@ -11,7 +11,7 @@ import pytest
 from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_YOLO_MODEL, ENGINE, MARKS_FILE, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
                              RunLock, auto_cleanup, clean_up, cleanup_summary_text, engine_id, feature_signature,
                              prepare_cache,
-                             result_card, results_document, save_profiles, scan_cleanup, size_text, write_results)
+                             publish_export, result_card, results_document, save_profiles, scan_cleanup, size_text)
 
 CURRENT = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL)
 OTHER = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL)
@@ -52,7 +52,7 @@ class Project:
         """entries: [(name, gallery, [thumbnails])]"""
         profiles = [{'name': n, 'fingerprint': 'x', 'gallery': g, 'normalized': True,
                      'cards': [card(t, i) for i, t in enumerate(ts, 1)]} for n, g, ts in entries]
-        write_results(self.results / RESULTS_FILE, results_document('s', 'f', [self.photos], {}, 1, profiles))
+        publish_export(self.results, [], results_document('s', 'f', [self.photos], {}, 1, profiles))
 
     def thumb(self, name, folder=None, data=b'jpg'):
         path = (folder or self.thumbs) / name

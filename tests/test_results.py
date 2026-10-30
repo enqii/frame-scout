@@ -7,7 +7,7 @@ import pytest
 
 from framescout_core import (RESULTS_FILE, RESULTS_FORMAT, load_profiles, open_command, openable_photo, page_count,
                              page_cards, profile_fingerprints, profile_state, publish_export, read_results,
-                             result_card, results_document, reveal_command, search_fingerprint, write_results)
+                             result_card, results_document, reveal_command, search_fingerprint)
 
 THUMB = '1c6b57780fa2df6f925b878c.jpg'
 
@@ -85,7 +85,7 @@ def test_format_2_needs_a_list_of_photo_folders(tmp_path, folders):
 
 def test_results_round_trip(tmp_path):
     path = tmp_path / RESULTS_FILE
-    write_results(path, document())
+    publish_export(tmp_path, [], document())  # no galleries: only the result file
     assert read_results(path) == document()
     # written atomically: no temporary file is left
     assert [p.name for p in tmp_path.iterdir()] == [RESULTS_FILE]
@@ -95,7 +95,7 @@ def test_results_round_trip(tmp_path):
 
 def old_export(folder):
     (folder / 'red-car.html').write_text('old red car', encoding='utf-8')
-    write_results(folder / RESULTS_FILE, document(cards=[]))
+    publish_export(folder, [], document(cards=[]))
 
 
 def test_an_export_publishes_its_galleries_and_results_json(tmp_path):

@@ -5,7 +5,7 @@ import os
 import re
 from pathlib import Path
 
-from ._common import _publish_together, _replace_with_retry
+from ._common import _publish_together
 from .names import EXT
 from .profiles import load_profiles, read_profiles
 
@@ -95,11 +95,6 @@ def results_document(started, finished, folders, settings, photos, profiles):
 
 def _results_bytes(document):
     return (json.dumps(document, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
-
-
-def write_results(path, document):
-    """Replace the result file path with document atomically (retried while the app reads it)."""
-    _replace_with_retry(path, _results_bytes(document), attempts=40, retry_delay=0.05)
 
 
 def publish_export(folder, galleries, document, replace=os.replace, attempts=40, retry_delay=0.05):
