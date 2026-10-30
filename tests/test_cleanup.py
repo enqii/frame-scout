@@ -842,6 +842,20 @@ def test_auto_cleanup_removes_temporary_files_of_a_stopped_run(project):
     assert removed['freed'] == len(stale) * len(b'partial')
 
 
+def test_the_age_of_temporary_files_follows_the_clock_of_the_results_folder(project, monkeypatch):
+    # a network share stamps files with its own clock: here this PC's clock runs 10 minutes
+    # ahead of it, so by time.time() a temporary file being written now would look stale
+    stale = temp_file(project.results, RESULTS_FILE, 120)
+    fresh = temp_file(project.results, MARKS_FILE, 5)
+    real_time = time.time
+    monkeypatch.setattr(time, 'time', lambda: real_time() + 600)
+    removed = auto_cleanup(project.results)
+    assert not stale.exists() and fresh.exists()
+    assert removed['temporary'] == 1
+    # the probe file that reads the folder's clock is gone again
+    assert sorted(p.name for p in project.results.glob('*.tmp')) == [fresh.name]
+
+
 def test_auto_cleanup_removes_temporary_files_also_if_results_json_cannot_be_read(project):
     (project.results / RESULTS_FILE).write_text('{broken', encoding='utf-8')
     stale = temp_file(project.results, RESULTS_FILE, 120)

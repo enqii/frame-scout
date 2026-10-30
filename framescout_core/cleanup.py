@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
-from ._common import _path_key
+from ._common import _path_key, _temp_path
 from .locks import RunLock
 from .marks import MARKS_FILE, read_marks, remove_marks
 from .names import EXT, profile_slugs
@@ -789,13 +789,38 @@ def _stale_temp_files(results, now):
     return stale
 
 
+def _file_system_now(folder):
+    """The current time by the clock that stamps files in folder: the mtime of a file created there now.
+
+    A network share stamps files with its own clock, which may run minutes apart from this
+    PC's. time.time() if no file can be created there. The probe file is removed (a process
+    killed meanwhile leaves it as a temporary file of RESULTS_FILE, see _TEMP_FILE).
+    """
+    try:
+        probe = _temp_path(Path(folder) / RESULTS_FILE)
+    except OSError:
+        return time.time()
+    try:
+        return probe.stat().st_mtime
+    except OSError:
+        return time.time()
+    finally:
+        try:
+            probe.unlink()
+        except OSError:  # removed by a later auto_cleanup
+            pass
+
+
 def auto_cleanup(results, now=None):
     """Remove left-over temporary files and the thumbnails nothing links; return a summary.
 
     For the engine at the end of a search, with the run lock held. Left over: the temporary
     thumbnails (E13) and the temporary files of the status, result and marks file and of the
     galleries that are at least STALE_TEMP_AGE seconds old (E24, E26; a younger one may be
-    written by an app session now, e.g. marks.json; now: time.time() for tests). Every HTML
+    written by an app session now, e.g. marks.json). Their age is measured against the clock
+    of the results folder's file system (_file_system_now; now: a time for tests), so a
+    network share whose clock runs behind this PC's does not make a file being written look
+    old. Every HTML
     file in results counts as kept here, so a thumbnail one of them or results.json links
     stays; if one of them or results.json cannot be read, every thumbnail stays. An emptied
     legacy thumbnail folder is removed. The summary's files and freed count every removed
@@ -803,7 +828,8 @@ def auto_cleanup(results, now=None):
     """
     results = Path(results)
     summary = _new_summary()
-    for path in [*_temp_thumbnails(results), *_stale_temp_files(results, time.time() if now is None else now)]:
+    now = _file_system_now(results) if now is None else now
+    for path in [*_temp_thumbnails(results), *_stale_temp_files(results, now)]:
         summary['temporary'] += _remove_file(path, summary)
     try:
         listed, _ = _result_names(results)
