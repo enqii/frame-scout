@@ -87,8 +87,8 @@ the module of its area and to the re-exports in `__init__.py`.
   E25), `slugify`, `profile_slugs` (unique gallery file names, used by the engine).
 - `photos.py` (E25): `available_decoders` (`Decoders`: whether AVIF, HEIC/HEIF and RAW
   can be read here), `supported_extensions` (`EXT` without the extensions of a missing
-  decoder), `missing_decoder`, `scan_photos` (the photos of a search as a `PhotoScan`; app
-  and engine use it), `skipped_lines` (the log lines about skipped files),
+  decoder), `missing_decoder`, `scan_each_folder` (one `PhotoScan` per folder, A28/A29) and `scan_photos` (the photos
+  of one folder as a `PhotoScan`, built on it), `skipped_lines` (the log lines about skipped files),
   `distinct_folders`/`output_folder_problem`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
   (several photo folders per search, A25; see "Several photo folders"),
   `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
@@ -525,27 +525,35 @@ A search covers a list of photo folders (A25, user decisions at the hold point o
 The engine resolves the positional folders (parsed with `parse_intermixed_args`, so they
 may stand between options); an output folder equal to one of them, or containing one
 (whose files the scan would always leave out), is an error (`output_folder_problem`). `distinct_folders` drops a folder listed twice and one inside another listed
-folder (compared by `os.path.normcase` of the resolved path; the notes go to the log).
+folder (compared by `os.path.normcase` of the resolved path and by `os.stat` identity,
+`st_dev`/`st_ino`, of the folder and its ancestors, so a mapped drive, a UNC path, a `subst`
+drive or a junction to a listed folder counts as the same; without an identity (missing
+folder, `st_ino` 0, stat error) only the path is compared; the notes go to the log).
 Missing folders are left out with a log line ("Photo folder not found, searched without
 it"); only if none exists is it an error (`missing_folders_message`, before the lock as
-for one folder, see "Run lock and status"). `scan_folders` joins the `scan_photos` of the
-folders. The gallery and `results.json` name a photo by `photo_name`: its path in its
+for one folder, see "Run lock and status"). `scan_folders` joins the `scan_each_folder`
+scans of the folders. The gallery and `results.json` name a photo by `photo_name`: its path in its
 folder, after the folder's label (`folder_labels`: none for one folder, so a one-folder
 gallery is unchanged; otherwise the folder name, with more trailing path parts for
 folders of the same name, compared case-insensitively, and for a label that starts
 another label, e.g. `Event` and `Event\sub`, so no two photos get the same name; a drive
 root is labeled by its drive, e.g. `D:`). Cache rows and marks stay keyed by absolute path, so neither the cache
-signature (`ENGINE`) nor `marks.json` changes. Not recognized: the same folder by another
-path (hard links, another drive letter or UNC path for the same share, A28) and junctions
-inside a listed folder, which `Path.rglob` follows on Python 3.14 (checked on Windows
-11: files under a junction are listed by their path through it, A29).
+signature (`ENGINE`) nor `marks.json` changes. `scan_each_folder` walks with `os.scandir` and still follows
+folder links (junctions, symlinks; `DirEntry.is_junction`, Python 3.12+), so event folders
+linked into a parent keep working, but finds nothing twice (A29): each folder is walked once
+by identity, all real subfolders of all listed folders before any link, so links into walked
+folders and loops add nothing and a photo reachable both ways is listed by its real path (for
+the folder it is really in). Supported files are deduplicated by identity (hard links, file
+symlinks, A28; one `os.stat` per photo file). The output folder is left out when reached
+through a link, too. Cache rows and marks under a link path of earlier runs are no longer
+used (A21).
 
 The app: the "Photo source" tab has a text area (`setting_photo_folders`, one folder per
 line). `settings.json` stores the list `photo_folders`; `setting_of_widget` /
 `widget_of_setting` in `app.py` convert between the text and the list (`folder_lines`:
 the non-empty lines, stripped), so `reconcile_settings` and `save_settings` work on
-lists. The tab shows the count per existing folder (each scanned once per page run, as
-before: A6), the notes of `distinct_folders` and a warning per missing folder. "Start
+lists. The tab shows the count per existing folder (one `scan_each_folder` call over the distinct folders per page run, so a link into another
+listed folder is not counted twice; as before: A6), the notes of `distinct_folders` and a warning per missing folder. "Start
 search" needs one existing folder (from that scan, no second `is_dir`) and passes all
 distinct folders. The copy target check takes the folders of `results.json` and the
 current list; the cleanup does not depend on the list (E8, see "Storage cleanup").
@@ -559,7 +567,7 @@ not in a browser.
 ### Photo formats
 
 The engine reads the files of the photo folders whose extension is in `EXT`
-(`framescout_core.scan_photos` per folder, also used for the app's photo count), leaving
+(`framescout_core.scan_each_folder`, also used for the app's photo count), leaving
 out the output folder. Pillow reads JPEG, PNG, WebP, BMP, TIFF and AVIF (if built with libavif,
 as its wheels are); `pillow-heif` adds HEIC/HEIF (`register_heif_opener` at engine start)
 and `rawpy` camera RAW (`RAW_EXT`, E25). `available_decoders` checks all three by
@@ -1207,6 +1215,7 @@ with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_pho
 the RAW fallback's mapping, its agreement with the scan's pairs across mixed-case names
 and joined folders, and the deferred decision (`raw_fallbacks`, `RawFallback`, E30,
 `test_photos.py`; the engine side of the fallback is not runtime-tested),
+the identity-based dedup and link-safe scan (A28, A29, `test_photos.py`),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search

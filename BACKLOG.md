@@ -291,24 +291,6 @@ and discussions.
       folder, with a short TTL and a "Rescan" button), or scan only when the folder setting
       changes; how stale a count may be is a UX decision. Found in the PR #26 review.
       Since A25 (PR #28) every listed folder is scanned once per rerun.
-- [ ] **A28 – The same photo folder by another path is searched twice:** A25 drops
-      folders listed twice or nested in another listed folder by comparing the resolved
-      paths (`os.path.normcase`) only (user decision on A25). The same folder reached by
-      another path – a mapped drive letter and the UNC path of the same share, two drive
-      letters for one share, a `subst` drive – is not recognized, and neither is the same
-      file through a hard link: such photos are analyzed, cached and ranked twice under
-      both paths (and their marks belong to each path, A21). Fix idea: compare
-      `os.stat` identities (`st_dev`, `st_ino`) of the folders, and of files if hard links
-      matter; costs a stat per file on network drives. Found in PR #28.
-- [ ] **A29 – Junctions and links inside a photo folder are followed:** `Path.rglob('*')`
-      follows directory junctions on Python 3.14 (checked on Windows 11 in PR #28: files
-      under a junction are listed by their path through it; `is_junction()` is true,
-      `is_symlink()` false). A junction pointing into another listed folder, or into the
-      same folder (a loop), therefore finds photos twice or walks a cycle; the folder
-      dedup of A25 does not cover it. Symbolic links to folders were not checked. Fix
-      idea: skip junctions and folder links in `scan_photos` (or resolve and dedupe the
-      found files), or document it; a user who links event folders into one parent may
-      rely on it today, so a user decision. Found in PR #28.
 
 - [ ] **A30 – Only one backup generation of `profiles.json`:** the user chose a single
       `profiles.json.bak` in PR #6 and again in the PR of A13 (hold point), so the backup is

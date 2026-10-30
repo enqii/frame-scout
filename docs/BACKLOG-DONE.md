@@ -1016,3 +1016,33 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       requests need approval. Dependabot security and version updates stay off (I9).
       `.claude/settings.json` denies `gh pr merge --admin`. Settings checked with
       `gh api repos/enqii/frame-scout/rulesets` and the repository's settings endpoints.)
+
+- [x] **A28 – The same photo folder by another path is searched twice:** A25 compared
+      folders by resolved path only, so a mapped drive letter and the UNC path of one
+      share, two drive letters or a `subst` drive for one folder, and the same file
+      through a hard link were analyzed, cached and ranked twice. Found in PR #28.
+      (done 2026-10-30 in PR #50: `distinct_folders` also compares `os.stat` identities
+      (`st_dev`, `st_ino`) of the listed folders and of their ancestor folders; a folder
+      that is the same as, or inside, another listed folder by another path is dropped
+      with a note; without an identity (missing folder, `st_ino` 0, stat error) the
+      path comparison applies as before. The scan deduplicates supported files by
+      identity (hard links, file symlinks; one `os.stat` per photo file, which replaces
+      the stat per entry of `rglob`). No change to `profiles.json`, `settings.json`, CLI,
+      `ENGINE` or `marks.json`. Unit tests inject identities; real mapped/UNC/subst
+      drives were not tested.)
+- [x] **A29 – Junctions and links inside a photo folder are followed:** `Path.rglob('*')`
+      follows directory junctions on Python 3.14, so a junction into another listed
+      folder or into the same folder found photos twice or walked a cycle. Found in PR #28.
+      (done 2026-10-30 in PR #50, without a user decision: links are still followed, so
+      event folders linked into a parent keep working, but nothing is found twice.
+      `scan_each_folder` walks with `os.scandir`; each folder once by identity, all real
+      subfolders of all listed folders before any link, so links into walked folders
+      and loops add nothing and a photo reachable both ways is listed by its real path,
+      counted for the folder it is really in. The output folder is also left out when
+      reached through a link. `scan_photos` and `scan_folders` are built on it; the app
+      counts per folder from one `scan_each_folder` call. A photo earlier found through
+      a link path is now only found by its real path, so cache rows and marks under the
+      link path are no longer used (A21). Needs `DirEntry.is_junction` (Python 3.12+).
+      The "skip links" option was not needed. Streamlit `AppTest` of the Photo source tab
+      with a junction between two listed folders; the folder symlink test is skipped
+      without privilege.)
