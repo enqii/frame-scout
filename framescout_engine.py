@@ -598,16 +598,17 @@ def search(args, parser, roots, dropped, output, status):
                    datetime.now().astimezone().isoformat(timespec='seconds'), roots, settings, len(paths), results))
     for (gallery, _), p in zip(pages, profiles):
         print(f"{p['name']}: {output / gallery}", flush=True)
-    # the harmless part of the cleanup (E7, E13): temporary thumbnails of a stopped export
-    # and thumbnails neither results.json nor any HTML file in the output folder links;
-    # the run lock is still held, so no other search writes thumbnails meanwhile
+    # the harmless part of the cleanup (E7, E13, E26): temporary thumbnails and other
+    # temporary files of a stopped run, and thumbnails neither results.json nor any HTML file
+    # in the output folder links; the run lock is still held, so no other search writes
+    # thumbnails meanwhile
     try:
         cleaned = auto_cleanup(output)
     except Exception as exc:  # never fails a finished search
         print(f'Cleanup of the thumbnails skipped: {exc}', flush=True)
     else:
         if cleaned['files']:
-            print(f"Removed {cleaned['files']} unused or temporary thumbnails ({size_text(cleaned['freed'])}).",
+            print(f"Removed {cleaned['files']} unused thumbnails or temporary files ({size_text(cleaned['freed'])}).",
                   flush=True)
         for note in cleaned['skipped']:
             print(note, flush=True)

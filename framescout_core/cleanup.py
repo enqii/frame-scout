@@ -12,7 +12,7 @@ from .locks import RunLock
 from .marks import MARKS_FILE, read_marks, remove_marks
 from .names import EXT, profile_slugs
 from .profiles import _backup_path, _read_entries, read_profiles
-from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
+from .results import RESULTS_FILE, _GALLERY_NAME, _THUMBNAIL_NAME, read_results
 from .run_status import RUN_LOCK, RUN_STATUS, read_status, run_active
 from .settings import SETTINGS_FILE
 from .signature import CACHE_FILE, classify_signatures, engine_id
@@ -57,6 +57,14 @@ CLEANUP_LOCK_TIMEOUT = 1.0
 # the temporary file of ensure_thumbnail (tempfile.mkstemp: <name>.<random>.jpg); a stop
 # during the export can leave it (E13)
 _TEMP_THUMBNAIL = re.compile(r'[0-9a-f]{24}\.jpg\.[a-z0-9_]+\.jpg')
+# the temporary files (<name>.<random>.tmp, _temp_path) of the atomic writes into the results
+# folder: status and result file and marks (one file each), the galleries of publish_export
+# (E24); terminate()/kill() during a write leaves one (E26)
+_TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name) for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE))
+                        + '|' + _GALLERY_NAME.pattern + r')\.[a-z0-9_]{8}\.tmp')
+# seconds after which such a temporary file counts as left over: the write of an app
+# session (marks.json, a stopped status) takes a fraction of a second
+STALE_TEMP_AGE = 60
 _GALLERY_LINK = re.compile(r'\b(' + THUMBNAILS_DIR + '|' + LEGACY_THUMBNAILS_DIR + r')/([0-9a-f]{24}\.jpg)')
 
 
@@ -767,18 +775,35 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     return summary
 
 
-def auto_cleanup(results):
-    """Remove the temporary thumbnails (E13) and the thumbnails nothing links; return a summary.
+def _stale_temp_files(results, now):
+    """The temporary files (_TEMP_FILE) directly in results last changed STALE_TEMP_AGE or more seconds before now."""
+    stale = []
+    for path in _files(results, _TEMP_FILE):
+        try:
+            if now - path.stat().st_mtime >= STALE_TEMP_AGE:
+                stale.append(path)
+        except OSError:  # gone meanwhile
+            continue
+    return stale
 
-    For the engine at the end of a search, with the run lock held. Every HTML file in results
-    counts as kept here, so a thumbnail one of them or results.json links stays; if one of
-    them or results.json cannot be read, every thumbnail stays. An emptied legacy thumbnail
-    folder is removed.
+
+def auto_cleanup(results, now=None):
+    """Remove left-over temporary files and the thumbnails nothing links; return a summary.
+
+    For the engine at the end of a search, with the run lock held. Left over: the temporary
+    thumbnails (E13) and the temporary files of the status, result and marks file and of the
+    galleries that are at least STALE_TEMP_AGE seconds old (E24, E26; a younger one may be
+    written by an app session now, e.g. marks.json; now: time.time() for tests). Every HTML
+    file in results counts as kept here, so a thumbnail one of them or results.json links
+    stays; if one of them or results.json cannot be read, every thumbnail stays. An emptied
+    legacy thumbnail folder is removed. The summary's files and freed count every removed
+    file, temporary those of them that were temporary files.
     """
     results = Path(results)
     summary = _new_summary()
-    for path in _temp_thumbnails(results):
+    for path in [*_temp_thumbnails(results), *_stale_temp_files(results, time.time() if now is None else now)]:
         _remove_file(path, summary)
+    summary['temporary'] = summary['files']
     try:
         listed, _ = _result_names(results)
         links = _union(_gallery_links(p)[1] for p in _html_files(results))
