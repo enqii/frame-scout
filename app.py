@@ -444,7 +444,10 @@ def mark_colors(states):
         selectors = ', '.join(f'.st-key-{key} button[kind="segmented_controlActive"]'
                               for key, saved in states.items() if saved == state)
         if selectors:
-            rules.append(f'{selectors}{{background-color:{background};border-color:{border};color:inherit}}')
+            # !important: Streamlit's own rule for the selected button ([kind=…]:not(:disabled)
+            # on its class) is more specific than this selector
+            rules.append(f'{selectors}{{background-color:{background}!important;border-color:{border}!important;'
+                         'color:inherit!important}')
     return f'<style>{"".join(rules)}</style>' if rules else ''
 
 def set_mark(profile, photo, key):
