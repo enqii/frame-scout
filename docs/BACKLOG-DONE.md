@@ -442,14 +442,14 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       review.
       (Done 2026-10-30, PR #46, roadmap P8 (C): `raw_fallbacks(scan)` and `RawFallback`
       in `framescout_core/photos.py` map a partner to its skipped RAW file (first in
-      sorted order if several). When a partner fails to decode, the engine logs the
-      `ERROR` and "Analyzing its RAW file instead", takes the RAW file from the cache or
-      decodes it synchronously in the main thread, and counts the shot once. Cache row,
-      gallery card, thumbnail, link and `--scores-file` use the RAW path; a repaired JPEG
-      wins again on the next run. Only decode failures fall back, not cache-scan or
-      embedding errors; truncated JPEGs: E46. No cache, CLI or profiles change.
-      Unit-tested (6 tests in `test_photos.py`); the engine side is **not
-      runtime-tested** (no RAW sample locally).)
+      sorted order if several). A partner that fails in the cache scan, in decoding or in
+      storing is logged as `ERROR` and deferred; after all photos the engine analyzes its
+      RAW file instead, unless another photo of the shot was analyzed (review), once per
+      shot, through the cache check and the decoding threads like any photo, and counts
+      the shot once. Cache row, gallery card, thumbnail, link and `--scores-file` use the
+      RAW path; a repaired JPEG wins again on the next run. Truncated JPEGs: E46. No
+      cache, CLI or profiles change. Unit-tested (9 tests in `test_photos.py`); the engine
+      side is **not runtime-tested** (no RAW sample locally).)
 
 ### App (`app.py`)
 

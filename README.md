@@ -237,9 +237,10 @@ phones) and camera RAW files (DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW).
 - If a JPEG or HEIC file of the same name is in the same folder as a RAW file (e.g.
   `IMG_0001.CR2` and `IMG_0001.JPG`, as cameras write them in "RAW+JPEG" mode), only the
   JPEG/HEIC file is searched, so the same shot does not appear twice. This goes by the
-  names only: if that JPEG cannot be decoded (e.g. a corrupt or unreadable file), the log
-  shows an `ERROR` for it and the RAW file of the shot is analyzed instead; the gallery
-  then shows the RAW file for that shot. A JPEG that is only truncated usually still
+  names only: if that JPEG cannot be analyzed (e.g. a corrupt or unreadable file), the log
+  shows an `ERROR` for it and, once all other photos are done, the RAW file of the shot is
+  analyzed instead, unless another photo of the shot (e.g. its HEIC) was analyzed; the
+  gallery then shows the RAW file for that shot. A JPEG that is only truncated usually still
   decodes (the missing part gray) and is searched as it is. To search the RAW file
   instead, rename or move the JPEG.
 - The search log names how many files were skipped and why (e.g. RAW files with a JPEG,
