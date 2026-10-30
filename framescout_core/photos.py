@@ -2,6 +2,7 @@
 import collections
 import importlib
 import os
+from pathlib import Path
 
 from .names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
 
@@ -85,28 +86,105 @@ def _shot(path):
     return path.parent, path.stem.casefold()
 
 
-def scan_photos(root, extensions=EXT, exclude=None):
-    """Return the PhotoScan of the files in root and its subfolders.
+def _identity(path):
+    """The (device, file id) of what path names, following links; None if it cannot be read (A28).
 
-    Files inside exclude (the output folder) are left out completely. A RAW file is
-    skipped when a file of the same name (ignoring case) with an extension of
-    RAW_PARTNER_EXT is in the same folder and is supported itself.
+    Two paths of the same identity are the same folder or file, e.g. a mapped drive letter
+    and the UNC path of the same share, a subst drive, a junction or a hard link. None
+    also for a file system without file ids (st_ino 0): such paths are compared by text.
     """
-    paths, unsupported = [], collections.Counter()
-    for path in root.rglob('*'):
-        if not path.is_file() or (exclude is not None and exclude in path.parents):
-            continue
-        suffix = path.suffix.lower()
-        if suffix in extensions:
-            paths.append(path)
-        else:
-            unsupported[suffix] += 1
+    try:
+        stat = os.stat(path)
+    except (OSError, ValueError):
+        return None
+    return (stat.st_dev, stat.st_ino) if stat.st_ino else None
+
+
+def _is_link(entry):
+    """True if the directory entry is a symbolic link or a junction (Windows), not a real folder."""
+    try:
+        return entry.is_symlink() or entry.is_junction()
+    except OSError:
+        return False
+
+
+def _shot_pairs(paths):
+    """Split the photos of a scan into (photos, RAW files skipped for a partner of the same name)."""
     partners = {_shot(p) for p in paths if p.suffix.lower() in RAW_PARTNER_EXT}
     photos, pairs = [], []
     for p in paths:
         paired = p.suffix.lower() in RAW_EXT and _shot(p) in partners
         (pairs if paired else photos).append(p)
-    return PhotoScan(sorted(photos), sorted(pairs), unsupported)
+    return photos, pairs
+
+
+def scan_each_folder(folders, extensions=EXT, exclude=None):
+    """Return the PhotoScan of each of folders and its subfolders, scanned together (A25, A28, A29).
+
+    Files inside exclude (the output folder) are left out completely. A RAW file is
+    skipped when a file of the same name (ignoring case) with an extension of
+    RAW_PARTNER_EXT is in the same folder and is supported itself.
+
+    Folder links (symbolic links and junctions) are followed, so event folders linked into
+    one folder are searched, but every folder is walked once, compared by its identity
+    (_identity): a link into a folder already walked, e.g. into the same or another of
+    folders, or a loop, adds nothing. All real subfolders of all folders are walked before
+    any link, so a photo reached both ways is found by its real path, in the folder it is
+    really in. A photo found twice by another path (a hard link, a file link) counts once,
+    for the first path in that order. A folder or file whose identity cannot be read is
+    compared by its path only, as before.
+    """
+    excluded = None if exclude is None else (Path(exclude), _identity(exclude))
+    found = [[] for _ in folders]
+    unsupported = [collections.Counter() for _ in folders]
+    seen_folders, seen_files = set(), set()
+    real = collections.deque((index, Path(folder)) for index, folder in enumerate(folders))
+    links = collections.deque()
+
+    def walk(index, folder):
+        identity = _identity(folder) or ('path', _folder_key(folder))
+        if identity in seen_folders:
+            return
+        seen_folders.add(identity)
+        try:
+            with os.scandir(folder) as listing:
+                entries = sorted(listing, key=lambda entry: entry.name)
+        except (OSError, ValueError):
+            return  # missing or not readable: nothing found, as with Path.rglob
+        for entry in entries:
+            path = folder / entry.name
+            try:
+                is_dir = entry.is_dir()
+                is_file = not is_dir and entry.is_file()
+            except OSError:
+                continue
+            if is_dir:
+                if excluded is not None and (path == excluded[0] or (excluded[1] is not None
+                                                                     and _identity(path) == excluded[1])):
+                    continue
+                (links if _is_link(entry) else real).append((index, path))
+            elif is_file:
+                suffix = path.suffix.lower()
+                if suffix not in extensions:
+                    unsupported[index][suffix] += 1
+                    continue
+                file_identity = _identity(path) or ('path', _folder_key(path))
+                if file_identity not in seen_files:
+                    seen_files.add(file_identity)
+                    found[index].append(path)
+
+    while real or links:
+        walk(*(real.popleft() if real else links.popleft()))
+    scans = []
+    for paths, counts in zip(found, unsupported):
+        photos, pairs = _shot_pairs(paths)
+        scans.append(PhotoScan(sorted(photos), sorted(pairs), counts))
+    return scans
+
+
+def scan_photos(root, extensions=EXT, exclude=None):
+    """Return the PhotoScan of the files in root and its subfolders (see scan_each_folder)."""
+    return scan_each_folder([root], extensions, exclude)[0]
 
 
 def raw_fallbacks(scan):
@@ -194,28 +272,44 @@ def _inside_key(key, parent):
     return key != parent and key.startswith(_inside_prefix(parent))
 
 
-def distinct_folders(folders):
-    """Return (kept, dropped) of the listed photo folders of a search (A25).
+def distinct_folders(folders, identity=_identity):
+    """Return (kept, dropped) of the listed photo folders of a search (A25, A28).
 
     folders: resolved paths in the order listed. A folder listed twice is searched once, and
     a folder inside another listed folder is searched as part of it, so no photo is found
     twice through the list. kept: the folders to search, in list order; dropped: (folder,
-    why) of the others. Only the paths are compared (resolved by the caller); the same
-    folder reachable through two paths, e.g. a junction or another drive letter, is not
-    recognized.
+    why) of the others. Folders are compared by their paths and by their identity
+    (identity(path): see _identity), so the same folder by another path, e.g. a mapped
+    drive letter and the UNC path of one share, a subst drive or a junction, is recognized
+    too, and so is a folder whose parent folder is another listed folder by another path.
+    A folder without an identity (e.g. a missing one) is compared by its path only.
     """
-    unique, dropped, seen = [], [], set()
+    unique, dropped, seen = [], [], {}
     for folder in folders:
-        key = _folder_key(folder)
-        if key in seen:
-            dropped.append((folder, f'The photo folder {folder} is listed twice; it is searched once.'))
+        key, folder_id = _folder_key(folder), identity(folder)
+        first = seen.get(key) or (seen.get(folder_id) if folder_id is not None else None)
+        if first is not None:
+            note = ('is listed twice' if _folder_key(first) == key
+                    else f'is the same folder as the listed folder {first} by another path')
+            dropped.append((folder, f'The photo folder {folder} {note}; it is searched once.'))
             continue
-        seen.add(key)
+        seen[key] = folder
+        if folder_id is not None:
+            seen[folder_id] = folder
         unique.append(folder)
     keys = [_folder_key(f) for f in unique]
+    ids = {}
+    for folder in unique:
+        folder_id = identity(folder)
+        if folder_id is not None:
+            ids[folder_id] = folder
     kept = []
     for folder, key in zip(unique, keys):
         parent = next((f for f, k in zip(unique, keys) if _inside_key(key, k)), None)
+        if parent is None and ids:
+            # a parent folder of folder that is another listed folder by another path
+            parent = next((ids[i] for i in map(identity, folder.parents)
+                           if i is not None and i in ids and ids[i] is not folder), None)
         if parent is None:
             kept.append(folder)
         else:
@@ -303,9 +397,9 @@ def photo_name(path, folders, labels):
 def scan_folders(folders, extensions=EXT, exclude=None):
     """Return the PhotoScan of several photo folders together (scan_photos of each, joined; A25).
 
-    folders should be distinct_folders' kept list, so no file is found twice.
+    folders should be distinct_folders' kept list; scan_each_folder finds no photo twice.
     """
-    return join_scans([scan_photos(folder, extensions, exclude) for folder in folders])
+    return join_scans(scan_each_folder(folders, extensions, exclude))
 
 
 def join_scans(scans):

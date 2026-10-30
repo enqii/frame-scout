@@ -8,7 +8,8 @@ import pytest
 from framescout_core import (ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
                              RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, RawFallback, available_decoders, distinct_folders,
                              folder_labels, join_scans, missing_decoder, missing_folders_message,
-                             output_folder_problem, photo_name, raw_fallbacks, raw_preview_transpose, raw_preview_usable, scan_folders, scan_photos, skipped_lines,
+                             output_folder_problem, photo_name, raw_fallbacks, raw_preview_transpose, raw_preview_usable, scan_each_folder, scan_folders, scan_photos,
+                             skipped_lines,
                              supported_extensions)
 
 NO_HEIF = Decoders(avif=True, heif=False, raw=True)
@@ -415,6 +416,142 @@ def test_join_scans_of_folders_counted_one_by_one(tmp_path):
     scans = [scan_photos(tmp_path / 'two'), scan_photos(tmp_path / 'one')]
     assert join_scans(scans) == PhotoScan([a, b], [], collections.Counter({'.mov': 2}))
     assert join_scans(scans) == scan_folders([tmp_path / 'one', tmp_path / 'two'])
+
+
+# --- the same folder or photo by another path (A28) and links inside a folder (A29) ---
+
+def link_folder(link, target):
+    """Make link a folder link to target: a junction on Windows (no privileges needed), a symlink elsewhere."""
+    if os.name == 'nt':
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+    else:
+        os.symlink(target, link, target_is_directory=True)
+    return link
+
+
+def symlink_folder(link, target):
+    try:
+        os.symlink(target, link, target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:  # Windows without the privilege or developer mode
+        pytest.skip(f'cannot create a symbolic link here: {exc}')
+    return link
+
+
+def fake_identity(same):
+    """An identity function for distinct_folders: the paths in each group of same are one folder."""
+    def identity(path):
+        for number, group in enumerate(same):
+            if path in group:
+                return ('group', number)
+        return ('path', os.path.normcase(str(path)))
+    return identity
+
+
+def test_distinct_folders_drop_the_same_folder_by_another_path(tmp_path):
+    # e.g. a mapped drive letter and the UNC path of the same share (A28)
+    drive, unc, other = Path('Z:/photos'), Path('//server/share/photos'), tmp_path / 'other'
+    kept, dropped = distinct_folders([drive, other, unc], identity=fake_identity([{drive, unc}]))
+    assert kept == [drive, other]
+    assert len(dropped) == 1 and dropped[0][0] == unc
+    assert 'same folder' in dropped[0][1] and str(drive) in dropped[0][1]
+
+
+def test_distinct_folders_drop_a_folder_inside_another_listed_folder_by_another_path(tmp_path):
+    # Z:/photos/event is inside //server/share/photos, which is Z:/photos (A28)
+    drive, unc = Path('Z:/photos'), Path('//server/share/photos')
+    child = drive / 'event'
+    for listed in ([unc, child], [child, unc]):
+        kept, dropped = distinct_folders(listed, identity=fake_identity([{drive, unc}]))
+        assert kept == [unc]
+        assert len(dropped) == 1 and dropped[0][0] == child
+        assert 'inside' in dropped[0][1] and str(unc) in dropped[0][1]
+
+
+def test_distinct_folders_compare_paths_where_a_folder_has_no_identity(tmp_path):
+    # a missing folder (or one whose identity cannot be read) is compared by its path, as before
+    a, b = tmp_path / 'gone', tmp_path / 'gone-too'
+    kept, dropped = distinct_folders([a, b, a], identity=lambda path: None)
+    assert kept == [a, b] and [d[0] for d in dropped] == [a]
+
+
+def test_distinct_folders_recognize_a_junction_to_a_listed_folder(tmp_path):
+    real = tmp_path / 'real'
+    (real / 'event').mkdir(parents=True)
+    link = link_folder(tmp_path / 'link', real)
+    kept, dropped = distinct_folders([real, link, link / 'event'])
+    assert kept == [real]
+    assert [d[0] for d in dropped] == [link, link / 'event']
+
+
+def test_scan_follows_a_folder_link_to_photos_outside_the_folder(tmp_path):
+    # event folders linked into one parent folder are searched through the links, as before (A29)
+    touch(tmp_path / 'elsewhere' / 'event' / 'a.jpg')
+    parent = tmp_path / 'all'
+    parent.mkdir()
+    link_folder(parent / 'event', tmp_path / 'elsewhere' / 'event')
+    assert scan_photos(parent).paths == [parent / 'event' / 'a.jpg']
+
+
+def test_scan_does_not_follow_a_folder_link_into_a_loop(tmp_path):
+    photo = touch(tmp_path / 'photos' / 'sub' / 'a.jpg')
+    link_folder(tmp_path / 'photos' / 'sub' / 'loop', tmp_path / 'photos')
+    scan = scan_photos(tmp_path / 'photos')
+    assert scan.paths == [photo]
+
+
+def test_scan_prefers_the_real_path_over_a_folder_link_inside_the_folder(tmp_path):
+    # the link sorts before the folder it points to; the photo is still found once, by its real path
+    root = tmp_path / 'photos'
+    photo = touch(root / 'zz-event' / 'a.jpg')
+    raw = touch(root / 'zz-event' / 'a.nef')
+    link_folder(root / 'aa-link', root / 'zz-event')
+    scan = scan_photos(root)
+    assert scan.paths == [photo] and scan.raw_pairs == [raw]
+
+
+def test_scan_follows_a_symbolic_link_once(tmp_path):
+    root = tmp_path / 'photos'
+    photo = touch(root / 'event' / 'a.jpg')
+    symlink_folder(root / 'link', root / 'event')
+    symlink_folder(root / 'event' / 'loop', root)
+    assert scan_photos(root).paths == [photo]
+
+
+def test_scan_folders_find_a_photo_once_through_a_link_into_another_listed_folder(tmp_path):
+    one, two = tmp_path / 'one', tmp_path / 'two'
+    a = touch(one / 'a.jpg')
+    b = touch(two / 'sub' / 'b.jpg')
+    link_folder(one / 'aa-two', two)
+    scan = scan_folders([one, two])
+    assert scan.paths == [a, b]
+    # the app counts each folder: the photo counts for the folder it is really in
+    scans = scan_each_folder([one, two])
+    assert [s.paths for s in scans] == [[a], [b]]
+    assert join_scans(scans) == scan
+
+
+def test_scan_finds_a_hard_linked_photo_once(tmp_path):
+    a = touch(tmp_path / 'one' / 'a.jpg')
+    (tmp_path / 'two').mkdir()
+    try:
+        os.link(a, tmp_path / 'two' / 'copy.jpg')
+    except OSError as exc:
+        pytest.skip(f'no hard links here: {exc}')
+    assert scan_folders([tmp_path / 'one', tmp_path / 'two']).paths == [a]
+    assert scan_photos(tmp_path).paths == [a]
+
+
+def test_scan_leaves_out_the_excluded_folder_through_a_link(tmp_path):
+    root = tmp_path / 'photos'
+    photo = touch(root / 'a.jpg')
+    touch(root / 'results' / 'thumb.jpg')
+    link_folder(root / 'aa-results', root / 'results')
+    assert scan_photos(root, exclude=root / 'results').paths == [photo]
+
+
+def test_scan_of_a_missing_folder_is_empty(tmp_path):
+    assert scan_photos(tmp_path / 'gone') == PhotoScan([], [], collections.Counter())
 
 
 # --- skipped_lines ---
