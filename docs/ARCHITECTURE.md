@@ -394,7 +394,11 @@ I19.
 
 ### `README.md`
 
-`README.md`: English user guide (GitHub start page).
+`README.md`: short English overview (GitHub start page): what FrameScout is,
+installation, quick start, reliability of the matches, license. Details live in
+`docs/USER-GUIDE.md` (every part of the app, formats, results, cleanup, scores,
+uninstalling) and `docs/DEVELOPMENT.md` (manual commands, CLI, tests, evaluation tool,
+project structure).
 
 ### `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`
 
@@ -509,7 +513,7 @@ user-defined `prompts` are appended.
 
 Search terms are **English only** (E3, user decision in PR #12): the model understands
 practically only English and nothing is translated. The profile tab shows a hint and
-labels the motif, context, features and custom search text fields "in English"; README
+labels the motif, context, features and custom search text fields "in English"; user guide
 section "Search terms in English". Hint text only: do not add a language check, warning or
 translation without a new user decision. A multilingual model is E21
 (`xlm-roberta-base-ViT-B-32`: about 1.47 GB, `transformers`, re-analysis of every photo; a
@@ -979,7 +983,7 @@ out of date), the photos before the marks lock is taken; its summary has a `mark
 `scan_cleanup` and `clean_up` require `current_model` (keyword-only: the signature, a
 hash, does not tell the model), `CACHE_CATEGORIES` lists the cache categories. Before E22
 rows of any other engine counted as `cache_old` (selected), and an older FrameScout still
-does so with the rows of the optional models (documented in the README);
+does so with the rows of the optional models;
 `references` (`EXT` files in `references/` that neither `profiles.json` nor
 `profiles.json.bak` names). `galleries`/`thumbnails` are not offered if `results.json` (a
 missing one counts as empty) or `profiles.json` (also missing) cannot be read,

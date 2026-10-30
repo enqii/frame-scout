@@ -39,7 +39,7 @@ Read only what the item needs – every token you read is paid again on each lat
 
 Mode `docs-update` reads only the PR text, the "Docs pending" comment, the code diff
 (`git diff origin/main...HEAD -- . ':!*.md'`) and the doc sections the diff touches
-(Grep `docs/ARCHITECTURE.md`, `README.md`, `BACKLOG.md` and `docs/BACKLOG-DONE.md` for the IDs); it does not
+(Grep `docs/ARCHITECTURE.md`, `README.md`, `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md`, `BACKLOG.md` and `docs/BACKLOG-DONE.md` for the IDs); it does not
 read whole files or the code beyond the diff.
 
 For modes other than `new`, also read the PR description, its commits,
@@ -91,14 +91,14 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   `gh pr create --draft --base main --head {BRANCH} --title "<type>(<scope>): <description> (<IDs>)" --body-file <file> --label fs:in-progress`.
   The PR body ends with the line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - Keep the PR description current while you work (`gh pr edit {PR} --body-file <file>`).
-- Documentation (`ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`, `README.md`, `docs/ARCHITECTURE.md`, and `CLAUDE.md` only
+- Documentation (`ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`, `README.md`, `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`, and `CLAUDE.md` only
   for rule changes; keep it short; out-of-scope findings as new backlog items, no GitHub
   issues) belongs in the same PR. Kind `docs`: write it as part of the work. Kinds
   `code`/`code-risky` in modes `new`/`continue`: **do not write it yourself** (your
   context is large by now). After the last code and test commit is pushed and the tests
   pass, post a PR comment starting with `Docs pending:` that lists the item, the backlog
   IDs, the commit SHAs, behavior and compatibility changes, out-of-scope findings and which
-  docs to update (README, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md`; new items). Leave the
+  docs to update (README, user guide, DEVELOPMENT, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md`; new items). Leave the
   label `fs:in-progress` and return; the orchestrator spawns the `docs-update` agent.
 - Wait for CI quietly: `gh pr checks {PR} --watch --interval 60 > /dev/null 2>&1; gh pr checks {PR}`
   (Git Bash; `--watch` reprints the whole table on every poll, so discard it and print
