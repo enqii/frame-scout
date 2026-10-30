@@ -151,6 +151,53 @@ def test_a_file_that_is_open_is_published_on_a_retry(tmp_path):
     assert sorted(p.name for p in tmp_path.iterdir()) == ['red-car.html', RESULTS_FILE]
 
 
+@pytest.mark.parametrize('held', ['dog.html', RESULTS_FILE])
+def test_a_rename_that_fails_every_try_restores_what_was_published_before_it(tmp_path, held):
+    # e.g. a virus scanner holds one file for longer than every retry: the run fails, but
+    # the galleries and results.json of the previous search stay together (review of PR #45)
+    old_export(tmp_path)
+    (tmp_path / 'dog.html').write_text('old dog', encoding='utf-8')
+    tries = []
+
+    def replace(tmp, target):
+        if Path(target).name == held and Path(tmp).name.startswith(held + '.'):
+            tries.append(target)
+            raise PermissionError('in use')
+        os.replace(tmp, target)
+
+    with pytest.raises(PermissionError):
+        publish_export(tmp_path, [('red-car.html', 'new'), ('cat.html', 'new'), ('dog.html', 'new')], document(),
+                       replace=replace, attempts=3, retry_delay=0)
+    assert len(tries) == 3
+    assert (tmp_path / 'red-car.html').read_text(encoding='utf-8') == 'old red car'
+    assert (tmp_path / 'dog.html').read_text(encoding='utf-8') == 'old dog'
+    assert not (tmp_path / 'cat.html').exists()  # new in this export: removed again
+    assert read_results(tmp_path / RESULTS_FILE) == document(cards=[])
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['dog.html', 'red-car.html', RESULTS_FILE]
+
+
+def test_a_restore_that_fails_too_is_skipped_and_the_rename_error_is_raised(tmp_path):
+    old_export(tmp_path)
+    renamed = []
+
+    def replace(tmp, target):
+        name = Path(target).name
+        if name == 'dog.html':
+            raise PermissionError('dog in use')
+        if name in renamed:  # the restore of red-car.html fails as well
+            raise PermissionError('red car in use')
+        renamed.append(name)
+        os.replace(tmp, target)
+
+    with pytest.raises(PermissionError, match='dog in use'):
+        publish_export(tmp_path, [('red-car.html', 'new'), ('cat.html', 'new'), ('dog.html', 'new')], document(),
+                       replace=replace, attempts=2, retry_delay=0)
+    assert (tmp_path / 'red-car.html').read_text(encoding='utf-8') == 'new'  # left replaced (E45)
+    assert not (tmp_path / 'cat.html').exists()  # the other restores still ran
+    assert read_results(tmp_path / RESULTS_FILE) == document(cards=[])
+    assert not list(tmp_path.glob('*.tmp'))
+
+
 def test_a_missing_result_file_is_none(tmp_path):
     assert read_results(tmp_path / RESULTS_FILE) is None
 
