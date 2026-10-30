@@ -145,3 +145,13 @@ def test_installer_constrains_the_torch_install_too():
     torch_install = next(i for i, line in enumerate(commands) if 'install_torch.py' in line)
     venv = next(i for i, line in enumerate(commands) if '-m venv' in line)
     assert venv < setting < torch_install
+
+
+def test_streamlit_floor_allows_the_width_parameter():
+    # app.py sizes its buttons with width="stretch", which st.button and st.download_button
+    # accept since Streamlit 1.48.0 (A10)
+    specifiers = requirements('requirements.txt')['streamlit']
+    floors = [wanted for op, wanted in specifiers if op == '>=']
+    assert floors and all(version_key(wanted) >= version_key('1.48') for wanted in floors)
+    source = (ROOT / 'app.py').read_text(encoding='utf-8')
+    assert 'use_container_width' not in source, 'use width="stretch" instead (A10)'

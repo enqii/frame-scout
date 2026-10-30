@@ -685,14 +685,14 @@ def show_results(results, photo_folders):
             ('Changed since this search: ', others['changed']),
             ('No longer search profiles: ', others['missing'])) if found))
     c1, c2, c3 = st.columns(3)
-    c1.button('Open gallery in browser', on_click=open_gallery, args=(entry['gallery'],), use_container_width=True,
+    c1.button('Open gallery in browser', on_click=open_gallery, args=(entry['gallery'],), width='stretch',
               help=f"Opens {entry['gallery']} from the results folder in your web browser.")
-    c2.button('Open results folder', on_click=open_results_folder, use_container_width=True)
+    c2.button('Open results folder', on_click=open_results_folder, width='stretch')
     page_file = RESULTS / entry['gallery']
     try:
         # cached: a click on Open or Folder reruns this fragment (review)
         c3.download_button('Download HTML (without thumbnails)', cached_bytes(*file_key(page_file)), file_name=page_file.name,
-                           mime='text/html', use_container_width=True, key='dl_results_gallery')
+                           mime='text/html', width='stretch', key='dl_results_gallery')
     except OSError:
         pass  # deleted or in use: the other buttons still work
     if st.session_state.get('gallery_notice'):
@@ -740,9 +740,9 @@ def show_results(results, photo_folders):
                     st.caption(f"{plain(card['detail'])}  \n{plain(card['relative'])}")
                     b1, b2 = st.columns(2)
                     b1.button('Open', key=f"open_{card['rank']}", on_click=open_photo, args=(card['path'],),
-                              use_container_width=True, help='Opens the photo in your image viewer.')
+                              width='stretch', help='Opens the photo in your image viewer.')
                     b2.button('Folder', key=f"reveal_{card['rank']}", on_click=show_photo, args=(card['path'],),
-                              use_container_width=True, help='Shows the photo in its folder.')
+                              width='stretch', help='Shows the photo in its folder.')
                     key = mark_keys[card['rank']]
                     st.segmented_control('Mark', list(MARK_LABELS.values()), key=key, on_change=set_mark,
                                          args=(name, card['path'], key), disabled=not can_mark,
@@ -778,9 +778,9 @@ def show_copy(name, entry, marks, photo_folders, profile_exists):
         st.warning(plain(problem))
     c1, c2 = st.columns(2)
     copy = c1.button(f'Copy {len(matches):,} marked photos', disabled=not matches or target is None,
-                     use_container_width=True)
+                     width='stretch')
     c2.button('Open target folder', on_click=open_target_folder, args=(key, photo_folders),
-              disabled=target is None or not target.is_dir(), use_container_width=True)
+              disabled=target is None or not target.is_dir(), width='stretch')
     if copy:
         copy_matches(name, key, photo_folders)
 
@@ -1265,11 +1265,11 @@ with run_tab:
         # at least one listed folder must exist (as sorted out in the Photo source tab, without
         # asking the file system again, review); the engine leaves out the others with a note (A25).
         # A search model without its package would only fail in the engine (E22 review)
-        start = st.button('▶ Start search', type='primary', use_container_width=True,
+        start = st.button('▶ Start search', type='primary', width='stretch',
                           disabled=active or not profiles or not folder_scans or bool(model_missing))
     with c2:
         # a cleanup holding the run lock is no search to stop (review)
-        stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), use_container_width=True)
+        stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), width='stretch')
     if start and settings_taken_over:
         # the page showed other values until this click: never start with settings the
         # user has not seen (review)
