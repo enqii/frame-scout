@@ -1,12 +1,13 @@
 """The result file of a search (results.json) and the app's result gallery helpers (A12, P4)."""
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from framescout_core import (RESULTS_FILE, RESULTS_FORMAT, load_profiles, open_command, openable_photo, page_count,
-                             page_cards, profile_fingerprints, profile_state, read_results, result_card,
-                             results_document, reveal_command, search_fingerprint, write_results)
+                             page_cards, profile_fingerprints, profile_state, publish_export, read_results,
+                             result_card, results_document, reveal_command, search_fingerprint, write_results)
 
 THUMB = '1c6b57780fa2df6f925b878c.jpg'
 
@@ -88,6 +89,66 @@ def test_results_round_trip(tmp_path):
     assert read_results(path) == document()
     # written atomically: no temporary file is left
     assert [p.name for p in tmp_path.iterdir()] == [RESULTS_FILE]
+
+
+# publishing the galleries together with results.json (E24)
+
+def old_export(folder):
+    (folder / 'red-car.html').write_text('old red car', encoding='utf-8')
+    write_results(folder / RESULTS_FILE, document(cards=[]))
+
+
+def test_an_export_publishes_its_galleries_and_results_json(tmp_path):
+    old_export(tmp_path)
+    publish_export(tmp_path, [('red-car.html', 'new red car ✓'), ('cat.html', 'new cat')], document())
+    assert (tmp_path / 'red-car.html').read_text(encoding='utf-8') == 'new red car ✓'
+    assert (tmp_path / 'cat.html').read_text(encoding='utf-8') == 'new cat'
+    assert read_results(tmp_path / RESULTS_FILE) == document()
+    # no temporary file is left
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['cat.html', 'red-car.html', RESULTS_FILE]
+
+
+def test_a_failed_export_publishes_nothing(tmp_path):
+    old_export(tmp_path)
+    # the second gallery cannot be written (its folder does not exist)
+    with pytest.raises(OSError):
+        publish_export(tmp_path, [('red-car.html', 'new'), ('missing/cat.html', 'new')], document())
+    assert (tmp_path / 'red-car.html').read_text(encoding='utf-8') == 'old red car'
+    assert read_results(tmp_path / RESULTS_FILE) == document(cards=[])
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['red-car.html', RESULTS_FILE]
+
+
+def test_every_file_is_complete_before_the_first_is_published_and_results_json_comes_last(tmp_path):
+    old_export(tmp_path)
+    published = []
+
+    def replace(tmp, target):
+        if not published:  # all temporary files are written in full before the first rename
+            temps = sorted(p.name for p in tmp_path.glob('*.tmp'))
+            assert len(temps) == 3
+            assert all(name.startswith(('red-car.html.', 'cat.html.', RESULTS_FILE + '.')) for name in temps)
+        assert Path(tmp).parent == tmp_path and Path(tmp).name.endswith('.tmp')
+        published.append(Path(target).name)
+        os.replace(tmp, target)
+
+    publish_export(tmp_path, [('red-car.html', 'new'), ('cat.html', 'new')], document(), replace=replace)
+    assert published == ['red-car.html', 'cat.html', RESULTS_FILE]
+    assert not list(tmp_path.glob('*.tmp'))
+
+
+def test_a_file_that_is_open_is_published_on_a_retry(tmp_path):
+    old_export(tmp_path)
+    failed = []
+
+    def replace(tmp, target):
+        if Path(target).name == 'red-car.html' and not failed:
+            failed.append(target)  # e.g. a virus scanner has the gallery open for a moment
+            raise PermissionError('in use')
+        os.replace(tmp, target)
+
+    publish_export(tmp_path, [('red-car.html', 'new')], document(), replace=replace, retry_delay=0)
+    assert failed and (tmp_path / 'red-car.html').read_text(encoding='utf-8') == 'new'
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['red-car.html', RESULTS_FILE]
 
 
 def test_a_missing_result_file_is_none(tmp_path):
