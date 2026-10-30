@@ -571,3 +571,26 @@ for the formats. Status: not yet run with real models (E34).
 | `.claude/` | Claude Code project settings and the `/roadmap` workflow skill |
 | `profiles.json`, `settings.json`, `photos/`, `references/`, `results/`, `run.log` | User data and runtime output (not in the repo) |
 | `.venv/`, `.cache/`, `.tmp/` | Environment, caches and model weights, including `.cache/ultralytics/yolo11n.pt` (not in the repo) |
+| `LICENSE`, `SECURITY.md` | License (AGPL-3.0) and how to report security issues |
+
+## License
+
+FrameScout is licensed under the **GNU Affero General Public License v3.0**
+(AGPL-3.0, see `LICENSE`). It comes without any warranty; its scores are search
+heuristics, not identifications.
+
+### Third-party components
+
+FrameScout installs and downloads the following components; none of them is part of
+this repository, and each keeps its own license:
+
+- **Ultralytics** and the YOLO11 person detector `yolo11n.pt` (AGPL-3.0). This is the
+  main reason FrameScout itself uses the AGPL.
+- **OpenCLIP** (`open_clip_torch`, MIT), **PyTorch** (BSD-3-Clause), **Streamlit**
+  (Apache-2.0) and the other packages in `requirements.txt` and `constraints.txt`,
+  each under its own license.
+- **Model weights** of the search models, downloaded from the Hugging Face Hub on the
+  first use (`timm/vit_base_patch32_clip_224.openai`,
+  `laion/CLIP-ViT-B-16-DataComp.XL-s13B-b90K`,
+  `laion/CLIP-ViT-L-14-DataComp.XL-s13B-b90K`, `timm/ViT-B-16-SigLIP`): each under
+  the license and terms on its model card.
