@@ -2,6 +2,7 @@
 import collections
 import importlib
 import os
+import time
 from pathlib import Path
 
 from .names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
@@ -435,6 +436,30 @@ def scan_folders(folders, extensions=EXT, exclude=None):
     folders should be distinct_folders' kept list; scan_each_folder finds no photo twice.
     """
     return join_scans(scan_each_folder(folders, extensions, exclude))
+
+
+def remembered_scans(memory, folders, extensions=EXT, exclude=None, recount=False, clock=time.time,
+                     scan=scan_each_folder):
+    """Return (scans, counted_at): scan_each_folder of folders, remembered in memory (A27).
+
+    The app counts the photos of the listed folders on every page run; walking a large
+    folder tree on a network drive or HDD each time is slow. memory is a dict the app keeps
+    per browser session; the scans are taken from it while the folders (in order), the
+    extensions and the output folder are the ones it was counted for, and scanned again when
+    one of them changes or recount is true (the "Recount" button). A photo added or removed
+    in a folder meanwhile is therefore counted only after a recount; counted_at (clock() of
+    the count, None without folders) lets the page say how old the count is. The search
+    itself always scans the folders again.
+    """
+    folders = list(folders)
+    if not folders:
+        return [], None
+    key = (tuple(str(f) for f in folders), frozenset(extensions), None if exclude is None else str(exclude))
+    if recount or memory.get('key') != key:
+        memory['scans'] = list(scan(folders, extensions, exclude))
+        memory['counted_at'] = clock()
+        memory['key'] = key
+    return memory['scans'], memory['counted_at']
 
 
 def join_scans(scans):

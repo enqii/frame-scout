@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 import psutil
@@ -27,7 +28,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              reconcile_settings, reference_folder,
                              rename_copy_folder, rename_marks, reveal_command, run_active, save_copy_folder,
                              available_decoders, distinct_folders, folder_lines, join_scans, save_marks,
-                             save_profiles, save_settings, scan_cleanup, scan_each_folder,
+                             remembered_scans, save_profiles, save_settings, scan_cleanup,
                              size_text, skipped_lines, stage_reference_move, started_in_time, status_fraction,
                              status_text, stopped_status, supported_extensions, undo_reference_move,
                              update_backup_references, write_new_file, write_status)
@@ -1154,19 +1155,30 @@ with f_tab:
                  disabled=active, help='One search covers all listed folders, e.g. event folders on several '
                                        'drives. A folder inside another listed folder is searched as part of it.')
     # per listed folder (A25): its photo count, or why it is not searched on its own. The
-    # folders are scanned together once per page run, as the engine scans them (E25), so
-    # the numbers match its log; a photo reached through a link into another listed folder
-    # counts once, for the folder it is really in (A29).
+    # folders are scanned together, as the engine scans them (E25), so the numbers match its
+    # log; a photo reached through a link into another listed folder counts once, for the
+    # folder it is really in (A29). The count is remembered for this browser session and
+    # repeated only when the existing folders, the readable formats or the output folder
+    # change, or on "Recount" (A27): not on every widget click, which walked the whole
+    # photo tree each time. Whether a folder exists is checked on every page run.
     existing = [folder for folder in search_folders if folder.is_dir()]
     missing_folders = [folder for folder in search_folders if folder not in existing]
-    folder_scans = list(zip(existing, scan_each_folder(existing, SUPPORTED, exclude=RESULTS)))
-    photo_scan = join_scans([scan for _, scan in folder_scans])
+    scans, counted_at = remembered_scans(st.session_state.setdefault('photo_count', {}), existing, SUPPORTED,
+                                         RESULTS, recount=st.session_state.pop('recount_photos', False))
+    folder_scans = list(zip(existing, scans))
+    photo_scan = join_scans(scans)
     if len(search_folders) == 1 and folder_scans:
         st.success(f'{len(photo_scan.paths):,} supported image files found.')
     elif folder_scans:
         st.success(f'{len(photo_scan.paths):,} supported image files found in {len(folder_scans)} folders.')
         for folder, scan in folder_scans:
             st.caption(plain(f"{folder}: {count_text(len(scan.paths), 'supported image file', 'supported image files')}"))
+    if folder_scans:
+        c1, c2 = st.columns([3, 1])
+        c1.caption(f"Counted at {time.strftime('%H:%M:%S', time.localtime(counted_at))}. Photos added or removed "
+                   'since are counted after "Recount"; a search always reads the folders again.')
+        c2.button('Recount', key='recount_button', on_click=st.session_state.__setitem__,
+                  args=('recount_photos', True), help='Count the photos in the listed folders again.')
     for _, note in dropped_folders:  # listed twice or inside another listed folder
         st.caption(plain(note))
     if not photo_folders:
