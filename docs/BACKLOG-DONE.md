@@ -991,3 +991,20 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       unlocked, merged `worktree-agent-*` branches are deleted with `-d`). Markdown only,
       nothing executed; `.claude/settings.json` is unchanged, so `git worktree remove` and
       `git branch -D` still ask. Follow-ups: I27, I28, I29. E40–E43 and A36 in the same PR are PR #42's out-of-round findings.)
+- [x] **I8 – No branch protection for `main`:** GitHub returns HTTP 403 "Upgrade to GitHub
+      Pro or make this repository public to enable this feature" for the private repo, so
+      `main` is protected only by the workflow rule (merge only on explicit user approval)
+      and the deny rules in `.claude/settings.json`, which are not a security boundary.
+      Options: GitHub Pro, making the repository public, or accepting the workflow rule.
+      User decision → hold point. (Done 2026-10-30, user decision in chat: the repository
+      is public since 2026-10-30 (PR #47 added the license and security policy first). The
+      ruleset `protect main` on the default branch blocks deletion and force pushes, needs
+      linear history and a pull request (no approval required, rebase merges only) and
+      the three `pytest (Windows, Python 3.1x)` checks; repository admins may bypass it only
+      when merging a pull request (`gh pr merge --admin`), never with a direct push. The
+      repository allows only rebase merges; secret scanning with push protection,
+      Dependabot alerts and private vulnerability reporting are on; Actions are limited to
+      GitHub-owned actions pinned to a SHA, and workflows of outside contributors' pull
+      requests need approval. Dependabot security and version updates stay off (I9).
+      `.claude/settings.json` denies `gh pr merge --admin`. Settings checked with
+      `gh api repos/enqii/frame-scout/rulesets` and the repository's settings endpoints.)
