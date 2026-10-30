@@ -75,12 +75,15 @@ def _publish_together(files, attempts, retry_delay, replace=os.replace):
     """Replace several files at once as far as a file system allows; files: [(target Path, bytes)].
 
     Every file is first written in full to its own temporary file (see _temp_path) and
-    flushed to disk; only then are they given their names, in the order of files, each
-    rename tried up to attempts times retry_delay seconds apart (see _retry). An error or a
-    stop while writing therefore leaves every target as it was; only the renames themselves
-    are not one step. The temporary files are removed whatever happens (a process killed
-    meanwhile leaves them, see auto_cleanup).
-    Raises the OSError of a write or of a rename that failed every try.
+    flushed to disk, and the current content of every target is read; only then are they
+    given their names, in the order of files, each rename tried up to attempts times
+    retry_delay seconds apart (see _retry). An error or a stop while writing therefore leaves
+    every target as it was. If a rename fails every try, the targets replaced before it get
+    their previous content back (one that did not exist is removed again) as far as that
+    works, and the error is raised; only a process killed between the renames, or a failed
+    restore, can leave some targets replaced (E45). The temporary files are removed whatever
+    happens (a process killed meanwhile leaves them, see auto_cleanup).
+    Raises the OSError of a write, a read or a rename that failed every try.
     """
     temps = []
     try:
@@ -89,11 +92,37 @@ def _publish_together(files, attempts, retry_delay, replace=os.replace):
             temps.append(tmp)
             tmp.write_bytes(data)
             _flush_to_disk(tmp)
-        for (target, _), tmp in zip(files, temps):
-            _retry(partial(replace, tmp, target), attempts, retry_delay)
+        previous = [_previous_content(target, attempts, retry_delay) for target, _ in files]
+        for index, ((target, _), tmp) in enumerate(zip(files, temps)):
+            try:
+                _retry(partial(replace, tmp, target), attempts, retry_delay)
+            except OSError:
+                _restore(files[:index], previous, attempts, retry_delay, replace)
+                raise
     finally:
         for tmp in temps:
             tmp.unlink(missing_ok=True)
+
+
+def _previous_content(target, attempts, retry_delay):
+    """The bytes of target, or None if it does not exist (read with retries)."""
+    try:
+        return _read_with_retry(target.read_bytes, attempts, retry_delay)
+    except FileNotFoundError:
+        return None
+
+
+def _restore(files, previous, attempts, retry_delay, replace):
+    """Give the targets of files the content previous lists for them again, last first; best effort."""
+    for (target, _), data in reversed(list(zip(files, previous))):
+        try:
+            if data is None:
+                _retry(partial(target.unlink, missing_ok=True), attempts, retry_delay)
+            else:
+                _publish_via_temp(target, lambda tmp: tmp.write_bytes(data),
+                                  lambda tmp, name: _retry(partial(replace, tmp, name), attempts, retry_delay))
+        except OSError:  # the error of the rename is the one to report
+            continue
 
 
 def _publish_new(tmp, target):

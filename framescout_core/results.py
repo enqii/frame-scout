@@ -109,9 +109,11 @@ def publish_export(folder, galleries, document, replace=os.replace, attempts=40,
     (results_document). All files are written in full to temporary files
     (<name>.<random>.tmp) first; only then are the galleries renamed into place, and
     RESULTS_FILE last, so a search stopped or failing while it writes leaves the galleries
-    and the result file of the previous search. Only the few renames are not one step: a
-    kill between them can still leave a gallery newer than RESULTS_FILE. Renames are retried
-    while another process has a file open (replace, attempts and retry_delay: for tests).
+    and the result file of the previous search; if a rename fails every retry, the files
+    renamed before it get their previous content back. Only the few renames are not one
+    step: a kill between them (or a restore that fails too) can still leave a gallery newer
+    than RESULTS_FILE (E45). Renames are retried while another process has a file open
+    (replace, attempts and retry_delay: for tests).
     Raises OSError; the temporary files are removed (left only by a killed process, which
     auto_cleanup removes after a later search, E26).
     """
