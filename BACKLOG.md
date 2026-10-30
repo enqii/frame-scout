@@ -201,8 +201,6 @@ and discussions.
 
 ### App (`app.py`)
 
-- [ ] **A6 – Folder count on every rerun:** `rglob` over the whole photo folder on every
-      interaction; slow for large folders/network drives.
 - [ ] **A10 – `use_container_width` is deprecated:** in Streamlit 1.66 the `st.button`
       docstring marks it as deprecated in favor of `width="stretch"` (no runtime warning
       yet; it still works). `width` for buttons is newer than the current floor
@@ -283,14 +281,6 @@ and discussions.
       setting (e.g. in its help text, built from `DEFAULT_SETTINGS` so it cannot drift) and
       mark a changed value. Not a search-quality change, since the defaults stay as they
       are.
-- [ ] **A27 – The photo folder is scanned on every rerun:** the "Photo folder" tab counts
-      the photos with `scan_photos` (since E25; before with the same `rglob`) at module
-      level, so every widget interaction anywhere in the app walks the whole photo tree
-      again – slow for tens of thousands of files on a network drive or HDD. Fix idea:
-      cache the scan (e.g. `st.cache_data` keyed on folder, extensions and the results
-      folder, with a short TTL and a "Rescan" button), or scan only when the folder setting
-      changes; how stale a count may be is a UX decision. Found in the PR #26 review.
-      Since A25 (PR #28) every listed folder is scanned once per rerun.
 
 - [ ] **A30 – Only one backup generation of `profiles.json`:** the user chose a single
       `profiles.json.bak` in PR #6 and again in the PR of A13 (hold point), so the backup is

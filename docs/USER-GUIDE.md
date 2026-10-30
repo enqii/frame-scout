@@ -81,6 +81,12 @@ letter, a UNC path, a junction) is recognized and searched once. Links to folder
 photo folder are followed, but each folder and each photo is searched once, even if it is
 reachable through several links or by a hard link.
 
+The tab shows how many photos each folder holds. To keep the app fast on large or network
+folders, the count is made once per browser session and again only when you change the
+folder list or the readable formats, or press **Recount**; "Counted at" shows when. Photos
+added or removed since then appear after "Recount". A search always reads the folders
+again, so it is never affected by an old count.
+
 FrameScout does not download images: download and extract archives and online albums
 yourself. A search sends nothing about your photos anywhere. It turns off Ultralytics'
 usage analytics and automatic package installs (`YOLO_OFFLINE=true`,
