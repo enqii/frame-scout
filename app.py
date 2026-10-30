@@ -23,6 +23,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, hide_no_match, lock_held, open_command, openable_photo, page_cards, page_count,
+                             hidden_text,
                              profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
@@ -742,12 +743,8 @@ def show_results(results, photo_folders):
             st.session_state.pop(key, None)  # a page of a longer list of an earlier search
         page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key)
     shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
-    if hidden and not shown:
-        st.caption(f"All {hidden:,} photos of this page are marked as no match and hidden."
-                   + (' The next page may hold photos still to check.' if page < pages else ''))
-    elif hidden:
-        st.caption(f"{hidden:,} photo{'s' if hidden != 1 else ''} of this page marked as no match "
-                   f"{'are' if hidden != 1 else 'is'} hidden.")
+    if hidden:
+        st.caption(hidden_text(hidden, len(shown), page < pages))
     st.caption('"Open" and "Folder" use the programs of the computer FrameScout runs on. Mark each photo you have '
                'checked as Match or No match; marks are kept for this profile across searches.')
     mark_keys = {}

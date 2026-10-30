@@ -181,3 +181,19 @@ def hide_no_match(cards, marks):
     """
     kept = [card for card in cards if marks.get(card['path']) != MARK_NO_MATCH]
     return kept, len(cards) - len(kept)
+
+
+def hidden_text(hidden, kept, more_pages):
+    """Return the caption of a gallery page's photos hidden by hide_no_match, or '' (A24).
+
+    hidden and kept are the counts hide_no_match left out and kept; more_pages says whether
+    a page follows this one.
+    """
+    if not hidden:
+        return ''
+    if kept:
+        return (f"{hidden:,} photo{'s' if hidden != 1 else ''} of this page marked as no match "
+                f"{'are' if hidden != 1 else 'is'} hidden.")
+    text = ('The only photo of this page is' if hidden == 1 else f'All {hidden:,} photos of this page are')
+    return (f'{text} marked as no match and hidden.'
+            + (' The next page may hold photos still to check.' if more_pages else ''))

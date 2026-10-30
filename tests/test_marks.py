@@ -5,8 +5,8 @@ import threading
 import pytest
 
 from framescout_core import (MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARKS_FILE, RunLock,
-                             UnknownProfileError, delete_marks, hide_no_match, lock_held, page_cards, read_marks,
-                             remove_marks, rename_marks, save_marks)
+                             UnknownProfileError, delete_marks, hidden_text, hide_no_match, lock_held, page_cards,
+                             read_marks, remove_marks, rename_marks, save_marks)
 
 
 def stored(path):
@@ -323,3 +323,17 @@ def test_hiding_the_rejects_of_a_page_keeps_the_pages_stable():
     assert kept == [] and hidden == 48  # an empty page rather than photos of page 2
     kept, hidden = hide_no_match(page_cards(cards, 2, 48), marks)
     assert [c['rank'] for c in kept] == list(range(49, 97)) and hidden == 0
+
+
+@pytest.mark.parametrize('hidden,kept,more_pages,text', [
+    (0, 48, True, ''),
+    (1, 47, False, '1 photo of this page marked as no match is hidden.'),
+    (1200, 3, False, '1,200 photos of this page marked as no match are hidden.'),
+    # review: no "All 1 photos" for a page of a single photo
+    (1, 0, False, 'The only photo of this page is marked as no match and hidden.'),
+    (48, 0, False, 'All 48 photos of this page are marked as no match and hidden.'),
+    (48, 0, True, 'All 48 photos of this page are marked as no match and hidden. '
+                  'The next page may hold photos still to check.'),
+])
+def test_hidden_text_counts_the_hidden_photos_of_a_page(hidden, kept, more_pages, text):
+    assert hidden_text(hidden, kept, more_pages) == text
