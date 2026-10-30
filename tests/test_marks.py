@@ -1,12 +1,14 @@
 """Marks of gallery photos in results/marks.json (framescout_core, A17)."""
 import json
+import re
 import threading
+from pathlib import Path
 
 import pytest
 
-from framescout_core import (MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARKS_FILE, RunLock,
-                             UnknownProfileError, delete_marks, hidden_text, hide_no_match, lock_held, page_cards,
-                             read_marks, remove_marks, rename_marks, save_marks)
+from framescout_core import (MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
+                             MARKS_FILE, RunLock, UnknownProfileError, delete_marks, hidden_text, hide_no_match,
+                             lock_held, mark_style, page_cards, read_marks, remove_marks, rename_marks, save_marks)
 
 
 def stored(path):
@@ -337,3 +339,42 @@ def test_hiding_the_rejects_of_a_page_keeps_the_pages_stable():
 ])
 def test_hidden_text_counts_the_hidden_photos_of_a_page(hidden, kept, more_pages, text):
     assert hidden_text(hidden, kept, more_pages) == text
+
+
+# --- the colors of the selected option of a mark (A24) ---
+
+def test_mark_style_colors_the_selected_option_of_each_marked_control():
+    style = mark_style({'mark_a1': MARK_MATCH, 'mark_b2': MARK_NO_MATCH, 'mark_c3': MARK_OPEN,
+                        'mark_d4': MARK_MATCH})
+    assert style.startswith('<style>') and style.endswith('</style>')
+    match_background, match_border = MARK_COLORS[MARK_MATCH]
+    reject_background, reject_border = MARK_COLORS[MARK_NO_MATCH]
+    # one rule per state listing the selected button of each control in that state, named as
+    # Streamlit 1.66 does: the key class of the element and the kind of the selected button
+    assert ('.st-key-mark_a1 button[kind="segmented_controlActive"], '
+            '.st-key-mark_d4 button[kind="segmented_controlActive"]'
+            f'{{background-color:{match_background}!important;border-color:{match_border}!important;'
+            'color:inherit!important}') in style
+    assert ('.st-key-mark_b2 button[kind="segmented_controlActive"]'
+            f'{{background-color:{reject_background}!important;border-color:{reject_border}!important;'
+            'color:inherit!important}') in style
+    assert 'mark_c3' not in style  # undecided keeps Streamlit's look
+
+
+def test_mark_style_is_empty_without_a_decided_mark():
+    assert mark_style({}) == ''
+    assert mark_style({'mark_a1': MARK_OPEN}) == ''
+
+
+def test_mark_style_names_a_key_as_streamlit_turns_it_into_a_class():
+    # Streamlit 1.66 trims the key and replaces every character but letters, digits, "_"
+    # and "-" by "-"
+    assert '.st-key-mark_a-b-c button' in mark_style({' mark_a.b c ': MARK_MATCH})
+
+
+def test_mark_style_was_checked_with_the_pinned_streamlit():
+    # the selectors rely on Streamlit internals: raising the pin fails here until the
+    # selectors were checked against the new version and MARK_STYLE_STREAMLIT updated
+    constraints = (Path(__file__).resolve().parent.parent / 'constraints.txt').read_text(encoding='utf-8')
+    pinned = re.search(r'^streamlit==(\S+)$', constraints, re.MULTILINE)
+    assert pinned and pinned.group(1) == MARK_STYLE_STREAMLIT
