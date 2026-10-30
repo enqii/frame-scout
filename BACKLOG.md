@@ -472,3 +472,26 @@ and discussions.
       conflicts with the attribution the session gives a subagent (a Sonnet implementer
       noticed). Take the trailer from the session's attribution instead and drop the literal
       line. Found in the PR of I26.
+- [ ] **I30 – Repository layout, step 1: scoring module outside the package (low risk):**
+      `framescout_scoring.py` (numpy only) lies loose in the root next to the standard-library-only
+      package `framescout_core/`. Move it into a package of its own (e.g. `framescout_scoring/`,
+      or a sub-package that keeps the "core is standard library only" rule intact) and adjust the
+      imports in the engine, the evaluation tool and the tests. No user-visible change. Found on
+      2026-10-30 in a review of the folder structure.
+- [ ] **I31 – Repository layout, step 2: group the loose root files (medium risk):** move
+      `requirements*.txt`, `constraints.txt` and `pytest.ini` into `requirements/` (check
+      whether `pytest.ini` may move), `profiles.example.json` and `framescout_eval_page.html`
+      into a data folder (e.g. `assets/`), and `ROADMAP.md`/`BACKLOG.md` into `docs/`
+      (`SECURITY.md` stays where GitHub finds it). Update `install_torch.py`, the `.bat` files,
+      CI, the test that compares the torch pins, `framescout_core.create_from_example`, the
+      skills and briefs in `.claude/` and every link in the docs and `CLAUDE.md`. `Install-`,
+      `Start-` and `Uninstall-FrameScout.bat` stay in the root (double-click). Needs a user
+      decision on the target names. Found on 2026-10-30 in a review of the folder structure.
+- [ ] **I32 – Repository layout, step 3: entry points in a package (breaking):** move `app.py`,
+      `framescout_engine.py`, `framescout_eval.py`, `framescout_uninstall.py` and
+      `install_torch.py` into a package (e.g. `src/framescout/`, started with
+      `python -m framescout.engine`). This changes the documented CLI call
+      `python framescout_engine.py`, the Streamlit start command and the `.bat` files, so it is
+      a hold point (breaking change, folder rename): decide first whether thin wrappers stay in
+      the root for a transition period. Best done after I30 and I31. Found on 2026-10-30 in a
+      review of the folder structure.
