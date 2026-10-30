@@ -36,7 +36,8 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
 - [x] (A) Skipped photos leave no gaps in the gallery (E12) (done 2026-10-30)
 - [x] (B) Stopped runs leave no half-written galleries and temporary files (E24, E26)
       (done 2026-10-30; open follow-ups: E44, E45)
-- [ ] (C) A RAW file whose JPEG partner is broken is analyzed instead (E30)
+- [x] (C) A RAW file whose JPEG partner is broken is analyzed instead (E30)
+      (done 2026-10-30; open follow-up: E46)
 - [ ] (D) The same photo folder by another path, and junctions inside a folder (A28, A29)
 
 ### P9 – App polish
