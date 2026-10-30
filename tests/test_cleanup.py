@@ -3,6 +3,7 @@ import json
 import os
 import sqlite3
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -805,6 +806,45 @@ def test_auto_cleanup_keeps_thumbnails_if_results_json_cannot_be_read(project):
 
 def test_auto_cleanup_without_thumbnail_folder(tmp_path):
     assert auto_cleanup(tmp_path)['files'] == 0
+
+
+def temp_file(folder, name, age):
+    # the name _publish_via_temp's temporary file gets (via tempfile.mkstemp), age seconds old
+    fd, path = tempfile.mkstemp(dir=folder, prefix=name + '.', suffix='.tmp')
+    os.write(fd, b'partial')
+    os.close(fd)
+    stamp = time.time() - age
+    os.utime(path, (stamp, stamp))
+    return Path(path)
+
+
+def test_auto_cleanup_removes_temporary_files_of_a_stopped_run(project):
+    # left by terminate()/kill() during an atomic write (E26) or during publish_export (E24)
+    project.write_results([('Red car', 'red-car.html', [])])
+    (project.results / MARKS_FILE).write_text('{}', encoding='utf-8')
+    stale = [temp_file(project.results, name, 120)
+             for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, 'red-car.html', 'Cat & dog.html')]
+    # less than a minute old: possibly being written now (e.g. marks.json by an app session)
+    fresh = [temp_file(project.results, name, 5) for name in (RUN_STATUS, MARKS_FILE, 'red-car.html')]
+    # not FrameScout's temporary files
+    mine = [project.results / name for name in ('notes.tmp', 'results.json.mine.tmp', 'settings.json.abcdefgh.tmp',
+                                               'red-car.html.abcdefgh.bak')]
+    for path in mine:
+        path.write_text('mine', encoding='utf-8')
+        os.utime(path, (time.time() - 120,) * 2)
+    removed = auto_cleanup(project.results)
+    assert not any(p.exists() for p in stale)
+    assert all(p.exists() for p in fresh + mine)
+    assert (project.results / MARKS_FILE).exists() and (project.results / RESULTS_FILE).exists()
+    assert removed['files'] == removed['temporary'] == len(stale)
+    assert removed['freed'] == len(stale) * len(b'partial')
+
+
+def test_auto_cleanup_removes_temporary_files_also_if_results_json_cannot_be_read(project):
+    (project.results / RESULTS_FILE).write_text('{broken', encoding='utf-8')
+    stale = temp_file(project.results, RESULTS_FILE, 120)
+    removed = auto_cleanup(project.results)
+    assert not stale.exists() and removed['temporary'] == 1 and removed['skipped']
 
 
 # texts
