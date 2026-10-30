@@ -404,7 +404,10 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       end. It writes all galleries and `results.json` in full to `<name>.<random>.tmp`
       (fsync), then renames them in profile order, `results.json` last
       (`_common._publish_together`, each rename retried 40 x 50 ms). A stop or failure while
-      writing leaves the previous galleries and `results.json`. The gallery path lines in
+      writing leaves the previous galleries and `results.json`; a rename that fails every
+      retry gives the files renamed before it their previous content back (review of PR #45).
+      `write_results` was removed: `publish_export` is the only writer of `results.json`.
+      The gallery path lines in
       the log now come after the export. Galleries are written as bytes: `\n` line ends on
       Windows too. Residual window of the renames: E45. No CLI, `profiles.json`, cache or
       `results.json` format change. Unit-tested; CPU engine smoke run with 4 synthetic
@@ -418,9 +421,12 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       a minute in `auto_cleanup`. Found in PR #18.
       (Done 2026-10-30, PR #45, roadmap P8 (B): `auto_cleanup(results, now=None)` also
       removes `run-status.json.*.tmp`, `results.json.*.tmp`, `marks.json.*.tmp` and
-      `<gallery>.html.*.tmp` (random part exactly 8 chars of `[a-z0-9_]`) that are at least
-      `STALE_TEMP_AGE` = 60 s old, even if `results.json` cannot be read; the age limit
-      protects a write an app session is doing right now. The summary gets `temporary`; the
+      `<slug>.html.*.tmp` (profile slugs `[a-z0-9-]+` only; random part exactly 8 chars of
+      `[a-z0-9_]`) that are at least `STALE_TEMP_AGE` = 60 s old, even if `results.json`
+      cannot be read; the age limit protects a write an app session is doing right now and
+      is measured against the results folder's file system clock (the mtime of a probe
+      file), so a network share whose clock runs behind does not break it (review of PR
+      #45). Every cleanup summary gets `temporary`; the
       engine log line reads "Removed N unused thumbnails or temporary files (size)". The
       app's "Clean up storage" is unchanged. Temporary files of the app's writes in the
       project folder: E44. Unit-tested; the same smoke run removed two stale temporary
