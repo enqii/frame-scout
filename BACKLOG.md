@@ -376,12 +376,6 @@ and discussions.
       Streamlit's `AppTest`, which needs Streamlit in CI); a smoke test with real models.)
 - [ ] **I4 – Installer requires the `py` launcher;** without it, the misleading message
       "Python 3.12 to 3.14 not found." is shown.
-- [ ] **I8 – No branch protection for `main`:** GitHub returns HTTP 403 "Upgrade to GitHub
-      Pro or make this repository public to enable this feature" for the private repo, so
-      `main` is protected only by the workflow rule (merge only on explicit user approval)
-      and the deny rules in `.claude/settings.json`, which are not a security boundary.
-      Options: GitHub Pro, making the repository public, or accepting the workflow rule.
-      User decision → hold point.
 - [ ] **I9 – CI action pins are updated by hand only:** `.github/workflows/tests.yml`
       pins `actions/checkout` and `actions/setup-python` to commit SHAs (with a version
       comment). That avoids moved tags, but security and runtime updates

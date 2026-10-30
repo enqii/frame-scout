@@ -189,8 +189,9 @@ points in `CLAUDE.md`):
 
 Only when the user explicitly approves the merge of this specific PR in chat:
 
-1. Gate on CI, because `main` is not branch-protected (I8) and GitHub will not block
-   the merge: note the head commit (`gh pr view <n> --json headRefOid`), then
+1. Gate on CI: the ruleset of `main` (I8) blocks a merge without the required checks,
+   but not a merge of a head commit the user did not approve. Never pass `--admin`. Note
+   the head commit (`gh pr view <n> --json headRefOid`), then
    `gh pr checks <n> --watch --interval 60 > /dev/null 2>&1; gh pr checks <n>` (Git Bash;
    `--watch` reprints the whole table on every poll, so discard it and print only the
    final state) must show every check passing for that commit.

@@ -1283,6 +1283,14 @@ merge`, force/reset variants of `git branch`/`git switch`, bulk staging (`git ad
 ask; force pushes, `--mirror`/`--all`/`--delete`, pushes naming `main` and `git reset
 --hard` are denied. Rules are evaluated deny → ask → allow and match the command text with
 `*` wildcards; they steer the agent but are **not** a security boundary (`git -C . push`,
-`sh -c …` or an absolute path to `git` are not matched, and `main` cannot be
-branch-protected on the current GitHub plan, see I8). Personal overrides go into
+`sh -c …` or an absolute path to `git` are not matched). Personal overrides go into
 `.claude/settings.local.json` (gitignored).
+
+On GitHub (since I8), the ruleset `protect main` blocks deleting and force-pushing the
+default branch, needs linear history and a pull request (rebase merges only, no approval
+required) and the three `pytest (Windows, Python 3.1x)` checks. Repository admins may
+bypass it only when merging a pull request (`gh pr merge --admin`, denied in
+`.claude/settings.json`), never with a direct push. The repository allows only rebase
+merges; Actions are limited to GitHub-owned actions pinned to a SHA, and workflows of
+outside contributors' pull requests need approval. Secret scanning with push protection,
+Dependabot alerts and private vulnerability reporting are on.
