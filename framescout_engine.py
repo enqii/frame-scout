@@ -410,33 +410,47 @@ def search(args, parser, roots, dropped, output, status):
         record = con.execute('SELECT mtime_ns,size FROM features WHERE path=? AND signature=?', (str(path), signature)).fetchone()
         return record == (stat.st_mtime_ns, stat.st_size)
 
-    def prepared(todo, pool, ahead):
-        """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped.
+    def analyzed(path):
+        """True if path has a current cache row; a file that cannot be read counts as not analyzed."""
+        try:
+            return cached(path)
+        except Exception:
+            return False
 
-        A JPEG/HEIC that fails with a RAW file of the same shot skipped for it is replaced
-        by that RAW file (E30): it is taken from the cache or decoded here, in this thread,
-        and counts for the shot instead of the failure.
+    def failed(path, exc):
+        """Log a photo that cannot be analyzed (cache scan, decoding or storing).
+
+        A JPEG/HEIC with a RAW file of the same shot skipped for it is not counted yet: once
+        all photos are done, its RAW file is analyzed instead if no photo of the shot was
+        analyzed (E30, review).
         """
+        print(f'ERROR {path}: {exc}', flush=True)
+        if not raw_fallback.defer(path):
+            finished(failed=1)
+
+    def to_analyze(candidates):
+        """Count the photos of candidates the cache has; return the others."""
+        todo = []
+        for path in candidates:
+            try:
+                hit = cached(path)
+            except Exception as exc:
+                failed(path, exc)
+                continue
+            if hit:
+                finished(cached=1)
+            else:
+                todo.append(path)
+        return todo
+
+    def prepared(todo, pool, ahead):
+        """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped."""
         for path, future in prefetch(lambda item: pool.submit(prepare, item), todo, ahead):
             try:
                 stat, labels, pixels = future.result()
             except Exception as exc:
-                print(f'ERROR {path}: {exc}', flush=True)
-                raw = raw_fallback.take(path)
-                if raw is None:
-                    finished(failed=1)
-                    continue
-                print(f'Analyzing its RAW file instead: {raw}', flush=True)
-                try:
-                    if cached(raw):
-                        finished(cached=1)
-                        continue
-                    stat, labels, pixels = prepare(raw)
-                except Exception as raw_exc:
-                    print(f'ERROR {raw}: {raw_exc}', flush=True)
-                    finished(failed=1)
-                    continue
-                path = raw
+                failed(path, exc)
+                continue
             yield path, stat, labels, pixels
 
     def store(group):
@@ -454,23 +468,11 @@ def search(args, parser, roots, dropped, output, status):
             raise
 
     def store_failed(item, exc):
-        print(f'ERROR {item[0]}: {exc}', flush=True)
-        finished(failed=1)
+        failed(item[0], exc)
 
     status.update('analyzing', total=len(paths))
     try:
-        todo = []
-        for path in paths:
-            try:
-                hit = cached(path)
-            except Exception as exc:
-                print(f'ERROR {path}: {exc}', flush=True)
-                finished(failed=1)
-                continue
-            if hit:
-                finished(cached=1)
-            else:
-                todo.append(path)
+        todo = to_analyze(paths)
         # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
         # crops of several photos are embedded together, batch_size at a time (E2).
         threads = DECODE_THREADS if detector is None else DETECTION_DECODE_THREADS
@@ -479,10 +481,26 @@ def search(args, parser, roots, dropped, output, status):
         # tensors, so memory grows with the batch size, not with the photo size (review)
         ahead = max(2 * threads, args.batch_size + threads)
         pool = ThreadPoolExecutor(threads)
-        try:
+
+        def analyze(todo):
             for group in group_batches(prepared(todo, pool, ahead), args.batch_size, size=lambda item: len(item[2])):
                 # after a failure the photos are stored one by one, so only a broken one fails
                 finished(new=store_group(group, store, store_failed))
+
+        try:
+            analyze(todo)
+            # a JPEG/HEIC that failed is replaced by the RAW file of its shot, unless another
+            # photo of the shot was analyzed; the RAW file comes from the cache or is decoded
+            # in the decoding threads like any photo, and counts for the shot (E30, review)
+            chosen, lost = raw_fallback.choose(analyzed)
+            for _ in lost:
+                finished(failed=1)
+            for partner, raw in chosen.items():
+                print(f'{partner} could not be analyzed; analyzing its RAW file instead: {raw}', flush=True)
+            analyze(to_analyze(list(chosen.values())))
+            for partner, raw in chosen.items():
+                if analyzed(raw):
+                    raw_fallback.use(partner, raw)
         finally:
             pool.shutdown(cancel_futures=True)  # on an interruption: no new decoding
     except KeyboardInterrupt:

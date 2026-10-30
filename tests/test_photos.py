@@ -208,17 +208,57 @@ def test_raw_fallbacks_without_pairs():
     assert raw_fallbacks(PhotoScan([Path('a.jpg')], [], collections.Counter())) == {}
 
 
-def test_raw_fallback_takes_a_raw_file_once(tmp_path):
+def test_raw_fallbacks_match_the_pairs_of_scan_photos_across_folders(tmp_path):
+    # the pairing of raw_fallbacks is the one scan_photos skips the RAW files by (review):
+    # mixed-case names, subfolders and several photo folders joined into one scan
+    first, second = tmp_path / 'one', tmp_path / 'two'
+    raws = [touch(first / 'Shot.NEF'), touch(first / 'sub' / 'x.dng'), touch(second / 'SHOT.cr2')]
+    partners = [touch(first / 'shot.JPG'), touch(first / 'sub' / 'X.heic'), touch(second / 'Shot.jpeg')]
+    touch(second / 'x.dng')  # no partner in its own folder: analyzed itself
+    scan = join_scans([scan_photos(first), scan_photos(second)])
+    assert sorted(scan.raw_pairs) == sorted(raws)
+    fallbacks = raw_fallbacks(scan)
+    assert fallbacks == dict(zip(partners, raws))
+    assert set(fallbacks.values()) == set(scan.raw_pairs)
+    assert set(fallbacks) <= set(scan.paths)
+
+
+def test_raw_fallback_defers_only_partners_with_a_raw_file(tmp_path):
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    other = touch(tmp_path / 'IMG_0002.jpg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    assert fallback.defer(other) is False  # no RAW file: a failure as before
+    assert fallback.defer(raw) is False  # a RAW file analyzed for its partner fails for good
+    assert fallback.defer(jpeg) is True
+    assert fallback.choose(lambda path: False) == ({jpeg: raw}, [])
+
+
+def test_raw_fallback_is_not_used_when_another_partner_of_the_shot_was_analyzed(tmp_path):
+    # IMG_0001.dng + a good JPEG + a broken HEIC: the shot is in the results once, as the JPEG (review)
+    touch(tmp_path / 'IMG_0001.dng')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    heic = touch(tmp_path / 'IMG_0001.heic')
+    touch(tmp_path / 'IMG_0002.dng')
+    jpeg2 = touch(tmp_path / 'IMG_0002.jpg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    assert fallback.defer(heic)
+    asked = []
+    assert fallback.choose(lambda path: asked.append(path) or path == jpeg) == ({}, [heic])
+    # only the partners of shots with a failure are asked about, not every photo again
+    assert asked == [jpeg] and jpeg2 not in asked
+
+
+def test_raw_fallback_analyzes_a_raw_file_once_for_two_failed_partners(tmp_path):
     raw = touch(tmp_path / 'IMG_0001.dng')
     jpeg = touch(tmp_path / 'IMG_0001.jpg')
     heic = touch(tmp_path / 'IMG_0001.heic')
-    other = touch(tmp_path / 'IMG_0002.jpg')
     fallback = RawFallback(scan_photos(tmp_path))
-    assert fallback.take(other) is None  # no RAW partner
-    assert fallback.take(jpeg) == raw
-    # the other partner of the same shot does not analyze the RAW file a second time
-    assert fallback.take(heic) is None
-    assert fallback.take(jpeg) is None
+    assert fallback.defer(heic) and fallback.defer(jpeg)
+    # the first failed partner gets the RAW file, the other one stays a failure
+    assert fallback.choose(lambda path: False) == ({heic: raw}, [jpeg])
+    # each failure is decided once
+    assert fallback.choose(lambda path: False) == ({}, [])
 
 
 def test_raw_fallback_photos_name_the_raw_file_in_place_of_its_partner(tmp_path):
@@ -230,7 +270,11 @@ def test_raw_fallback_photos_name_the_raw_file_in_place_of_its_partner(tmp_path)
     scan = scan_photos(tmp_path)
     fallback = RawFallback(scan)
     assert fallback.photos(scan.paths) == [a, b, c]
-    fallback.take(b)
+    fallback.defer(b)
+    chosen, _ = fallback.choose(lambda path: False)
+    # a chosen RAW file that could not be analyzed either is not named (review)
+    assert fallback.photos(scan.paths) == [a, b, c]
+    fallback.use(b, chosen[b])
     # the shot keeps its place (and the number of photos stays the same)
     assert fallback.photos(scan.paths) == [a, raw, c]
     assert fallback.used == {b: raw}
