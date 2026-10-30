@@ -285,6 +285,16 @@ and discussions.
       shows. Idea: count the duplicates in the scan (e.g. a field of `PhotoScan`) and add a
       line like `skipped_lines` ("12 photos found again through another path, analyzed
       once"). Review of PR #50, finding 5.
+- [ ] **A38 – The style block of the mark colors may take a layout slot:** the gallery
+      writes the `<style>` block of `mark_style` (A24) with `st.markdown` on every run of the
+      gallery fragment, outside the keyed card container, so it may add an empty element
+      with the block gap above the cards. `st.html` with only style tags goes to Streamlit's
+      event container and takes no space, but whether a fragment rerun then replaces the
+      old block or keeps stale rules of earlier marks next to the new ones was not checked;
+      `st.markdown` in the fragment is replaced on every run. Check both in a browser
+      (light and dark theme) and switch if `st.html` is clean. One selector per card stays:
+      the state of a mark is not in the DOM, and a page holds at most 48 cards. Review of
+      PR #55, finding 6.
 
 ### Installation / project
 
