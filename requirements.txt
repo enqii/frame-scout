@@ -7,8 +7,9 @@ torchvision==0.29.1
 # Minimum versions only: the versions of the project venv of the verified runs (Python 3.14,
 # CPU). Install-FrameScout.bat installs with -c constraints.txt, which pins these and all
 # their dependencies to the versions of that venv (I12); a pip install without it takes the
-# newest releases. Streamlit keeps its older floor until A10.
-streamlit>=1.40
+# newest releases. Streamlit follows the same rule since A10; app.py needs at least 1.48
+# (width='stretch' on buttons).
+streamlit>=1.66.1
 numpy>=2.5.4
 pillow>=12.3.0
 open_clip_torch>=3.3.0
