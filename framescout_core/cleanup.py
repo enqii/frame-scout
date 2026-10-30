@@ -12,7 +12,7 @@ from .locks import RunLock
 from .marks import MARKS_FILE, read_marks, remove_marks
 from .names import EXT, profile_slugs
 from .profiles import _backup_path, _read_entries, read_profiles
-from .results import RESULTS_FILE, _GALLERY_NAME, _THUMBNAIL_NAME, read_results
+from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
 from .run_status import RUN_LOCK, RUN_STATUS, read_status, run_active
 from .settings import SETTINGS_FILE
 from .signature import CACHE_FILE, classify_signatures, engine_id
@@ -59,9 +59,10 @@ CLEANUP_LOCK_TIMEOUT = 1.0
 _TEMP_THUMBNAIL = re.compile(r'[0-9a-f]{24}\.jpg\.[a-z0-9_]+\.jpg')
 # the temporary files (<name>.<random>.tmp, _temp_path) of the atomic writes into the results
 # folder: status and result file and marks (one file each), the galleries of publish_export
-# (E24); terminate()/kill() during a write leaves one (E26)
+# (E24; only names profile_slugs gives, [a-z0-9-], so that no other tool's file in a chosen
+# output folder matches); terminate()/kill() during a write leaves one (E26)
 _TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name) for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE))
-                        + '|' + _GALLERY_NAME.pattern + r')\.[a-z0-9_]{8}\.tmp')
+                        + r'|[a-z0-9-]+\.html)\.[a-z0-9_]{8}\.tmp')
 # seconds after which such a temporary file counts as left over: the write of an app
 # session (marks.json, a stopped status) takes a fraction of a second
 STALE_TEMP_AGE = 60
