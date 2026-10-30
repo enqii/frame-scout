@@ -457,12 +457,6 @@ and discussions.
       derives the same four variables from `--cache-dir`; it takes a cache folder, not the
       project folder, so it was left alone in E9/I10. It could share
       `framescout_core.cache_paths`. Found in the PR of E9/I10.
-- [ ] **I27 – Routine worktree commands still ask for approval:** `/roadmap` cleans up
-      worktrees and `worktree-agent-*` branches as a fixed step (I26), but
-      `.claude/settings.json` does not pre-approve `git worktree unlock *`,
-      `git branch -d worktree-agent-*` and `git worktree remove .claude/worktrees/*`. Proposal:
-      allow these three and keep `-f`/`--force` removals and `git branch -D` on "ask". Needs the
-      user's explicit decision (a permission change). Found in the PR of I26.
 - [ ] **I28 – The reviewer posts one comment for all findings (optional):** when
       `/code-review` posts nothing, the reviewer posts one numbered comment (I26), so
       `address-review` can only answer in one comment. One comment per finding (numbered,
