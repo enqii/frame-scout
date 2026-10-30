@@ -784,3 +784,14 @@ def test_remembered_scans_finds_new_photos_only_on_recount(tmp_path):
     assert remembered_scans(memory, [tmp_path], EXT, None)[0][0].paths == [tmp_path / 'a.jpg']
     assert remembered_scans(memory, [tmp_path], EXT, None, recount=True)[0][0].paths == [
         tmp_path / 'a.jpg', tmp_path / 'b.jpg']
+
+
+def test_remembered_scans_counts_again_after_a_folder_was_gone(tmp_path):
+    # [A], [], [A]: the only folder disconnected and reconnected (e.g. a USB drive) is counted
+    # again, though the key of the count is the same as before (review)
+    memory, scan = {}, CountingScan()
+    remembered_scans(memory, [tmp_path], EXT, None, scan=scan, clock=lambda: 1.0)
+    assert remembered_scans(memory, [], EXT, None, scan=scan) == ([], None)
+    _, counted_at = remembered_scans(memory, [tmp_path], EXT, None, scan=scan, clock=lambda: 2.0)
+    assert len(scan.calls) == 2
+    assert counted_at == 2.0
