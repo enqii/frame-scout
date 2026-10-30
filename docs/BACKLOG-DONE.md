@@ -991,6 +991,14 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       unlocked, merged `worktree-agent-*` branches are deleted with `-d`). Markdown only,
       nothing executed; `.claude/settings.json` is unchanged, so `git worktree remove` and
       `git branch -D` still ask. Follow-ups: I27, I28, I29. E40–E43 and A36 in the same PR are PR #42's out-of-round findings.)
+- [x] **I27 – Routine worktree commands still ask for approval:** `/roadmap` cleans up
+      worktrees and `worktree-agent-*` branches as a fixed step (I26), but
+      `.claude/settings.json` did not pre-approve the commands. Found in the PR of I26.
+      (Done 2026-10-30, user decision in chat: `git worktree unlock/remove/prune`,
+      `git branch -d` and `git branch -D` are allowed without a prompt; `git worktree remove`
+      with `-f`/`--force` still asks; `git branch -d/-D main` is denied. `/roadmap` section 4
+      updated. Checked only that `settings.json` is valid JSON; not exercised in a real
+      `/roadmap` run.)
 - [x] **I8 – No branch protection for `main`:** GitHub returns HTTP 403 "Upgrade to GitHub
       Pro or make this repository public to enable this feature" for the private repo, so
       `main` is protected only by the workflow rule (merge only on explicit user approval)
