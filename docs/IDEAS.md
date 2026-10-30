@@ -22,7 +22,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   texts like custom prompts; no cache change (scoring runs on cached features).
 - **Affected:** `app.py` (profile form), `framescout_core` profile validation and
   `search_fingerprint`, `framescout_scoring.py`, `framescout_engine.py`, `profiles.example.json`,
-  tests, README "What the numbers in a gallery mean".
+  tests, user guide "What the numbers mean".
 - **Effort:** M.
 - **Risks:** CLIP handles negation poorly in a single text, so the exclusion must be a
   separate query, not "a car, not a toy"; a too-strong λ can bury real matches.
@@ -59,7 +59,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   file could report "Nothing new to analyze – ranking only". Same idea for the image
   half of CLIP is not possible (text encoder shares the model), so only YOLO is deferred.
 - **Affected:** `framescout_engine.py`, possibly `framescout_core` (a helper that lists
-  uncached photos, testable without torch), README "Search & results".
+  uncached photos, testable without torch), user guide "Search & results".
 - **Effort:** S.
 - **Risks:** the detector must still be created under the existing lock and environment
   (E27/E28 offline flags); a detector load error now appears mid-run instead of at start.
@@ -77,7 +77,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   `--date-from/--date-to`; the skip counts appear in the log like the RAW skips.
 - **Affected:** `framescout_core` (scan/filter, standard library), `framescout_engine.py`
   (CLI), `app.py` (settings widgets via `setting_<name>`), `settings.json` defaults,
-  README, tests.
+  user guide, tests.
 - **Effort:** M.
 - **Risks:** reading EXIF for every photo slows the scan (cache the date next to the
   features or only read EXIF when a date filter is set); copies inside excluded folders
@@ -94,7 +94,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   with one path per line (many viewers can open such a list). Options: all ranked photos,
   or only marked as match. Pure standard library (`csv`), never touches the photos and
   never writes XMP sidecars next to them.
-- **Affected:** `framescout_core` (export function, tested), `app.py`, README "Results",
+- **Affected:** `framescout_core` (export function, tested), `app.py`, user guide "Results",
   storage cleanup (exports are user data: add them to `NEVER_DELETED` or leave them out of
   every category).
 - **Effort:** S.
@@ -114,7 +114,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   to rename the file to `cache.sqlite3.broken-<date>` (never delete), so the next search
   rebuilds it.
 - **Affected:** `framescout_core` (marks module, cleanup), `app.py`, `NEVER_DELETED`
-  (add `marks.json.bak`), README "Results" and "Cleaning up storage", tests.
+  (add `marks.json.bak`), user guide "Results" and "Cleaning up storage", tests.
 - **Effort:** S–M.
 - **Risks:** `quick_check` on a large cache takes a few seconds and must not run while a
   search holds the run lock.
@@ -130,7 +130,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   CPU, one or two fewer PyTorch threads. Standard library only; the CLI gets
   `--low-priority` for manual runs.
 - **Affected:** `app.py` (`subprocess.Popen` creation flags, settings widget),
-  `framescout_engine.py` (thread count), `settings.json`, README "AI settings".
+  `framescout_engine.py` (thread count), `settings.json`, user guide "AI settings".
 - **Effort:** S.
 - **Risks:** the effect on GPU runs is small; must not interact badly with the stop
   logic (process tree, PID in the status file).
@@ -146,7 +146,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   × thumbnail size + model weights not yet in `.cache/`) and before a first model use.
   A warning, not a hard block, with the free and the estimated space.
 - **Affected:** `install_torch.py`, `framescout_core` (estimate, tested),
-  `app.py`, README "Installation" and "Requirements".
+  `app.py`, README "Installation" and "Requirements", user guide "Installation details".
 - **Effort:** S.
 - **Risks:** estimates are rough; the drive of `results/` and of `.cache/` may differ
   (check both).

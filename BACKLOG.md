@@ -86,7 +86,7 @@ and discussions.
       `ViT-B-16-SigLIP-i18n-256` (about 1.48 GB), `nllb-clip-base` (about 2 GB). Builds
       on the model choice of the roadmap item "Optional stronger models" (E22): one more
       registry entry with `multilingual=True`, and the "in English" hint of the app and
-      the README depends on the selected model. SigLIP 2 (a candidate of E22) has a
+      the user guide depends on the selected model. SigLIP 2 (a candidate of E22) has a
       multilingual tokenizer and training data and may cover this item as well; check
       it with German queries before adding `xlm-roberta-base-ViT-B-32`. A download and a
       new dependency are hold points. **Status after E22 (PR #31):** the registry and its
@@ -102,13 +102,13 @@ and discussions.
       (`SearchModel.evaluated`), because their search quality has not been measured.
       Follow-up PR of E22 (user decision: two PRs). **Tooling delivered 2026-10-26 in
       PR #32** (user decision: that PR builds only the tooling): `framescout_eval.py`
-      (`run` / `pool` / `label` / `metrics`, README "Evaluating the search models",
+      (`run` / `pool` / `label` / `metrics`, `docs/DEVELOPMENT.md` "Evaluating the search models",
       ARCHITECTURE "Model evaluation tool") computes AP@40 per profile and model, a
       reference-weight sweep per model and supports several collections (E20); the engine
       got `--scores-file`. **Remaining (a later PR):** the user labels a pool on the home PC
       (Core i5-13600K, RTX 4070) for the cosplay collection and a second, non-cosplay one;
       then record the run metrics, choose the reference weight per model (0.3, E5), trim
-      `MODELS`, set `evaluated`, and update the labels and the README. The tool itself was
+      `MODELS`, set `evaluated`, and update the labels and the user guide. The tool itself was
       not run with real models yet (E34). A key trimmed from the registry falls back to the default with
       a warning in a user's `settings.json` (`read_settings`); its cache rows then count as
       "older version" in the cleanup. Search quality is a hold point.
@@ -132,7 +132,7 @@ and discussions.
       a profile whose motif changes under the same name (context, features, reference
       images) silently reuses labels made for the old motif, and the "profile has changed"
       warning of `pool`/`metrics` disappears once every model has been run again. Today
-      the README asks for a new profile name instead. Fix idea: store each profile's
+      `docs/DEVELOPMENT.md` asks for a new profile name instead. Fix idea: store each profile's
       context, features and reference images in `labels.json` when a label is set and warn
       in `pool`/`metrics` when they differ. Found in the review of PR #32 (E32).
 - [ ] **E37 – The unbound check guards only the root probe with a timeout:** a folder
