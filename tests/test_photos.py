@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
-                             RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, available_decoders, distinct_folders,
+                             RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, RawFallback, available_decoders, distinct_folders,
                              folder_labels, join_scans, missing_decoder, missing_folders_message,
-                             output_folder_problem, photo_name, raw_preview_transpose, raw_preview_usable, scan_folders, scan_photos, skipped_lines,
+                             output_folder_problem, photo_name, raw_fallbacks, raw_preview_transpose, raw_preview_usable, scan_folders, scan_photos, skipped_lines,
                              supported_extensions)
 
 NO_HEIF = Decoders(avif=True, heif=False, raw=True)
@@ -175,6 +175,65 @@ def test_scan_ignores_a_heic_partner_that_cannot_be_read(tmp_path):
 
 def test_scan_of_an_empty_folder(tmp_path):
     assert scan_photos(tmp_path) == PhotoScan([], [], collections.Counter())
+
+
+# --- the RAW file of a broken partner (E30) ---
+
+def test_raw_fallbacks_map_each_partner_to_its_skipped_raw_file(tmp_path):
+    raw = touch(tmp_path / 'IMG_0001.CR2')
+    jpeg = touch(tmp_path / 'img_0001.jpg')
+    raw2 = touch(tmp_path / 'sub' / 'IMG_0002.nef')
+    heic = touch(tmp_path / 'sub' / 'IMG_0002.HEIC')
+    alone = touch(tmp_path / 'IMG_0003.jpg')
+    assert raw_fallbacks(scan_photos(tmp_path)) == {jpeg: raw, heic: raw2}
+    assert alone not in raw_fallbacks(scan_photos(tmp_path))
+
+
+def test_raw_fallbacks_of_two_partners_name_the_same_raw_file(tmp_path):
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    heic = touch(tmp_path / 'IMG_0001.heic')
+    assert raw_fallbacks(scan_photos(tmp_path)) == {jpeg: raw, heic: raw}
+
+
+def test_raw_fallbacks_of_two_raw_files_take_the_first_one(tmp_path):
+    # e.g. a DNG converted from the camera's RAW file next to it: one shot, one fallback
+    first = touch(tmp_path / 'IMG_0001.arw')
+    touch(tmp_path / 'IMG_0001.dng')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    assert raw_fallbacks(scan_photos(tmp_path)) == {jpeg: first}
+
+
+def test_raw_fallbacks_without_pairs():
+    assert raw_fallbacks(PhotoScan([Path('a.jpg')], [], collections.Counter())) == {}
+
+
+def test_raw_fallback_takes_a_raw_file_once(tmp_path):
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    heic = touch(tmp_path / 'IMG_0001.heic')
+    other = touch(tmp_path / 'IMG_0002.jpg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    assert fallback.take(other) is None  # no RAW partner
+    assert fallback.take(jpeg) == raw
+    # the other partner of the same shot does not analyze the RAW file a second time
+    assert fallback.take(heic) is None
+    assert fallback.take(jpeg) is None
+
+
+def test_raw_fallback_photos_name_the_raw_file_in_place_of_its_partner(tmp_path):
+    raw = touch(tmp_path / 'b.cr3')
+    a = touch(tmp_path / 'a.jpg')
+    b = touch(tmp_path / 'b.jpg')
+    c = touch(tmp_path / 'c.jpg')
+    touch(tmp_path / 'c.nef')
+    scan = scan_photos(tmp_path)
+    fallback = RawFallback(scan)
+    assert fallback.photos(scan.paths) == [a, b, c]
+    fallback.take(b)
+    # the shot keeps its place (and the number of photos stays the same)
+    assert fallback.photos(scan.paths) == [a, raw, c]
+    assert fallback.used == {b: raw}
 
 
 # --- several photo folders (A25) ---

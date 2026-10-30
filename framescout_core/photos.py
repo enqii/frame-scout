@@ -104,6 +104,49 @@ def scan_photos(root, extensions=EXT, exclude=None):
     return PhotoScan(sorted(photos), sorted(pairs), unsupported)
 
 
+def raw_fallbacks(scan):
+    """Return {partner: RAW file} of the RAW files scan (a PhotoScan) skipped for a partner (E30).
+
+    Every partner of a skipped RAW file (a JPEG/HEIC of the same name in the same folder)
+    maps to it, so the engine can analyze the RAW file instead if the partner cannot be
+    decoded. If a partner has several RAW files (e.g. a camera RAW and a DNG made from it),
+    it maps to the first one in sorted order: one shot, one fallback.
+    """
+    raws = {}
+    for raw in sorted(scan.raw_pairs):
+        raws.setdefault((raw.parent, raw.stem.casefold()), raw)
+    fallbacks = {}
+    for path in scan.paths:
+        raw = raws.get((path.parent, path.stem.casefold()))
+        if raw is not None and path.suffix.lower() in RAW_PARTNER_EXT:
+            fallbacks[path] = raw
+    return fallbacks
+
+
+class RawFallback:
+    """The RAW files a search analyzes instead of their partner that cannot be decoded (E30).
+
+    take(partner) returns the RAW file to analyze for a partner that failed, or None if it
+    has none or its RAW file was taken already (e.g. for the HEIC of the same shot);
+    photos(paths) names that RAW file in place of its partner, so the shot keeps its place
+    and the number of photos stays the same. used: {partner: RAW file} of the taken ones.
+    """
+
+    def __init__(self, scan):
+        self.fallbacks = raw_fallbacks(scan)
+        self.used = {}
+
+    def take(self, partner):
+        raw = self.fallbacks.get(partner)
+        if raw is None or partner in self.used or raw in self.used.values():
+            return None
+        self.used[partner] = raw
+        return raw
+
+    def photos(self, paths):
+        return [self.used.get(path, path) for path in paths]
+
+
 def _folder_key(folder):
     """The text a folder is compared by: case-insensitive where the file system is (Windows)."""
     return os.path.normcase(str(folder))
