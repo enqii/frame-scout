@@ -38,7 +38,8 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       (done 2026-10-30; open follow-ups: E44, E45)
 - [x] (C) A RAW file whose JPEG partner is broken is analyzed instead (E30)
       (done 2026-10-30; open follow-up: E46)
-- [ ] (D) The same photo folder by another path, and junctions inside a folder (A28, A29)
+- [x] (D) The same photo folder by another path, and junctions inside a folder (A28, A29)
+      (done 2026-10-30)
 
 ### P9 – App polish
 - [ ] (A) The photo folder is not scanned on every rerun (A6 and A27 are the same

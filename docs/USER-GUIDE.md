@@ -76,8 +76,10 @@ few example profiles that you can edit or delete.
 Enter one or more local image folders, one per line (default: `photos` in the project
 folder). Subfolders are searched too, and one search covers all listed folders. A folder
 listed twice or inside another listed folder is searched once; a missing folder (e.g. a
-disconnected drive) is left out with a note. Folders are compared by path only, so the
-same folder reached by two paths (another drive letter, a junction) is searched twice.
+disconnected drive) is left out with a note. The same folder reached by another path (another drive
+letter, a UNC path, a junction) is recognized and searched once. Links to folders inside a
+photo folder are followed, but each folder and each photo is searched once, even if it is
+reachable through several links or by a hard link.
 
 FrameScout does not download images: download and extract archives and online albums
 yourself. A search sends nothing about your photos anywhere. It turns off Ultralytics'
