@@ -80,6 +80,11 @@ def missing_decoder(suffix, decoders):
     return None
 
 
+def _shot(path):
+    """The key of the shot a file belongs to: its folder and its name ignoring case and extension."""
+    return path.parent, path.stem.casefold()
+
+
 def scan_photos(root, extensions=EXT, exclude=None):
     """Return the PhotoScan of the files in root and its subfolders.
 
@@ -96,10 +101,10 @@ def scan_photos(root, extensions=EXT, exclude=None):
             paths.append(path)
         else:
             unsupported[suffix] += 1
-    partners = {(p.parent, p.stem.casefold()) for p in paths if p.suffix.lower() in RAW_PARTNER_EXT}
+    partners = {_shot(p) for p in paths if p.suffix.lower() in RAW_PARTNER_EXT}
     photos, pairs = [], []
     for p in paths:
-        paired = p.suffix.lower() in RAW_EXT and (p.parent, p.stem.casefold()) in partners
+        paired = p.suffix.lower() in RAW_EXT and _shot(p) in partners
         (pairs if paired else photos).append(p)
     return PhotoScan(sorted(photos), sorted(pairs), unsupported)
 
@@ -114,34 +119,61 @@ def raw_fallbacks(scan):
     """
     raws = {}
     for raw in sorted(scan.raw_pairs):
-        raws.setdefault((raw.parent, raw.stem.casefold()), raw)
+        raws.setdefault(_shot(raw), raw)
     fallbacks = {}
     for path in scan.paths:
-        raw = raws.get((path.parent, path.stem.casefold()))
+        raw = raws.get(_shot(path))
         if raw is not None and path.suffix.lower() in RAW_PARTNER_EXT:
             fallbacks[path] = raw
     return fallbacks
 
 
 class RawFallback:
-    """The RAW files a search analyzes instead of their partner that cannot be decoded (E30).
+    """The RAW files a search analyzes instead of their partner that cannot be analyzed (E30).
 
-    take(partner) returns the RAW file to analyze for a partner that failed, or None if it
-    has none or its RAW file was taken already (e.g. for the HEIC of the same shot);
-    photos(paths) names that RAW file in place of its partner, so the shot keeps its place
-    and the number of photos stays the same. used: {partner: RAW file} of the taken ones.
+    A partner that fails (cache scan, decoding or storing) is deferred with defer(partner);
+    once all photos are done, choose(analyzed) decides each deferred failure with the
+    outcome of the whole shot known: the RAW file is analyzed only if no partner of the
+    shot was analyzed (e.g. the good JPEG next to a broken HEIC, review), and only once for
+    several failed partners. use(partner, raw) records a RAW file that was analyzed;
+    photos(paths) names it in place of its partner, so the shot keeps its place and the
+    number of photos stays the same. used: {partner: RAW file} of the analyzed ones.
     """
 
     def __init__(self, scan):
         self.fallbacks = raw_fallbacks(scan)
+        self.failed = []
         self.used = {}
 
-    def take(self, partner):
-        raw = self.fallbacks.get(partner)
-        if raw is None or partner in self.used or raw in self.used.values():
-            return None
+    def defer(self, path):
+        """Record a failed photo; True if it is a partner with a RAW file, decided later by choose."""
+        if path not in self.fallbacks or path in self.failed:
+            return False
+        self.failed.append(path)
+        return True
+
+    def choose(self, analyzed):
+        """Return ({partner: RAW file to analyze instead}, [partners that stay failures]).
+
+        analyzed(path) tells whether a photo of the search was analyzed. The deferred
+        failures are decided in the order they were deferred, each one once.
+        """
+        failed, self.failed = self.failed, []
+        # only the other partners of shots with a failure are asked about
+        failed_raws = {self.fallbacks[partner] for partner in failed}
+        shots_done = {raw for partner, raw in self.fallbacks.items()
+                      if raw in failed_raws and partner not in failed and analyzed(partner)}
+        chosen, lost = {}, []
+        for partner in failed:
+            raw = self.fallbacks[partner]
+            if raw in shots_done or raw in chosen.values():
+                lost.append(partner)
+            else:
+                chosen[partner] = raw
+        return chosen, lost
+
+    def use(self, partner, raw):
         self.used[partner] = raw
-        return raw
 
     def photos(self, paths):
         return [self.used.get(path, path) for path in paths]
