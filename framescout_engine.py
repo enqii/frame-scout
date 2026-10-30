@@ -23,7 +23,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
                              final_status, yolo_weights,
-                             ensure_thumbnail, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
+                             SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
                              load_profiles, missing_decoder, missing_folders_message, model_problem,
                              output_folder_problem, photo_name,
@@ -546,18 +546,26 @@ def search(args, parser, roots, dropped, output, status):
     total_cards = sum(min(args.top, len(ranked)) for ranked in rankings.values())
     print('Writing the galleries ...', flush=True)
     status.update('exporting', total=total_cards)
-    cards_done = 0
+    # skips (and logs) photos deleted or unreadable since scoring instead of aborting (E6),
+    # each photo tried and logged once per export (review of E12)
+    skipped = SkippedPhotos(log)
+    progress = 0
     results = []  # the content of results.json: what each gallery shows (A12)
     for p in profiles:
         name = p['name']; ranked = rankings[name]
         cards, entries = [], []
-        planned = cards_done + min(args.top, len(ranked))
-        # skips (and logs) photos deleted or unreadable since scoring instead of aborting (E6);
+
+        # progress counts every photo tried, also a skipped one (heartbeat), capped at the
+        # gallery's share of the total; a full gallery or an exhausted ranking reaches it (review)
+        def thumbnail(found, planned=progress + min(args.top, len(ranked))):
+            nonlocal progress
+            if progress < planned:
+                progress += 1
+                status.update(done=progress, force=progress == total_cards)
+            return skipped.thumbnail(found[1], thumbs, legacy_thumbs, render_thumbnail)
+
         # ranks count only the cards shown, lower-ranked photos fill up to --top (E12)
-        for rank, (match, path, label), thumb_name in gallery_cards(
-                ranked, args.top, lambda found: ensure_thumbnail(found[1], thumbs, legacy_thumbs, render_thumbnail, log)):
-            cards_done += 1
-            status.update(done=cards_done, force=cards_done == total_cards)
+        for rank, (match, path, label), thumb_name in gallery_cards(ranked, args.top, thumbnail):
             uri = html.escape(path.as_uri(), quote=True)
             relative = photo_name(path, roots, labels)  # once, for the HTML card and results.json (review)
             rel = html.escape(relative)
@@ -568,9 +576,6 @@ def search(args, parser, roots, dropped, output, status):
             cards.append(f'<article><a href="{uri}" target="_blank"><img loading="lazy" src="thumbnails/{quote(thumb_name)}" alt="{rel}"></a>'
                          f'<p><b>#{rank}</b> · {score} · {html.escape(label)}<br><small>{detail}</small><br>'
                          f'<a href="{uri}" target="_blank">{html.escape(path.name)}</a></p><small>{rel}</small></article>')
-        if cards_done < planned:  # too few photos with a thumbnail: the progress still reaches the total
-            cards_done = planned
-            status.update(done=cards_done, force=cards_done == total_cards)
         page = ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                 f'<title>FrameScout – {html.escape(name)}</title><style>{style}</style>' + nav +
                 f'<h1>{html.escape(name)} – Top {len(cards)}</h1><p>Automatically generated ranking, not a guaranteed identification. '
@@ -581,6 +586,8 @@ def search(args, parser, roots, dropped, output, status):
         print(f'{name}: {target}', flush=True)
         results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': target.name,
                         'normalized': normalized[name], 'cards': entries})
+    if skipped.summary():
+        log(skipped.summary())
     # after all galleries, so the file always describes a complete export (A12)
     settings = {'device': device, 'batch_size': args.batch_size, 'top': args.top,
                 'person_detection': not args.no_person_detection, 'max_persons': args.max_persons,

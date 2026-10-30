@@ -69,3 +69,39 @@ def gallery_cards(ranked, top, thumbnail):
         if name is not None:
             rank += 1
             yield rank, item, name
+
+
+# How many skipped photos an export names one by one in the log before it only counts them.
+SKIP_LOG_LIMIT = 50
+
+
+class SkippedPhotos:
+    """The photos of one export that got no thumbnail (review of E12).
+
+    thumbnail() is ensure_thumbnail for a whole export: a photo that failed once is not
+    tried again in later galleries, and only the first limit failures are logged, so a
+    photo folder that vanished since scoring cannot flood the log with one line per photo
+    and gallery. summary() returns the closing log line if more photos were skipped than
+    logged, otherwise None.
+    """
+
+    def __init__(self, log, limit=SKIP_LOG_LIMIT):
+        self.paths, self.log, self.limit = set(), log, limit
+
+    def thumbnail(self, path, thumbs, legacy_thumbs, render):
+        if path in self.paths:
+            return None
+        name = ensure_thumbnail(path, thumbs, legacy_thumbs, render, self._log)
+        if name is None:
+            self.paths.add(path)
+        return name
+
+    def _log(self, message):
+        if len(self.paths) < self.limit:
+            self.log(message)
+
+    def summary(self):
+        if len(self.paths) <= self.limit:
+            return None
+        return (f'{len(self.paths)} photos got no thumbnail and are left out of the galleries; '
+                f'only the first {self.limit} are listed above.')
