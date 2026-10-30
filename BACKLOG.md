@@ -92,20 +92,6 @@ and discussions.
       new dependency are hold points. **Status after E22 (PR #31):** the registry and its
       `multilingual` flag exist, but all offered models are English-only and the "in
       English" hint does not depend on the model yet.
-- [ ] **E24 – An interrupted export leaves galleries newer than `results.json`:** the
-      engine writes `results.json` only after all galleries, so a search stopped while it
-      writes the galleries has already replaced some HTML files, while the app still shows
-      the previous complete search (its date is shown, and the status says that the last
-      run did not finish). Opening such a gallery from the app shows the newer, partial
-      result. Fix idea: write the galleries under temporary names and publish them
-      together with `results.json` at the end. Found in PR #14.
-- [ ] **E26 – Other temporary files of a stopped run stay in `results/`:** the atomic
-      writes of `run-status.json` and `results.json` (and of `marks.json` by the app) go
-      through `<name>.<random>.tmp`; `terminate()`/`kill()` during such a write leaves that
-      file behind, like the thumbnails of E13. They are small and rare, and the cleanup
-      of E7 does not remove them (an app session may be writing `marks.json` at that
-      moment). Fix idea: remove `run-status.json.*.tmp` and `results.json.*.tmp` older than
-      a minute in `auto_cleanup`. Found in PR #18.
 - [ ] **E29 – HEIC/RAW support as optional extras:** E25 made `pillow-heif` and `rawpy`
       required in `requirements.txt` (user decision at the PR #26 hold point; the user may
       want them optional later). Idea: a separate requirements file, a question in
@@ -202,6 +188,16 @@ and discussions.
       path, but this was not run; if it does not, the first download fails. Check on the first
       download into an empty cache (P10 A, next to E38) or create the folder in
       `yolo_weights`/the engine. Review of PR #42, finding 10.
+- [ ] **E44 – Temporary files of the app's atomic writes in the project folder stay after a
+      kill (minor):** `profiles.json.<random>.tmp`, `settings.json.<random>.tmp` (and the
+      write of `profiles.json.bak`) remain if the app process is killed during a write. No
+      cleanup removes them: `auto_cleanup` only looks at `results/`. Small and rare. Found
+      in PR #45.
+- [ ] **E45 – `publish_export` is not one step across files (minor):** a kill between the
+      renames (milliseconds), or a rename that fails every retry (a gallery held open for
+      over 2 s; the run then fails), can still leave some galleries newer than
+      `results.json`. Idea, if it ever matters: a versioned gallery subfolder that
+      `results.json` names. Found in PR #45.
 
 ### App (`app.py`)
 

@@ -22,6 +22,10 @@ app production-ready. The installer's download, extraction and `venv` creation w
 Python 3.14.9 (P5 part C) and the uninstall with it were run under `.tmp`; a full installation
 with PyTorch on it is **not runtime-tested**.
 
+Publishing the export (E24, E26, PR #45): one CPU smoke run (4 synthetic photos, 2 profiles,
+`.tmp/`) wrote both galleries and `results.json`, removed two stale temporary files and kept
+a fresh one. A real stop during the export was **not** reproduced (unit tests only).
+
 Search models (E22, PR #31): CPU smoke runs of all four registered models (default,
 ViT-B/16, ViT-L/14, SigLIP) with `--no-person-detection`, 3 synthetic images and `.tmp/`
 output succeeded, the weights downloaded into the main checkout's `.cache/`. **Not
@@ -159,7 +163,7 @@ the module of its area and to the re-exports in `__init__.py`.
   (the app's `settings.json`, the ranges of its widgets, the engine's `--device` choices,
   and the sync of the widgets with the file, A8).
 - `results.py`:
-  `RESULTS_FILE`/`RESULTS_FORMAT`/`result_card`/`results_document`/`write_results`/`read_results`/`search_fingerprint`/`profile_fingerprints`/`profile_state`/`GALLERY_PAGE_SIZE`/`page_count`/`page_cards`/`openable_photo`/`open_command`/`reveal_command`
+  `RESULTS_FILE`/`RESULTS_FORMAT`/`result_card`/`results_document`/`write_results`/`publish_export`/`read_results`/`search_fingerprint`/`profile_fingerprints`/`profile_state`/`GALLERY_PAGE_SIZE`/`page_count`/`page_cards`/`openable_photo`/`open_command`/`reveal_command`
   (the result file of a search and the app's gallery: validation of the file (plain
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
@@ -173,7 +177,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `forget_copy_folder` removes only the saved entry of a deleted profile, A22;
   `save_copy_folder(..., profiles_file=...)` like `save_marks`).
 - `cleanup.py`:
-  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`ROOT_TIMEOUT`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
+  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`STALE_TEMP_AGE`/`ROOT_TIMEOUT`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14/E8; the unbound-photo check is the private `_PathCheck`).
 - `portable_python.py` (P5 part C):
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
@@ -214,7 +218,9 @@ the module of its area and to the re-exports in `__init__.py`.
   `A-Za-z0-9_-`, no Windows device names).
 - `_common.py` (internal, not re-exported): helpers several areas share, i.e. atomic
   writes (`_publish_via_temp`, `_publish_new`, `_replace_atomically`,
-  `_replace_with_retry`), reading a file (`_read_with_retry`) or a JSON object file
+  `_replace_with_retry`, `_temp_path`, `_flush_to_disk`, and `_publish_together`, which
+  writes several files in full to temporary files and only then renames them in order, each
+  rename retried 40 x 50 ms), reading a file (`_read_with_retry`) or a JSON object file
   (`_read_json_object`) with retries, the save lock of a file on `<file>.lock`
   (`_file_lock`, used by `_update_locked` and `save_profiles`), the locked
   read-change-write of a JSON file (`_update_locked`) and `_path_key`.
@@ -676,12 +682,25 @@ not try or log it again, and after 50 logged photos a closing line only counts t
 The export progress total is `sum(min(--top, photos))`; every photo tried counts, also a
 skipped one, capped at the profile's share, so the status file stays fresh during a run
 of skipped photos and a full gallery or an exhausted ranking reaches the share. Keep the
-output folder intact; exporting an HTML file on its own does **not** embed thumbnails. After `results.json` is written, still holding the run
+output folder intact; exporting an HTML file on its own does **not** embed thumbnails.
+The engine keeps each gallery's HTML in memory (`pages`) during the export and at the end
+calls `framescout_core.publish_export(output, pages, document)` (E24): it writes every
+gallery and `results.json` in full to `<name>.<random>.tmp` (fsync) and only then renames
+them in profile order, `results.json` last (`_common._publish_together`). A stop or failure
+while writing leaves the previous galleries and `results.json`. The gallery path lines in
+the log come after this step. Galleries are written as bytes, so their line ends are `\n`
+on Windows too. After `results.json` is published, still holding the run
 lock, the engine calls `auto_cleanup`: it removes temporary thumbnails
-(`<hash>.jpg.<random>.jpg`, left by a stop during the export, E13) and thumbnails (both
+(`<hash>.jpg.<random>.jpg`, left by a stop during the export, E13), stale temporary files
+(`run-status.json.*.tmp`, `results.json.*.tmp`, `marks.json.*.tmp`, `<gallery>.html.*.tmp`;
+random part exactly 8 chars of `[a-z0-9_]`, regex `cleanup._TEMP_FILE`) at least
+`STALE_TEMP_AGE` = 60 s old by mtime, even if `results.json` cannot be read (E26; the age
+limit protects a write the app is doing right now), and thumbnails (both
 folders, `[0-9a-f]{24}.jpg` names only) that neither `results.json` nor any HTML file in
 the output folder links; if one of them cannot be read, every thumbnail stays; a failure
-is logged and never fails the run. Local paths may not work on another computer.
+is logged and never fails the run. The summary has `temporary` (temporary thumbnails and
+temporary files among `files`); the log line reads "Removed N unused thumbnails or
+temporary files (size)". Local paths may not work on another computer.
 
 ### Result file
 
@@ -699,7 +718,10 @@ thumbnail name) in gallery order. `read_results` also reads format 1 (`photo_fol
 string) and returns it with `photo_folders` as a list of one (none for an empty value);
 app versions before A25 reject format 2 ("not a FrameScout result file of format 1") and
 show no results until they run a search themselves. Written only when the export completes, so a stopped
-search leaves the previous file (galleries already rewritten: E24). The app reads it
+search leaves the previous file and the previous galleries (`publish_export`, E24). Not one
+step across files: a kill between the renames (milliseconds), or a rename that fails every
+retry (a gallery held open for over 2 s, which fails the run), can still leave galleries
+newer than `results.json` (E45). The app reads it
 (cached by mtime and size) instead of deriving file names from the current profile list
 (A12). The gallery's "Open" uses `os.startfile` and only for an existing file with an
 `EXT` suffix (`openable_photo`), "Folder" `SHOpenFolderAndSelectItems` via ctypes on
@@ -957,8 +979,10 @@ letter now used by another disk, or on POSIX the root `/` of an unmounted mount,
 reachable; only mitigated by naming the folders).
 While `clean_up` holds the lock it registers the results folder in the process
 (`cleanup_running`; app sessions are threads of one process), so other tabs show "The
-storage is being cleaned up" instead of a running search and disable Stop (A23); other
-temporary files: E26.
+storage is being cleaned up" instead of a running search and disable Stop (A23). The
+app's "Temporary thumbnails" category does not list the temporary files `auto_cleanup`
+removes (E26); the temporary files of the app's own atomic writes in the project folder
+(`profiles.json.<random>.tmp`, `settings.json.<random>.tmp`) are never cleaned up: E44.
 
 ### Run state (lock and status file)
 
@@ -1129,7 +1153,9 @@ target folders (A17) with their deletion with a profile and no saves for a name 
 profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, unreachable roots simulated by patching
+`test_cleanup.py` also for stale temporary files (removed; fresh and foreign ones kept; also with an unreadable `results.json`, E26) and
+`publish_export` in `test_results.py` (publishes; a failed write publishes nothing; all
+files complete before the first rename and `results.json` last; retry on an open file, E24), also for unbound rows and marks, unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the cache folders and the `yolo11n.pt`
 location (E9/I10: `test_cache_dirs.py`, also that importing `framescout_core` loads no
