@@ -5,8 +5,8 @@ import threading
 import pytest
 
 from framescout_core import (MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARKS_FILE, RunLock,
-                             UnknownProfileError, delete_marks, lock_held, read_marks, remove_marks, rename_marks,
-                             save_marks)
+                             UnknownProfileError, delete_marks, hide_no_match, lock_held, page_cards, read_marks,
+                             remove_marks, rename_marks, save_marks)
 
 
 def stored(path):
@@ -298,3 +298,28 @@ def test_the_profile_is_checked_under_the_marks_lock(tmp_path, monkeypatch):
     monkeypatch.setattr(marks_module, 'require_profile', check)
     save_marks(path, 'Red car', {'a.jpg': MARK_MATCH}, profiles_file=profiles)
     assert seen == [True]
+
+
+# --- hiding the photos marked as no match within a gallery page (A24) ---
+
+def cards_of(count):
+    return [{'rank': rank, 'path': f'photo{rank}.jpg'} for rank in range(1, count + 1)]
+
+
+def test_hide_no_match_drops_only_the_photos_marked_as_no_match():
+    cards = cards_of(5)
+    marks = {'photo2.jpg': MARK_NO_MATCH, 'photo3.jpg': MARK_MATCH, 'other.jpg': MARK_NO_MATCH}
+    kept, hidden = hide_no_match(cards, marks)
+    assert [c['rank'] for c in kept] == [1, 3, 4, 5] and hidden == 1
+    assert hide_no_match(cards, {}) == (cards, 0)
+    assert hide_no_match([], marks) == ([], 0)
+
+
+def test_hiding_the_rejects_of_a_page_keeps_the_pages_stable():
+    # user report: hiding the rejects of page 1 pulled the undecided photos of page 2 up
+    cards = cards_of(100)
+    marks = {f'photo{rank}.jpg': MARK_NO_MATCH for rank in range(1, 49)}  # all of page 1
+    kept, hidden = hide_no_match(page_cards(cards, 1, 48), marks)
+    assert kept == [] and hidden == 48  # an empty page rather than photos of page 2
+    kept, hidden = hide_no_match(page_cards(cards, 2, 48), marks)
+    assert [c['rank'] for c in kept] == list(range(49, 97)) and hidden == 0
