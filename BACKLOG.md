@@ -332,6 +332,13 @@ and discussions.
       ignores e.g. a `HF_HOME` the user exported, a manual run honours it. Probably intended
       (the app keeps the install self-contained), but undecided and undocumented; decide and
       document, or use `default_cache_env` in the app too. Review of PR #42, finding 12.
+- [ ] **A37 – Photos found through a second path are dropped silently:** since A28/A29
+      `scan_each_folder` lists a photo reached through a link, another path or a hard link
+      once, under the first path, and neither the engine log nor the app's per-folder
+      count says how many were dropped, so the count can be lower than what a file manager
+      shows. Idea: count the duplicates in the scan (e.g. a field of `PhotoScan`) and add a
+      line like `skipped_lines` ("12 photos found again through another path, analyzed
+      once"). Review of PR #50, finding 5.
 
 ### Installation / project
 

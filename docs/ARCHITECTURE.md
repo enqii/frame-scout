@@ -528,7 +528,9 @@ may stand between options); an output folder equal to one of them, or containing
 folder (compared by `os.path.normcase` of the resolved path and by `os.stat` identity,
 `st_dev`/`st_ino`, of the folder and its ancestors, so a mapped drive, a UNC path, a `subst`
 drive or a junction to a listed folder counts as the same; without an identity (missing
-folder, `st_ino` 0, stat error) only the path is compared; the notes go to the log).
+folder, `st_ino` 0, stat error) only the path is compared, and the ancestors of a folder are
+stat'ed only when it and another listed folder have an identity, so an unreachable network
+folder is not asked again per ancestor; the notes go to the log).
 Missing folders are left out with a log line ("Photo folder not found, searched without
 it"); only if none exists is it an error (`missing_folders_message`, before the lock as
 for one folder, see "Run lock and status"). `scan_folders` joins the `scan_each_folder`
@@ -543,10 +545,19 @@ folder links (junctions, symlinks; `DirEntry.is_junction`, Python 3.12+), so eve
 linked into a parent keep working, but finds nothing twice (A29): each folder is walked once
 by identity, all real subfolders of all listed folders before any link, so links into walked
 folders and loops add nothing and a photo reachable both ways is listed by its real path (for
-the folder it is really in). Supported files are deduplicated by identity (hard links, file
-symlinks, A28; one `os.stat` per photo file). The output folder is left out when reached
-through a link, too. Cache rows and marks under a link path of earlier runs are no longer
-used (A21).
+the folder it is really in; a folder outside all listed folders reached by links from
+several of them counts for the first in list order). A folder is marked as walked only after
+`os.scandir` read it, so an unreadable path is tried again through another one. Folders and
+files without an identity (`st_ino` 0) are compared by `os.path.realpath`, so a link loop
+ends there too (a loop the server follows itself, invisible to the client, is not detected;
+neither did the old `rglob`). Supported files are deduplicated by identity plus size and
+modification time (`_file_identity`: hard links and file symlinks share all four, while
+different photos on a file system with repeated file ids stay apart; A28). One `os.stat` per
+walked folder and per photo file. The output folder is left out wherever it is reached: as
+a listed folder or inside one (by path, as the old `exclude in path.parents` check), or
+through a link or another path (by identity). Photos found twice are dropped silently (no
+count in the log or app; A37). Cache rows and marks under a link path of earlier runs are
+no longer used (A21).
 
 The app: the "Photo source" tab has a text area (`setting_photo_folders`, one folder per
 line). `settings.json` stores the list `photo_folders`; `setting_of_widget` /
@@ -1215,7 +1226,9 @@ with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_pho
 the RAW fallback's mapping, its agreement with the scan's pairs across mixed-case names
 and joined folders, and the deferred decision (`raw_fallbacks`, `RawFallback`, E30,
 `test_photos.py`; the engine side of the fallback is not runtime-tested),
-the identity-based dedup and link-safe scan (A28, A29, `test_photos.py`),
+the identity-based dedup and link-safe scan, including the output folder as or inside a
+listed folder, repeated file ids, link loops without file ids and an unreadable path (A28,
+A29, `test_photos.py`),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search
