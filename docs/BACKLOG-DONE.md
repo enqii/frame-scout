@@ -1018,10 +1018,12 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       that is the same as, or inside, another listed folder by another path is dropped
       with a note; without an identity (missing folder, `st_ino` 0, stat error) the
       path comparison applies as before. The scan deduplicates supported files by
-      identity (hard links, file symlinks; one `os.stat` per photo file, which replaces
-      the stat per entry of `rglob`). No change to `profiles.json`, `settings.json`, CLI,
-      `ENGINE` or `marks.json`. Unit tests inject identities; real mapped/UNC/subst
-      drives were not tested.)
+      identity plus size and modification time (hard links, file symlinks; different
+      photos with a repeated file id stay apart; one `os.stat` per walked folder and per
+      photo file, which replaces the stat per entry of `rglob`). Review fix: ancestors are
+      stat'ed only for a folder with an identity. No change to `profiles.json`,
+      `settings.json`, CLI, `ENGINE` or `marks.json`. Unit tests inject identities; real
+      mapped/UNC/subst drives were not tested. Silent dropping of duplicates: A37.)
 - [x] **A29 – Junctions and links inside a photo folder are followed:** `Path.rglob('*')`
       follows directory junctions on Python 3.14, so a junction into another listed
       folder or into the same folder found photos twice or walked a cycle. Found in PR #28.
@@ -1030,11 +1032,15 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       `scan_each_folder` walks with `os.scandir`; each folder once by identity, all real
       subfolders of all listed folders before any link, so links into walked folders
       and loops add nothing and a photo reachable both ways is listed by its real path,
-      counted for the folder it is really in. The output folder is also left out when
-      reached through a link. `scan_photos` and `scan_folders` are built on it; the app
-      counts per folder from one `scan_each_folder` call. A photo earlier found through
-      a link path is now only found by its real path, so cache rows and marks under the
-      link path are no longer used (A21). Needs `DirEntry.is_junction` (Python 3.12+).
-      The "skip links" option was not needed. Streamlit `AppTest` of the Photo source tab
-      with a junction between two listed folders; the folder symlink test is skipped
-      without privilege.)
+      counted for the folder it is really in. The output folder is left out wherever it
+      is reached (listed, inside a listed folder, through a link or another path); folders
+      and files without a file id are compared by their real path, so a link loop ends
+      there too; a folder that cannot be read is tried again through another path (review
+      fixes). `scan_photos` and `scan_folders` are built on it; the app counts per folder
+      from one `scan_each_folder` call. A photo earlier found through a link path is now
+      only found by its real path, so cache rows and marks under the link path are no
+      longer used (A21). Needs `DirEntry.is_junction` (Python 3.12+). The "skip links"
+      option was not needed. The app's per-folder count was checked once manually with
+      Streamlit's `AppTest` (a junction between two listed folders; not part of the test
+      suite, so the `app.py` change has no automated test); the folder symlink test is
+      skipped without privilege.)
