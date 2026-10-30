@@ -823,12 +823,13 @@ def test_auto_cleanup_removes_temporary_files_of_a_stopped_run(project):
     project.write_results([('Red car', 'red-car.html', [])])
     (project.results / MARKS_FILE).write_text('{}', encoding='utf-8')
     stale = [temp_file(project.results, name, 120)
-             for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, 'red-car.html', 'Cat & dog.html')]
+             for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, 'red-car.html', 'cat-2.html')]
     # less than a minute old: possibly being written now (e.g. marks.json by an app session)
     fresh = [temp_file(project.results, name, 5) for name in (RUN_STATUS, MARKS_FILE, 'red-car.html')]
-    # not FrameScout's temporary files
+    # not FrameScout's temporary files: also none of a gallery name profile_slugs never gives
     mine = [project.results / name for name in ('notes.tmp', 'results.json.mine.tmp', 'settings.json.abcdefgh.tmp',
-                                               'red-car.html.abcdefgh.bak')]
+                                               'red-car.html.abcdefgh.bak', 'Cat & dog.html.abcdefgh.tmp',
+                                               'Red-car.html.abcdefgh.tmp')]
     for path in mine:
         path.write_text('mine', encoding='utf-8')
         os.utime(path, (time.time() - 120,) * 2)
