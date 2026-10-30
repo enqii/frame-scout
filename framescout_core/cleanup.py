@@ -22,7 +22,8 @@ from .signature import CACHE_FILE, classify_signatures, engine_id
 # "Clean up storage" lists what FrameScout no longer needs per category and deletes the
 # selected categories permanently after a confirmation, holding the run lock of the
 # results folder; at the end of every search the engine itself removes the harmless part
-# (temporary and unreferenced thumbnails, auto_cleanup). Never deleted: the marks file
+# (temporary and unreferenced thumbnails, and the stale temporary files of the status,
+# result and marks file and of the galleries, E26: auto_cleanup). Never deleted: the marks file
 # (only single marks of photos that no longer exist, if the user selects them), the run,
 # status and result files, the cache file itself, settings and profiles.
 # Unbound entries (E8/A21, user decision 2026-10-28): cache rows and marks stay keyed by the

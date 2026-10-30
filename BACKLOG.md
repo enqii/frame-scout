@@ -194,10 +194,11 @@ and discussions.
       cleanup removes them: `auto_cleanup` only looks at `results/`. Small and rare. Found
       in PR #45.
 - [ ] **E45 – `publish_export` is not one step across files (minor):** a kill between the
-      renames (milliseconds), or a rename that fails every retry (a gallery held open for
-      over 2 s; the run then fails), can still leave some galleries newer than
-      `results.json`. Idea, if it ever matters: a versioned gallery subfolder that
-      `results.json` names. Found in PR #45.
+      renames (milliseconds) can still leave some galleries newer than `results.json`. A
+      rename that fails every retry (a file held open for over 2 s; the run then fails)
+      restores the files renamed before it, but if a restore fails too, they stay new.
+      Idea, if it ever matters: a versioned gallery subfolder that `results.json` names.
+      Found in PR #45.
 
 ### App (`app.py`)
 
