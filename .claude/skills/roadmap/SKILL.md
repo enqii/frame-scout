@@ -169,8 +169,8 @@ For every worktree under `.claude/worktrees/` (`git worktree list`):
    `git branch -d <branch>` when `git log --oneline origin/main..<branch>` is empty.
 3. Uncommitted or unpushed work is never removed: first row of the state machine (report).
 
-`git worktree remove` and `git branch -D` ask for approval by design
-(`.claude/settings.json`); that is expected, not an error.
+`git worktree unlock/remove/prune`, `git branch -d` and `git branch -D` (not on `main`) are
+pre-approved in `.claude/settings.json` (I27); forced removals (`-f`/`--force`) still ask.
 
 ## 5. Hold points
 
