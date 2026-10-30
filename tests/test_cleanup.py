@@ -673,6 +673,7 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
         assert path.exists(), path.name
     assert json.loads(keep[MARKS_FILE].read_text(encoding='utf-8')) == {'format': 1, 'profiles': {}}
     assert summary['marks'] == 1
+    assert summary['temporary'] == 1  # the temporary thumbnail, counted like in auto_cleanup
     assert (project.base / 'settings.json').exists() and project.profiles.exists()
     assert sorted(p.name for p in project.results.iterdir()) == sorted(
         [*keep, CACHE_FILE, 'red-car.html', 'thumbnails'])
@@ -791,7 +792,7 @@ def test_auto_cleanup_removes_temporary_and_unreferenced_thumbnails(project):
     removed = auto_cleanup(project.results)
     assert sorted(p.name for p in project.thumbs.iterdir()) == sorted([T1, T2, 'notes.txt'])
     assert not project.legacy.exists()
-    assert removed['files'] == 3
+    assert removed['files'] == 3 and removed['temporary'] == 1  # T4's temporary file
     assert (project.results / 'cat.html').exists()
 
 
