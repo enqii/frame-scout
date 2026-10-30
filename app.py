@@ -20,6 +20,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              cleanup_summary_text,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
+                             AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, hide_no_match, lock_held, open_command, openable_photo, page_cards, page_count,
                              profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
@@ -1051,15 +1052,41 @@ def widget_of_setting(name, value):
     """Return the widget value that shows the setting value of setting name (see setting_of_widget)."""
     return '\n'.join(value) if name == 'photo_folders' else value
 
+# the labels of the AI settings' widgets, also used in the list of changed settings (A26)
+AI_LABELS = {'model': 'Search model', 'device': 'Compute device', 'batch_size': 'Batch size',
+             'top': 'Maximum matches per search profile',
+             'person_detection': 'Also detect individual persons in group photos (YOLO)',
+             'max_persons': 'Maximum detected persons per photo',
+             'person_confidence': 'Minimum confidence of the person detection',
+             'reference_weight': 'Weight of reference images (if any)'}
+
+def default_help(name, text=''):
+    """Return the help text of the widget of setting name: text and its default (A26)."""
+    return (text + ' ' if text else '') + f'Default: {setting_text(name, DEFAULT_SETTINGS[name])}.'
+
+def reset_ai_settings():
+    """Put the defaults into the AI settings' widgets (on_click, so before they are drawn; A26).
+
+    Never as value= (A8 review); the next run saves them as a change of this session.
+    """
+    for name in AI_SETTINGS:
+        st.session_state[setting_key(name)] = widget_of_setting(name, DEFAULT_SETTINGS[name])
+    st.session_state.settings_reset = list(AI_SETTINGS)
+
 seen = st.session_state.setdefault('settings_seen', {})
 shown = st.session_state.setdefault('settings_shown', {})
 widget_values = {name: setting_of_widget(name, st.session_state[setting_key(name)]) for name in DEFAULT_SETTINGS
                  if setting_key(name) in st.session_state}
+# the settings "Reset to defaults" reset (A26): saved as a change of this session even where
+# the widget showed the default before, and kept until the save succeeded
+settings_reset = st.session_state.get('settings_reset', ())
 setting_updates, changed_settings, settings_taken_over = reconcile_settings(
-    widget_values, seen, shown, saved_settings, DEFAULT_SETTINGS)
+    widget_values, seen, shown, saved_settings, DEFAULT_SETTINGS, reset=settings_reset)
 for name, value in setting_updates.items():
     st.session_state[setting_key(name)] = widget_of_setting(name, value)
-if changed_settings:
+if not changed_settings:
+    st.session_state.pop('settings_reset', None)
+else:
     if saved_settings is None:
         st.warning(f'The changed settings are used, but not saved yet, since {SETTINGS.name} cannot be read.')
     else:
@@ -1072,6 +1099,7 @@ if changed_settings:
         else:
             shown.update(changed_settings)
             seen.update(written)  # as stored, e.g. rounded (review)
+            st.session_state.pop('settings_reset', None)
 settings = {name: setting_of_widget(name, st.session_state[setting_key(name)]) for name in DEFAULT_SETTINGS}
 # the folders as the image count, the Start check and the engine use them (review: ~ expanded)
 photo_folders = [Path(folder).expanduser() for folder in settings['photo_folders']]
@@ -1235,8 +1263,9 @@ with settings_tab:
         info, info_error = None, exc
     # E22: the registry keys, the default first; the labels name the CPU factor, the download
     # and whether the model is evaluated
-    st.selectbox('Search model', MODEL_KEYS, format_func=model_label, key=setting_key('model'), disabled=active,
-                 help='The AI model that compares your search texts and reference images with the photos.')
+    st.selectbox(AI_LABELS['model'], MODEL_KEYS, format_func=model_label, key=setting_key('model'), disabled=active,
+                 help=default_help('model', 'The AI model that compares your search texts and reference images '
+                                            'with the photos.'))
     chosen_model = MODELS[settings['model']]
     if settings['model'] == DEFAULT_MODEL:
         st.caption("The default search model: the fastest one, and the one FrameScout's settings were tuned for.")
@@ -1258,7 +1287,9 @@ with settings_tab:
         # the only substitute (review): a saved device this PyTorch cannot use (e.g. "cuda"
         # after switching to the CPU build) is shown and used as "auto" but stays saved
         st.session_state[setting_key('device')] = shown['device'] = 'auto'
-    st.selectbox('Compute device', devices, key=setting_key('device'), disabled=active, help='auto uses CUDA if a compatible NVIDIA GPU is available, otherwise the CPU.')
+    st.selectbox(AI_LABELS['device'], devices, key=setting_key('device'), disabled=active,
+                 help=default_help('device', 'auto uses CUDA if a compatible NVIDIA GPU is available, otherwise '
+                                             'the CPU.'))
     if seen.get('device', 'auto') not in devices:
         # a saved device this PyTorch cannot use (e.g. "cuda" after switching to the CPU
         # build) is shown and used as "auto", but stays saved, so it applies again once
@@ -1273,14 +1304,36 @@ with settings_tab:
             else:
                 seen['device'] = 'auto'
                 st.rerun()
-    st.number_input('Batch size', **number_range('batch_size'), step=1, key=setting_key('batch_size'), disabled=active)
-    st.number_input('Maximum matches per search profile', **number_range('top'), step=25, key=setting_key('top'), disabled=active)
-    st.checkbox('Also detect individual persons in group photos (YOLO)', key=setting_key('person_detection'), disabled=active)
-    st.number_input('Maximum detected persons per photo', **number_range('max_persons'), key=setting_key('max_persons'), disabled=active)
-    st.slider('Minimum confidence of the person detection', **number_range('person_confidence'), step=SETTING_STEPS['person_confidence'], key=setting_key('person_confidence'), disabled=active)
-    st.slider('Weight of reference images (if any)', **number_range('reference_weight'), step=SETTING_STEPS['reference_weight'], key=setting_key('reference_weight'), disabled=active, help=f'0 = text only; {DEFAULT_REFERENCE_WEIGHT:g} (default) = {DEFAULT_REFERENCE_WEIGHT:.0%} reference images '
-              f'and {1 - DEFAULT_REFERENCE_WEIGHT:.0%} text. Text and reference scores are scaled to the photos of '
-              'the search before they are weighted.')
+    st.number_input(AI_LABELS['batch_size'], **number_range('batch_size'), step=1, key=setting_key('batch_size'),
+                    disabled=active, help=default_help('batch_size'))
+    st.number_input(AI_LABELS['top'], **number_range('top'), step=25, key=setting_key('top'), disabled=active,
+                    help=default_help('top'))
+    st.checkbox(AI_LABELS['person_detection'], key=setting_key('person_detection'), disabled=active,
+                help=default_help('person_detection'))
+    st.number_input(AI_LABELS['max_persons'], **number_range('max_persons'), key=setting_key('max_persons'),
+                    disabled=active, help=default_help('max_persons'))
+    st.slider(AI_LABELS['person_confidence'], **number_range('person_confidence'),
+              step=SETTING_STEPS['person_confidence'], key=setting_key('person_confidence'), disabled=active,
+              help=default_help('person_confidence'))
+    st.slider(AI_LABELS['reference_weight'], **number_range('reference_weight'),
+              step=SETTING_STEPS['reference_weight'], key=setting_key('reference_weight'), disabled=active,
+              help=default_help('reference_weight', f'0 = text only; {DEFAULT_REFERENCE_WEIGHT:g} = '
+                                f'{DEFAULT_REFERENCE_WEIGHT:.0%} reference images and {1 - DEFAULT_REFERENCE_WEIGHT:.0%} '
+                                'text. Text and reference scores are scaled to the photos of the search before they '
+                                'are weighted.'))
+    # what differs from the defaults, as the widgets show it now (a substituted device is
+    # shown as "auto"), and the way back to them (A26)
+    not_default = changed_from_defaults({name: st.session_state[setting_key(name)] for name in AI_SETTINGS},
+                                        DEFAULT_SETTINGS, AI_SETTINGS)
+    c1, c2 = st.columns([3, 1], vertical_alignment='center')
+    if not_default:
+        c1.caption('Changed from the default: ' + ' · '.join(
+            f'{AI_LABELS[name]} (default {setting_text(name, DEFAULT_SETTINGS[name])})' for name in not_default) + '.')
+    else:
+        c1.caption('All AI settings have their default values.')
+    c2.button('Reset to defaults', on_click=reset_ai_settings, disabled=active or not not_default, width='stretch',
+              help='Sets every AI setting on this tab back to its default and saves that. The photo folders stay '
+                   'as they are.')
     if info:
         st.caption(f"Detected: {info['cpu']} · {info['threads']} logical CPU cores · " +
                    (f"{info['ram_gb']} GB RAM · " if info['ram_gb'] else 'RAM unknown · ') +

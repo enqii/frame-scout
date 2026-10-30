@@ -22,6 +22,11 @@ SETTING_STEPS = {'person_confidence': 0.05, 'reference_weight': 0.05}
 # 0.3 did best on the local evaluation set (user decision in PR #11). A value saved in
 # settings.json is kept as it is, also the old default.
 DEFAULT_REFERENCE_WEIGHT = 0.3
+# the settings of the app's AI settings tab, in the order it shows them: what its "Reset to
+# defaults" button resets (A26). Not the photo folders, the user's data location, which sit
+# in the Photo source tab.
+AI_SETTINGS = ('model', 'device', 'batch_size', 'top', 'person_detection', 'max_persons',
+               'person_confidence', 'reference_weight')
 # seconds save_settings waits for the lock around its read-merge-write
 SETTINGS_LOCK_TIMEOUT = 5.0
 
@@ -163,7 +168,7 @@ def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05, loc
     return normalized
 
 
-def reconcile_settings(widgets, seen, shown, saved, defaults):
+def reconcile_settings(widgets, seen, shown, saved, defaults, reset=()):
     """Bring the app's settings widgets and the saved settings together (A8 review).
 
     Called at the start of every page run, before the widgets are drawn. widgets maps a
@@ -181,15 +186,41 @@ def reconcile_settings(widgets, seen, shown, saved, defaults):
     taken_over lists the settings another session saved, now shown here. A change in this
     session wins over another session's save, since it is the later action. seen and shown
     are updated for the updates.
+
+    reset names the settings this session reset to their defaults (A26): their widgets count
+    as changed even if they show what they showed before, e.g. the default while another
+    session saved another value, or "auto" shown for a saved device PyTorch cannot use.
     """
     updates, changed, taken_over = {}, {}, []
     for name, default in defaults.items():
         file_value = default if saved is None else saved[name]
         if name not in widgets:
             updates[name] = seen[name] = shown[name] = file_value
-        elif widgets[name] != shown.get(name, widgets[name]):
+        elif name in reset or widgets[name] != shown.get(name, widgets[name]):
             changed[name] = widgets[name]
         elif saved is not None and file_value != seen.get(name, file_value):
             updates[name] = seen[name] = shown[name] = file_value
             taken_over.append(name)
     return updates, changed, taken_over
+
+
+def changed_from_defaults(values, defaults, names):
+    """Return the settings of names (in that order) whose value in values differs from its default (A26).
+
+    Compared as save_settings stores them, so slider noise such as 0.30000000000000004 is
+    no change.
+    """
+    return [name for name in names if _setting_value(name, values[name]) != defaults[name]]
+
+
+def setting_text(name, value):
+    """Return the value of setting name as the app shows it, e.g. in "Default: …" (A26)."""
+    if name == 'model':
+        return MODELS[value].label if value in MODELS else str(value)
+    if isinstance(value, bool):
+        return 'on' if value else 'off'
+    if isinstance(value, float):
+        return f'{round(value, 4):g}'
+    if isinstance(value, int):
+        return f'{value:,}'
+    return str(value)
