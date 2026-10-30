@@ -51,6 +51,11 @@ MARKS = RESULTS / MARKS_FILE
 # the three states of a mark, as the control on each gallery card shows them (A17)
 MARK_LABELS = {MARK_OPEN: 'Undecided', MARK_MATCH: 'Match', MARK_NO_MATCH: 'No match'}
 MARK_BY_LABEL = {label: state for state, label in MARK_LABELS.items()}
+# the color of the selected option of a mark (A24): (background, border) per state; Undecided
+# keeps Streamlit's look. Translucent backgrounds and the theme's text color keep the label
+# readable in the light and the dark theme.
+MARK_COLORS = {MARK_MATCH: ('rgba(33, 195, 84, 0.25)', 'rgb(33, 195, 84)'),
+               MARK_NO_MATCH: ('rgba(255, 75, 75, 0.25)', 'rgb(255, 75, 75)')}
 GALLERY_COLUMNS = 4
 # Markdown characters, escaped in file names shown with st.markdown/st.caption
 MARKDOWN_CHARS = re.compile(r'([\\`*_{}\[\]()#+\-.!|<>~$])')
@@ -425,6 +430,22 @@ def load_marks():
     except (OSError, ValueError) as exc:
         return {}, exc
 
+def mark_colors(states):
+    """Return a <style> block coloring the selected option of each mark control, or '' (A24).
+
+    states maps the key of a mark control to its saved state. st.segmented_control has no
+    colors per option, so the style targets the element of each control by its key class
+    (st-key-<key>) and its selected button (kind "segmented_controlActive"): Streamlit 1.66
+    internals, to check after an upgrade.
+    """
+    rules = []
+    for state, (background, border) in MARK_COLORS.items():
+        selectors = ', '.join(f'.st-key-{key} button[kind="segmented_controlActive"]'
+                              for key, saved in states.items() if saved == state)
+        if selectors:
+            rules.append(f'{selectors}{{background-color:{background};border-color:{border};color:inherit}}')
+    return f'<style>{"".join(rules)}</style>' if rules else ''
+
 def set_mark(profile, photo, key):
     """Save the mark the control key shows for photo of profile (on_change of the control)."""
     # no selection (the selected option clicked again) is "open"
@@ -731,6 +752,9 @@ def show_results(results, photo_folders):
         # is the truth, also for marks made in another tab
         mark_keys[card['rank']] = key = 'mark_' + widget_id(name, card['path'])
         st.session_state[key] = MARK_LABELS[marks.get(card['path'], MARK_OPEN)]
+    mark_style = mark_colors({mark_keys[card['rank']]: marks.get(card['path'], MARK_OPEN) for card in shown})
+    if mark_style:
+        st.markdown(mark_style, unsafe_allow_html=True)
     # a new container for every profile, page and card count: in a fragment rerun with fewer
     # cards (the shorter last page) the rows of the previous page stayed in the browser
     # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
