@@ -112,6 +112,10 @@ asking the Hugging Face Hub; missing files are downloaded with a note. Set
   which helps with group photos. Turn it off for other motifs: JPEGs are then decoded
   at a reduced resolution, which is noticeably faster.
 - **Weight of the reference images:** see [What the numbers mean](#what-the-numbers-mean).
+- **Defaults:** the help text of each setting ends with its default, and a line below the
+  settings lists the ones you changed. "Reset to defaults" (disabled while a search runs)
+  sets all settings of this tab, the search model included, back to their defaults. Your
+  photo folders are not reset.
 
 Photo folders and AI settings are saved in `settings.json` as soon as you change them and
 apply in every tab. Only values that differ from the defaults are stored; delete the file
@@ -135,7 +139,10 @@ search is marked, since its results no longer fit it.
 
 The results are candidates, not certain hits. Mark a photo you checked as **Match** or
 **No match** (or leave it **Undecided**). Marks are kept per profile and photo across
-later searches and in every tab; "Hide photos marked as no match" hides the rejected ones.
+later searches and in every tab. The selected option is colored (green for Match, red for
+No match). "Hide photos marked as no match" hides the rejected ones within the page you
+are looking at only, so the pages keep their photos and ranks; a caption tells how many
+are hidden, and a page where every photo was rejected says so (see the next page).
 
 "Copy N marked photos" copies all photos marked as match into the folder in "Copy to
 folder" (default `Pictures\FrameScout\<profile>`, saved per profile). Copying never

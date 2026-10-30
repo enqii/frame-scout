@@ -47,8 +47,8 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       (done 2026-10-30)
 - [x] (B) Raise the Streamlit minimum and switch to `width="stretch"` (A10)
       (done 2026-10-30)
-- [ ] (C) "Hide no match" keeps the pages stable, "Reset to defaults" for the AI settings
-      (A24, A26)
+- [x] (C) "Hide no match" keeps the pages stable, "Reset to defaults" for the AI settings
+      (A24, A26) (done 2026-10-30)
 
 ### P10 – Checks on the home PC (needs the user's hardware; before P4b)
 - [ ] (A) Run the CUDA path and the evaluation tool with real models and fix what shows up
