@@ -201,14 +201,6 @@ and discussions.
 
 ### App (`app.py`)
 
-- [ ] **A10 – `use_container_width` is deprecated:** in Streamlit 1.66 the `st.button`
-      docstring marks it as deprecated in favor of `width="stretch"` (no runtime warning
-      yet; it still works). `width` for buttons is newer than the current floor
-      `streamlit>=1.40` (the release notes name 1.48 – not verified), so switching needs
-      a raised minimum version → do it together with I3.
-      (I3 is done, but the user kept the Streamlit floor at `>=1.40` in PR #8: raising
-      it and switching to `width` belong together in this item. The result gallery of P4
-      (A) uses `use_container_width` for its buttons as well.)
 - [ ] **A15 – Reference folder and gallery file can get different suffixes:**
       `reference_folder` adds `-2`, `-3`, … when another profile's references occupy the
       folder, `profile_slugs` adds them by profile order. The same profile can therefore

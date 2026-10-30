@@ -523,6 +523,18 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       `use_container_width` possibly deprecated (Streamlit 1.66).
       (done 2026-10-21: duplicate import removed, `EXT` lives in `framescout_core`;
       `use_container_width` moved to A10.)
+- [x] **A10 – `use_container_width` is deprecated:** in Streamlit 1.66 the `st.button`
+      docstring marks it as deprecated in favor of `width="stretch"` (no runtime warning
+      yet; it still works). `width` for buttons is newer than the old floor
+      `streamlit>=1.40`, so switching needs a raised minimum version.
+      (done 2026-10-30, PR #54: all 9 `use_container_width=True` in `app.py` are now
+      `width='stretch'` (same layout); `requirements.txt` says `streamlit>=1.66.1`, the
+      version of the verified runs like the other packages (I12). `width` on `st.button`
+      and `st.download_button` exists since 1.48.0 (checked in the Streamlit sources), so
+      1.48 would be technically sufficient; 1.66.1 was chosen for consistency, and
+      `constraints.txt` already pinned it, so the installer downloads nothing new. New test
+      `test_streamlit_floor_allows_the_width_parameter`. Not run: the gallery buttons that
+      need results, a real browser, an install of Streamlit 1.48.)
 - [x] **A11 – Progress bar parses German log text:** the app reads progress from `run.log`
       with a regex on `Neu:`/`Cache:`/`Fehler:`. Translating the engine log (I7) breaks
       the progress bar unless both change together; a machine-readable progress line or
