@@ -1,8 +1,8 @@
 """Internal helpers that several areas share (not part of the package's interface).
 
 Atomic file writes (_publish_via_temp, _publish_new, _replace_atomically,
-_replace_with_retry, _publish_together for several files), reading a file (_read_with_retry) or a JSON object file
-(_read_json_object) with retries, the
+_replace_with_retry, _publish_together for several files), retrying an action (_retry),
+reading a file (_read_with_retry) or a JSON object file (_read_json_object) with retries, the
 save lock of a file (_file_lock), the locked read-change-write of a JSON file
 (_update_locked) and the comparable form of a path (_path_key).
 """
@@ -11,6 +11,7 @@ import os
 import tempfile
 import time
 from contextlib import contextmanager
+from functools import partial
 from pathlib import Path
 
 from .locks import RunLock
@@ -55,15 +56,30 @@ def _publish_via_temp(target, write, publish, suffix='.tmp', durable=True):
         tmp.unlink(missing_ok=True)
 
 
+def _retry(action, attempts, retry_delay):
+    """Return action(), trying up to attempts times, retry_delay seconds apart, while it raises OSError.
+
+    On Windows, replacing a file fails while another process or thread has it open, e.g. an
+    app session reading it or a virus scanner. Raises the last OSError if every try fails.
+    """
+    for attempt in range(max(attempts, 1)):
+        try:
+            return action()
+        except OSError:
+            if attempt + 1 >= attempts:
+                raise
+            time.sleep(retry_delay)
+
+
 def _publish_together(files, attempts, retry_delay, replace=os.replace):
     """Replace several files at once as far as a file system allows; files: [(target Path, bytes)].
 
     Every file is first written in full to its own temporary file (see _temp_path) and
     flushed to disk; only then are they given their names, in the order of files, each
-    rename tried up to attempts times retry_delay seconds apart (Windows refuses to replace
-    a file another process has open). An error or a stop while writing therefore leaves every
-    target as it was; only the renames themselves are not one step. The temporary files are
-    removed whatever happens (a process killed meanwhile leaves them, see auto_cleanup).
+    rename tried up to attempts times retry_delay seconds apart (see _retry). An error or a
+    stop while writing therefore leaves every target as it was; only the renames themselves
+    are not one step. The temporary files are removed whatever happens (a process killed
+    meanwhile leaves them, see auto_cleanup).
     Raises the OSError of a write or of a rename that failed every try.
     """
     temps = []
@@ -74,14 +90,7 @@ def _publish_together(files, attempts, retry_delay, replace=os.replace):
             tmp.write_bytes(data)
             _flush_to_disk(tmp)
         for (target, _), tmp in zip(files, temps):
-            for attempt in range(max(attempts, 1)):
-                try:
-                    replace(tmp, target)
-                    break
-                except OSError:
-                    if attempt + 1 >= attempts:
-                        raise
-                    time.sleep(retry_delay)
+            _retry(partial(replace, tmp, target), attempts, retry_delay)
     finally:
         for tmp in temps:
             tmp.unlink(missing_ok=True)
@@ -105,16 +114,10 @@ def _replace_with_retry(target, data, attempts, retry_delay, durable=True):
 
     On Windows, replacing a file fails while another process or thread has it open, e.g. an
     app session reading the status or settings file at that moment; the tries are
-    retry_delay seconds apart. Raises the last OSError if every try fails.
+    retry_delay seconds apart (_retry). Raises the last OSError if every try fails.
     """
-    for attempt in range(max(attempts, 1)):
-        try:
-            _publish_via_temp(Path(target), lambda tmp: tmp.write_bytes(data), os.replace, durable=durable)
-            return
-        except OSError:
-            if attempt + 1 >= attempts:
-                raise
-            time.sleep(retry_delay)
+    _retry(lambda: _publish_via_temp(Path(target), lambda tmp: tmp.write_bytes(data), os.replace, durable=durable),
+           attempts, retry_delay)
 
 
 def _read_with_retry(read, attempts, retry_delay):
