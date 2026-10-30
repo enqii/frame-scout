@@ -110,9 +110,11 @@ the module of its area and to the re-exports in `__init__.py`.
   (an unreadable file: `ValueError` naming it), the check of `save_marks` and
   `save_copy_folder` (review of A22, A33).
 - `thumbnails.py`: `thumbnail_name`/`ensure_thumbnail` (gallery thumbnails; a photo
-  deleted before the export is skipped, E6), `gallery_cards` (the first `top` photos of a
-  ranking that get a thumbnail, with ranks counting only shown photos, E12), `crop_label`/`FULL_IMAGE_LABEL` (gallery crop
-  labels).
+  deleted before the export is skipped, E6), `SkippedPhotos`/`SKIP_LOG_LIMIT` (one export's
+  photos without a thumbnail: each tried and logged once, only the first 50 logged one by
+  one, then a count), `gallery_cards` (the first `top` photos of a ranking that get a
+  thumbnail, with ranks counting only shown photos, E12), `crop_label`/`FULL_IMAGE_LABEL`
+  (gallery crop labels).
 - `pipeline.py`: `progress_line`/`progress_due` (the progress line the engine logs for
   people, A11), `prefetch`/`group_batches`/`store_group`/`draft_size`/`DRAFT_DECODING`
   (the engine's analysis pipeline: decoding ahead in threads, crops of several photos per
@@ -668,10 +670,13 @@ Outputs one ranked `.html` file per profile (`<slug>.html` from
 profile order, hash fallback), with separate JPEG thumbnails in `results/thumbnails/` and
 `file://` links to originals. The export walks the full sorted ranking of a profile through
 `gallery_cards`: a photo whose thumbnail fails (E6) is skipped, lower-ranked photos fill up
-to `--top`, so ranks in the galleries and in `results.json` are contiguous (E12). The
-export progress total is `sum(min(--top, photos))`; a profile with too few photos that get
-a thumbnail jumps to its planned count. Keep the output folder intact; exporting an HTML file on its
-own does **not** embed thumbnails. After `results.json` is written, still holding the run
+to `--top`, so ranks in the galleries and in `results.json` are contiguous (E12). A
+skipped photo is remembered in `SkippedPhotos` for the whole export: later galleries do
+not try or log it again, and after 50 logged photos a closing line only counts the rest.
+The export progress total is `sum(min(--top, photos))`; every photo tried counts, also a
+skipped one, capped at the profile's share, so the status file stays fresh during a run
+of skipped photos and a full gallery or an exhausted ranking reaches the share. Keep the
+output folder intact; exporting an HTML file on its own does **not** embed thumbnails. After `results.json` is written, still holding the run
 lock, the engine calls `auto_cleanup`: it removes temporary thumbnails
 (`<hash>.jpg.<random>.jpg`, left by a stop during the export, E13) and thumbnails (both
 folders, `[0-9a-f]{24}.jpg` names only) that neither `results.json` nor any HTML file in

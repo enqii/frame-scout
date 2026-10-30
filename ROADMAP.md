@@ -33,7 +33,7 @@ The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
       the uninstall clean) (done 2026-10-29)
 
 ### P8 – Robust runs and galleries
-- [x] (A) Skipped photos leave no gaps in the gallery (E12) (done 2026-10-29)
+- [x] (A) Skipped photos leave no gaps in the gallery (E12) (done 2026-10-30)
 - [ ] (B) Stopped runs leave no half-written galleries and temporary files (E24, E26)
 - [ ] (C) A RAW file whose JPEG partner is broken is analyzed instead (E30)
 - [ ] (D) The same photo folder by another path, and junctions inside a folder (A28, A29)

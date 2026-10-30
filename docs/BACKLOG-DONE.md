@@ -373,20 +373,25 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       Also: `ensure_thumbnail` repeats the `stat()` done during scoring; the mtime could
       be kept with the score (PR #6 review). Since P4 (A) the app's result gallery shows
       the same gaps: `results.json` keeps the ranks of the HTML gallery.
-      (Done 2026-10-29, PR #44, roadmap P8 (A): `framescout_core.gallery_cards(ranked, top,
+      (Done 2026-10-30, PR #44, roadmap P8 (A): `framescout_core.gallery_cards(ranked, top,
       thumbnail)` yields `(rank, item, thumbnail name)` for the first `top` photos that get
       a thumbnail; ranks count only shown photos, lower-ranked photos fill up, and it stops
       trying once the gallery is full. The engine export passes the full sorted ranking
       (no `[:args.top]` cut) through it, so HTML galleries and `results.json` have
       contiguous ranks and still show `--top` cards if enough photos exist. Export progress
-      keeps the total `sum(min(--top, photos))`; a profile with too few photos that get a
-      thumbnail jumps to its planned count so the total is still reached. Not done: the
+      keeps the total `sum(min(--top, photos))`; every photo tried counts, also a skipped
+      one, capped at the profile's share, so the total is reached without a jump and the
+      status stays fresh during a run of skipped photos (review). `SkippedPhotos` tries and
+      logs each skipped photo once per export and logs only the first 50 one by one, then
+      a count, so a vanished photo folder cannot flood the log (review). Not done: the
       "Also" part (reuse the scoring mtime instead of the `stat()` in `ensure_thumbnail`):
       that `stat()` is what detects a photo deleted since scoring; without it an existing
       or legacy thumbnail would still produce a card for a deleted photo. No CLI,
       `profiles.json`, cache signature or `results.json` format change. Unit-tested; engine
       smoke run with a simulated thumbnail failure of the best photo gave cards #1–#5 for
-      `--top 5`.)
+      `--top 5`; after the review a second smoke run with five failing photos, two profiles
+      and a log limit of 1 gave two full `Top 5` galleries with ranks 1–5, one logged
+      photo plus the count line, and export progress 1–10 of 10.)
 
 ### App (`app.py`)
 
