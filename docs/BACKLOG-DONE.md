@@ -1110,13 +1110,14 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       hidden"; a page where everything was rejected says "All N photos of this page are
       marked as no match and hidden" and points to the next page. The checkbox got a help
       text. The selected mark option is colored per state (match green, no match red,
-      undecided unchanged) by one `<style>` block per page from `mark_colors` in `app.py`,
+      undecided unchanged) by one `<style>` block per page from `framescout_core.mark_style`,
       targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]` with
-      `!important` to beat Streamlit's own rule for the selected button (Streamlit 1.66
-      internals: check it after upgrades). The alternative "Show: all / undecided only /
+      `!important` to beat Streamlit's own rule for the selected button (Streamlit 1.66.1
+      internals, read from its frontend bundle; a test fails when `constraints.txt` pins
+      another Streamlit, review). The alternative "Show: all / undecided only /
       matches" filter over the whole list was not built. Not verified: the colors in a real
       browser or in the dark theme (only the generated style block and an `AppTest` run).
-      Tested with unit tests of `hide_no_match`. No change to `marks.json`, `results.json`,
+      Tested with unit tests of `hide_no_match`, `hidden_text` and `mark_style`. No change to `marks.json`, `results.json`,
       `settings.json` or the CLI.)
 - [x] **A26 – No way back to the default AI settings:** user request on 2026-10-25. Once a
       value of the AI settings tab is changed (compute device, batch size, maximum matches,

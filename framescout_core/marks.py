@@ -1,4 +1,5 @@
 """Marks of gallery photos in results/marks.json (A17)."""
+import re
 from pathlib import Path
 
 from ._common import _read_json_object, _update_locked
@@ -16,6 +17,15 @@ MARK_OPEN, MARK_MATCH, MARK_NO_MATCH = 'open', 'match', 'no-match'
 MARK_STATES = (MARK_OPEN, MARK_MATCH, MARK_NO_MATCH)
 # seconds save_marks and rename_marks wait for the lock around their read-change-write
 MARKS_LOCK_TIMEOUT = 5.0
+# the color of the selected option of a mark in the app's gallery (A24): (background, border)
+# per state; Undecided keeps Streamlit's look. Translucent backgrounds and the theme's text
+# color keep the label readable in the light and the dark theme.
+MARK_COLORS = {MARK_MATCH: ('rgba(33, 195, 84, 0.25)', 'rgb(33, 195, 84)'),
+               MARK_NO_MATCH: ('rgba(255, 75, 75, 0.25)', 'rgb(255, 75, 75)')}
+# the Streamlit version whose internals mark_style was checked against (its frontend bundle:
+# the key class st-key-<key> and the kind "segmented_controlActive" of the selected button);
+# a test fails once constraints.txt pins another version (review)
+MARK_STYLE_STREAMLIT = '1.66.1'
 
 
 def _read_marks_document(path, attempts=5, retry_delay=0.05):
@@ -181,6 +191,27 @@ def hide_no_match(cards, marks):
     """
     kept = [card for card in cards if marks.get(card['path']) != MARK_NO_MATCH]
     return kept, len(cards) - len(kept)
+
+
+def mark_style(states):
+    """Return a <style> block coloring the selected option of each mark control, or '' (A24).
+
+    states maps the widget key of a mark control to its saved state. st.segmented_control
+    has no colors per option, so the style targets the element of each control by its key
+    class and its selected button: Streamlit internals, see MARK_STYLE_STREAMLIT.
+    """
+    rules = []
+    for state, (background, border) in MARK_COLORS.items():
+        # the class Streamlit gives the element of a widget with a key
+        selectors = ', '.join(f'.st-key-{re.sub(r"[^a-zA-Z0-9_-]", "-", key.strip())} '
+                              'button[kind="segmented_controlActive"]'
+                              for key, saved in states.items() if saved == state)
+        if selectors:
+            # !important: Streamlit's own rule for the selected button ([kind=…]:not(:disabled)
+            # on its class) is more specific than this selector
+            rules.append(f'{selectors}{{background-color:{background}!important;border-color:{border}!important;'
+                         'color:inherit!important}')
+    return f'<style>{"".join(rules)}</style>' if rules else ''
 
 
 def hidden_text(hidden, kept, more_pages):

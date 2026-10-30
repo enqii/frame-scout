@@ -171,12 +171,14 @@ the module of its area and to the re-exports in `__init__.py`.
   (the result file of a search and the app's gallery: validation of the file (plain
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
-- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`hide_no_match`
+- `marks.py`: `MARKS_FILE`/`MARK_STATES`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`hide_no_match`/`hidden_text`/`mark_style`
   (the user's marks, A17; `delete_marks` removes all marks of a deleted profile, A22;
   `remove_marks(path, entries)` removes single `(profile, photo path)` marks for the cleanup, E8;
   `save_marks(..., profiles_file=...)` saves only for a name that is a profile now;
   `hide_no_match(cards, marks)` returns the cards not marked as no match and how many it
-  left out, applied to the cards of one gallery page, A24).
+  left out, applied to the cards of one gallery page, and `hidden_text` the caption of that
+  count; `mark_style(states)` the `<style>` block of the gallery's mark colors `MARK_COLORS`,
+  checked against Streamlit `MARK_STYLE_STREAMLIT`; A24).
 - `copying.py`:
   `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`/`forget_copy_folder`
   (copying marked matches and their saved target folders in `settings.json`, A17;
@@ -921,9 +923,11 @@ for other tabs; its `on_change` saves. The gallery paginates the whole ranked li
 "Hide photos marked as no match" (`hide_no_match`) then hides the rejects within the shown
 page only, so ranks and pages stay stable (A24; a page of only rejects says so). The
 selected option is colored by state (green match, red no match) by one `<style>` block per
-page from `mark_colors`, targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]`
-with `!important`; this relies on Streamlit 1.66 internals, so check it after Streamlit
-upgrades (not verified in a real browser or the dark theme). A rename in the profile tab calls `rename_marks`
+page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]`
+with `!important`; this relies on Streamlit internals (the key class and the button kind,
+read from the 1.66.1 frontend bundle), so `test_marks.py` fails once `constraints.txt` pins
+another Streamlit than `MARK_STYLE_STREAMLIT`: check the selectors against the new version,
+then raise that constant (not verified in a real browser or the dark theme). A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
 that are no longer search profiles cannot be marked and their "Copy to folder" field is
 disabled. A gallery drawn before its profile was renamed or deleted (another tab) still
@@ -1257,7 +1261,8 @@ listed folder, repeated file ids, link loops without file ids and an unreadable 
 A29, `test_photos.py`),
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
-hiding no-match photos per page (`hide_no_match`, `test_marks.py`) and the AI settings reset
+hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the
+CSS of `mark_style` and its Streamlit pin, `test_marks.py`) and the AI settings reset
 (`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
 `test_settings.py`; A24, A26; the buttons and the mark colors were run with `AppTest`/the
 generated style only, not in a browser),
