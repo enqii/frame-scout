@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEVICES, MODEL_KEYS, SETTING_RANGES,
-                             SETTINGS_FILE, default_settings, folder_lines, read_settings, reconcile_settings, save_settings)
+from framescout_core import (AI_SETTINGS, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEVICES, MODEL_KEYS, MODELS,
+                             SETTING_RANGES, SETTINGS_FILE, changed_from_defaults, default_settings, folder_lines,
+                             read_settings, reconcile_settings, save_settings, setting_text)
 
 
 @pytest.fixture
@@ -411,3 +412,59 @@ def test_an_unreadable_file_keeps_what_the_widgets_show(defaults):
     seen, shown = {}, {}
     updates, changed, taken_over = reconcile_settings({}, seen, shown, None, defaults)
     assert updates == defaults and changed == {} and taken_over == []
+
+
+# --- resetting the AI settings to their defaults (A26) ---
+
+def test_the_ai_settings_are_every_setting_but_the_photo_folders(defaults):
+    assert set(AI_SETTINGS) == set(defaults) - {'photo_folders'}
+    assert len(AI_SETTINGS) == len(set(AI_SETTINGS))
+
+
+def test_a_reset_setting_is_saved_even_if_its_widget_shows_no_change(defaults):
+    # the widget already showed the default, but another session saved another value since:
+    # the reset is this session's latest action and wins (A26)
+    seen, shown = dict(defaults), dict(defaults)
+    saved = {**defaults, 'top': 300, 'batch_size': 16}
+    updates, changed, taken_over = reconcile_settings(dict(defaults), seen, shown, saved, defaults, reset=['top'])
+    assert changed == {'top': defaults['top']}
+    assert updates == {'batch_size': 16} and taken_over == ['batch_size']
+
+
+def test_a_reset_of_a_substituted_device_saves_auto(defaults):
+    # a saved "cuda" PyTorch cannot use is shown as "auto"; the reset saves "auto" (A26)
+    seen, shown = {**defaults, 'device': 'cuda'}, dict(defaults)
+    saved = {**defaults, 'device': 'cuda'}
+    updates, changed, taken_over = reconcile_settings(dict(defaults), seen, shown, saved, defaults, reset=['device'])
+    assert updates == {} and changed == {'device': 'auto'} and taken_over == []
+
+
+def test_a_reset_on_a_new_page_shows_the_saved_values(defaults):
+    # without a widget there is nothing to save: the reset only applies to drawn widgets
+    seen, shown = {}, {}
+    saved = {**defaults, 'top': 300}
+    updates, changed, taken_over = reconcile_settings({}, seen, shown, saved, defaults, reset=['top'])
+    assert updates == saved and changed == {}
+
+
+def test_changed_from_defaults_lists_the_settings_that_differ(defaults):
+    values = {**defaults, 'top': 300, 'person_confidence': 0.1 + 4 * 0.05, 'reference_weight': 0.5,
+              'photo_folders': ['elsewhere']}
+    # slider noise is no change; only the names asked for are compared, in their order
+    assert changed_from_defaults(values, defaults, AI_SETTINGS) == ['top', 'reference_weight']
+    assert changed_from_defaults(dict(defaults), defaults, AI_SETTINGS) == []
+    assert changed_from_defaults({**defaults, 'person_detection': False}, defaults, ['person_detection']) == [
+        'person_detection']
+
+
+@pytest.mark.parametrize('name,value,text', [
+    ('device', 'auto', 'auto'), ('batch_size', 8, '8'), ('top', 1500, '1,500'),
+    ('person_detection', True, 'on'), ('person_detection', False, 'off'),
+    ('person_confidence', 0.30000000000000004, '0.3'), ('reference_weight', 0.0, '0'),
+])
+def test_setting_text_shows_a_value_as_the_app_names_it(name, value, text):
+    assert setting_text(name, value) == text
+
+
+def test_setting_text_names_a_model_by_its_label():
+    assert setting_text('model', DEFAULT_MODEL) == MODELS[DEFAULT_MODEL].label
