@@ -591,8 +591,9 @@ def _remove_empty_folders(folder, stop):
 
 
 def _new_summary():
-    return {'refused': None, 'files': 0, 'rows': 0, 'marks': 0, 'freed': 0, 'compacted': False, 'failed': [],
-            'skipped': []}
+    # files and freed count every deleted file, temporary those of them that were temporary files
+    return {'refused': None, 'files': 0, 'temporary': 0, 'rows': 0, 'marks': 0, 'freed': 0, 'compacted': False,
+            'failed': [], 'skipped': []}
 
 
 def _delete_unlinked(results, links, listed, allowed, summary):
@@ -741,7 +742,7 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
             allowed = set(shown['temp_thumbnails']['items'])
             for path in _temp_thumbnails(results):
                 if path in allowed:
-                    _remove_file(path, summary)
+                    summary['temporary'] += _remove_file(path, summary)
 
         def references():
             try:
@@ -803,8 +804,7 @@ def auto_cleanup(results, now=None):
     results = Path(results)
     summary = _new_summary()
     for path in [*_temp_thumbnails(results), *_stale_temp_files(results, time.time() if now is None else now)]:
-        _remove_file(path, summary)
-    summary['temporary'] = summary['files']
+        summary['temporary'] += _remove_file(path, summary)
     try:
         listed, _ = _result_names(results)
         links = _union(_gallery_links(p)[1] for p in _html_files(results))
