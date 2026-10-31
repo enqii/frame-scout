@@ -411,8 +411,12 @@ project structure).
 
 `ROADMAP.md`: the prioritized roadmap that drives the PR workflow (open items first, the
 next item is the first `- [ ]` line; finished ones under "Done").
-`BACKLOG.md`: open items (IDs E/A/I). `docs/BACKLOG-DONE.md`: finished items with their
+`BACKLOG.md`: open items (IDs E/A/I/F, each with a status tag once triaged).
+`docs/BACKLOG-DONE.md`: finished items with their
 reports; an item moves there unchanged when its PR is merged (I22).
+`docs/IDEAS.md` (raw ideas) feeds the backlog and the roadmap only through the `/triage`
+skill (`.claude/skills/triage/`, user-invoked; its result is a docs-only PR without
+`fs:*` label and review round).
 
 ### `.claude/skills/roadmap/` and `.claude/settings.json`
 

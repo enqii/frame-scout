@@ -3,7 +3,9 @@
 Order of work. Each unchecked item is implemented in its own pull request, strictly one
 after another (see the PR workflow in `CLAUDE.md` and the `/roadmap` skill). The open
 items come first, in priority order; the next item is the first `- [ ]` line.
-The items' IDs (E/A/I) are described in [BACKLOG.md](BACKLOG.md) (open) and
+The list is a rolling window of about 10 open PRs at most, filled by `/triage` (see
+`CLAUDE.md` → "Triage"); everything else stays in the backlog.
+The items' IDs (E/A/I/F) are described in [BACKLOG.md](BACKLOG.md) (open) and
 [docs/BACKLOG-DONE.md](docs/BACKLOG-DONE.md) (finished).
 
 ## Open (priority order)
