@@ -53,6 +53,18 @@ def test_an_existing_thumbnail_is_not_rendered_again(tmp_path):
     assert (thumbs / name).read_bytes() == b'existing'
 
 
+def test_a_thumbnail_can_be_named_by_a_given_modification_time_without_a_legacy_folder(tmp_path):
+    # the evaluation tool names a pool photo's thumbnail by the time its scores were made (E35)
+    photo = make_photo(tmp_path)
+    thumbs = tmp_path / 'thumbnails'
+    thumbs.mkdir()
+    calls = []
+    name = ensure_thumbnail(photo, thumbs, None, renderer(calls), print, mtime_ns=42)
+    assert name == thumbnail_name(photo, 42) and (thumbs / name).read_bytes() == b'thumbnail'
+    assert ensure_thumbnail(photo, thumbs, None, renderer(calls), print, mtime_ns=42) == name
+    assert len(calls) == 1
+
+
 def test_a_thumbnail_of_an_older_version_is_copied_and_left_in_place(tmp_path):
     photo = make_photo(tmp_path)
     thumbs, legacy = tmp_path / 'thumbnails', tmp_path / 'vorschaubilder'
