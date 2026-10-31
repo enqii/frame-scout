@@ -6,7 +6,8 @@ a folder of their own (default: .tmp/eval/ in the project folder, which git igno
 
   1. run      runs the engine once per search model and keeps the raw scores
               (needs the installed FrameScout; downloads a model's weights on its first use)
-  2. pool     pools the top photos of every model per profile: the photos to label
+  2. pool     pools the top photos of every model per profile: the photos to label, and
+              renders the thumbnails the labelling page lacks
   3. label    opens a local labelling page: match / no match per photo, saved at once
   4. metrics  AP@40 per profile and model, and a sweep of the reference weight
 
@@ -15,11 +16,13 @@ a folder of their own (default: .tmp/eval/ in the project folder, which git igno
   python framescout_eval.py label cosplay
   python framescout_eval.py metrics cosplay outdoor
 
-Steps 2-4 need numpy only (no torch), and the labels stay in the collection's folder.
+Steps 2-4 need numpy only (no torch); pool renders thumbnails with the engine's decoders
+when the engine can be loaded (E35). The labels stay in the collection's folder.
 Everything runs locally; the labelling page is served on 127.0.0.1 only.
 """
 import argparse
 import http.server
+import importlib
 import json
 import mimetypes
 import os
@@ -28,15 +31,16 @@ import subprocess
 import sys
 import threading
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 import numpy as np
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EVAL_K, MODEL_KEYS, MODELS,
-                             average_precision, build_pool, collection_name_problem, load_profiles, model_problem,
-                             read_document, read_labels, read_profiles, read_scores, save_labels, set_label,
-                             thumbnail_name, write_document)
+from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EVAL_K, MODEL_KEYS, MODELS, SKIP_LOG_LIMIT,
+                             average_precision, build_pool, collection_name_problem, ensure_thumbnail, load_profiles,
+                             model_problem, read_document, read_labels, read_profiles, read_scores, save_labels,
+                             set_label, thumbnail_name, write_document)
 from framescout_scoring import rank_photos
 
 ROOT = Path(__file__).resolve().parent
@@ -47,8 +51,11 @@ COLLECTION_FORMAT = 1
 POOL_FORMAT = 1
 # photos per model and profile that go into the pool: the union of all models is labelled
 DEFAULT_DEPTH = 100
-# gallery length of the engine runs: their thumbnails are what the labelling page shows
+# gallery length of the engine runs: the labelling page shows their thumbnails, pool renders
+# the missing ones (E35)
 DEFAULT_TOP = 150
+# threads that render missing thumbnails, like the engine's decoding threads
+THUMBNAIL_THREADS = min(4, os.cpu_count() or 1)
 DEFAULT_PORT = 8765
 # bytes of a label request the page accepts (a label is a few dozen)
 MAX_BODY = 10_000
@@ -78,11 +85,17 @@ class Collection:
         self.config_file = self.root / 'collection.json'
         self.pool_file = self.root / 'pool.json'
         self.labels_file = self.root / 'labels.json'
+        # thumbnails pool renders for the labelling page: photos outside every gallery, references
+        self.thumbnails = self.root / 'thumbnails'
 
     def engine_output(self, model):
         """The engine's output folder for model (galleries, thumbnails, cache); one per model,
         so that a run's thumbnail cleanup never removes the thumbnails of another model."""
         return self.root / 'engine' / model
+
+    def thumbnail_folders(self, models):
+        """Where the labelling page looks for thumbnails: the galleries of models, then its own."""
+        return [self.engine_output(model) / 'thumbnails' for model in models] + [self.thumbnails]
 
     def scores_file(self, model):
         return self.root / 'scores' / f'{model}.json'
@@ -282,6 +295,91 @@ def pool_document(collection, scores, depth, weights):
             'profiles': profiles}
 
 
+def file_mtime(path):
+    """The modification time of path in nanoseconds, or None if it cannot be read."""
+    try:
+        return Path(path).stat().st_mtime_ns
+    except OSError:
+        return None
+
+
+def find_thumbnail(folders, path, mtime_ns):
+    """The thumbnail of path at mtime_ns in the first of folders that has it, or None."""
+    if mtime_ns is None:
+        return None
+    name = thumbnail_name(Path(path), mtime_ns)
+    return next((folder / name for folder in folders if (folder / name).is_file()), None)
+
+
+def missing_thumbnails(collection, document):
+    """[(path, mtime_ns)] of the pool photos and reference images of the pool document that
+    have no thumbnail yet; a pool photo is named by its time of scoring, like the galleries'."""
+    folders = collection.thumbnail_folders(document['models'])
+    missing, seen = [], set()
+    for profile in document['profiles']:
+        items = [(path, file_mtime(path)) for path in profile['references']]
+        items += [(photo['path'], photo['mtime_ns']) for photo in profile['photos']]
+        for item in items:
+            # a reference image that cannot be read is answered "not found" by the page anyway
+            if item[1] is not None and item not in seen:
+                seen.add(item)
+                if find_thumbnail(folders, *item) is None:
+                    missing.append(item)
+    return missing
+
+
+def load_renderer(import_module=importlib.import_module):
+    """(render, None) with the engine's thumbnail renderer and its decoders (HEIC/HEIF, RAW),
+    or (None, reason) if the engine cannot be loaded here, e.g. without torch or Pillow.
+
+    Loading the engine imports torch, which takes a few seconds; pool does it only when
+    thumbnails are missing.
+    """
+    try:
+        return import_module('framescout_engine').render_thumbnail, None
+    except Exception as exc:  # ImportError, or e.g. an OSError of a torch DLL that does not load
+        return None, f'{type(exc).__name__}: {exc}'
+
+
+def render_thumbnails(collection, missing, render, log, threads=THUMBNAIL_THREADS):
+    """Render the thumbnails of missing [(path, mtime_ns)] into the collection's thumbnail
+    folder with render(path, target); return how many failed (logged, the first SKIP_LOG_LIMIT)."""
+    collection.thumbnails.mkdir(parents=True, exist_ok=True)
+    problems = []  # list.append is safe across threads
+
+    def one(item):
+        path, mtime_ns = item
+        return ensure_thumbnail(Path(path), collection.thumbnails, None, render, problems.append, mtime_ns=mtime_ns)
+
+    with ThreadPoolExecutor(max(1, threads)) as executor:
+        names = list(executor.map(one, missing))
+    for message in problems[:SKIP_LOG_LIMIT]:
+        log(message)
+    return sum(name is None for name in names)
+
+
+def pool_thumbnails(collection, document, log):
+    """Make sure the labelling page can show every pool photo and reference image (E35).
+
+    The galleries hold thumbnails of each model's top photos at the run's reference weight
+    only; a pool photo from another weight, and every reference image, would otherwise be
+    shown as the original file, which a browser cannot display for HEIC/HEIF and RAW.
+    """
+    missing = missing_thumbnails(collection, document)
+    if not missing:
+        return
+    render, reason = load_renderer()
+    if render is None:
+        log(f'Note: {len(missing)} photo(s) or reference image(s) have no thumbnail, and the engine that would '
+            f'render them cannot be loaded ({reason}); the labelling page shows their original files, which a '
+            'browser cannot display for HEIC/HEIF or RAW.')
+        return
+    log(f'Rendering {len(missing)} thumbnail(s) for the labelling page ...')
+    failed = render_thumbnails(collection, missing, render, log)
+    log(f'Thumbnails rendered: {len(missing) - failed}'
+        + (f', {failed} failed (the labelling page shows their original files).' if failed else '.'))
+
+
 def parse_weights(text):
     try:
         weights = [float(part) for part in text.split(',') if part.strip()]
@@ -312,6 +410,7 @@ def command_pool(args):
         done = sum(photo['path'] in labels.get(profile['name'], {}) for photo in profile['photos'])
         total += len(profile['photos']); todo += len(profile['photos']) - done
         print(f'{profile["name"]}: {len(profile["photos"])} photos to label ({done} labelled)', flush=True)
+    pool_thumbnails(collection, document, lambda message: print(message, flush=True))
     print(f'Pool of {len(document["models"])} model(s): {total} photos, {todo} still to label '
           f'(about {todo * 1.5 / 60:.0f} min at 1.5 s each). Next: python framescout_eval.py label {collection.name}',
           flush=True)
@@ -458,7 +557,7 @@ class LabelSession:
         self.labels = read_labels(collection.labels_file)  # ValueError: never saved over
         self.token = secrets.token_urlsafe(16)
         self.lock = threading.Lock()
-        self.thumb_folders = [collection.engine_output(model) / 'thumbnails' for model in self.pool['models']]
+        self.thumb_folders = collection.thumbnail_folders(self.pool['models'])
 
     def state(self):
         profiles = []
@@ -483,9 +582,8 @@ class LabelSession:
             return None
 
     def thumbnail(self, photo):
-        """The gallery thumbnail of a pool photo in any model's engine output, or None."""
-        name = thumbnail_name(Path(photo['path']), photo['mtime_ns'])
-        return next((folder / name for folder in self.thumb_folders if (folder / name).is_file()), None)
+        """The thumbnail of a pool photo in any model's engine output or the pool's own, or None."""
+        return find_thumbnail(self.thumb_folders, photo['path'], photo['mtime_ns'])
 
     def image(self, path, thumbnail=None):
         path = Path(path)
@@ -539,7 +637,7 @@ class LabelSession:
         if len(route) == 3 and route[0] == 'reference':
             found = self.entry(route[1], route[2], 'references')
             if found:
-                return self.image(found[1])
+                return self.image(found[1], find_thumbnail(self.thumb_folders, found[1], file_mtime(found[1])))
         return 404, 'text/plain', b'not found'
 
 

@@ -36,6 +36,16 @@ def collection(tmp_path):
     return ev.Collection(tmp_path / 'eval', 'cosplay')
 
 
+# the real one, before no_engine replaces it
+LOAD_RENDERER = ev.load_renderer
+
+
+@pytest.fixture(autouse=True)
+def no_engine(monkeypatch):
+    """pool never loads the engine (torch) here: no thumbnails are rendered unless a test gives a renderer."""
+    monkeypatch.setattr(ev, 'load_renderer', lambda: (None, 'no engine in the tests'))
+
+
 # --- collections ---
 
 def test_a_collection_keeps_its_files_in_one_folder(collection, tmp_path):
@@ -401,6 +411,91 @@ def test_a_photo_is_shown_by_its_gallery_thumbnail_or_else_the_original(session,
     assert [p['thumb'] for p in json.loads(get(session, 'state')[2])['profiles'][0]['photos']] == [True, False, False]
     assert get(session, 'original/0/0')[2].startswith(b'original')
     assert get(session, 'reference/1/0')[2] == b'reference'
+
+
+def renderer(calls, fail=()):
+    def render(path, target):
+        name = Path(path).name
+        if name in fail:
+            raise OSError(f'cannot decode {name}')
+        calls.append(name)
+        target.write_bytes(b'rendered ' + name.encode())
+    return render
+
+
+def pool_files(session):
+    """The file names of the pool's photos and reference images."""
+    return {Path(path).name for profile in session.pool['profiles']
+            for path in [p['path'] for p in profile['photos']] + profile['references']}
+
+
+def test_pool_renders_the_thumbnails_the_labelling_page_lacks(session, collection, monkeypatch, capsys):
+    # E35: a pool photo outside every gallery has no thumbnail, and the page would show the
+    # original, which a browser cannot display for HEIC/HEIF or RAW; reference images too
+    entry = session.pool['profiles'][0]['photos'][0]
+    thumbs = collection.engine_output(DEFAULT_MODEL) / 'thumbnails'
+    thumbs.mkdir(parents=True)
+    (thumbs / thumbnail_name(Path(entry['path']), entry['mtime_ns'])).write_bytes(b'gallery thumb')
+    calls = []
+    monkeypatch.setattr(ev, 'load_renderer', lambda: (renderer(calls), None))
+    assert ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3']) == 0
+    assert sorted(calls) == sorted(pool_files(session) - {Path(entry['path']).name})
+    assert 'Thumbnails rendered' in capsys.readouterr().out
+    session = ev.LabelSession(collection)
+    state = json.loads(get(session, 'state')[2])
+    assert all(p['thumb'] for profile in state['profiles'] for p in profile['photos'])
+    assert get(session, 'photo/0/0')[2] == b'gallery thumb'
+    second = session.pool['profiles'][0]['photos'][1]['path']
+    assert get(session, 'photo/0/1')[2] == b'rendered ' + Path(second).name.encode()
+    assert get(session, 'original/0/1')[2].startswith(b'original')
+    assert get(session, 'reference/1/0')[2] == b'rendered dog.jpg'
+    # a second pool run renders nothing again
+    calls.clear()
+    ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3'])
+    assert calls == []
+
+
+def test_a_thumbnail_that_cannot_be_rendered_leaves_the_original(session, collection, monkeypatch, capsys):
+    failing = session.pool['profiles'][0]['photos'][0]['path']
+    calls = []
+    monkeypatch.setattr(ev, 'load_renderer', lambda: (renderer(calls, fail={Path(failing).name}), None))
+    assert ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3']) == 0
+    out = capsys.readouterr().out
+    assert '1 failed' in out and f'cannot decode {Path(failing).name}' in out
+    session = ev.LabelSession(collection)
+    assert get(session, 'photo/0/0')[2].startswith(b'original')
+    assert json.loads(get(session, 'state')[2])['profiles'][0]['photos'][0]['thumb'] is False
+
+
+def test_pool_without_the_engine_names_the_photos_left_without_a_thumbnail(session, collection, capsys):
+    assert ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3']) == 0
+    out = capsys.readouterr().out
+    assert f'{len(pool_files(session))} photo(s) or reference image(s) have no thumbnail' in out
+    assert 'no engine in the tests' in out and out.rstrip().splitlines()[-1].startswith('Pool of')
+    assert not collection.thumbnails.exists()
+
+
+def test_the_renderer_is_the_engines_or_none_with_the_reason():
+    def render(path, target):
+        pass
+
+    names = []
+
+    def engine(name):
+        names.append(name)
+        return type('Engine', (), {'render_thumbnail': staticmethod(render)})
+
+    def no_torch(name):
+        raise ImportError("No module named 'torch'")
+
+    assert LOAD_RENDERER(engine) == (render, None) and names == ['framescout_engine']
+    assert LOAD_RENDERER(no_torch) == (None, "ImportError: No module named 'torch'")
+
+
+def test_the_engine_renders_thumbnails_with_a_function_of_its_own():
+    import ast
+    tree = ast.parse(Path(ev.ENGINE).read_text(encoding='utf-8'))
+    assert 'render_thumbnail' in {node.name for node in tree.body if isinstance(node, ast.FunctionDef)}
 
 
 @pytest.mark.parametrize('route', ['photo/0/99', 'photo/5/0', 'photo/x/0', 'reference/0/0', 'nothing'])
