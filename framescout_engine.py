@@ -160,6 +160,16 @@ def raw_preview(raw, min_size=None):
         return None
 
 
+def render_thumbnail(path, target):
+    """Write the gallery thumbnail of the photo path to target (a .jpg name).
+
+    Decoded at reduced scale like an unloaded image in Image.thumbnail (E2). The
+    evaluation tool renders the thumbnails its labelling page lacks with it (E35).
+    """
+    im = open_image(path, DRAFT_REDUCING_GAP * THUMBNAIL_SIZE)
+    im.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE)); im.save(target, quality=82)
+
+
 def crops_for(image, detector, options, lock):
     """Return [(label, image)]: the whole photo, then each person found with detector.predict(**options)."""
     crops = [(FULL_IMAGE_LABEL, image)]
@@ -564,11 +574,6 @@ def search(args, parser, roots, dropped, output, status):
     # rendered again; it is never written (old galleries link it), and the cleanup removes
     # its files once no gallery links them (E7)
     legacy_thumbs = output / 'vorschaubilder'
-
-    def render_thumbnail(path, target):
-        # decoded at reduced scale like an unloaded image in Image.thumbnail (E2)
-        im = open_image(path, DRAFT_REDUCING_GAP * THUMBNAIL_SIZE)
-        im.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE)); im.save(target, quality=82)
 
     def log(message):
         print(message, flush=True)
