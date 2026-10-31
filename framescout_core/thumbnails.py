@@ -23,22 +23,24 @@ def thumbnail_name(path, mtime_ns):
     return hashlib.sha256((str(path) + str(mtime_ns)).encode()).hexdigest()[:24] + '.jpg'
 
 
-def ensure_thumbnail(path, thumbs, legacy_thumbs, render, log):
+def ensure_thumbnail(path, thumbs, legacy_thumbs, render, log, mtime_ns=None):
     """Return the file name of path's thumbnail in the folder thumbs, or None on failure.
 
     An existing thumbnail is reused; one of an older version in legacy_thumbs (same name =
-    same photo and modification time) is copied and left in place; otherwise
-    render(path, target) writes a new one. Any failure, including a photo that was
-    deleted or moved after scoring (E6), is reported with log(message) and the photo
+    same photo and modification time; None: no such folder) is copied and left in place;
+    otherwise render(path, target) writes a new one. Any failure, including a photo that
+    was deleted or moved after scoring (E6), is reported with log(message) and the photo
     is skipped, so one missing file cannot abort the whole HTML export. render must
-    write to the target it is given (a temporary .jpg name, not the final one).
+    write to the target it is given (a temporary .jpg name, not the final one). The name
+    is made of mtime_ns if given (the evaluation tool's time of scoring, E35), otherwise
+    of the photo's current modification time.
     """
     try:
-        name = thumbnail_name(path, path.stat().st_mtime_ns)
+        name = thumbnail_name(path, path.stat().st_mtime_ns if mtime_ns is None else mtime_ns)
         target = thumbs / name
         if not target.exists():
-            old = legacy_thumbs / name
-            if old.is_file():
+            old = None if legacy_thumbs is None else legacy_thumbs / name
+            if old is not None and old.is_file():
                 def write(tmp):
                     shutil.copyfile(old, tmp)
             else:
