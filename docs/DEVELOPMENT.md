@@ -84,8 +84,16 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 - Labels belong to a profile **name**: editing the prompts keeps them, so give a profile
   a new name when its motif changes.
 - Files go to `.tmp/eval/<collection>/` (gitignored; `--dir` chooses another place).
-- Status: not yet run with real models (E34). Formats: `ARCHITECTURE.md` → "Model
-  evaluation tool".
+- `pool` also renders a thumbnail for every pool photo that no gallery has and for every
+  reference image into `<collection>/thumbnails/`, so the page can show HEIC/HEIF and RAW
+  files (E35). It loads the engine for that (imports torch, only when thumbnails are
+  missing); without a loadable engine it prints how many photos stay without one.
+- `run --cache-dir` defaults to the `.cache` next to the script. From a git worktree pass
+  the main checkout's `.cache`, otherwise the models are downloaded again (E48).
+- Status: runtime-tested on the home PC (E34, 2026-11-01): all four models on CUDA over
+  4997 photos, then `pool`, the labelling page and `metrics` with the user's own labels.
+  That collection used profiles chosen for its photos (a local studio-event photo set), not
+  the shipped examples. Formats: `ARCHITECTURE.md` → "Model evaluation tool".
 
 ## Project structure
 

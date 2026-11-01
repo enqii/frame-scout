@@ -53,8 +53,10 @@ The items' IDs (E/A/I/F) are described in [BACKLOG.md](BACKLOG.md) (open) and
       (A24, A26) (done 2026-10-30)
 
 ### P10 – Checks on the home PC (needs the user's hardware; before P4b)
-- [ ] (A) Run the CUDA path and the evaluation tool with real models and fix what shows up
-      (I11, E34, E35; a PR "runtime-tested on the home PC")
+- [x] (A) Run the CUDA path and the evaluation tool with real models and fix what shows up
+      (I11, E34, E35; a PR "runtime-tested on the home PC") (done 2026-11-01 in PR #56: E34
+      confirmed, E35 fixed; open follow-ups: I11 rest (fresh CUDA install, cu126, other GPUs),
+      E32 labelling data, E47, E48, A39)
 - [ ] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
       detection results is a hold point)
 

@@ -13,9 +13,12 @@ and 6 HTML galleries written. The project `.venv` used for that run is Python 3.
 torch 2.14.1+cpu (per `.venv/pyvenv.cfg` and the installed torch package; `run.log` itself
 does not record versions). The log also shows the QuickGELU warning (E1, fixed since: that
 run's embeddings came from the GELU variant). This is a single CPU-only run, not a test
-suite: CUDA beyond one engine smoke run (the installer option and GPU use exist since PR #8; one run with `--device cuda` on an RTX 4070 with torch 2.14.1+cu130 and 300 synthetic
-photos, embeddings matching the CPU run; the CUDA install itself, the app on a GPU, real
-photos and other GPUs are untested, I11), other Python versions, a fresh install on
+suite: the CUDA path has been run on one machine only (the installer option and GPU use
+exist since PR #8): an RTX 4070 with torch 2.14.1+cu130, Python 3.14 (I11, PR #56). CLIP and
+YOLO on CUDA, `--device auto`, the app's device choice (seen in headless Edge), 400
+synthetic photos and 4997 real full-size JPEGs on CUDA and CPU, all four search models
+and the evaluation tool with real models. A fresh `Install-FrameScout.bat cuda`, `cu126`
+and other or several GPUs are untested (I11), as are other Python versions, a fresh install on
 another machine and the edge cases in the backlog are **not** verified. Treat syntax
 checks, unit tests and a real model run as distinct kinds of evidence, and do not call the
 app production-ready. The installer's download, extraction and `venv` creation with the private
@@ -38,10 +41,20 @@ Evaluation tooling (E32/E20, PR #32): `framescout_eval.py`, `framescout_core/eva
 and the engine's `--scores-file` are covered by unit tests, the engine change additionally by
 its syntax tree and `py_compile`; the labelling page was rendered in headless Edge (again
 after the review fixes, with fake scores), and the labelling server answered real HTTP
-requests on Windows (a label POST, a negative `Content-Length`, a wrong token). **Not
-run:** `framescout_eval.py run` with real models, the engine's `--scores-file` in a real
-search, the page's keyboard and click handling in a real browser (E34), originals that a
-browser cannot display (E35), macOS/Linux.
+requests on Windows (a label POST, a negative `Content-Length`, a wrong token). **Since
+PR #56 (E34, E35):** `run` with all four models on CUDA, `pool`, `metrics` and the engine's
+`--scores-file` ran with real models on 4997 real photos and a collection with profiles
+chosen for them (a local studio-event photo set); the user labelled it in their own browser
+(about 1600 pool photos, 6 of 7 profiles) and `metrics` produced the first AP@40 values (E32);
+the page's keyboard and mouse handling was also driven by trusted CDP input in headless Edge
+(25 of 25 checks, with HEIC pool photos and reference images). **Not run:** macOS/Linux, a
+second collection.
+
+CUDA vs CPU (I11, PR #56, RTX 4070, 4997 real photos, 7 profiles, ViT-B/32): both runs exit
+0 with 0 errors and the same cache signatures; CUDA with person detection 348 s, CPU 486 s,
+CUDA without person detection 93 s (person detection is the GPU bottleneck, E18). Full-image
+embeddings are identical (minimum cosine 1.000000); person crops differ slightly (see
+"Known quirks").
 
 Offline loading (E16/E31/E33, P7 A): a CPU engine smoke run with the cached default model
 and the network blocked finished without Hub requests; SigLIP (cached, network blocked)
@@ -479,12 +492,20 @@ true|false}}}`; an unreadable file is never saved over, the page refuses to star
   per photo), and warns if a profile changed between model runs or the models scored
   different photos (path and `mtime_ns`). Re-running keeps all labels. Labels are keyed by
   profile name and photo path only, so they survive prompt edits; a new motif needs a new
-  profile name (E36).
+  profile name (E36). Finally `pool_thumbnails` (E35) renders a thumbnail for every pool
+  photo (named by its time of scoring) and every reference image that no model's gallery
+  has, into `<collection>/thumbnails/`: `missing_thumbnails` finds them, `load_renderer`
+  imports `framescout_engine` and takes its module-level `render_thumbnail` (imports torch,
+  only when something is missing; on failure `pool` prints how many photos stay without a
+  thumbnail and works as before), `render_thumbnails` runs `ensure_thumbnail(path, thumbs,
+  None, render, log, mtime_ns=...)` in up to four threads. Existing collections get the
+  missing thumbnails on their next `pool` run; labels are untouched.
 - `label`: `LabelServer` (a `ThreadingHTTPServer` without `SO_REUSEADDR` on Windows, where
   it would let a second page bind the same port silently) on `127.0.0.1:8765` (`--port`
   0-65535, `--no-browser`; a port in use is an error, exit code 2), every route behind a
   random token (`/<token>/`, compared with `secrets.compare_digest`); shows the profile and
-  one photo (the gallery thumbnail of any model's run if present, else the original, E35;
+  one photo (the thumbnail of any model's run or the collection's own `thumbnails/` if
+  present, else the original, E35; reference images are served the same way;
   the state's `thumb` flag lets the page prefetch thumbnails only, never originals); each
   label is POSTed (`Content-Length` 0 to `MAX_BODY` = 10,000, else 400) and saved
   atomically at once, a failed save is shown and reverted; resumes at the first unlabelled
@@ -1323,6 +1344,13 @@ reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pil
 and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
 
 ### Known quirks
+
+- **Person crops depend on the device (I11, PR #56):** YOLO's boxes differ slightly between
+  CUDA and CPU, and for a few photos a person more or less is found (4997 real photos: 9253
+  vs 9249 crops, 5 photos with another number of crops). Full-image embeddings are identical
+  up to float16 storage; a person crop's embedding and the ranking of near-ties change (top
+  20 of a profile overlap 19 to 20 of 20 between the devices). The cache signature ignores
+  the device on purpose, so a cache built on one device is reused as is on the other. Not a bug.
 
 Potential current quirks to investigate rather than assume solved (most are tracked in
 `BACKLOG.md`): "Clean up storage" was checked with `AppTest` only (not in a browser), and

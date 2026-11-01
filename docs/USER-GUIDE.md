@@ -42,8 +42,9 @@ series or newer (compute capability 7.5+) with driver 580 or newer, otherwise CU
 (GTX 900 series or newer, driver 528.33 or newer; RTX 50 series cards need CUDA 13.0).
 With several GPUs it prefers a build that suits all of them. If no build fits, it says why
 and installs the CPU version. These limits come from the CUDA and PyTorch documentation and
-are **not verified**; the GPU path has had a single test run (GeForce RTX 4070, CUDA 13.0),
-so treat it as experimental. Under "AI settings" the app shows whether PyTorch can use the
+are **not verified**; the GPU path has only been tested on one machine (GeForce RTX 4070, CUDA 13.0),
+so treat it as experimental. Person detection can find slightly different boxes on a GPU
+than on the CPU, so the order of near-equal matches may differ a little between devices. Under "AI settings" the app shows whether PyTorch can use the
 GPU and offers "cuda" only then.
 
 ## Using the app
