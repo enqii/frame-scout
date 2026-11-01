@@ -498,8 +498,12 @@ true|false}}}`; an unreadable file is never saved over, the page refuses to star
   imports `framescout_engine` and takes its module-level `render_thumbnail` (imports torch,
   only when something is missing; on failure `pool` prints how many photos stay without a
   thumbnail and works as before), `render_thumbnails` runs `ensure_thumbnail(path, thumbs,
-  None, render, log, mtime_ns=...)` in up to four threads. Existing collections get the
-  missing thumbnails on their next `pool` run; labels are untouched.
+  None, render, log, mtime_ns=...)` in up to four threads. A photo whose modification time
+  is no longer its time of scoring gets no thumbnail (logged; the page shows the original),
+  so a thumbnail never shows pixels other than the scored ones under that name; a reference
+  image that cannot be read is named in a note (review). Existing collections get the
+  missing thumbnails on their next `pool` run; labels are untouched. Loading the whole
+  engine for the renderer is a known cost (E49).
 - `label`: `LabelServer` (a `ThreadingHTTPServer` without `SO_REUSEADDR` on Windows, where
   it would let a second page bind the same port silently) on `127.0.0.1:8765` (`--port`
   0-65535, `--no-browser`; a port in use is an error, exit code 2), every route behind a
