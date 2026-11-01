@@ -343,12 +343,19 @@ def load_renderer(import_module=importlib.import_module):
 
 def render_thumbnails(collection, missing, render, log, threads=THUMBNAIL_THREADS):
     """Render the thumbnails of missing [(path, mtime_ns)] into the collection's thumbnail
-    folder with render(path, target); return how many failed (logged, the first SKIP_LOG_LIMIT)."""
+    folder with render(path, target); return how many failed (logged, the first SKIP_LOG_LIMIT).
+
+    A photo whose modification time is no longer mtime_ns gets none: its thumbnail is named
+    by that time (of scoring), so it must not show the photo's later pixels (review).
+    """
     collection.thumbnails.mkdir(parents=True, exist_ok=True)
     problems = []  # list.append is safe across threads
 
     def one(item):
         path, mtime_ns = item
+        if file_mtime(path) != mtime_ns:
+            problems.append(f'Thumbnail not rendered ({path}): the photo changed or is gone since it was scored')
+            return None
         return ensure_thumbnail(Path(path), collection.thumbnails, None, render, problems.append, mtime_ns=mtime_ns)
 
     with ThreadPoolExecutor(max(1, threads)) as executor:

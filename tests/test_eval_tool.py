@@ -1,6 +1,7 @@
 """The search-model evaluation tool framescout_eval.py (E32, E20), without torch or a model."""
 import http.server
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,8 @@ from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, read_labels, save_labels
 from framescout_scoring import rank_photos
 
 PHOTOS = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg', 'e.jpg']
+# the photos' modification time at scoring (a multiple of 100 ns, which every file system keeps)
+MTIME_NS = 1_700_000_000_000_000_000
 
 
 def write_model_scores(collection, model, car, dog_text=None, dog_visual=None, photos=PHOTOS):
@@ -21,7 +24,7 @@ def write_model_scores(collection, model, car, dog_text=None, dog_visual=None, p
     if dog_text is not None:
         profiles.append({'name': 'Dog', 'prompts': ['A photograph of Dog.'], 'references': [str(collection.root / 'dog.jpg')],
                          'text': [[s] for s in dog_text], 'visual': [[s] for s in dog_visual]})
-    document = scores_document(model, 'sig', [(str(collection.root / 'photos' / p), 7, ['Full image']) for p in photos],
+    document = scores_document(model, 'sig', [(str(collection.root / 'photos' / p), MTIME_NS, ['Full image']) for p in photos],
                                profiles)
     write_scores(collection.scores_file(model), document)
     return document
@@ -345,6 +348,7 @@ def session(collection, tmp_path):
     (collection.root / 'photos').mkdir(parents=True)
     for name in PHOTOS:
         (collection.root / 'photos' / name).write_bytes(b'original ' + name.encode())
+        os.utime(collection.root / 'photos' / name, ns=(MTIME_NS, MTIME_NS))  # unchanged since scoring
     (collection.root / 'dog.jpg').write_bytes(b'reference')
     write_model_scores(collection, DEFAULT_MODEL, [0.9, 0.8, 0.1, 0.2, 0.0],
                        [0.9, 0.1, 0.5, 0.4, 0.0], [0.1, 0.9, 0.5, 0.4, 0.0])
@@ -464,6 +468,21 @@ def test_a_thumbnail_that_cannot_be_rendered_leaves_the_original(session, collec
     assert '1 failed' in out and f'cannot decode {Path(failing).name}' in out
     session = ev.LabelSession(collection)
     assert get(session, 'photo/0/0')[2].startswith(b'original')
+    assert json.loads(get(session, 'state')[2])['profiles'][0]['photos'][0]['thumb'] is False
+
+
+def test_a_photo_changed_since_scoring_gets_no_thumbnail_of_its_new_pixels(session, collection, monkeypatch, capsys):
+    # review: the thumbnail is named by the time of scoring, so rendering the photo as it is
+    # now would show other pixels than were scored under that name; the page shows the original
+    changed = Path(session.pool['profiles'][0]['photos'][0]['path'])
+    changed.write_bytes(b'edited')
+    os.utime(changed, ns=(MTIME_NS + 10**9, MTIME_NS + 10**9))
+    calls = []
+    monkeypatch.setattr(ev, 'load_renderer', lambda: (renderer(calls), None))
+    assert ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3']) == 0
+    out = capsys.readouterr().out
+    assert changed.name not in calls and 'changed or is gone since it was scored' in out and '1 failed' in out
+    session = ev.LabelSession(collection)
     assert json.loads(get(session, 'state')[2])['profiles'][0]['photos'][0]['thumb'] is False
 
 
