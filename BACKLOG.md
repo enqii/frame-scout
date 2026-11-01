@@ -2,8 +2,8 @@
 
 Open work: known weaknesses and ideas, nothing is checked off here. Result of the code
 analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
-(E = engine, A = app, I = installation/project) are referenced in commits, pull requests
-and discussions.
+(E = engine, A = app, I = installation/project, F = feature, taken over from
+[docs/IDEAS.md](docs/IDEAS.md)) are referenced in commits, pull requests and discussions.
 
 - **Finished items** move to [docs/BACKLOG-DONE.md](docs/BACKLOG-DONE.md) with their
   reports when their PR is merged; the ID stays valid (search both files for it).
@@ -11,6 +11,13 @@ and discussions.
   roadmap does not name is not scheduled.
 - **A new ID** is the next free number of its group: search both files, e.g.
   `rg -o "\*\*E\d+ " BACKLOG.md docs/BACKLOG-DONE.md`, and take the highest plus one.
+- **Status tags** are set by `/triage` (untagged = not triaged yet) and written in
+  backticks before the ID, e.g. ``- [ ] `minor` **E39 – …**``:
+  `ready` (clear scope, can be implemented now), `decision` (needs a user decision first;
+  the item names the question), `hardware` (needs the home PC), `minor` (small or rare;
+  bundled into a hygiene PR), `parked` (deliberately not planned now; the item gives the
+  reason).
+- **Ideas** (`docs/IDEAS.md`) become group F items only through `/triage`.
 
 ## Known weaknesses
 

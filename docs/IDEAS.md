@@ -1,8 +1,11 @@
 # FrameScout – Feature ideas
 
 Raw feature ideas from the weekly brainstorming run. They are **not** planned work:
-an idea becomes work only when the user moves it into `BACKLOG.md` (with an ID) and
-`ROADMAP.md`. Each run appends a dated section; earlier sections are never edited.
+an idea becomes work only when the user moves it into `BACKLOG.md` (group F, with an ID)
+and `ROADMAP.md`, which `/triage` does together with the user. Each run appends a dated
+section; earlier sections are never edited, except that `/triage` adds one line under an
+idea's heading: `Disposition: take over → F<n> | discarded: <reason> | parked: <reason>
+(<date>)`. An idea without that line has not been triaged yet.
 "Hold point" refers to the hold points in `CLAUDE.md` → "PR workflow".
 
 ## 2026-10-27
