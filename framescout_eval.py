@@ -312,20 +312,24 @@ def find_thumbnail(folders, path, mtime_ns):
 
 
 def missing_thumbnails(collection, document):
-    """[(path, mtime_ns)] of the pool photos and reference images of the pool document that
-    have no thumbnail yet; a pool photo is named by its time of scoring, like the galleries'."""
+    """(missing, unreadable): missing is [(path, mtime_ns)] of the pool photos and reference
+    images of the pool document that have no thumbnail yet, a pool photo named by its time of
+    scoring like the galleries'; unreadable is [path] of the reference images that cannot be
+    read (no thumbnail, the page answers "not found")."""
     folders = collection.thumbnail_folders(document['models'])
-    missing, seen = [], set()
+    missing, unreadable, seen = [], [], set()
     for profile in document['profiles']:
         items = [(path, file_mtime(path)) for path in profile['references']]
         items += [(photo['path'], photo['mtime_ns']) for photo in profile['photos']]
         for item in items:
-            # a reference image that cannot be read is answered "not found" by the page anyway
-            if item[1] is not None and item not in seen:
-                seen.add(item)
-                if find_thumbnail(folders, *item) is None:
-                    missing.append(item)
-    return missing
+            if item in seen:
+                continue
+            seen.add(item)
+            if item[1] is None:
+                unreadable.append(item[0])
+            elif find_thumbnail(folders, *item) is None:
+                missing.append(item)
+    return missing, unreadable
 
 
 def load_renderer(import_module=importlib.import_module):
@@ -372,7 +376,11 @@ def pool_thumbnails(collection, document, log):
     only; a pool photo from another weight, and every reference image, would otherwise be
     shown as the original file, which a browser cannot display for HEIC/HEIF and RAW.
     """
-    missing = missing_thumbnails(collection, document)
+    missing, unreadable = missing_thumbnails(collection, document)
+    if unreadable:
+        log(f'Note: {len(unreadable)} reference image(s) cannot be read (moved or deleted since the run?); the '
+            'labelling page cannot show them: ' + ', '.join(unreadable[:SKIP_LOG_LIMIT])
+            + (' ...' if len(unreadable) > SKIP_LOG_LIMIT else ''))
     if not missing:
         return
     render, reason = load_renderer()
