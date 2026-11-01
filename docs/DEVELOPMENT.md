@@ -87,7 +87,8 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 - `pool` also renders a thumbnail for every pool photo that no gallery has and for every
   reference image into `<collection>/thumbnails/`, so the page can show HEIC/HEIF and RAW
   files (E35). It loads the engine for that (imports torch, only when thumbnails are
-  missing); without a loadable engine it prints how many photos stay without one.
+  missing); without a loadable engine it prints how many photos stay without one. A photo
+  changed since its run gets no thumbnail (the page shows the original file).
 - `run --cache-dir` defaults to the `.cache` next to the script. From a git worktree pass
   the main checkout's `.cache`, otherwise the models are downloaded again (E48).
 - Status: runtime-tested on the home PC (E34, 2026-11-01): all four models on CUDA over

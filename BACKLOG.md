@@ -209,6 +209,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       worktree downloads the models again unless the main checkout's `.cache` is passed
       with `--cache-dir`. Document it in `docs/DEVELOPMENT.md` (done in PR #56) and/or make
       the default follow the checkout of the Python environment in use. Found in PR #56.
+- [ ] `minor` **E49 – `framescout_eval.py pool` imports the whole engine to render thumbnails:**
+      `load_renderer` imports `framescout_engine` (torch, numpy, Pillow, a few seconds) for
+      `render_thumbnail` alone, and the import sets the cache variables of the process
+      (E42). Only when thumbnails are missing, once per pool run. Fix idea: move the image
+      decoding (`open_image`, `open_raw`, `raw_preview`, `render_thumbnail`, the decoder
+      registration) into a torch-free module that the engine and the evaluation tool both
+      import; that also drops the fallback for a missing engine and the ast-based test. An
+      engine refactor with its own smoke run. Review of PR #56, finding 2.
 
 ### App (`app.py`)
 
