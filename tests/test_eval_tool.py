@@ -486,6 +486,17 @@ def test_a_photo_changed_since_scoring_gets_no_thumbnail_of_its_new_pixels(sessi
     assert json.loads(get(session, 'state')[2])['profiles'][0]['photos'][0]['thumb'] is False
 
 
+def test_pool_names_a_reference_image_that_cannot_be_read(session, collection, monkeypatch, capsys):
+    # review: it gets no thumbnail and the page answers "not found"; pool says so
+    (collection.root / 'dog.jpg').unlink()
+    calls = []
+    monkeypatch.setattr(ev, 'load_renderer', lambda: (renderer(calls), None))
+    assert ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3']) == 0
+    out = capsys.readouterr().out
+    assert 'dog.jpg' not in calls
+    assert '1 reference image(s) cannot be read' in out and str(collection.root / 'dog.jpg') in out
+
+
 def test_pool_without_the_engine_names_the_photos_left_without_a_thumbnail(session, collection, capsys):
     assert ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3']) == 0
     out = capsys.readouterr().out
