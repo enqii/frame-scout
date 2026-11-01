@@ -48,7 +48,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       speed change: Ultralytics pads photos of different shapes in one call to a square
       (`LetterBox(auto=False)`) instead of the smallest rectangle, so the detected boxes
       and the person crops change → needs an evaluation of search quality first, and the
-      gain can only be measured on a GPU (I11). Deferred from the roadmap item "YOLO on
+      gain can only be measured on a GPU. **Data (I11, PR #56, RTX 4070, ViT-B/32,
+      4997 full-size camera JPEGs, 7 profiles, `--batch-size 16`):** with person detection
+      348 s on CUDA (486 s on CPU), without 93 s on CUDA, so detection dominates a CUDA run
+      and is the GPU bottleneck. Deferred from the roadmap item "YOLO on
       GPU" (PR #8, user decision).
 - [ ] **E19 – The detection settings in the cache signature are listed by hand:**
       `feature_signature` hashes `max_persons`, `person_confidence` and `yolo_model`, but
@@ -116,23 +119,16 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (Core i5-13600K, RTX 4070) for the cosplay collection and a second, non-cosplay one;
       then record the run metrics, choose the reference weight per model (0.3, E5), trim
       `MODELS`, set `evaluated`, and update the labels and the user guide. The tool itself was
-      not run with real models yet (E34). A key trimmed from the registry falls back to the default with
+      run with real models (E34, done). **First data (2026-11-01, PR #56, raw evidence,
+      no conclusion drawn):** the user labelled 6 of 7 profiles of a local studio-event
+      photo set (about 1600 pool photos; the profile "armor" was left unlabelled because it
+      is very hard to judge). Mean AP@40 at reference weight 0.3: vit-b-32-openai 0.673,
+      vit-b-16-datacomp 0.697, vit-l-14-datacomp 0.722, vit-b-16-siglip 0.739; the ranking
+      of the models changes per profile, and the profile "group photo" had 146 of 146
+      hits, so it is not informative. A second, non-specialized collection is still
+      missing. A key trimmed from the registry falls back to the default with
       a warning in a user's `settings.json` (`read_settings`); its cache rows then count as
       "older version" in the cleanup. Search quality is a hold point.
-- [ ] **E34 – The evaluation tool is not runtime-tested with real models:**
-      `framescout_eval.py run` and the engine's `--scores-file` (E32, PR #32) were checked
-      by unit tests, the syntax tree and `py_compile` only (no real-model run without
-      approval); the labelling page was rendered in headless Edge, but its keyboard and
-      click handling was not tried in a real browser. Verify on the first real use (the
-      user's home PC) and fix what shows up.
-- [ ] **E35 – The labelling page may show originals a browser cannot display:** thumbnails
-      exist only for each model's top `--top` (150) at the run's reference weight; pool
-      photos from the other pool weights may lack one and are then shown as the original
-      file, which a browser cannot display for HEIC/HEIF and RAW. Fix idea: render the
-      missing thumbnails with the engine's decoders (needs Pillow/rawpy in the tool) or
-      raise `run --top`. Found in E32 (PR #32). Since the review of PR #32 the page names
-      such a photo "original file" and prefetches only thumbnails, so large originals are
-      loaded only when shown.
 - [ ] **E36 – Labels do not record the motif they were made for:** `labels.json` keys a
       label by profile name and photo path only. Editing the prompts under the same name
       keeps the labels (intended: prompt wordings can be compared on the same labels), but
@@ -205,6 +201,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       file, broken HEIC) fall back. Idea: for partners of a RAW file, detect truncation
       (Pillow's truncation warning, or a decode with `LOAD_TRUNCATED_IMAGES` off) and
       prefer the RAW file then. Found in PR #46.
+- [ ] `minor` **E47 – The best-weight mark of `framescout_eval.py metrics` is set on a tie at 0:**
+      in the reference-weight sweep, every weight gets the `*` (best) mark when a model's
+      best AP is 0 (all weights tie at 0). Fix: mark nothing then. Found in PR #56.
+- [ ] `ready` **E48 – `framescout_eval.py run --cache-dir` follows the script folder, not the venv's checkout:**
+      the default is the `.cache` next to the script, so running the tool from a git
+      worktree downloads the models again unless the main checkout's `.cache` is passed
+      with `--cache-dir`. Document it in `docs/DEVELOPMENT.md` (done in PR #56) and/or make
+      the default follow the checkout of the Python environment in use. Found in PR #56.
 
 ### App (`app.py`)
 
@@ -302,6 +306,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (light and dark theme) and switch if `st.html` is clean. One selector per card stays:
       the state of a mark is not in the DOM, and a page holds at most 48 cards. Review of
       PR #55, finding 6.
+- [ ] `minor` **A39 – The model list shows a download size for cached models:** the app's
+      model list shows "605 MB download" for a model even when its weights are already in
+      the cache. Idea: look for the weights file in the cache folder and show "downloaded"
+      instead. Found in PR #56.
 
 ### Installation / project
 
@@ -335,31 +343,27 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       the SHAs. Options: periodic manual bump, or Dependabot for `github-actions`.
       Dependabot opens its own PRs outside the one-PR-per-roadmap-item workflow, so
       this is a workflow decision → hold point.
-- [ ] **I11 – The CUDA path has run on a GPU only once:** the development PC had no NVIDIA GPU,
-      so the CUDA install (`cu130`/`cu126` choice, about 2.5 GB), CLIP and YOLO on CUDA
-      (E14), the app's device choice with a CUDA build (A7) and the speed gain are
-      untested; the support limits in `framescout_core.CUDA_BUILDS` are not verified either.
-      To do on an NVIDIA machine: `Install-FrameScout.bat cuda`, a search run with
-      `--device cuda` with and without person detection, compare scores with a CPU run,
-      and measure the time (also for E18); re-run the installer without an argument and
-      check that the CUDA build is kept. With several GPUs, check which one `cuda`
-      (device 0 in CUDA's order) uses when the build cannot use all of them.
-      (partly done 2026-10-21, user-approved smoke run from the main checkout: NVIDIA
-      GeForce RTX 4070 with 12 GB, driver 616.56, `.venv` with torch 2.14.1+cu130 and
-      Python 3.14, `torch.cuda.is_available()` True. 300 synthetic 1600×1200 JPEGs
-      (coloured shapes, no real photos), `profiles.example.json` (6 profiles),
-      `--batch-size 16`, person detection on, nothing downloaded. `--device cuda`: the log
-      says "CLIP: cuda; person detection (YOLO): cuda", exit code 0, 300 new analyses,
-      0 errors, 6 galleries, 17 s wall time including model load; `--device cpu` on the
-      same input: exit code 0, 0 errors, 26 s – small-set timings, not a benchmark. Both
-      caches have 300 rows with the same paths and identical signatures; the 301
-      comparable crops have embeddings with cosine similarity ≥ 0.99999 (float16 storage).
-      One synthetic photo got one extra YOLO "person" crop on CUDA (303 vs 302 crops), a
-      borderline false detection near the confidence threshold. Still open: a fresh
-      install with `Install-FrameScout.bat cuda` (the `.venv` already had `cu130`) and the
-      installer re-run, `cu126`, other GPUs and several GPUs, a run without person
-      detection, real photos and scores compared on them, the app's device choice in the
-      browser, and the speed on a large folder (also for E18).)
+- [ ] `hardware` **I11 – The CUDA path is untested on a fresh install and on other GPUs:**
+      what remains: a fresh `Install-FrameScout.bat cuda` (about 2.5 GB download; the
+      `.venv` already had `cu130`, and only a dry run of the torch step was done), `cu126`
+      and the support limits in `framescout_core.CUDA_BUILDS` (not verified), other GPUs
+      and several GPUs (check which one `cuda`, device 0 in CUDA's order, uses when the
+      build cannot use all of them), and the app's device choice with a CUDA build on a
+      real search (the settings tab was only seen in headless Edge).
+      (partly done: user-approved runs on the home PC from the main checkout, NVIDIA GeForce
+      RTX 4070 with 12 GB, driver 616.56, `.venv` with torch 2.14.1+cu130, Python 3.14.
+      2026-10-21: 300 synthetic 1600×1200 JPEGs, `--device cuda` and `cpu`, both exit 0,
+      embeddings identical up to float16. 2026-11-01, PR #56: 400 synthetic photos (JPEG,
+      HEIC, PNG), CUDA 22 s vs CPU 34 s, without person detection 13 s vs 21 s, `--device
+      auto` picks CUDA for CLIP and YOLO; then 4997 real full-size JPEGs (about 13 GB) with
+      7 profiles: CUDA 348 s, CPU 486 s, CUDA without person detection 93 s. Full-image
+      embeddings are identical (minimum cosine 1.000000); YOLO boxes differ slightly
+      between devices, so person crops differ (9253 vs 9249 crops; best-matched crops mean
+      cosine 0.99977) and the top 20 of a profile overlaps 19 to 20 of 20 between the
+      devices. The installer's torch step was run dry (no argument keeps `cu130`, `cuda`
+      recognises the RTX 4070 with compute capability 8.9, `cpu` would replace it); all four
+      search models and the evaluation tool ran on CUDA with real models. The speed numbers
+      feed E18 and P10 (B).)
 - [ ] **I13 – Background runs die with the agent session:** a long engine run that an
       agent starts as a background command of Claude Code ends when that agent session
       ends; the first evaluation run of PR #11 stopped at 1,110 of 4,997 photos (stale

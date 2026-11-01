@@ -450,6 +450,43 @@ finished work are in [ROADMAP.md](../ROADMAP.md) → "Done".
       RAW path; a repaired JPEG wins again on the next run. Truncated JPEGs: E46. No
       cache, CLI or profiles change. Unit-tested (9 tests in `test_photos.py`); the engine
       side is **not runtime-tested** (no RAW sample locally).)
+- [x] **E34 – The evaluation tool is not runtime-tested with real models:**
+      `framescout_eval.py run` and the engine's `--scores-file` (E32, PR #32) were checked
+      by unit tests, the syntax tree and `py_compile` only (no real-model run without
+      approval); the labelling page was rendered in headless Edge, but its keyboard and
+      click handling was not tried in a real browser. Verify on the first real use (the
+      user's home PC) and fix what shows up.
+      (done 2026-11-01 in PR #56, confirmed by the user: the evaluation tool ran with real
+      models on the home PC (RTX 4070, torch 2.14.1+cu130). `run` over all four models on
+      CUDA, 4997 photos, 7 profiles chosen for a local studio-event photo set (eval-only
+      profiles under `.tmp/`, about 5.5 to 6 min per model); `pool` made 1596 photos to
+      label (146 to 308 per profile); the labelling page, `pool` and `metrics` worked with
+      the user's own labelling (6 of 7 profiles labelled; the profile "armor" was left
+      unlabelled on purpose, it is very hard to judge). Before that the page's keyboard
+      and mouse handling was driven by trusted CDP input events in headless Edge, 25 of 25
+      checks passed after the E35 fix. The first mean AP@40 values are recorded in E32. No
+      further bug showed up.)
+- [x] **E35 – The labelling page may show originals a browser cannot display:** thumbnails
+      exist only for each model's top `--top` (150) at the run's reference weight; pool
+      photos from the other pool weights may lack one and are then shown as the original
+      file, which a browser cannot display for HEIC/HEIF and RAW. Fix idea: render the
+      missing thumbnails with the engine's decoders (needs Pillow/rawpy in the tool) or
+      raise `run --top`. Found in E32 (PR #32). Since the review of PR #32 the page names
+      such a photo "original file" and prefetches only thumbnails, so large originals are
+      loaded only when shown.
+      (done 2026-11-01 in PR #56: `framescout_eval.py pool` renders a thumbnail for every
+      pool photo outside the galleries and for every reference image into
+      `<collection>/thumbnails/`, with the engine's own renderer and decoders
+      (`framescout_engine.render_thumbnail`, now a module-level function; loading the engine
+      imports torch, so `pool` does it only when thumbnails are missing). Without a
+      loadable engine `pool` prints how many photos stay without a thumbnail and works as
+      before. `framescout_core.ensure_thumbnail` got an optional `mtime_ns` (name a
+      thumbnail by the time of scoring) and `legacy_thumbs=None`. The labelling page
+      serves the rendered thumbnails of pool photos and also of reference images, which
+      were always served as originals before (a HEIC reference image stayed blank). Found
+      on the home PC: with a short gallery (`run --top 20`) 372 pool entries had no
+      thumbnail, 5 of them HEIC; after the fix 0. No cache signature, CLI, profiles or
+      results change; labels are untouched.)
 
 ### App (`app.py`)
 
