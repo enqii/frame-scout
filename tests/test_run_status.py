@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (FINAL_PHASES, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
+from framescout_core import (FINAL_PHASES, NOTHING_NEW, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
                              read_status, run_active, started_in_time, status_fraction, status_text,
                              stopped_status, write_status)
 
@@ -286,6 +286,22 @@ def test_phases_without_a_count_show_their_name_only():
     assert status_fraction({'phase': 'loading'}) is None
     assert status_fraction({'phase': 'analyzing', 'done': 0, 'total': 0}) is None
     assert status_text({'phase': 'something-new'}) == 'something-new'
+
+
+def test_a_running_phase_shows_the_message_of_the_run():
+    # a repeat search on an analyzed folder ranks only, without loading the detector (F2)
+    assert NOTHING_NEW == 'Nothing new to analyze – ranking only'
+    status = {'phase': 'scoring', 'done': 3, 'total': 10, 'message': NOTHING_NEW}
+    assert status_text(status) == f'Scoring photos: 3/10 · {NOTHING_NEW}'
+    assert status_text({'phase': 'exporting', 'message': NOTHING_NEW}) == f'Writing galleries · {NOTHING_NEW}'
+
+
+def test_a_final_phase_does_not_repeat_its_message():
+    # the app shows the message of a failed or interrupted run in its own warning
+    assert status_text({'phase': 'failed', 'message': 'boom'}) == 'Failed'
+    assert status_text({'phase': 'interrupted', 'message': 'Stopped in the app.'}) == 'Interrupted'
+    assert status_text({'phase': 'scoring', 'message': None}) == 'Scoring photos'
+    assert status_text({'phase': 'scoring', 'message': 3}) == 'Scoring photos'
 
 
 def test_the_fraction_stays_between_zero_and_one():

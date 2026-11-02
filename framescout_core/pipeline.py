@@ -1,4 +1,4 @@
-"""Engine pipeline helpers: progress lines, JPEG draft size, crop batches and prefetching."""
+"""Engine pipeline helpers: progress lines, JPEG draft size, crop batches, prefetching and lazy loading."""
 import collections
 
 
@@ -117,3 +117,25 @@ def prefetch(submit, items, depth):
     finally:
         for _, future in queue:
             future.cancel()
+
+
+class Lazy:
+    """A value created by factory() on the first get() only, e.g. the person detector (F2).
+
+    A repeat search on an analyzed folder needs no detector: every photo comes from the
+    cache, so the detector (seconds to tens of seconds on a CPU, a download on first use)
+    is created only when a photo has to be analyzed. None is a value like any other; a
+    factory that raises creates nothing, and the next get() tries again. Not thread-safe:
+    the engine calls get() from its main thread before the decoding threads use the value.
+    """
+
+    def __init__(self, factory):
+        self._factory = factory
+        self._value = None
+        self.created = False
+
+    def get(self):
+        if not self.created:
+            self._value = self._factory()
+            self.created = True
+        return self._value
