@@ -1,7 +1,7 @@
 """The app's settings.json (A8): defaults, validation, saving and the widget sync."""
 from pathlib import Path
 
-from ._common import _read_json_object, _update_locked
+from ._common import _json_object, _read_json_object, _update_locked
 from .models import DEFAULT_MODEL, MODELS
 
 
@@ -77,6 +77,11 @@ def _read_settings_file(filename, attempts=5, retry_delay=0.05):
     OSError is retried up to attempts times, retry_delay seconds apart (review).
     """
     return _read_json_object(filename, 'settings file', attempts, retry_delay)
+
+
+def _parse_settings(content):
+    """Return the JSON object of a settings file's content (bytes; None: a missing file, {}); ValueError if unreadable."""
+    return _json_object(content, 'settings file')
 
 
 def _with_folder_list(data):
@@ -163,8 +168,7 @@ def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05, loc
             document[key] = value
         return document if document or filename.exists() else None
 
-    _update_locked(filename, lambda: _read_settings_file(filename, attempts, retry_delay), update,
-                   attempts, retry_delay, lock_timeout)
+    _update_locked(filename, _parse_settings, update, attempts, retry_delay, lock_timeout)
     return normalized
 
 

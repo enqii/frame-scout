@@ -8,11 +8,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import quote
 
-from ._common import _path_key, _temp_path
+from ._common import _backup_path, _path_key, _temp_path
 from .locks import RunLock
 from .marks import MARKS_BACKUP, MARKS_FILE, read_marks, remove_marks
 from .names import EXT, profile_slugs
-from .profiles import _backup_path, _read_entries, read_profiles
+from .profiles import _read_entries, read_profiles
 from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
 from .run_status import RUN_LOCK, RUN_STATUS, read_status, run_active
 from .settings import SETTINGS_FILE
