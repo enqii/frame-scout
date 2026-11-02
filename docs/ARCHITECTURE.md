@@ -144,7 +144,7 @@ the module of its area and to the re-exports in `__init__.py`.
 - `locks.py`: `RunLock`/`lock_held` (the operating-system file lock of a search run, A4,
   also used around the read-merge-write of `settings.json` and `marks.json`).
 - `run_status.py`:
-  `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`
+  `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`/`LOADING_DETECTOR`
   (one search per output folder, its phase and progress, A4/A5).
 - `devices.py`: `detection_options` (YOLO arguments on the CLIP device, E14),
   `device_choices`/`cuda_status`/`cuda_hint` (the app's device choice, CUDA status and the
@@ -740,8 +740,9 @@ after E2 analyzes every photo once more and drafted and full-resolution embeddin
 mix (they agree to a cosine similarity ≥ 0.999 on a 202-photo sample).
 
 The detector is loaded inside `analyze()` (F2, see "Person detection"): while it loads, the
-status phase is `loading` (log line `Loading the person detector ...`), then `analyzing`
-again with `total` and `done` restored and the counts kept. The draft size and the thread
+status phase stays `analyzing` with its progress and counts, and the status message is
+`LOADING_DETECTOR` (log line `Loading the person detector ...`), cleared once it is loaded
+(review: the phase `loading` would show "Loading the AI models" without progress mid-run). The draft size and the thread
 count follow the person-detection setting, not the detector object. If no photo needed an
 analysis (all from the cache, or only cache-scan errors), the log prints `Nothing new to
 analyze – ranking only.` and the status message is `NOTHING_NEW` during scoring and export.
@@ -1169,8 +1170,9 @@ are an error before the lock only if the output folder does not exist yet (no fo
 created for a mistyped call); otherwise it is reported in the status file. A missing
 folder of several is left out with a log line (A25). The final phase comes from
 the exit code (`final_status`: 0 finished, 130 interrupted, others failed). The `message`
-is also set during a run: `NOTHING_NEW` ("Nothing new to analyze – ranking only", F2) when
-no photo needed an analysis; `status_text` appends the message of a running (non-final)
+is also set during a run: `LOADING_DETECTOR` ("Loading the person detector", F2) while the
+detector loads in the analysis phase, `NOTHING_NEW` ("Nothing new to analyze – ranking only",
+F2) when no photo needed an analysis; `status_text` appends the message of a running (non-final)
 phase, e.g. `Scoring photos: 3/10 · Nothing new to analyze – ranking only`, while the
 message of a final phase is shown by the app in its own line. A successful finish clears it.
 
