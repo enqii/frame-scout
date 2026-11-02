@@ -150,7 +150,8 @@ Before each change of a mark FrameScout keeps the previous `marks.json` as `mark
 and, when the backup is readable, offers **Restore marks from backup** with the backup's
 date and number of marks. Nothing is restored on its own. The damaged file is kept as
 `marks.json.broken-<date>` in the `results` folder; delete it yourself when you no longer
-need it. If `marks.json` is simply missing, no restore is offered.
+need it. Do not delete the damaged `marks.json` before restoring: if `marks.json` is
+missing, no restore is offered.
 
 "Copy N marked photos" copies all photos marked as match into the folder in "Copy to
 folder" (default `Pictures\FrameScout\<profile>`, saved per profile). Copying never
@@ -236,12 +237,18 @@ scan listed and is still unused when deleting is deleted. Never deleted: `marks.
 `profiles.json` and its backup, and your photos.
 
 **Check cache** (below the cleanup) tests `cache.sqlite3` for damage, e.g. after a full
-disk or a power loss. It only reads, and it is refused while a search runs or is being
-started. The result is one of: no cache yet, no damage found, could not be checked (e.g.
-the file cannot be opened; nothing is offered), or damaged. For a damaged cache,
-**Rename the damaged cache.sqlite3** renames it (and its `-journal`/`-wal`/`-shm` files)
-to `cache.sqlite3.broken-<date>`; nothing is deleted. The next search then analyzes all
-photos again. Delete the `.broken-` file yourself when you do not need it.
+disk or a power loss. It changes nothing in the cache, except that the unfinished changes
+of a stopped search (a leftover `cache.sqlite3-journal`) are rolled back first, as the next
+search would do. It is refused while a search runs or is being started. The result is one
+of: no cache yet, no damage found, could not be checked (e.g. the file is locked by another
+program; nothing is offered), could not be read (a disk I/O error: a damaged spot on the
+disk, or a drive or network share that is not reachable now), or damaged. For a damaged or
+unreadable cache, **Rename the damaged cache.sqlite3** renames it (and its
+`-journal`/`-wal`/`-shm` files) to `cache.sqlite3.broken-<date>`; nothing is deleted. For
+an unreadable cache, check again first if the drive may just have been unreachable. The
+next search then analyzes all photos again. Delete the `.broken-` file yourself when you do
+not need it. A shown result disappears once the cache changes (e.g. after a cleanup or a
+search); check again then.
 
 ### What the numbers mean
 
