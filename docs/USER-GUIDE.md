@@ -37,6 +37,13 @@ GPU. You can also choose directly:
 Close FrameScout before you run the installer: pip cannot replace PyTorch's files while
 the app uses them. Running it again without an option keeps the installed build.
 
+Before it downloads PyTorch, the installer checks the free disk space of the drives it
+writes to (`.venv` and the temporary folder `.tmp`). It estimates about 0.3 GB download
+and 1.2 GB installed for the CPU version, and about 3 GB download and 6 GB installed for
+the CUDA version (an estimate). If a drive would keep less than 1 GB free, it lists the
+drives and asks `Install anyway? [Y/N]`: a full disk during the installation leaves a
+broken installation. `N` stops the installer (PyTorch is not installed).
+
 The installer picks the build from what `nvidia-smi` reports: CUDA 13.0 for GeForce RTX 20
 series or newer (compute capability 7.5+) with driver 580 or newer, otherwise CUDA 12.6
 (GTX 900 series or newer, driver 528.33 or newer; RTX 50 series cards need CUDA 13.0).
@@ -132,6 +139,13 @@ stays open), and opening the page again lets you stop it. Only one search runs a
 A repeat search on a folder that is already analyzed (e.g. after changing only a search
 text or the reference weight) skips loading the person detector and shows "Nothing new to
 analyze – ranking only"; the detector is loaded only when a photo has to be analyzed.
+
+Before a search the run tab warns when a drive would keep less than 1 GB free after the
+search: it lists the drives with the space needed and the space free, and what the search
+writes (cache, thumbnails, and the search model or person detector if they still have to
+be downloaded). Every photo counts as not yet analyzed, so the figure is an upper
+estimate. The warning does not block "Start search"; free some space or lower "Maximum
+matches per search profile" to reduce the thumbnails.
 
 **Results** shows the last finished search per profile: thumbnails, best first, 48 per
 page, with rank, score, the best-matching part ("Full image" or "Person 1", …) and the

@@ -1237,3 +1237,22 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       with three generated photos: run 1 loaded the detector, run 2 (all from the cache) did
       not, run 3 with one added photo loaded it again. Not tested: CUDA, the progress line in
       a browser.)
+- [x] **F3 – Free disk space check before installing and searching:** the CUDA install
+      downloads about 2.5 GB, optional models up to 1.7 GB, and a search writes cache rows and
+      thumbnails; a full disk leaves a broken `.venv`, a half-downloaded model or failed cache
+      commits. Sketch: `shutil.disk_usage` checks with a clear message in `install_torch.py`
+      (size per variant) and in the app before a search (uncached photos × bytes per row +
+      top × profiles × thumbnail size + model weights not yet in `.cache/`) and before a first
+      model use; a warning, not a block. Check the drives of `results/` and `.cache/`. Affected:
+      `install_torch.py`, `framescout_core` (estimate, tested), `app.py`, README, user guide.
+      Size S. No hold point.
+      (done 2026-11-02 in PR #64: new `framescout_core/disk_space.py` estimates the space of a
+      PyTorch install (cpu 0.3 GB download + 1.2 GB installed, cuda 3 + 6 GB) and of a search
+      (photos x 10 KB cache row + min(top, photos) x profiles x 50 KB thumbnail + model and
+      detector downloads not yet present) and returns the drives that would keep less than
+      1 GB free. `install_torch.py` warns and asks `Install anyway? [Y/N]` (N exits 1; no
+      console continues; `--dry-run` only warns); the app run tab shows a warning and Start
+      stays enabled. Compatibility: none. Tested with unit tests (`test_disk_space.py`, new
+      installer tests in `test_torch_install.py`). Not tested: a real full disk, a real
+      CUDA install. The CUDA size is an estimate and every photo counts as uncached. Open:
+      I33, E51.)
