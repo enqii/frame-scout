@@ -88,6 +88,20 @@ def check_cache(results, alive, lock_timeout=CLEANUP_LOCK_TIMEOUT):
     return result
 
 
+def cache_check_current(results, result):
+    """Whether the cache file of results is still as the check_cache result result saw it (F1 review).
+
+    False once the file was changed, created or removed since the check, e.g. by a cleanup
+    (deleted rows, compacting), a search started in any tab or a rename, so the app drops
+    the outdated result and its rename offer. A refused check stays (it says why, not what
+    the file is like). One stat of the file.
+    """
+    if result.get('refused'):
+        return True
+    expected = result.get('file')
+    return _file_key(Path(results) / CACHE_FILE) == (None if expected is None else tuple(expected))
+
+
 def set_cache_aside(results, alive, expected, lock_timeout=CLEANUP_LOCK_TIMEOUT, now=None):
     """Rename the damaged cache file of results to <name>.broken-<YYYYMMDD-HHMMSS>; return the result (F1).
 

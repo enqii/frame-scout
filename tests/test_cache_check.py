@@ -8,7 +8,8 @@ import pytest
 
 import framescout_core
 from framescout_core import (CACHE_FILE, CACHE_SIDE_FILES, DEFAULT_YOLO_MODEL, MARKS_FILE, RUN_LOCK, RUN_STATUS,
-                             RunLock, check_cache, cleanup_running, prepare_cache, set_cache_aside)
+                             RunLock, cache_check_current, check_cache, cleanup_running, prepare_cache,
+                             set_cache_aside)
 
 # 2026-11-02 12:30:45 local time
 NOW = time.mktime((2026, 11, 2, 12, 30, 45, 0, 0, -1))
@@ -160,6 +161,39 @@ def test_the_check_holds_the_run_lock(tmp_path, monkeypatch):
     lock = RunLock(tmp_path / RUN_LOCK)
     assert lock.acquire()  # released afterwards
     lock.release()
+
+
+# --- whether a shown result still applies (review) ------------------------------------------
+
+def test_a_result_applies_until_the_cache_changes(tmp_path):
+    cache = healthy_cache(tmp_path)
+    result = check_cache(tmp_path, no_engine)
+    assert cache_check_current(tmp_path, result)
+    assert cache_check_current(tmp_path, dict(result, file=list(result['file'])))  # as kept by the app
+    con = sqlite3.connect(cache)
+    try:
+        con.execute('VACUUM')  # e.g. "Compact cache.sqlite3" of a cleanup, or a search writing rows
+    finally:
+        con.close()
+    os.utime(cache, ns=(result['file'][1] + 10**9,) * 2)  # a coarse clock: the size may stay the same
+    assert not cache_check_current(tmp_path, result)
+
+
+def test_a_result_no_longer_applies_once_the_cache_is_gone_or_created(tmp_path):
+    cache = healthy_cache(tmp_path)
+    result = check_cache(tmp_path, no_engine)
+    cache.unlink()  # e.g. renamed in another tab
+    assert not cache_check_current(tmp_path, result)
+    missing = check_cache(tmp_path, no_engine)
+    assert missing['state'] == 'missing' and cache_check_current(tmp_path, missing)
+    healthy_cache(tmp_path)  # the first search creates it
+    assert not cache_check_current(tmp_path, missing)
+
+
+def test_a_refused_check_stays_shown(tmp_path):
+    healthy_cache(tmp_path)
+    assert cache_check_current(tmp_path, {'refused': 'A search is running.', 'state': None, 'details': [],
+                                          'file': None})
 
 
 # --- setting a damaged cache aside ----------------------------------------------------------
