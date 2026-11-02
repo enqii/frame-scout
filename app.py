@@ -738,9 +738,11 @@ def show_results(results, photo_folders):
         (st.success if kind == 'success' else st.warning)(plain(text))
     if marks_error:
         offer = marks_backup_offer(marks_error)
+        # with a backup, no "remove it": without marks.json the restore is not offered (review, A40)
+        advice = ('Restore the backup below, or fix the file in the results folder' if offer
+                  else 'Fix or remove it in the results folder')
         st.warning(f'{MARKS_FILE} cannot be read, so marks are not shown and cannot be changed; FrameScout does not '
-                   f'change the file. Fix or remove it in the results folder'
-                   f'{", or restore the backup below" if offer else ""}.\n\nDetails: {plain(str(marks_error))}')
+                   f'change the file. {advice}.\n\nDetails: {plain(str(marks_error))}')
         if offer:
             st.caption(plain(offer))
             st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
