@@ -171,14 +171,23 @@ def render_thumbnail(path, target):
     im.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE)); im.save(target, quality=82)
 
 
-def crops_for(image, detector, options, lock):
-    """Return [(label, image)]: the whole photo, then each person found with detector.predict(**options)."""
+def crops_for(image, detector, options, lock, threads=None):
+    """Return [(label, image)]: the whole photo, then each person found with detector.predict(**options).
+
+    threads: the PyTorch thread count of a low-priority search (F4), set in this decoding
+    thread before and after the detector: Ultralytics sets its own count on its first
+    prediction on the CPU (min(8, CPU count - 1)), which would undo it (review).
+    """
     crops = [(FULL_IMAGE_LABEL, image)]
     if detector is None:
         return crops
     limit = options['max_det']
     with lock:  # one detector instance is shared by the decoding threads
+        if threads:
+            torch.set_num_threads(threads)
         result = detector.predict(source=image, **options)[0]
+        if threads:
+            torch.set_num_threads(threads)
     boxes = result.boxes.xyxy.cpu().tolist() if result.boxes is not None else []
     w, h = image.size
     for i, (x1, y1, x2, y2) in enumerate(boxes[:limit], 1):
@@ -230,8 +239,9 @@ def main():
                         help='weight of the reference image score (0..1); profiles without reference images use text only')
     # F4: the app's "Keep the PC responsive"; little effect on a GPU run
     parser.add_argument('--low-priority', action='store_true',
-                        help='run at a lower process priority and leave one or two CPU cores to other programs, so '
-                             'the PC stays responsive; the search may take longer')
+                        help='run at a lower process priority, so other programs get the CPU first, and keep one or '
+                             'two CPU cores out of the PyTorch threads; the search may take longer (the effect is not '
+                             'measured yet)')
     # E32: the input of the search-model evaluation (framescout_eval.py); not used by the app
     parser.add_argument('--scores-file', type=Path, default=None, metavar='JSON',
                         help='also write the raw text and reference similarity of every part of every photo '
@@ -291,10 +301,13 @@ def search(args, parser, roots, dropped, output, status):
     folders left out, with the reason, for the log.
     """
     if args.low_priority:
-        # first, so that scanning and model loading run at the lower priority too (F4); the
-        # app's stop works by process id and is not affected
+        # first, so that scanning and model loading run at the lower priority too (F4), and
+        # before any other thread starts: on Linux the niceness changes only the calling
+        # thread and the threads it starts later (review); the app's stop works by process
+        # id and is not affected
         problem = lower_priority()
-        print('Low priority: on, so the PC stays responsive; the search may take longer.' if problem is None else
+        print('Low priority: on; other programs get the CPU first and the search uses fewer threads for the AI '
+              'models, so it may take longer.' if problem is None else
               f'The priority could not be lowered ({problem}); the search runs at normal priority.', flush=True)
     for _, note in dropped:
         print(note, flush=True)
@@ -334,7 +347,8 @@ def search(args, parser, roots, dropped, output, status):
     if device == 'cuda' and not torch.cuda.is_available():
         parser.error(f'CUDA is not available; use --device cpu. {cuda_hint(torch.version.cuda)}')
     # fewer with --low-priority, so other programs keep a core (F4)
-    torch.set_num_threads(torch_threads(torch.get_num_threads(), args.low_priority))
+    cpu_threads = torch_threads(torch.get_num_threads(), args.low_priority)
+    torch.set_num_threads(cpu_threads)
     status.update('loading')
     print(f'{len(paths)} photos; {len(profiles)} search profiles; search model: {search_model.label} '
           f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
@@ -404,7 +418,8 @@ def search(args, parser, roots, dropped, output, status):
         long before), so the stored modification time and size belong to the analyzed content.
         """
         stat = path.stat()
-        crops = crops_for(open_image(path, min_size), detector, detect_options, detect_lock)
+        crops = crops_for(open_image(path, min_size), detector, detect_options, detect_lock,
+                          cpu_threads if args.low_priority else None)
         return stat, [label for label, _ in crops], torch.stack([preprocess(im) for _, im in crops])
 
     fresh = reused = errors = done = 0
