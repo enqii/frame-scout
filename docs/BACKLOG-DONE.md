@@ -1247,12 +1247,17 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `install_torch.py`, `framescout_core` (estimate, tested), `app.py`, README, user guide.
       Size S. No hold point.
       (done 2026-11-02 in PR #64: new `framescout_core/disk_space.py` estimates the space of a
-      PyTorch install (cpu 0.3 GB download + 1.2 GB installed, cuda 3 + 6 GB) and of a search
-      (photos x 10 KB cache row + min(top, photos) x profiles x 50 KB thumbnail + model and
-      detector downloads not yet present) and returns the drives that would keep less than
-      1 GB free. `install_torch.py` warns and asks `Install anyway? [Y/N]` (N exits 1; no
-      console continues; `--dry-run` only warns); the app run tab shows a warning and Start
-      stays enabled. Compatibility: none. Tested with unit tests (`test_disk_space.py`, new
-      installer tests in `test_torch_install.py`). Not tested: a real full disk, a real
-      CUDA install. The CUDA size is an estimate and every photo counts as uncached. Open:
-      I33, E51.)
+      PyTorch install (cpu 0.3 GB download + 1.2 GB installed, cuda 3 + 6 GB; 0.2 + 0.4 GB
+      for the other packages when PyTorch is installed but they are not) and of a search
+      (photos not yet analyzed with the current settings x 10 KB cache row + min(top, photos)
+      x profiles x 50 KB thumbnail + model and detector downloads not yet present) and
+      returns the drives (volumes) that would keep less than 1 GB free, in 1024-based units;
+      a drive root that does not answer within 1 s is left out. `install_torch.py` warns and
+      asks `Install anyway? [Y/N]` (N exits 3, which the `.bat` reports as "Installation
+      stopped"; no console continues; `--dry-run` only warns); the app run tab shows a
+      warning, reused for 30 s, and Start stays enabled. Review: 8 findings, all fixed.
+      Compatibility: none (new installer exit code 3 only for the stop). Tested with unit
+      tests (`test_disk_space.py`, `test_cache_dirs.py`, new installer tests in
+      `test_torch_install.py`) and an `AppTest` render of the run tab. Not tested: a real
+      full disk, a real CUDA install, a real disconnected network share. The CUDA size is an
+      estimate. Open: I33, E51.)

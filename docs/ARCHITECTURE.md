@@ -164,9 +164,10 @@ the module of its area and to the re-exports in `__init__.py`.
   default's too. Since E16 each model also names `weights_repo` and `tokenizer_repo`
   (the Hugging Face Hub repositories open_clip loads the weights and a Hugging Face
   tokenizer from; `''` = built-in tokenizer; tested against open_clip's config).
-- `cache_dirs.py` (E9/I10): `CACHE_DIR`/`cache_paths`/`default_cache_env`/`yolo_weights`
-  (the project's `.cache/` folders and the engine's defaults for them; see "Environment
-  variables and caches").
+- `cache_dirs.py` (E9/I10): `CACHE_DIR`/`cache_paths`/`default_cache_env`/`yolo_weights`/`find_yolo_weights`
+  (the project's `.cache/` folders and the engine's defaults for them; `find_yolo_weights`
+  is `yolo_weights`' lookup without moving anything, also used by the disk space check; see
+  "Environment variables and caches").
 - `hub.py` (E16/E31/E33): `HUB_QUIET_ENV`/`WEIGHTS_FILES`/`TOKENIZER_FILES`/`OFFLINE_VARIABLES`/`hub_cache_dir`/`hub_file_cached`/`model_cached`/`import_open_clip`/`hub_go_online`/`hub_file_error`/`load_with_hub_fallback`
   (loading a search model without a Hub request once it is cached; see "Environment
   variables and caches").
@@ -208,16 +209,28 @@ the module of its area and to the re-exports in `__init__.py`.
 - `cache_check.py` (F1): `CACHE_CHECK_LINES`/`CACHE_SIDE_FILES`/`check_cache`/`cache_check_current`/`set_cache_aside`
   (the cache health check and renaming a damaged cache, see "Storage cleanup").
   `_common._broken_names` builds the `<name>.broken-<YYYYMMDD-HHMMSS>[-n]` names.
-- `disk_space.py` (F3): the free disk space estimate. `TORCH_INSTALL_SPACE` (download,
-  installed bytes per build: `cpu` 0.3 + 1.2 GB, `cuda` 3 + 6 GB; the CPU numbers are
-  measured, the CUDA ones an estimate, I33), `CACHE_BYTES_PER_PHOTO` (10 KB),
+- `disk_space.py` (F3): the free disk space estimate. Sizes are 1024-based, the units
+  `size_text` shows (1 GB = 1024³ bytes). `TORCH_INSTALL_SPACE` (download, installed bytes
+  per build: `cpu` 0.3 + 1.2 GB, `cuda` 3 + 6 GB; the CPU numbers are measured, the CUDA
+  ones an estimate, I33), `OTHER_PACKAGES_SPACE` (0.2 + 0.4 GB: the `requirements.txt` part
+  of it, for a rerun with PyTorch installed), `CACHE_BYTES_PER_PHOTO` (10 KB),
   `THUMBNAIL_BYTES` (50 KB), `DETECTOR_DOWNLOAD` (6 MB), `SPACE_RESERVE` (1 GB),
-  `LowSpace(folder, needed, free)`, `download_bytes("605 MB")` (parses
-  `SearchModel.download`), `search_space_bytes(photos, top, profiles)` (every photo counts
-  as uncached), `search_space_needs`, `torch_install_needs`, `low_space` (groups the needs
-  by drive – `st_dev` plus the anchor of the nearest existing folder, nothing is created –
-  and returns the drives where free − needed < reserve; a need of 0 or a drive that cannot
-  be asked gives no warning) and `low_space_lines`.
+  `SPACE_CHECK_TIMEOUT` (1 s), `LowSpace(folder, needed, free)`, `download_bytes("605 MB")`
+  (parses `SearchModel.download`), `search_space_bytes(photos, top, profiles, analyzed=0)`
+  (cache rows for the photos not analyzed yet), `analyzed_photos(cache_file, signature,
+  paths)` (how many of the paths have rows of the signature; read-only, an index-only query,
+  a missing or unreadable cache counts as empty), `search_space_needs` (looks at the hub
+  cache and the detector weights only if their root answers in time), `app_search_needs`
+  (the needs of a search the app starts: the `cache_paths(base)` variables over the
+  environment, as `cache_env` sets them, the hub cache from `hub_cache_dir`, the weights
+  from `find_yolo_weights`), `torch_install_needs(build, venv, temp, torch=True)`,
+  `low_space` (probes the drive or share roots first with cleanup's threaded
+  `_reachable_roots` and `SPACE_CHECK_TIMEOUT`, leaving out a root that does not answer;
+  groups the needs by volume – device number, or the anchor if it is 0, plus the volume
+  size, so one volume reached through a subst or mapped letter or a UNC path is one drive
+  and cloned disks with the same serial number stay apart – on the nearest existing folder,
+  nothing is created; returns the drives where free − needed < reserve; a need of 0 or a
+  drive that cannot be asked gives no warning) and `low_space_lines`.
 - `portable_python.py` (P5 part C):
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
   the installer downloads into `.python`; constants only, checked against the `.bat` by
@@ -396,13 +409,18 @@ for every GPU, else for the most capable one). Without an argument an installed 
 is kept and nothing is asked; otherwise it asks for GPU support only if `nvidia-smi` finds
 an NVIDIA driver. If no CUDA build fits, an installed CUDA build is kept, otherwise the
 CPU build is installed; **only an explicit `cpu` replaces a CUDA build** (PR #8 review). A
-matching installed build is not downloaded again. Before the pip call, and only if the
-build is not installed yet (F3), it checks the free space of the drives of `sys.prefix`
-(the venv) and `tempfile.gettempdir()` (`.tmp` under `Install-FrameScout.bat`) with
-`framescout_core.torch_install_needs`/`low_space`; on low space it prints the drives and
-asks `Install anyway? [Y/N]` (no console: continues; `--dry-run` only warns). N prints
-"PyTorch was not installed." and exits 1. Exit code 0 done, 1 failed or stopped on low
-disk space. Standard library only.
+matching installed build is not downloaded again. Before the pip call (F3) it checks the
+free space of the drives of `sys.prefix` (the venv) and `tempfile.gettempdir()` (`.tmp`
+under `Install-FrameScout.bat`) with `framescout_core.torch_install_needs`/`low_space`;
+with the build installed already it still checks the space of the other packages
+(`torch=False`, `OTHER_PACKAGES_SPACE`) unless every name of `requirements.txt`
+(`requirement_names`) is installed, since the `.bat` installs them next (review). On low
+space it prints the drives and asks `Install anyway? [Y/N]` (no console: continues;
+`--dry-run` only warns). N prints "PyTorch was not installed." (or "The other packages were
+not installed.") and exits with `STOPPED_EXIT_CODE` 3; the `.bat` checks `errorlevel 3`
+before `errorlevel 1` and says "Installation stopped. Free some disk space, then run
+Install-FrameScout.bat again." instead of "Installing PyTorch failed" (review). Exit code 0
+done, 1 failed, 3 stopped by the user on low disk space. Standard library only.
 
 ### `Uninstall-FrameScout.bat` and `framescout_uninstall.py`
 
@@ -1213,14 +1231,22 @@ is the launcher, the pid in the status file the engine (its child); killing the 
 also ends the engine (verified).
 
 Disk space warning (F3): while photo folders exist and no search runs, the run tab calls
-`low_space_warning(photos, top, profile_count, model, person_detection)` and shows an
-`st.warning` for the drives that would keep less than 1 GB free: what the search writes
-(cache, thumbnails, first-use model and detector downloads) and the hint to free space or
-lower "Maximum matches per search profile". Start stays enabled. It looks at `results/`,
-the Hub cache (`hub_cache_dir` with the `cache_paths(BASE)` variables, as `cache_env` sets
-them; a user's `HF_HUB_CACHE` is respected) and the detector weights (`BASE/yolo11n.pt` if
-present, else `.cache/ultralytics/yolo11n.pt`; none when person detection is off). Any
-exception in the check gives no warning.
+`low_space_warning(photos, top, profile_count, model, person_detection, analyzed)` and
+shows an `st.warning` for the drives that would keep less than 1 GB free: what the search
+writes (cache, thumbnails, first-use model and detector downloads) and the hint to free
+space or lower "Maximum matches per search profile". Start stays enabled. `analyzed` comes
+from `cached_analyzed_photos` (`analyzed_photos` of the scanned paths with the current
+settings' signature `cleanup_signature()`, an `st.cache_data` keyed on `file_key` of the
+cache file, the signature and the scan's folders and `counted_at`), so a repeat search of
+an analyzed collection counts no cache rows (review). The folders come from
+`app_search_needs(BASE, RESULTS, os.environ, …)`: `results/`, the Hub cache
+(`hub_cache_dir` with the `cache_paths(BASE)` variables, as `cache_env` sets them; a
+user's `HF_HUB_CACHE` is respected) and the detector weights (`find_yolo_weights` with base
+and working folder `BASE`, as the engine runs; none when person detection is off).
+`low_space_warning` is an `st.cache_data` with `ttl=LOW_SPACE_TTL` (30 s), and a drive
+root that does not answer within `SPACE_CHECK_TIMEOUT` is left out, so a disconnected
+network share does not block the page runs (review). `OSError` and `ValueError` give no
+warning; other exceptions are not swallowed (review).
 
 ### Stopping a search
 
@@ -1357,7 +1383,7 @@ target folders (A17) with their deletion with a profile and no saves for a name 
 profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate and drive grouping in `test_disk_space.py` and the installer's check and question in `test_torch_install.py` (F3), unreachable roots simulated by patching
+`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` in `test_cache_dirs.py`, and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the stale temporary files of
 `auto_cleanup` (E26, `test_cleanup.py`: removed; fresh ones, foreign ones and gallery names
