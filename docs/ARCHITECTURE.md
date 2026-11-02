@@ -231,6 +231,14 @@ the module of its area and to the re-exports in `__init__.py`.
   and cloned disks with the same serial number stay apart – on the nearest existing folder,
   nothing is created; returns the drives where free − needed < reserve; a need of 0 or a
   drive that cannot be asked gives no warning) and `low_space_lines`.
+- `priority.py` (F4): `MAX_TORCH_THREADS` (12), `BELOW_NORMAL_PRIORITY_CLASS` (0x4000),
+  `LOW_PRIORITY_NICE` (10), `torch_threads(available, low_priority=False)` (normal:
+  `min(12, max(1, available))`; low priority additionally at most `available - 1`,
+  `available - 2` from 8 cores on, never below 1, so a CPU above the cap keeps its thread
+  count) and `lower_priority(os_name=None, set_priority_class=None, nice=None)` (Windows:
+  `SetPriorityClass(BELOW_NORMAL_PRIORITY_CLASS)` via ctypes; elsewhere `os.nice(10)`;
+  returns None or the error text of an `OSError`, never raises; the parameters allow tests
+  to inject the calls). Standard library only.
 - `portable_python.py` (P5 part C):
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
   the installer downloads into `.python`; constants only, checked against the `.bat` by
@@ -979,7 +987,9 @@ strings, saved without empty or blank entries; an empty list is allowed and disa
 the Start button; A25), `device`
 `auto|cpu|cuda` ("cuda" is offered only if `torch.cuda.is_available()`, A7; a saved device
 PyTorch cannot use is shown and used as "auto" but stays saved until another one or "Use
-auto from now on" is chosen), `batch_size` 8, `top` 150, `person_detection` on,
+auto from now on" is chosen), `batch_size` 8, `low_priority` off (F4: bool, not written
+while off, an invalid value falls back with the usual warning; in `AI_SETTINGS` after
+`batch_size`; Start passes `--low-priority` when on), `top` 150, `person_detection` on,
 `max_persons` 12, `person_confidence` .30, `reference_weight` 0.3
 (`DEFAULT_REFERENCE_WEIGHT`; 0.35 before PR #11, a saved value is not migrated), `model`
 (a registry key, `DEFAULT_MODEL`; not written when it is the default; a free-text name or a
@@ -1230,6 +1240,16 @@ page when the state changes. On Windows the venv's `python.exe` is a launcher: `
 is the launcher, the pid in the status file the engine (its child); killing the launcher
 also ends the engine (verified).
 
+Low priority (F4): the engine option `--low-priority` makes `search()` call
+`lower_priority()` first (scanning and model loading run low too) and log "Low priority:
+on, …" or, if it failed, "The priority could not be lowered (…); the search runs at normal
+priority."; `torch.set_num_threads` uses `torch_threads(torch.get_num_threads(),
+args.low_priority)`. The engine lowers its own priority, not the app via `Popen`
+`creationflags`, so a manual CLI run behaves the same and the start/stop logic above (process
+tree, pid in the status file, `engine_alive`) is unchanged; on Windows only the interpreter
+behind the venv launcher is lowered. The decoding threads (E2) are not reduced. The effect
+is not measured (E52).
+
 Disk space warning (F3): while photo folders exist and no search runs, the run tab calls
 `low_space_warning(photos, top, profile_count, model, person_detection, analyzed)` and
 shows an `st.warning` for the drives that would keep less than 1 GB free: what the search
@@ -1411,6 +1431,10 @@ CSS of `mark_style` and its Streamlit pin, `test_marks.py`) and the AI settings 
 (`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
 `test_settings.py`; A24, A26; the buttons and the mark colors were run with `AppTest`/the
 generated style only, not in a browser),
+the thread counts and the priority (`torch_threads`, `lower_priority` with injected calls,
+the failure text, and a child process that really lowers and reads back its priority class:
+`test_priority.py`; `low_priority` in `test_settings.py`; F4; the slowdown and the gain in
+responsiveness are not measured, E52; `os.nice` is not run on a non-Windows OS),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search

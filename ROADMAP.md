@@ -28,7 +28,8 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
       (done 2026-11-02 in PR #62)
 - [x] (B) Free disk space check before installing and searching (F3)
       (done 2026-11-02 in PR #64; follow-ups I33, E51)
-- [ ] (C) "Keep the PC responsive" option, measured together with P10 (B) (F4)
+- [x] (C) "Keep the PC responsive" option, measured together with P10 (B) (F4)
+      (done 2026-11-02 in PR #65; the effect is not measured yet: follow-up E52, with E17)
 
 ### P13 – Export (added 2026-11-02)
 - [ ] Export a result list as CSV / file list (F5)
