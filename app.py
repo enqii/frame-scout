@@ -24,7 +24,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
-                             hub_cache_dir, low_space, low_space_lines, search_space_needs,
+                             find_yolo_weights, hub_cache_dir, low_space, low_space_lines, search_space_needs,
                              hidden_text, hide_no_match, mark_style,
                              profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
@@ -1068,10 +1068,9 @@ def low_space_warning(photos, top, profile_count, model, person_detection):
         env = {**os.environ, **{name: str(path) for name, path in paths.items()}}
         weights = None
         if person_detection:
-            # where the engine finds the weights (yolo_weights): a copy in BASE is moved, not downloaded
-            weights = BASE / DEFAULT_YOLO_MODEL
-            if not weights.is_file():
-                weights = paths['YOLO_CONFIG_DIR'] / DEFAULT_YOLO_MODEL
+            # where the engine finds the weights (it runs in BASE with the cache_env variables)
+            found, cached = find_yolo_weights(DEFAULT_YOLO_MODEL, BASE, BASE, env)
+            weights = found or cached
         low = low_space(search_space_needs(RESULTS, photos, top, profile_count, MODELS[model], hub_cache_dir(env),
                                            weights))
     except Exception:

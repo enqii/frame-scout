@@ -47,12 +47,11 @@ def yolo_weights(name, base, cwd, environ, log=None, replace=os.replace):
     """
     if Path(name).name != name:
         return name
-    folder = environ.get('YOLO_CONFIG_DIR') or cache_paths(base)['YOLO_CONFIG_DIR']
-    cached = Path(folder) / name
-    if cached.is_file():
+    found, cached = find_yolo_weights(name, base, cwd, environ)
+    if found is None or found == cached:
         return str(cached)
     legacy = Path(base) / name
-    if name == DEFAULT_YOLO_MODEL and legacy.is_file():
+    if name == DEFAULT_YOLO_MODEL and found == legacy:
         try:
             cached.parent.mkdir(parents=True, exist_ok=True)
             replace(legacy, cached)
@@ -63,6 +62,25 @@ def yolo_weights(name, base, cwd, environ, log=None, replace=os.replace):
                 log(f'Could not move {legacy} to {cached}, using it where it is: {exc}')
             return str(legacy)
         return str(cached)
+    return name  # the file in the working folder
+
+
+def find_yolo_weights(name, base, cwd, environ):
+    """Return (found, cached) for the bare weights file name, without moving or downloading anything.
+
+    found is the file the detector loads, looked up as yolo_weights does: in the folder of
+    YOLO_CONFIG_DIR in environ (base/.cache/ultralytics if unset), the default file an older
+    version downloaded into base (yolo_weights moves it), a file in the working folder cwd;
+    None if there is none, so it is downloaded on first use. cached is the path in that
+    cache folder, where a download goes. The free disk space check uses it too (F3 review).
+    """
+    folder = environ.get('YOLO_CONFIG_DIR') or cache_paths(base)['YOLO_CONFIG_DIR']
+    cached = Path(folder) / name
+    if cached.is_file():
+        return cached, cached
+    legacy = Path(base) / name
+    if name == DEFAULT_YOLO_MODEL and legacy.is_file():
+        return legacy, cached
     if (Path(cwd) / name).is_file():
-        return name
-    return str(cached)
+        return Path(cwd) / name, cached
+    return None, cached
