@@ -42,7 +42,11 @@ writes to (`.venv` and the temporary folder `.tmp`). It estimates about 0.3 GB d
 and 1.2 GB installed for the CPU version, and about 3 GB download and 6 GB installed for
 the CUDA version (an estimate). If a drive would keep less than 1 GB free, it lists the
 drives and asks `Install anyway? [Y/N]`: a full disk during the installation leaves a
-broken installation. `N` stops the installer (PyTorch is not installed).
+broken installation. `N` stops the installer ("Installation stopped. Free some disk space,
+then run Install-FrameScout.bat again."). If PyTorch is installed already but other packages
+are missing (e.g. a full disk stopped the previous run), it checks the space they need
+(about 0.2 GB download and 0.4 GB installed) the same way. Sizes are in the units Windows
+Explorer shows (1 GB = 1024 MB).
 
 The installer picks the build from what `nvidia-smi` reports: CUDA 13.0 for GeForce RTX 20
 series or newer (compute capability 7.5+) with driver 580 or newer, otherwise CUDA 12.6
@@ -143,9 +147,12 @@ analyze – ranking only"; the detector is loaded only when a photo has to be an
 Before a search the run tab warns when a drive would keep less than 1 GB free after the
 search: it lists the drives with the space needed and the space free, and what the search
 writes (cache, thumbnails, and the search model or person detector if they still have to
-be downloaded). Every photo counts as not yet analyzed, so the figure is an upper
-estimate. The warning does not block "Start search"; free some space or lower "Maximum
-matches per search profile" to reduce the thumbnails.
+be downloaded). Only photos not yet analyzed with the current AI settings count for the
+cache, so a repeat search of an analyzed collection needs little. The figure is an
+estimate, checked again at most every 30 seconds; a drive that does not answer within a
+second (e.g. a disconnected network share) is left out. The warning does not block "Start
+search"; free some space or lower "Maximum matches per search profile" to reduce the
+thumbnails.
 
 **Results** shows the last finished search per profile: thumbnails, best first, 48 per
 page, with rank, score, the best-matching part ("Full image" or "Person 1", …) and the
