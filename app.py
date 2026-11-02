@@ -1178,6 +1178,7 @@ def widget_of_setting(name, value):
 
 # the labels of the AI settings' widgets, also used in the list of changed settings (A26)
 AI_LABELS = {'model': 'Search model', 'device': 'Compute device', 'batch_size': 'Batch size',
+             'low_priority': 'Keep the PC responsive during a search',
              'top': 'Maximum matches per search profile',
              'person_detection': 'Also detect individual persons in group photos (YOLO)',
              'max_persons': 'Maximum detected persons per photo',
@@ -1430,6 +1431,12 @@ with settings_tab:
                 st.rerun()
     st.number_input(AI_LABELS['batch_size'], **number_range('batch_size'), step=1, key=setting_key('batch_size'),
                     disabled=active, help=default_help('batch_size'))
+    # F4: the engine's --low-priority; its effect on the search time is not measured yet
+    st.checkbox(AI_LABELS['low_priority'], key=setting_key('low_priority'), disabled=active,
+                help=default_help('low_priority', 'Runs the search at a lower priority and leaves one or two CPU '
+                                                  'cores to other programs, so they stay usable. The search may take '
+                                                  'longer while you use the PC. Helps little when the GPU does the '
+                                                  'work.'))
     st.number_input(AI_LABELS['top'], **number_range('top'), step=25, key=setting_key('top'), disabled=active,
                     help=default_help('top'))
     st.checkbox(AI_LABELS['person_detection'], key=setting_key('person_detection'), disabled=active,
@@ -1493,6 +1500,8 @@ with run_tab:
             '--reference-weight',str(settings['reference_weight']),'--model',settings['model']]
         if not settings['person_detection']:
             cmd.append('--no-person-detection')
+        if settings['low_priority']:
+            cmd.append('--low-priority')  # the engine lowers its own priority (F4)
         st.session_state.pop('cleanup_scan', None)  # the search changes what a cleanup finds (E7)
         st.session_state.pop('cache_check', None)  # and the cache a check looked at (F1)
         try:

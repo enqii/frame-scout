@@ -31,7 +31,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              prepare_cache, profile_slugs, progress_due, publish_export,
                              progress_line, raw_preview_transpose, raw_preview_usable, result_card, results_document,
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
-                             store_group, supported_extensions, write_scores)
+                             store_group, supported_extensions, write_scores, lower_priority, torch_threads)
 
 # model downloads and library config files go to the project's .cache folder, as with the
 # .bat files and the app, also for a manual run; a variable the user set is kept (I10).
@@ -228,6 +228,10 @@ def main():
                              'their weights on first use and are not evaluated yet')
     parser.add_argument('--reference-weight', type=float, default=DEFAULT_REFERENCE_WEIGHT,
                         help='weight of the reference image score (0..1); profiles without reference images use text only')
+    # F4: the app's "Keep the PC responsive"; little effect on a GPU run
+    parser.add_argument('--low-priority', action='store_true',
+                        help='run at a lower process priority and leave one or two CPU cores to other programs, so '
+                             'the PC stays responsive; the search may take longer')
     # E32: the input of the search-model evaluation (framescout_eval.py); not used by the app
     parser.add_argument('--scores-file', type=Path, default=None, metavar='JSON',
                         help='also write the raw text and reference similarity of every part of every photo '
@@ -286,6 +290,12 @@ def search(args, parser, roots, dropped, output, status):
     roots: the photo folders to search (distinct_folders' kept list); dropped: the listed
     folders left out, with the reason, for the log.
     """
+    if args.low_priority:
+        # first, so that scanning and model loading run at the lower priority too (F4); the
+        # app's stop works by process id and is not affected
+        problem = lower_priority()
+        print('Low priority: on, so the PC stays responsive; the search may take longer.' if problem is None else
+              f'The priority could not be lowered ({problem}); the search runs at normal priority.', flush=True)
     for _, note in dropped:
         print(note, flush=True)
     # checked here, not before the lock, so the app's status names the error: a folder
@@ -323,7 +333,8 @@ def search(args, parser, roots, dropped, output, status):
     device = ('cuda' if torch.cuda.is_available() else 'cpu') if args.device == 'auto' else args.device
     if device == 'cuda' and not torch.cuda.is_available():
         parser.error(f'CUDA is not available; use --device cpu. {cuda_hint(torch.version.cuda)}')
-    torch.set_num_threads(min(12, max(1, torch.get_num_threads())))
+    # fewer with --low-priority, so other programs keep a core (F4)
+    torch.set_num_threads(torch_threads(torch.get_num_threads(), args.low_priority))
     status.update('loading')
     print(f'{len(paths)} photos; {len(profiles)} search profiles; search model: {search_model.label} '
           f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
