@@ -88,6 +88,44 @@ def test_an_error_that_is_no_damage_leaves_the_cache_unchecked(tmp_path, monkeyp
     assert result['state'] == 'unchecked' and result['details'] == ['unable to open database file']
 
 
+class FailingConnection:
+    """A connection whose quick_check fails with error, e.g. on a bad sector of the disk."""
+
+    def __init__(self, error):
+        self.error = error
+
+    def execute(self, sql):
+        raise self.error
+
+    def close(self):
+        pass
+
+
+@pytest.mark.parametrize('code', [sqlite3.SQLITE_IOERR, sqlite3.SQLITE_IOERR | (2 << 8), None])
+def test_a_disk_io_error_makes_the_cache_unreadable(tmp_path, monkeypatch, code):
+    # review: a bad sector shows as "disk I/O error" (an OperationalError), and setting the
+    # file aside is the remedy, so it is offered (SQLITE_IOERR_READ is an extended code)
+    cache = healthy_cache(tmp_path)
+    error = sqlite3.OperationalError('disk I/O error')
+    if code is not None:
+        error.sqlite_errorcode = code
+    monkeypatch.setattr(framescout_core.cache_check.sqlite3, 'connect', lambda *args, **kwargs: FailingConnection(error))
+    result = check_cache(tmp_path, no_engine)
+    assert result['state'] == 'unreadable' and result['details'] == ['disk I/O error']
+    assert result['file'] == (cache.stat().st_size, cache.stat().st_mtime_ns)
+    monkeypatch.undo()
+    done = set_cache_aside(tmp_path, no_engine, result['file'], now=NOW)
+    assert done == {'refused': None, 'renamed': [BROKEN]}
+
+
+def test_a_locked_cache_stays_unchecked(tmp_path, monkeypatch):
+    healthy_cache(tmp_path)
+    error = sqlite3.OperationalError('database is locked')
+    error.sqlite_errorcode = sqlite3.SQLITE_BUSY
+    monkeypatch.setattr(framescout_core.cache_check.sqlite3, 'connect', lambda *args, **kwargs: FailingConnection(error))
+    assert check_cache(tmp_path, no_engine)['state'] == 'unchecked'
+
+
 def test_the_check_is_refused_while_a_search_runs(tmp_path):
     healthy_cache(tmp_path)
     lock = RunLock(tmp_path / RUN_LOCK)
