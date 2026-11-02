@@ -39,7 +39,7 @@ from .thumbnails import (FULL_IMAGE_LABEL, crop_label, thumbnail_name, ensure_th
     SKIP_LOG_LIMIT, SkippedPhotos)
 from .pipeline import (progress_line, progress_due, DRAFT_REDUCING_GAP, DRAFT_DECODING, draft_size,
     group_batches, store_group, prefetch, Lazy)
-from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINAL_PHASES, NOTHING_NEW,
+from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINAL_PHASES, NOTHING_NEW, LOADING_DETECTOR,
     StatusReporter, write_status, stopped_status, started_in_time, final_status, read_status,
     run_active, status_fraction, status_text)
 from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,

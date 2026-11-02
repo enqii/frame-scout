@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (FINAL_PHASES, NOTHING_NEW, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
+from framescout_core import (FINAL_PHASES, LOADING_DETECTOR, NOTHING_NEW, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
                              read_status, run_active, started_in_time, status_fraction, status_text,
                              stopped_status, write_status)
 
@@ -294,6 +294,24 @@ def test_a_running_phase_shows_the_message_of_the_run():
     status = {'phase': 'scoring', 'done': 3, 'total': 10, 'message': NOTHING_NEW}
     assert status_text(status) == f'Scoring photos: 3/10 · {NOTHING_NEW}'
     assert status_text({'phase': 'exporting', 'message': NOTHING_NEW}) == f'Writing galleries · {NOTHING_NEW}'
+
+
+def test_the_detector_load_keeps_the_analysis_progress(tmp_path):
+    # the detector loads on the first photo the cache does not have: the analysis phase and
+    # its counts stay, the message names the load and is cleared afterwards (F2, review)
+    assert LOADING_DETECTOR == 'Loading the person detector'
+    path = tmp_path / RUN_STATUS
+    status = StatusReporter(path, 1)
+    status.update('analyzing', total=10)
+    status.update(done=4, cached=4)
+    status.update(message=LOADING_DETECTOR, force=True)
+    loading = read_status(path)
+    assert (loading['phase'], loading['done'], loading['total']) == ('analyzing', 4, 10)
+    counts = 'Analyzing photos: 4/10 · 0 new · 4 from cache · 0 errors'
+    assert status_text(loading) == f'{counts} · {LOADING_DETECTOR}'
+    assert status_fraction(loading) == pytest.approx(0.4)
+    status.update(message=None, force=True)
+    assert status_text(read_status(path)) == counts
 
 
 def test_a_final_phase_does_not_repeat_its_message():

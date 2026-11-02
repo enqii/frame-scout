@@ -21,7 +21,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RAW_EXT, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
-                             Lazy, NOTHING_NEW,
+                             Lazy, LOADING_DETECTOR, NOTHING_NEW,
                              final_status, yolo_weights,
                              RawFallback, SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
@@ -399,19 +399,22 @@ def search(args, parser, roots, dropped, output, status):
     fresh = reused = errors = done = 0
 
     def load_detector():
-        """Load the person detector (None without person detection), reporting the phase "loading"."""
+        """Load the person detector (None without person detection).
+
+        It loads in the middle of the analysis, after the cache scan: the phase stays
+        "analyzing" with its progress, the status message names the load (review).
+        """
         if not person_detection:
             return None
-        status.update('loading')
-        print('Loading the person detector ...', flush=True)
+        status.update(message=LOADING_DETECTOR, force=True)
+        print(f'{LOADING_DETECTOR} ...', flush=True)
         # without Ultralytics' usage analytics and run-time pip installs (E27, E28)
         YOLO = import_detector_class(os.environ, importlib.import_module, Image)
         # downloaded into .cache on first use, not into the working folder (E9); the cache
         # signature keeps the name as given
         loaded = YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), os.environ,
                                    lambda text: print(text, flush=True)))
-        # back to the analysis: the counts so far are kept (StatusReporter.update)
-        status.update('analyzing', total=len(paths), done=done)
+        status.update(message=None, force=True)
         return loaded
 
     # created on the first photo that is not in the cache: a repeat search on an analyzed
