@@ -27,6 +27,9 @@ _GB = 1024 ** 3
 # about 0.4 GB next. The CPU build was measured (torch 0.55 GB, all packages 0.9 GB on
 # Windows); the CUDA build is about 2.5 GB to download and was not measured unpacked.
 TORCH_INSTALL_SPACE = {'cpu': (300 * _MB, 1200 * _MB), 'cuda': (3 * _GB, 6 * _GB)}
+# the part of it the other packages of requirements.txt take, installed after PyTorch: what a
+# rerun of the installer needs when PyTorch is there but they are not (review; an estimate)
+OTHER_PACKAGES_SPACE = (200 * _MB, 400 * _MB)
 # the feature cache rows of one photo: float16 embeddings of the whole image and of the
 # person crops (about 2-3 KB per photo on average), with room for SQLite
 CACHE_BYTES_PER_PHOTO = 10_000
@@ -133,9 +136,15 @@ def app_search_needs(base, results, environ, photos, top, profiles, model, perso
                               timeout, reachable)
 
 
-def torch_install_needs(build, venv, temp):
-    """Return the (folder, bytes) pairs installing the PyTorch build ("cpu", "cu130", ...) writes."""
-    download, installed = TORCH_INSTALL_SPACE['cpu' if build == 'cpu' else 'cuda']
+def torch_install_needs(build, venv, temp, torch=True):
+    """Return the (folder, bytes) pairs installing the PyTorch build ("cpu", "cu130", ...) writes.
+
+    torch False: PyTorch is installed already, only the other packages are.
+    """
+    if torch:
+        download, installed = TORCH_INSTALL_SPACE['cpu' if build == 'cpu' else 'cuda']
+    else:
+        download, installed = OTHER_PACKAGES_SPACE
     return [(Path(temp), download), (Path(venv), installed)]
 
 

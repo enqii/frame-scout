@@ -379,7 +379,7 @@ def test_the_user_can_stop_on_low_disk_space(monkeypatch, capsys):
     monkeypatch.setattr('builtins.input', lambda prompt: next(answers))
     ran = Ran()
     monkeypatch.setattr(install_torch.subprocess, 'run', ran)
-    assert install_torch.main(['cpu']) == 1
+    assert install_torch.main(['cpu']) == install_torch.STOPPED_EXIT_CODE
     assert ran.commands == [] and 'Free some disk space' in capsys.readouterr().out
 
 
@@ -396,7 +396,49 @@ def test_low_disk_space_without_a_console_or_in_a_dry_run_continues(monkeypatch)
     assert install_torch.main(['cpu', '--dry-run']) == 0 and len(ran.commands) == 1
 
 
-def test_no_space_check_when_the_build_is_installed(monkeypatch):
+def test_the_user_stopping_has_its_own_exit_code(monkeypatch):
+    # review: Install-FrameScout.bat must not report a deliberate "N" as "Installing PyTorch failed"
+    low_drive(monkeypatch)
+    monkeypatch.setattr('builtins.input', lambda prompt: 'n')
+    monkeypatch.setattr(install_torch.subprocess, 'run', Ran())
+    assert install_torch.main(['cpu']) == install_torch.STOPPED_EXIT_CODE
+    assert install_torch.STOPPED_EXIT_CODE not in (0, 1, 2)  # 2: argparse's usage error
+    lines = (ROOT / 'Install-FrameScout.bat').read_text(encoding='utf-8').splitlines()
+    call = next(n for n, line in enumerate(lines) if 'install_torch.py' in line and not line.startswith('rem'))
+    # "if errorlevel N" means N or more: the stop is told apart before the failure line
+    assert lines[call + 1].startswith(f'if errorlevel {install_torch.STOPPED_EXIT_CODE} (')
+    assert 'run Install-FrameScout.bat again' in lines[call + 1] and 'exit /b 1' in lines[call + 1]
+    assert lines[call + 2].startswith('if errorlevel 1 (echo Installing PyTorch failed')
+
+
+def all_installed(monkeypatch, build):
+    """torch of build and every package of requirements.txt are installed."""
+    installed(monkeypatch, build)
+    torch_versions = install_torch.installed_version
+    monkeypatch.setattr(install_torch, 'installed_version', lambda name: torch_versions(name) or '1.0')
+
+
+def test_installed_build_still_checks_space_for_the_other_packages(monkeypatch, capsys):
+    # review: after a full disk stopped the requirements.txt step, the rerun keeps the installed
+    # torch but must still warn before pip installs the other packages
     installed(monkeypatch, 'cpu')
+    asked = low_drive(monkeypatch)
+    monkeypatch.setattr('builtins.input', lambda prompt: 'n')
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main(['cpu']) == install_torch.STOPPED_EXIT_CODE
+    assert ran.commands == []
+    assert asked == [torch_install_needs('cpu', sys.prefix, tempfile.gettempdir(), torch=False)]
+    out = capsys.readouterr().out
+    assert 'already installed' in out and 'the other packages' in out and 'PyTorch was not installed' not in out
+    # with every package of requirements.txt installed, pip writes nothing: no check
+    all_installed(monkeypatch, 'cpu')
     monkeypatch.setattr(install_torch, 'low_space', lambda needs: never_ask())
     assert install_torch.main(['cpu']) == 0
+
+
+def test_requirement_names_of_requirements_txt():
+    names = install_torch.requirement_names((ROOT / 'requirements.txt').read_text(encoding='utf-8'))
+    assert {'torch', 'torchvision', 'streamlit', 'open_clip_torch', 'pillow-heif', 'transformers'} <= set(names)
+    assert install_torch.requirement_names('# comment\n\nnumpy>=2 ; python_version>"3"\nfoo[bar]==1\n') == [
+        'numpy', 'foo']
