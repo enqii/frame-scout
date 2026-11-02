@@ -29,6 +29,9 @@ FINAL_PHASES = frozenset({'finished', 'failed', 'interrupted'})
 # the message of a run whose photos all come from the cache: no person detector is
 # loaded, the search only ranks (F2)
 NOTHING_NEW = 'Nothing new to analyze – ranking only'
+# the message while the person detector loads on the first photo the cache does not have:
+# the phase stays "analyzing" with its progress (F2, review)
+LOADING_DETECTOR = 'Loading the person detector'
 
 
 def _timestamp():
