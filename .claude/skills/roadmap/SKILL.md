@@ -199,7 +199,9 @@ Only when the user explicitly approves the merge of this specific PR in chat:
    the user approved → stop and report instead of merging.
 2. Check that the PR's worktree (if any) is clean and fully pushed
    (`git -C <path> status --porcelain` empty, `git -C <path> log --oneline origin/<branch>..HEAD`
-   empty), then `git worktree remove <path>` so the branches it holds can be deleted.
+   empty), then `git worktree remove <path>` so the branches it holds can be deleted. A
+   finished agent's worktree is usually still locked ("cannot remove a locked working
+   tree"): run `git worktree unlock <path>` first, as in section 4 (the agent has ended).
 3. `gh pr merge <n> --rebase --delete-branch --match-head-commit <headRefOid>` (refuses
    if anything was pushed after the CI gate; deletes the remote branch and, where
    possible, the local one).
