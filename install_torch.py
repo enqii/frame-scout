@@ -12,17 +12,21 @@ Install-FrameScout.bat runs it with the project venv before requirements.txt:
   update, never drops GPU support); otherwise, if nvidia-smi finds an NVIDIA driver, it
   asks whether to install GPU support, else it installs the CPU build.
 
-A build that is already installed is not downloaded again. --dry-run only prints the pip
-command. Standard library only. Exit codes: 0 done, 1 failed.
+A build that is already installed is not downloaded again. Before a download it warns if
+the drive of the venv or of the temporary folder has little free space (F3) and asks
+whether to continue (without a console it continues). --dry-run only prints the pip
+command. Standard library only. Exit codes: 0 done, 1 failed or stopped.
 """
 import argparse
 import shutil
 import subprocess
 import sys
+import tempfile
 from importlib import metadata
 
 from framescout_core import (CUDA_BUILDS, cuda_build, driver_text, installed_build_matches, installed_cuda_build,
-                             parse_gpu_query, torch_index_url, torch_requirements, unsupported_gpus)
+                             low_space, low_space_lines, parse_gpu_query, torch_index_url, torch_install_needs,
+                             torch_requirements, unsupported_gpus)
 
 KNOWN_CUDA_BUILDS = {build for build, *_ in CUDA_BUILDS}
 PYPI_INDEX = 'https://pypi.org/simple'
@@ -80,6 +84,39 @@ def chosen_cuda_build():
     return build
 
 
+def enough_space(build, ask):
+    """Warn if installing build leaves little free space on a drive (F3); return False if the user stops.
+
+    Checks the venv (sys.prefix), where pip installs, and the temporary folder, where it
+    downloads. ask: whether to ask to continue (not in a dry run).
+    """
+    low = low_space(torch_install_needs(build, sys.prefix, tempfile.gettempdir()))
+    if not low:
+        return True
+    print('Little free disk space: installing PyTorch and the other packages needs about this much on the drive of',
+          flush=True)
+    for line in low_space_lines(low):
+        print(f'  {line}', flush=True)
+    print('A full disk during the installation leaves a broken installation. Free some disk space first and run '
+          'the installer again.', flush=True)
+    if not ask or ask_continue():
+        return True
+    print('PyTorch was not installed.', flush=True)
+    return False
+
+
+def ask_continue():
+    """Ask whether to install despite little free space; True for yes. Without a console the answer is yes."""
+    while True:
+        try:
+            answer = input('Install anyway? [Y/N] ').strip().lower()
+        except EOFError:
+            print()
+            return True
+        if answer in ('y', 'n'):
+            return answer == 'y'
+
+
 def choose_build(variant, current):
     """Return the PyTorch build to install, or None if that is impossible without dropping GPU support.
 
@@ -120,6 +157,8 @@ def main(argv=None):
     if installed_build_matches(installed_version('torch'), installed_version('torchvision'), build):
         print(f'PyTorch {installed_version("torch")} ({build}) is already installed.', flush=True)
         return 0
+    if not enough_space(build, ask=not args.dry_run):
+        return 1
     if build == 'cpu':
         print('Installing PyTorch for the CPU.', flush=True)
     else:

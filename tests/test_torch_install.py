@@ -1,12 +1,14 @@
 """Choice of the PyTorch build in the installer (A7, I3)."""
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
 
 import install_torch
-from framescout_core import (TORCH_VERSION, TORCHVISION_VERSION, cuda_build, driver_text, installed_build_matches,
-                             installed_cuda_build, parse_gpu_query, torch_index_url, torch_requirements,
-                             unsupported_gpus)
+from framescout_core import (TORCH_VERSION, TORCHVISION_VERSION, LowSpace, cuda_build, driver_text,
+                             installed_build_matches, installed_cuda_build, parse_gpu_query, torch_index_url,
+                             torch_install_needs, torch_requirements, unsupported_gpus)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -161,6 +163,8 @@ def nothing_installed(monkeypatch):
     monkeypatch.setattr(install_torch, 'installed_version', lambda name: None)
     # and whether this PC has an NVIDIA driver
     monkeypatch.setattr(install_torch, 'driver_found', lambda: False)
+    # and that its drives have enough free space (F3)
+    monkeypatch.setattr(install_torch, 'low_space', lambda needs: [])
 
 
 def test_matching_build_is_not_installed_again(monkeypatch, capsys):
@@ -341,3 +345,58 @@ def test_dry_run_installs_nothing(monkeypatch, capsys):
 def test_unknown_variant_is_rejected():
     with pytest.raises(SystemExit):
         install_torch.main(['gpu'])
+
+
+# --- free disk space before the download (F3): a warning, never a block ---
+
+def low_drive(monkeypatch):
+    """Let the space check find a full drive; return the needs it was asked about."""
+    asked = []
+
+    def low(needs):
+        asked.append(needs)
+        return [LowSpace(Path('X:/FrameScout/.venv'), 6 * 1000 ** 3, 2 * 1000 ** 3)]
+    monkeypatch.setattr(install_torch, 'low_space', low)
+    return asked
+
+
+def test_low_disk_space_is_named_before_the_download(monkeypatch, capsys):
+    asked = low_drive(monkeypatch)
+    monkeypatch.setattr('builtins.input', lambda prompt: 'y')
+    monkeypatch.setattr(install_torch, 'query_gpus', lambda: '8.9, 581.57, NVIDIA GeForce RTX 4070\n')
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main(['cuda']) == 0 and len(ran.commands) == 1
+    # the venv's drive and the temporary folder's drive, with the size of the CUDA build
+    assert asked == [torch_install_needs('cu130', sys.prefix, tempfile.gettempdir())]
+    out = capsys.readouterr().out
+    assert 'Little free disk space' in out and 'about 5.6 GB needed, 1.9 GB free' in out
+
+
+def test_the_user_can_stop_on_low_disk_space(monkeypatch, capsys):
+    low_drive(monkeypatch)
+    answers = iter(['maybe', 'N'])
+    monkeypatch.setattr('builtins.input', lambda prompt: next(answers))
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main(['cpu']) == 1
+    assert ran.commands == [] and 'Free some disk space' in capsys.readouterr().out
+
+
+def test_low_disk_space_without_a_console_or_in_a_dry_run_continues(monkeypatch):
+    low_drive(monkeypatch)
+
+    def closed(prompt):
+        raise EOFError
+    monkeypatch.setattr('builtins.input', closed)
+    ran = Ran()
+    monkeypatch.setattr(install_torch.subprocess, 'run', ran)
+    assert install_torch.main(['cpu']) == 0 and len(ran.commands) == 1
+    monkeypatch.setattr('builtins.input', lambda prompt: never_ask())
+    assert install_torch.main(['cpu', '--dry-run']) == 0 and len(ran.commands) == 1
+
+
+def test_no_space_check_when_the_build_is_installed(monkeypatch):
+    installed(monkeypatch, 'cpu')
+    monkeypatch.setattr(install_torch, 'low_space', lambda needs: never_ask())
+    assert install_torch.main(['cpu']) == 0
