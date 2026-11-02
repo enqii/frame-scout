@@ -14,15 +14,19 @@ Install-FrameScout.bat runs it with the project venv before requirements.txt:
 
 A build that is already installed is not downloaded again. Before a download it warns if
 the drive of the venv or of the temporary folder has little free space (F3) and asks
-whether to continue (without a console it continues). --dry-run only prints the pip
-command. Standard library only. Exit codes: 0 done, 1 failed or stopped.
+whether to continue (without a console it continues); with the build installed it still
+checks for the other packages of requirements.txt the .bat installs next, unless they are
+all installed. --dry-run only prints the pip command. Standard library only. Exit codes:
+0 done, 1 failed, STOPPED_EXIT_CODE (3) stopped by the user on low disk space.
 """
 import argparse
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from importlib import metadata
+from pathlib import Path
 
 from framescout_core import (CUDA_BUILDS, cuda_build, driver_text, installed_build_matches, installed_cuda_build,
                              low_space, low_space_lines, parse_gpu_query, torch_index_url, torch_install_needs,
@@ -30,6 +34,30 @@ from framescout_core import (CUDA_BUILDS, cuda_build, driver_text, installed_bui
 
 KNOWN_CUDA_BUILDS = {build for build, *_ in CUDA_BUILDS}
 PYPI_INDEX = 'https://pypi.org/simple'
+# the user stopped on low disk space: Install-FrameScout.bat says so instead of "failed"
+# (review); not 1 (failure, also an uncaught exception) or 2 (argparse's usage error)
+STOPPED_EXIT_CODE = 3
+REQUIREMENTS = Path(__file__).resolve().parent / 'requirements.txt'
+_REQUIREMENT_NAME = re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)')
+
+
+def requirement_names(text):
+    """Return the package names of the requirements file text (comments and blank lines skipped)."""
+    names = []
+    for line in text.splitlines():
+        match = _REQUIREMENT_NAME.match(line.split('#', 1)[0])
+        if match:
+            names.append(match[1])
+    return names
+
+
+def other_packages_missing():
+    """Return whether a package of requirements.txt is not installed (an unreadable file counts as missing)."""
+    try:
+        names = requirement_names(REQUIREMENTS.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError):
+        return True
+    return any(installed_version(name) is None for name in names)
 
 
 def installed_version(name):
@@ -84,24 +112,25 @@ def chosen_cuda_build():
     return build
 
 
-def enough_space(build, ask):
+def enough_space(build, ask, torch=True):
     """Warn if installing build leaves little free space on a drive (F3); return False if the user stops.
 
     Checks the venv (sys.prefix), where pip installs, and the temporary folder, where it
-    downloads. ask: whether to ask to continue (not in a dry run).
+    downloads. ask: whether to ask to continue (not in a dry run); torch False: PyTorch is
+    installed, only the other packages of requirements.txt are installed next (review).
     """
-    low = low_space(torch_install_needs(build, sys.prefix, tempfile.gettempdir()))
+    low = low_space(torch_install_needs(build, sys.prefix, tempfile.gettempdir(), torch=torch))
     if not low:
         return True
-    print('Little free disk space: installing PyTorch and the other packages needs about this much on the drive of',
-          flush=True)
+    what = 'PyTorch and the other packages' if torch else 'the other packages'
+    print(f'Little free disk space: installing {what} needs about this much on the drive of', flush=True)
     for line in low_space_lines(low):
         print(f'  {line}', flush=True)
     print('A full disk during the installation leaves a broken installation. Free some disk space first and run '
           'the installer again.', flush=True)
     if not ask or ask_continue():
         return True
-    print('PyTorch was not installed.', flush=True)
+    print('PyTorch was not installed.' if torch else 'The other packages were not installed.', flush=True)
     return False
 
 
@@ -156,9 +185,13 @@ def main(argv=None):
         return 1
     if installed_build_matches(installed_version('torch'), installed_version('torchvision'), build):
         print(f'PyTorch {installed_version("torch")} ({build}) is already installed.', flush=True)
+        # Install-FrameScout.bat installs requirements.txt next; a rerun after a full disk
+        # stopped that step must warn again (review)
+        if other_packages_missing() and not enough_space(build, ask=not args.dry_run, torch=False):
+            return STOPPED_EXIT_CODE
         return 0
     if not enough_space(build, ask=not args.dry_run):
-        return 1
+        return STOPPED_EXIT_CODE
     if build == 'cpu':
         print('Installing PyTorch for the CPU.', flush=True)
     else:

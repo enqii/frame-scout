@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core import disk_space
-from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, SPACE_RESERVE, THUMBNAIL_BYTES,
+from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, OTHER_PACKAGES_SPACE, SPACE_RESERVE, THUMBNAIL_BYTES,
                              TORCH_INSTALL_SPACE, LowSpace, analyzed_photos, app_search_needs, download_bytes, low_space, low_space_lines,
                              search_space_bytes, search_space_needs, torch_install_needs)
 
@@ -157,6 +157,11 @@ def test_torch_install_needs_per_build(tmp_path):
         assert torch_install_needs(build, venv, temp) == [(temp, download), (venv, installed)]
     # the CUDA build is the large one (about 2.5 GB download)
     assert TORCH_INSTALL_SPACE['cuda'][0] >= 2 * GB > TORCH_INSTALL_SPACE['cpu'][0]
+    # PyTorch installed already: only the other packages of requirements.txt (review), which
+    # the sizes of a PyTorch install include
+    download, installed = OTHER_PACKAGES_SPACE
+    assert torch_install_needs('cu130', venv, temp, torch=False) == [(temp, download), (venv, installed)]
+    assert all(installed < space[1] for space in TORCH_INSTALL_SPACE.values())
 
 
 def test_enough_space_gives_no_warning(tmp_path):

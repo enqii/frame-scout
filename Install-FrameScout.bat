@@ -114,8 +114,9 @@ rem run in this folder.
 set "PIP_CONSTRAINT=constraints.txt"
 rem PyTorch first (CPU or CUDA build); requirements.txt pins the same version. Without an
 rem argument install_torch.py keeps an installed CUDA build, otherwise it asks if it finds
-rem an NVIDIA driver.
+rem an NVIDIA driver. Exit code 3: the user stopped on low disk space (F3), not a failure.
 ".venv\Scripts\python.exe" install_torch.py %TORCH_VARIANT%
+if errorlevel 3 (echo Installation stopped. Free some disk space, then run Install-FrameScout.bat again. & pause & exit /b 1)
 if errorlevel 1 (echo Installing PyTorch failed. See the error message above. & pause & exit /b 1)
 ".venv\Scripts\python.exe" -m pip install --no-cache-dir -r requirements.txt -c constraints.txt
 if errorlevel 1 (echo Installation failed. See the error message above. & pause & exit /b 1)
