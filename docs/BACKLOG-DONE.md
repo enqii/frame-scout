@@ -1216,3 +1216,24 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       a shown check result is dropped once the cache changes; no "remove it" advice when a
       backup is offered; a failed restore leaves no `.broken-` copy; the backup is written
       through the shared `_update_locked` without its own fsync.)
+- [x] **F2 – Load the person detector only when something needs analysis:** a repeat
+      search on an analyzed folder (only a profile text or the reference weight changed) still
+      loads YOLO (`detector = YOLO(...)` before the cache is consulted), which costs seconds
+      to tens of seconds on a CPU and on first use a download. Sketch: check the cache first
+      (paths, `mtime_ns`, size against the signature), create the detector lazily on the
+      first uncached photo, report "Nothing new to analyze – ranking only" in the status file.
+      Affected: `framescout_engine.py`, possibly a torch-free helper in `framescout_core`,
+      user guide. Risks: the detector must still be created under the lock and the E27/E28
+      offline flags; a load error now appears mid-run. Size S. No hold point.
+      (done 2026-11-02 in PR #62: the detector is wrapped in `framescout_core.Lazy` and
+      created in `analyze()` on the first non-empty list of photos to analyze (also the RAW
+      fallback pass), in the main thread, before the decoding threads use it; the E27/E28
+      flags and the E9 weights path are unchanged. While it loads, the status phase is
+      `loading` (then back to `analyzing`, counts kept). When nothing needed analysis the
+      log says `Nothing new to analyze – ranking only.` and the status `message` is
+      `NOTHING_NEW` during scoring and export; `status_text` appends the message of a running
+      phase. A detector load error now appears after the cache scan, mid-run. Tested with
+      unit tests (`Lazy`, `status_text` message; 997 passed, 2 skipped) and a CPU smoke run
+      with three generated photos: run 1 loaded the detector, run 2 (all from the cache) did
+      not, run 3 with one added photo loaded it again. Not tested: CUDA, the progress line in
+      a browser.)
