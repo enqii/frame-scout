@@ -420,10 +420,13 @@ installation, quick start, reliability of the matches, license. Details live in
 uninstalling) and `docs/DEVELOPMENT.md` (manual commands, CLI, tests, evaluation tool,
 project structure).
 
-### `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`
+### `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`, `docs/ROADMAP-DONE.md`
 
 `ROADMAP.md`: the prioritized roadmap that drives the PR workflow (open items first, the
-next item is the first `- [ ]` line; finished ones under "Done").
+next item is the first `- [ ]` line; checked-off lines stay in their package until every
+line of it is done).
+`docs/ROADMAP-DONE.md`: the packages whose lines are all done; `/triage` moves them there
+unchanged.
 `BACKLOG.md`: open items (IDs E/A/I/F, each with a status tag once triaged).
 `docs/BACKLOG-DONE.md`: finished items with their
 reports; an item moves there unchanged when its PR is merged (I22).
