@@ -673,10 +673,13 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
         assert path.exists(), path.name
     assert json.loads(keep[MARKS_FILE].read_text(encoding='utf-8')) == {'format': 1, 'profiles': {}}
     assert summary['marks'] == 1
+    # removing the mark kept the file before it as the backup (F1)
+    assert json.loads((project.results / 'marks.json.bak').read_text(encoding='utf-8'))['profiles'] == {
+        'Red car': {str(project.photos / 'gone.jpg'): 'match'}}
     assert summary['temporary'] == 1  # the temporary thumbnail, counted like in auto_cleanup
     assert (project.base / 'settings.json').exists() and project.profiles.exists()
     assert sorted(p.name for p in project.results.iterdir()) == sorted(
-        [*keep, CACHE_FILE, 'red-car.html', 'thumbnails'])
+        [*keep, 'marks.json.bak', CACHE_FILE, 'red-car.html', 'thumbnails'])
     assert [p.name for p in project.thumbs.iterdir()] == [T1]
     assert not project.legacy.exists()  # emptied, and no kept gallery links it
     assert project.rows() == [(str(photo), CURRENT)]
@@ -823,10 +826,12 @@ def test_auto_cleanup_removes_temporary_files_of_a_stopped_run(project):
     # left by terminate()/kill() during an atomic write (E26) or during publish_export (E24)
     project.write_results([('Red car', 'red-car.html', [])])
     (project.results / MARKS_FILE).write_text('{}', encoding='utf-8')
+    (project.results / 'marks.json.bak').write_text('{}', encoding='utf-8')
     stale = [temp_file(project.results, name, 120)
-             for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, 'red-car.html', 'cat-2.html')]
+             for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, 'marks.json.bak', 'red-car.html', 'cat-2.html')]
     # less than a minute old: possibly being written now (e.g. marks.json by an app session)
-    fresh = [temp_file(project.results, name, 5) for name in (RUN_STATUS, MARKS_FILE, 'red-car.html')]
+    fresh = [temp_file(project.results, name, 5) for name in (RUN_STATUS, MARKS_FILE, 'marks.json.bak',
+                                                              'red-car.html')]
     # not FrameScout's temporary files: also none of a gallery name profile_slugs never gives
     mine = [project.results / name for name in ('notes.tmp', 'results.json.mine.tmp', 'settings.json.abcdefgh.tmp',
                                                'red-car.html.abcdefgh.bak', 'Cat & dog.html.abcdefgh.tmp',
@@ -838,6 +843,7 @@ def test_auto_cleanup_removes_temporary_files_of_a_stopped_run(project):
     assert not any(p.exists() for p in stale)
     assert all(p.exists() for p in fresh + mine)
     assert (project.results / MARKS_FILE).exists() and (project.results / RESULTS_FILE).exists()
+    assert (project.results / 'marks.json.bak').exists()
     assert removed['files'] == removed['temporary'] == len(stale)
     assert removed['freed'] == len(stale) * len(b'partial')
 

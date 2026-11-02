@@ -2,13 +2,15 @@
 import json
 import re
 import threading
+import time
 from pathlib import Path
 
 import pytest
 
 from framescout_core import (MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
-                             MARKS_FILE, RunLock, UnknownProfileError, delete_marks, hidden_text, hide_no_match,
-                             lock_held, mark_style, page_cards, read_marks, remove_marks, rename_marks, save_marks)
+                             MARKS_BACKUP, MARKS_FILE, NEVER_DELETED, RunLock, UnknownProfileError, delete_marks,
+                             hidden_text, hide_no_match, lock_held, mark_style, marks_backup, page_cards, read_marks,
+                             remove_marks, rename_marks, restore_marks, save_marks)
 
 
 def stored(path):
@@ -378,3 +380,143 @@ def test_mark_style_was_checked_with_the_pinned_streamlit():
     constraints = (Path(__file__).resolve().parent.parent / 'constraints.txt').read_text(encoding='utf-8')
     pinned = re.search(r'^streamlit==(\S+)$', constraints, re.MULTILINE)
     assert pinned and pinned.group(1) == MARK_STYLE_STREAMLIT
+
+
+# --- backup and restore (F1) ----------------------------------------------------------------
+
+# 2026-11-02 12:30:45 local time
+NOW = time.mktime((2026, 11, 2, 12, 30, 45, 0, 0, -1))
+
+
+def test_the_backup_name():
+    assert MARKS_BACKUP == 'marks.json.bak'
+    assert marks_backup(Path('results') / MARKS_FILE) == Path('results') / MARKS_BACKUP
+    assert MARKS_BACKUP in NEVER_DELETED
+
+
+def test_a_save_keeps_the_previous_file_as_backup(tmp_path):
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
+    assert not marks_backup(path).exists()  # the first save has nothing to keep
+    first = path.read_bytes()
+    save_marks(path, 'Red car', {'b.jpg': MARK_NO_MATCH})
+    assert marks_backup(path).read_bytes() == first
+    second = path.read_bytes()
+    save_marks(path, 'Red car', {'a.jpg': MARK_OPEN})
+    assert marks_backup(path).read_bytes() == second  # one generation: the state before the latest save
+    assert read_marks(marks_backup(path)) == {'Red car': {'a.jpg': MARK_MATCH, 'b.jpg': MARK_NO_MATCH}}
+
+
+def test_a_save_that_changes_nothing_keeps_the_backup(tmp_path):
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
+    save_marks(path, 'Red car', {'b.jpg': MARK_MATCH})
+    backup = marks_backup(path).read_bytes()
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
+    assert marks_backup(path).read_bytes() == backup
+
+
+@pytest.mark.parametrize('change', [lambda path: rename_marks(path, 'Red car', 'Blue car'),
+                                    lambda path: delete_marks(path, 'Red car'),
+                                    lambda path: remove_marks(path, {('Red car', 'a.jpg')})])
+def test_renaming_deleting_and_removing_marks_keep_a_backup_too(tmp_path, change):
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
+    before = path.read_bytes()
+    change(path)
+    assert marks_backup(path).read_bytes() == before
+
+
+def test_an_unreadable_file_never_replaces_the_backup(tmp_path):
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
+    save_marks(path, 'Red car', {'b.jpg': MARK_MATCH})
+    backup = marks_backup(path).read_bytes()
+    path.write_text('{broken', encoding='utf-8')
+    with pytest.raises(ValueError):
+        save_marks(path, 'Red car', {'c.jpg': MARK_MATCH})
+    assert marks_backup(path).read_bytes() == backup
+
+
+DAMAGED = b'{"format": 1, "prof\x00\x00'  # e.g. a power loss during a sync tool's write
+
+
+def damaged(tmp_path):
+    """A marks file that became unreadable after two saves; its backup holds the first."""
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH, 'b.jpg': MARK_NO_MATCH})
+    save_marks(path, 'Dog', {'c.jpg': MARK_MATCH})
+    path.write_bytes(DAMAGED)
+    return path
+
+
+def test_restoring_copies_the_backup_and_keeps_the_damaged_file(tmp_path):
+    path = damaged(tmp_path)
+    backup = marks_backup(path).read_bytes()
+    restored, kept = restore_marks(path, now=NOW)
+    assert restored == 2
+    assert kept == tmp_path / 'marks.json.broken-20261102-123045'
+    assert kept.read_bytes() == DAMAGED
+    assert path.read_bytes() == backup and marks_backup(path).read_bytes() == backup
+    assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH, 'b.jpg': MARK_NO_MATCH}}
+    # a second damaged file of the same second gets a name of its own
+    path.write_text('{broken', encoding='utf-8')
+    assert restore_marks(path, now=NOW)[1] == tmp_path / 'marks.json.broken-20261102-123045-2'
+    assert kept.read_bytes() == DAMAGED
+
+
+def test_a_readable_file_is_never_replaced_by_the_backup(tmp_path):
+    path = damaged(tmp_path)
+    fixed = path.with_name('fixed.json')
+    save_marks(fixed, 'Red car', {'a.jpg': MARK_MATCH})
+    path.write_bytes(fixed.read_bytes())  # fixed by hand meanwhile, or restored in another tab
+    with pytest.raises(ValueError, match='can be read'):
+        restore_marks(path, now=NOW)
+    assert path.read_bytes() == fixed.read_bytes()
+    assert not list(tmp_path.glob('*.broken-*'))
+
+
+@pytest.mark.parametrize('backup', [None, b'{broken', b'{"format": 2, "profiles": {}}'])
+def test_nothing_is_restored_without_a_readable_backup(tmp_path, backup):
+    path = damaged(tmp_path)
+    if backup is None:
+        marks_backup(path).unlink()
+    else:
+        marks_backup(path).write_bytes(backup)
+    with pytest.raises(ValueError, match=re.escape(MARKS_BACKUP)):
+        restore_marks(path, now=NOW)
+    assert path.read_bytes() == DAMAGED
+    assert not list(tmp_path.glob('*.broken-*'))
+
+
+def test_a_missing_file_gets_the_backup(tmp_path):
+    # removed by hand after the app offered the restore: nothing is lost by restoring
+    path = damaged(tmp_path)
+    path.unlink()
+    assert restore_marks(path, now=NOW) == (2, None)
+    assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH, 'b.jpg': MARK_NO_MATCH}}
+
+
+def test_restoring_waits_for_the_lock_and_gives_up(tmp_path):
+    path = damaged(tmp_path)
+    lock = RunLock(tmp_path / (MARKS_FILE + '.lock'))
+    assert lock.acquire()
+    try:
+        with pytest.raises(OSError):
+            restore_marks(path, now=NOW, lock_timeout=0.05)
+    finally:
+        lock.release()
+    assert path.read_bytes() == DAMAGED and not list(tmp_path.glob('*.broken-*'))
+
+
+def test_a_failed_restore_leaves_the_damaged_file(tmp_path, monkeypatch):
+    import framescout_core.marks as marks_module
+    path = damaged(tmp_path)
+
+    def fail(*args, **kwargs):
+        raise OSError('disk full')
+
+    monkeypatch.setattr(marks_module, '_replace_with_retry', fail)
+    with pytest.raises(OSError):
+        restore_marks(path, now=NOW, attempts=1)
+    assert path.read_bytes() == DAMAGED

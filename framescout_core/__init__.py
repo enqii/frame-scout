@@ -48,9 +48,9 @@ from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
 from .results import (RESULTS_FILE, RESULTS_FORMAT, GALLERY_PAGE_SIZE, search_fingerprint,
     profile_fingerprints, profile_state, result_card, results_document, publish_export,
     read_results, page_count, page_cards, openable_photo, open_command, reveal_command)
-from .marks import (MARKS_FILE, MARKS_FORMAT, MARK_OPEN, MARK_MATCH, MARK_NO_MATCH, MARK_STATES,
-    MARKS_LOCK_TIMEOUT, read_marks, save_marks, rename_marks, delete_marks, remove_marks, hide_no_match,
-    hidden_text, MARK_COLORS, MARK_STYLE_STREAMLIT, mark_style)
+from .marks import (MARKS_FILE, MARKS_BACKUP, MARKS_FORMAT, MARK_OPEN, MARK_MATCH, MARK_NO_MATCH, MARK_STATES,
+    MARKS_LOCK_TIMEOUT, marks_backup, read_marks, save_marks, rename_marks, delete_marks, remove_marks,
+    restore_marks, hide_no_match, hidden_text, MARK_COLORS, MARK_STYLE_STREAMLIT, mark_style)
 from .copying import (COPY_FOLDERS_KEY, COPY_MAX_NAMES, default_copy_folder, copy_target,
     copy_photos, copy_summary_text, read_copy_folders, save_copy_folder, rename_copy_folder, forget_copy_folder)
 from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLEANUP_CATEGORIES,
