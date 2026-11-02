@@ -30,7 +30,18 @@ def test_the_defaults_are_the_previous_session_defaults(tmp_path):
     assert default_settings(tmp_path) == {
         'photo_folders': [str(tmp_path / 'photos')], 'device': 'auto', 'batch_size': 8, 'top': 150,
         'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.3,
-        'model': DEFAULT_MODEL}
+        'model': DEFAULT_MODEL, 'low_priority': False}
+
+
+def test_keep_the_pc_responsive_is_an_ai_setting_off_by_default(tmp_path, defaults):
+    # F4: an older settings.json without it runs at normal priority, as before
+    assert defaults['low_priority'] is False and 'low_priority' in AI_SETTINGS
+    path = tmp_path / 'settings.json'
+    assert save_settings(path, {'low_priority': True}, defaults) == {'low_priority': True}
+    assert stored(path) == {'low_priority': True}
+    assert read_settings(path, defaults) == ({**defaults, 'low_priority': True}, [])
+    save_settings(path, {'low_priority': False}, defaults)  # the default is not written
+    assert stored(path) == {}
 
 
 def test_the_search_model_is_a_registry_key(tmp_path, defaults):
@@ -81,6 +92,7 @@ def test_a_byte_order_mark_is_accepted(tmp_path, defaults):
     ('photo_folder', 5), ('device', 'gpu'), ('device', None),
     ('batch_size', 0), ('batch_size', 65), ('batch_size', 8.0), ('batch_size', True), ('batch_size', '8'),
     ('top', 5001), ('max_persons', 51), ('person_detection', 1), ('person_detection', 'yes'),
+    ('low_priority', 1), ('low_priority', 'true'), ('low_priority', None),
     ('person_confidence', 0.05), ('person_confidence', 0.95), ('person_confidence', True),
     ('reference_weight', -0.1), ('reference_weight', 1.5), ('reference_weight', float('nan')),
     # a free-text OpenCLIP name or a model no longer offered (E22)
