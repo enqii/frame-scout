@@ -16,11 +16,12 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
       (I11, E34, E35; a PR "runtime-tested on the home PC") (done 2026-11-01 in PR #56: E34
       confirmed, E35 fixed; open follow-ups: I11 rest (fresh CUDA install, cu126, other GPUs),
       E32 labelling data, E47, E48, A39)
-- [ ] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
-      detection results is a hold point)
+- [~] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
+      detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
 ### P11 – Safety of marks and cache (added 2026-11-02)
-- [ ] Backup of `marks.json` with a restore offer, and a cache health check (F1)
+- [x] Backup of `marks.json` with a restore offer, and a cache health check (F1)
+      (done 2026-11-02 in PR #60; follow-ups E50, A40)
 
 ### P12 – Lighter runs (added 2026-11-02)
 - [ ] (A) No person detector load when nothing needs analysis (F2)
