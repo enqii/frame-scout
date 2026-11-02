@@ -21,6 +21,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RAW_EXT, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
+                             Lazy, NOTHING_NEW,
                              final_status, yolo_weights,
                              RawFallback, SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
@@ -372,28 +373,21 @@ def search(args, parser, roots, dropped, output, status):
             profile_vectors[p['name']] = (text_queries(t.cpu().numpy(), p['generated']),
                                           np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
 
-    detector = None
-    if not args.no_person_detection:
-        # without Ultralytics' usage analytics and run-time pip installs (E27, E28)
-        YOLO = import_detector_class(os.environ, importlib.import_module, Image)
-        # downloaded into .cache on first use, not into the working folder (E9); the cache
-        # signature below keeps the name as given
-        detector = YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), os.environ,
-                                     lambda text: print(text, flush=True)))
+    person_detection = not args.no_person_detection
     con = sqlite3.connect(output / CACHE_FILE)
     # also records which engine version and settings the signature stands for (E11)
-    signature = prepare_cache(con, not args.no_person_detection, args.max_persons, args.person_confidence,
+    signature = prepare_cache(con, person_detection, args.max_persons, args.person_confidence,
                               args.yolo_model, model=args.model)
     # the registry's input size (tested against the OpenCLIP config) if the model does not name it
     image_size = getattr(model.visual, 'image_size', search_model.image_size)
     min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
-                          detector is not None)
+                          person_detection)
     detect_lock = threading.Lock()
     # the detector runs on the CLIP device (E14)
     detect_options = detection_options(device, args.max_persons, args.person_confidence)
 
-    def prepare(path):
-        """Decode, detect and preprocess one photo; runs in a decoding thread (E2).
+    def prepare(path, detector):
+        """Decode, detect and preprocess one photo with detector (None: no detection); runs in a decoding thread (E2).
 
         The file is stat-ed right before it is decoded (not in the cache scan, which can be
         long before), so the stored modification time and size belong to the analyzed content.
@@ -403,6 +397,26 @@ def search(args, parser, roots, dropped, output, status):
         return stat, [label for label, _ in crops], torch.stack([preprocess(im) for _, im in crops])
 
     fresh = reused = errors = done = 0
+
+    def load_detector():
+        """Load the person detector (None without person detection), reporting the phase "loading"."""
+        if not person_detection:
+            return None
+        status.update('loading')
+        print('Loading the person detector ...', flush=True)
+        # without Ultralytics' usage analytics and run-time pip installs (E27, E28)
+        YOLO = import_detector_class(os.environ, importlib.import_module, Image)
+        # downloaded into .cache on first use, not into the working folder (E9); the cache
+        # signature keeps the name as given
+        loaded = YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), os.environ,
+                                   lambda text: print(text, flush=True)))
+        # back to the analysis: the counts so far are kept (StatusReporter.update)
+        status.update('analyzing', total=len(paths), done=done)
+        return loaded
+
+    # created on the first photo that is not in the cache: a repeat search on an analyzed
+    # folder ranks only, without the seconds (or the download) of loading YOLO (F2)
+    detector = Lazy(load_detector)
 
     def finished(new=0, cached=0, failed=0):
         nonlocal fresh, reused, errors, done
@@ -453,9 +467,9 @@ def search(args, parser, roots, dropped, output, status):
                 todo.append(path)
         return todo
 
-    def prepared(todo, pool, ahead):
+    def prepared(todo, pool, ahead, detector):
         """Yield (path, stat, labels, pixels) of the photos in todo; failures are logged and skipped."""
-        for path, future in prefetch(lambda item: pool.submit(prepare, item), todo, ahead):
+        for path, future in prefetch(lambda item: pool.submit(prepare, item, detector), todo, ahead):
             try:
                 stat, labels, pixels = future.result()
             except Exception as exc:
@@ -485,7 +499,7 @@ def search(args, parser, roots, dropped, output, status):
         todo = to_analyze(paths)
         # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
         # crops of several photos are embedded together, batch_size at a time (E2).
-        threads = DECODE_THREADS if detector is None else DETECTION_DECODE_THREADS
+        threads = DETECTION_DECODE_THREADS if person_detection else DECODE_THREADS
         # enough photos ahead for the next group while CLIP embeds the current one (a group
         # holds at most batch_size photos); finished photos wait as small preprocessed
         # tensors, so memory grows with the batch size, not with the photo size (review)
@@ -493,7 +507,12 @@ def search(args, parser, roots, dropped, output, status):
         pool = ThreadPoolExecutor(threads)
 
         def analyze(todo):
-            for group in group_batches(prepared(todo, pool, ahead), args.batch_size, size=lambda item: len(item[2])):
+            if not todo:
+                return
+            # loaded in this thread, before the decoding threads use it
+            loaded = detector.get()
+            for group in group_batches(prepared(todo, pool, ahead, loaded), args.batch_size,
+                                       size=lambda item: len(item[2])):
                 # after a failure the photos are stored one by one, so only a broken one fails
                 finished(new=store_group(group, store, store_failed))
 
@@ -511,6 +530,10 @@ def search(args, parser, roots, dropped, output, status):
             for partner, raw in chosen.items():
                 if analyzed(raw):
                     raw_fallback.use(partner, raw)
+            if not detector.created:
+                # no photo needed an analysis, e.g. all came from the cache (F2)
+                print(f'{NOTHING_NEW}.', flush=True)
+                status.update(message=NOTHING_NEW, force=True)
         finally:
             pool.shutdown(cancel_futures=True)  # on an interruption: no new decoding
     except KeyboardInterrupt:
