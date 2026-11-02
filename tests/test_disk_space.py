@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from framescout_core import disk_space
 from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, SPACE_RESERVE, THUMBNAIL_BYTES,
                              TORCH_INSTALL_SPACE, LowSpace, download_bytes, low_space, low_space_lines,
                              search_space_bytes, search_space_needs, torch_install_needs)
@@ -17,24 +18,26 @@ class Drives:
     """Stands in for shutil.disk_usage and os.stat: folders under a known root are on its drive."""
 
     def __init__(self, **roots):
-        # roots: name -> (root folder, free bytes); the device number is the name
-        self.roots = roots
+        # roots: name -> (root folder, free bytes[, device number[, total bytes]]); by default
+        # the device number is the name and the total 1000 GB
+        defaults = {name: (name, 1000 * GB) for name in roots}
+        self.roots = {name: (*root, *defaults[name][len(root) - 2:]) for name, root in roots.items()}
         self.asked = []
 
     def _root(self, path):
-        for name, (root, free) in self.roots.items():
+        for root, free, device, total in self.roots.values():
             if Path(path) == root or root in Path(path).parents:
-                return name, free
+                return free, device, total
         raise OSError(f'no drive for {path}')
 
     def disk_usage(self, path):
         self.asked.append(Path(path))
-        _, free = self._root(path)
-        return Usage(0, 0, free)
+        free, _, total = self._root(path)
+        return Usage(total, total - free, free)
 
     def stat(self, path):
-        name, _ = self._root(path)
-        return Stat(name)
+        _, device, _ = self._root(path)
+        return Stat(device)
 
 
 def test_download_sizes_of_the_model_labels():
@@ -108,6 +111,25 @@ def test_needs_on_the_same_drive_add_up(tmp_path):
     needs = [(results, GB), (cache, int(1.5 * GB)), (other, GB)]
     low = low_space(needs, disk_usage=drives.disk_usage, stat=drives.stat)
     assert low == [LowSpace(results, int(2.5 * GB), 3 * GB)]
+
+
+def test_one_volume_reached_through_two_paths_is_one_drive(monkeypatch):
+    # e.g. a subst or mapped drive letter and C:\ for the same volume: the same device
+    # number and size, other anchors; the needs add up (review)
+    monkeypatch.setattr(disk_space, '_existing_folder', lambda path: Path(path).parent)
+    drives = Drives(s=(Path('S:/'), 3 * GB, 7), c=(Path('C:/'), 3 * GB, 7))
+    results, hub = Path('S:/FrameScout/results'), Path('C:/hub/models')
+    low = low_space([(results, GB), (hub, int(1.5 * GB))], disk_usage=drives.disk_usage, stat=drives.stat)
+    assert low == [LowSpace(results, int(2.5 * GB), 3 * GB)]
+
+
+def test_volumes_with_the_same_serial_number_but_other_sizes_stay_apart(tmp_path):
+    # a cloned disk keeps the volume serial number Windows reports as st_dev
+    drives = Drives(c=(tmp_path / 'c', 3 * GB, 7, 500 * GB), d=(tmp_path / 'd', 3 * GB, 7, 2000 * GB))
+    (tmp_path / 'c').mkdir()
+    (tmp_path / 'd').mkdir()
+    needs = [(tmp_path / 'c' / 'results', GB), (tmp_path / 'd' / 'hub', int(1.5 * GB))]
+    assert low_space(needs, disk_usage=drives.disk_usage, stat=drives.stat) == []
 
 
 def test_a_missing_folder_is_checked_on_the_drive_of_its_nearest_existing_parent(tmp_path):
