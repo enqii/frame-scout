@@ -58,7 +58,7 @@ from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLE
     auto_cleanup, size_text, count_text, cleanup_summary_text)
 from .disk_space import (TORCH_INSTALL_SPACE, OTHER_PACKAGES_SPACE,CACHE_BYTES_PER_PHOTO, THUMBNAIL_BYTES, DETECTOR_DOWNLOAD, SPACE_RESERVE,
     SPACE_CHECK_TIMEOUT, LowSpace, analyzed_photos, app_search_needs, download_bytes, search_space_bytes, search_space_needs, torch_install_needs, low_space, low_space_lines)
-from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, LOW_PRIORITY_NICE, torch_threads,
+from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE, torch_threads,
     lower_priority)
 from .cache_check import CACHE_CHECK_LINES, CACHE_SIDE_FILES, cache_check_current, check_cache, set_cache_aside
 from .uninstall import (UNINSTALL_ITEMS, UNINSTALL_KEEP, UNINSTALL_FIRST, USER_DATA, ENVIRONMENT_PROGRAMS,
