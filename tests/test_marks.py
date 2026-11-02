@@ -539,6 +539,9 @@ def test_a_failed_restore_leaves_the_damaged_file(tmp_path, monkeypatch):
         raise OSError('disk full')
 
     monkeypatch.setattr(marks_module, '_replace_with_retry', fail)
-    with pytest.raises(OSError):
-        restore_marks(path, now=NOW, attempts=1)
+    for _ in range(2):  # e.g. the file is held open by a sync tool, and the user tries again
+        with pytest.raises(OSError):
+            restore_marks(path, now=NOW, attempts=1)
     assert path.read_bytes() == DAMAGED
+    # review: no copy of the damaged file per failed try
+    assert sorted(p.name for p in tmp_path.iterdir()) == [MARKS_FILE, MARKS_BACKUP, MARKS_FILE + '.lock']

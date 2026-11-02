@@ -221,8 +221,8 @@ def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MAR
     to <path>.broken-<YYYYMMDD-HHMMSS> (of now, a time.time() value; -2, -3, ... if that
     name exists), which is returned; then the file is replaced atomically by the backup's
     content, which stays as the backup. A missing file (removed meanwhile) just gets the
-    backup (None is returned). Any error leaves the file as it was; OSError if the lock is
-    not free within lock_timeout seconds or a write keeps failing.
+    backup (None is returned). Any error leaves the file as it was, without a copy; OSError
+    if the lock is not free within lock_timeout seconds or a write keeps failing.
     """
     path = Path(path)
     backup = marks_backup(path)
@@ -243,7 +243,13 @@ def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MAR
         except ValueError as exc:
             raise ValueError(f'{backup.name} cannot be read either ({exc})') from None
         kept = None if current is None else _keep_copy(path, current, now)
-        _replace_with_retry(path, content, attempts, retry_delay)
+        try:
+            _replace_with_retry(path, content, attempts, retry_delay)
+        except OSError:
+            # the damaged file is still there: no copy of it per failed try (review)
+            if kept is not None:
+                kept.unlink(missing_ok=True)
+            raise
     return sum(len(marks) for marks in restored.values()), kept
 
 

@@ -60,11 +60,14 @@ CLEANUP_LOCK_TIMEOUT = 1.0
 # during the export can leave it (E13)
 _TEMP_THUMBNAIL = re.compile(r'[0-9a-f]{24}\.jpg\.[a-z0-9_]+\.jpg')
 # the temporary files (<name>.<random>.tmp, _temp_path) of the atomic writes into the results
-# folder: status and result file, marks and their backup (F1; one file each), the galleries of
-# publish_export (E24; only names profile_slugs gives, [a-z0-9-], so that no other tool's file
-# in a chosen output folder matches); terminate()/kill() during a write leaves one (E26)
+# folder: status and result file, marks and their backup (F1; one file each), the copy of a
+# damaged marks file restore_marks keeps (marks.json.broken-<YYYYMMDD-HHMMSS>[-n], F1 review),
+# the galleries of publish_export (E24; only names profile_slugs gives, [a-z0-9-], so that no
+# other tool's file in a chosen output folder matches); terminate()/kill() during a write
+# leaves one (E26)
 _TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name)
                                          for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, MARKS_BACKUP))
+                        + '|' + re.escape(MARKS_FILE) + r'\.broken-\d{8}-\d{6}(?:-\d+)?'
                         + r'|[a-z0-9-]+\.html)\.[a-z0-9_]{8}\.tmp')
 # seconds after which such a temporary file counts as left over: the write of an app
 # session (marks.json, a stopped status) takes a fraction of a second
