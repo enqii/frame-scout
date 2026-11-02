@@ -225,7 +225,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       first use downloads) search models without the F3 check; only app searches and the
       installer are covered. Found in F3 (PR #64).
 - [ ] `hardware` **E52 – The effect of `--low-priority` is not measured:** F4 lowers the engine's
-      process priority and leaves one or two cores free (`torch_threads`), but neither the
+      process priority and keeps one or two cores out of the PyTorch threads (`torch_threads`,
+      also for the person detector), but neither the
       slowdown of the search (CPU and GPU) nor the gain in responsiveness of other programs
       (e.g. a second CPU-heavy task running at the same time) was measured. Measure it on the
       home PC together with E17 (P10 B); from the results adjust how many cores
