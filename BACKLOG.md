@@ -217,6 +217,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       registration) into a torch-free module that the engine and the evaluation tool both
       import; that also drops the fallback for a missing engine and the ast-based test. An
       engine refactor with its own smoke run. Review of PR #56, finding 2.
+- [ ] `minor` **E50 – A search on a damaged `cache.sqlite3` fails with SQLite's raw error:**
+      `run.log` shows "file is not a database" or "database disk image is malformed". The
+      engine could catch `sqlite3.DatabaseError` when opening or reading the cache and point
+      to "Clean up storage" -> "Check cache". Found in F1 (PR #60).
 
 ### App (`app.py`)
 
@@ -318,6 +322,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       model list shows "605 MB download" for a model even when its weights are already in
       the cache. Idea: look for the weights file in the cache folder and show "downloaded"
       instead. Found in PR #56.
+- [ ] `minor` **A40 – `*.broken-*` files are not offered by "Clean up storage"; no restore for a missing `marks.json`:**
+      `marks.json.broken-*` and `cache.sqlite3.broken-*` are never deleted by FrameScout, so
+      the user deletes them by hand in the results folder (the notices say so); a cleanup
+      category for them (default off) could be added. Also, when `marks.json` is missing (e.g.
+      the user removed the damaged file as the old warning advised) but `marks.json.bak`
+      exists, no restore is offered. Found in F1 (PR #60).
 
 ### Installation / project
 
@@ -456,17 +466,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 
 ### Features (from [docs/IDEAS.md](docs/IDEAS.md))
 
-- [ ] `ready` **F1 – Backup of `marks.json` and a cache health check:** `results/marks.json`
-      holds hours of manual review but has no backup (A30 concerns `profiles.json` only), and
-      a damaged `cache.sqlite3` (disk full, power loss) surfaces only as errors in a search.
-      Sketch: (a) `save_marks` keeps the previous file as `marks.json.bak` before the atomic
-      replace; an unreadable `marks.json` offers "Restore marks from backup" (never
-      automatic). (b) "Clean up storage" gets a "Check cache" action running SQLite
-      `PRAGMA quick_check`; on failure the app explains it and offers to rename the file to
-      `cache.sqlite3.broken-<date>` (never delete). Affected: `framescout_core` (marks module,
-      cleanup), `app.py`, `NEVER_DELETED` (add `marks.json.bak`), user guide, tests. Risks:
-      `quick_check` takes a few seconds on a large cache and must not run while a search holds
-      the run lock. Size S–M. No hold point (the restore UX is a small product decision).
 - [ ] `ready` **F2 – Load the person detector only when something needs analysis:** a repeat
       search on an analyzed folder (only a profile text or the reference weight changed) still
       loads YOLO (`detector = YOLO(...)` before the cache is consulted), which costs seconds

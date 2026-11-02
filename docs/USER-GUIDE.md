@@ -145,6 +145,13 @@ No match). "Hide photos marked as no match" hides the rejected ones within the p
 are looking at only, so the pages keep their photos and ranks; a caption tells how many
 are hidden, and a page where every photo was rejected says so (see the next page).
 
+Before each change of a mark FrameScout keeps the previous `marks.json` as `marks.json.bak`
+(one generation). If `marks.json` is damaged, the gallery warns that no marks are shown
+and, when the backup is readable, offers **Restore marks from backup** with the backup's
+date and number of marks. Nothing is restored on its own. The damaged file is kept as
+`marks.json.broken-<date>` in the `results` folder; delete it yourself when you no longer
+need it. If `marks.json` is simply missing, no restore is offered.
+
 "Copy N marked photos" copies all photos marked as match into the folder in "Copy to
 folder" (default `Pictures\FrameScout\<profile>`, saved per profile). Copying never
 moves, changes, deletes or overwrites anything: a different photo with the same name is
@@ -192,6 +199,8 @@ Everything a search writes lands in `results/`:
 | `thumbnails/` | The galleries' thumbnails. Keep the `results` folder together: a gallery copied on its own has no thumbnails, and links to originals work only on this computer. |
 | `results.json` | What the galleries of the last finished search show; the app reads it. Replaced only when a search finishes, so a stopped search keeps the previous results. |
 | `marks.json` | Your Match / No match marks. The search never changes it and the cleanup never deletes it. Marks belong to a photo's full path, so moving or renaming a photo drops them. |
+| `marks.json.bak` | The state of `marks.json` before your last change of a mark (one generation). If `marks.json` is damaged, the gallery offers to restore it. The cleanup never deletes it. |
+| `marks.json.broken-<date>`, `cache.sqlite3.broken-<date>` | Damaged files FrameScout set aside when you restored the marks or renamed the cache. They are never deleted for you: delete them yourself in the `results` folder once you no longer need them. |
 | `cache.sqlite3` | Analyses of photos already seen. An interrupted search resumes from here, and new profiles reuse them. Updates that change the image analysis analyze every photo again; the old entries stay until you clean them up. |
 | `run.lock`, `run-status.json` | Mark a running search and its progress. They stay after a run and can be deleted when no search runs. |
 
@@ -225,6 +234,14 @@ analyses and marks are listed as "unbound".
 scan listed and is still unused when deleting is deleted. Never deleted: `marks.json`,
 `results.json`, `run.lock`, `run-status.json`, the cache file itself, `settings.json`,
 `profiles.json` and its backup, and your photos.
+
+**Check cache** (below the cleanup) tests `cache.sqlite3` for damage, e.g. after a full
+disk or a power loss. It only reads, and it is refused while a search runs or is being
+started. The result is one of: no cache yet, no damage found, could not be checked (e.g.
+the file cannot be opened; nothing is offered), or damaged. For a damaged cache,
+**Rename the damaged cache.sqlite3** renames it (and its `-journal`/`-wal`/`-shm` files)
+to `cache.sqlite3.broken-<date>`; nothing is deleted. The next search then analyzes all
+photos again. Delete the `.broken-` file yourself when you do not need it.
 
 ### What the numbers mean
 

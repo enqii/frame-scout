@@ -1189,3 +1189,26 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (E22), since it sits on the same tab. Tested with unit tests of `reconcile_settings`
       with `reset`, `changed_from_defaults`, `setting_text` and `AI_SETTINGS`; the button
       itself was run with Streamlit's `AppTest` only, not in a real browser.)
+
+### Features (from [docs/IDEAS.md](IDEAS.md))
+
+- [x] **F1 – Backup of `marks.json` and a cache health check:** `results/marks.json`
+      holds hours of manual review but has no backup (A30 concerns `profiles.json` only), and
+      a damaged `cache.sqlite3` (disk full, power loss) surfaces only as errors in a search.
+      Sketch: (a) `save_marks` keeps the previous file as `marks.json.bak` before the atomic
+      replace; an unreadable `marks.json` offers "Restore marks from backup" (never
+      automatic). (b) "Clean up storage" gets a "Check cache" action running SQLite
+      `PRAGMA quick_check`; on failure the app explains it and offers to rename the file to
+      `cache.sqlite3.broken-<date>` (never delete). Affected: `framescout_core` (marks module,
+      cleanup), `app.py`, `NEVER_DELETED` (add `marks.json.bak`), user guide, tests. Risks:
+      `quick_check` takes a few seconds on a large cache and must not run while a search holds
+      the run lock. Size S–M. No hold point (the restore UX is a small product decision).
+      (done 2026-11-02 in PR #60: every change of `marks.json` first copies the previous
+      valid file to `marks.json.bak`; `restore_marks` keeps a damaged file as
+      `marks.json.broken-<date>` and the gallery offers the restore (never automatic);
+      `framescout_core/cache_check.py` runs `PRAGMA quick_check(20)` under the run lock
+      and renames a damaged cache with its side files to `cache.sqlite3.broken-<date>`;
+      `NEVER_DELETED` has `marks.json.bak`. Tested with unit tests (real damaged SQLite
+      files, 983 passed, 2 skipped; CI green on py3.12/3.13/3.14) and the app flows with
+      `AppTest`. Not tested: a real browser, the `quick_check` duration on a large cache, a
+      real search after the cache rename, the rollback of a hot journal. Open: E50, A40.)
