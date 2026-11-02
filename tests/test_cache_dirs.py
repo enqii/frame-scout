@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from framescout_core import DEFAULT_YOLO_MODEL, cache_paths, default_cache_env, yolo_weights
+from framescout_core import DEFAULT_YOLO_MODEL, cache_paths, default_cache_env, find_yolo_weights, yolo_weights
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -129,6 +129,26 @@ def test_yolo_weights_in_the_working_folder_are_used_as_before(tmp_path):
     assert yolo_weights('yolo11s.pt', base, cwd, {}) == 'yolo11s.pt'
     # another official name that is not there yet is downloaded into the cache too
     assert yolo_weights('yolo11m.pt', base, cwd, {}) == str(base / '.cache' / 'ultralytics' / 'yolo11m.pt')
+
+
+def test_find_yolo_weights_looks_where_yolo_weights_does_without_moving(tmp_path):
+    # the free disk space check asks whether the detector needs a download (F3 review)
+    base, cwd = tmp_path / 'project', tmp_path / 'elsewhere'
+    base.mkdir(), cwd.mkdir()
+    cached = base / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
+    assert find_yolo_weights(DEFAULT_YOLO_MODEL, base, cwd, {}) == (None, cached)
+    own = tmp_path / 'own'
+    assert find_yolo_weights(DEFAULT_YOLO_MODEL, base, cwd, {'YOLO_CONFIG_DIR': str(own)}) == (
+        None, own / DEFAULT_YOLO_MODEL)
+    (cwd / 'yolo11s.pt').write_bytes(b'w')
+    assert find_yolo_weights('yolo11s.pt', base, cwd, {}) == (cwd / 'yolo11s.pt', cached.with_name('yolo11s.pt'))
+    legacy = base / DEFAULT_YOLO_MODEL
+    legacy.write_bytes(b'weights')
+    assert find_yolo_weights(DEFAULT_YOLO_MODEL, base, cwd, {}) == (legacy, cached)
+    assert legacy.exists() and not cached.parent.exists()  # nothing moved or created
+    cached.parent.mkdir(parents=True)
+    cached.write_bytes(b'w')
+    assert find_yolo_weights(DEFAULT_YOLO_MODEL, base, cwd, {}) == (cached, cached)
 
 
 def test_yolo_weights_paths_and_urls_are_used_as_given(tmp_path):
