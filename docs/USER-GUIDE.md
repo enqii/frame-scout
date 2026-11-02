@@ -129,6 +129,9 @@ search" first shows the new ones and asks you to start again.
 Start the search; the page shows the current step and its progress. The search keeps
 running when you reload or close the tab (as long as the `Start-FrameScout.bat` window
 stays open), and opening the page again lets you stop it. Only one search runs at a time.
+A repeat search on a folder that is already analyzed (e.g. after changing only a search
+text or the reference weight) skips loading the person detector and shows "Nothing new to
+analyze – ranking only"; the detector is loaded only when a photo has to be analyzed.
 
 **Results** shows the last finished search per profile: thumbnails, best first, 48 per
 page, with rank, score, the best-matching part ("Full image" or "Person 1", …) and the

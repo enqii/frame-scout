@@ -24,7 +24,8 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
       (done 2026-11-02 in PR #60; follow-ups E50, A40)
 
 ### P12 – Lighter runs (added 2026-11-02)
-- [ ] (A) No person detector load when nothing needs analysis (F2)
+- [x] (A) No person detector load when nothing needs analysis (F2)
+      (done 2026-11-02 in PR #62)
 - [ ] (B) Free disk space check before installing and searching (F3)
 - [ ] (C) "Keep the PC responsive" option, measured together with P10 (B) (F4)
 

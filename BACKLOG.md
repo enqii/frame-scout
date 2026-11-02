@@ -466,15 +466,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 
 ### Features (from [docs/IDEAS.md](docs/IDEAS.md))
 
-- [ ] `ready` **F2 – Load the person detector only when something needs analysis:** a repeat
-      search on an analyzed folder (only a profile text or the reference weight changed) still
-      loads YOLO (`detector = YOLO(...)` before the cache is consulted), which costs seconds
-      to tens of seconds on a CPU and on first use a download. Sketch: check the cache first
-      (paths, `mtime_ns`, size against the signature), create the detector lazily on the
-      first uncached photo, report "Nothing new to analyze – ranking only" in the status file.
-      Affected: `framescout_engine.py`, possibly a torch-free helper in `framescout_core`,
-      user guide. Risks: the detector must still be created under the lock and the E27/E28
-      offline flags; a load error now appears mid-run. Size S. No hold point.
 - [ ] `ready` **F3 – Free disk space check before installing and searching:** the CUDA install
       downloads about 2.5 GB, optional models up to 1.7 GB, and a search writes cache rows and
       thumbnails; a full disk leaves a broken `.venv`, a half-downloaded model or failed cache

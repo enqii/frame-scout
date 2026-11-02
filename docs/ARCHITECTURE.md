@@ -139,11 +139,12 @@ the module of its area and to the re-exports in `__init__.py`.
   people, A11), `prefetch`/`group_batches`/`store_group`/`draft_size`/`DRAFT_DECODING`
   (the engine's analysis pipeline: decoding ahead in threads, crops of several photos per
   CLIP batch, photo-by-photo fallback after a failed group, `Image.draft` size and its part
-  of the cache signature, E2).
+  of the cache signature, E2), `Lazy` (a value created on the first `get()`; the engine's
+  person detector, F2).
 - `locks.py`: `RunLock`/`lock_held` (the operating-system file lock of a search run, A4,
   also used around the read-merge-write of `settings.json` and `marks.json`).
 - `run_status.py`:
-  `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`
+  `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`
   (one search per output folder, its phase and progress, A4/A5).
 - `devices.py`: `detection_options` (YOLO arguments on the CLIP device, E14),
   `device_choices`/`cuda_status`/`cuda_hint` (the app's device choice, CUDA status and the
@@ -711,6 +712,13 @@ already (then it stays for the uninstall; used in place with a `run.log` line if
 fails); a file of that name in the working folder as before; otherwise the cache path,
 where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged.
 
+The detector is created lazily (F2): the engine wraps the creation in `framescout_core.Lazy`
+and calls `get()` in `analyze()` on the first non-empty list of photos to analyze (main pass
+or the RAW fallback pass, E30), in the main thread before the decoding threads use it; a
+repeat search on an analyzed folder never loads YOLO. The E27/E28 flags and the E9 weights
+path are unchanged, and it still happens under the run lock. A load error (e.g. a failed
+first download) therefore appears after the cache scan, mid-run, as a failed run.
+
 ### Analysis pipeline
 
 Analysis pipeline (E2): uncached photos are stat-ed, decoded, searched for persons and
@@ -730,6 +738,13 @@ unchanged (the features are identical); without detection it names the drafted d
 (`DRAFT_DECODING`, user decision in the PR #7 review), so the first detection-off run
 after E2 analyzes every photo once more and drafted and full-resolution embeddings never
 mix (they agree to a cosine similarity ≥ 0.999 on a 202-photo sample).
+
+The detector is loaded inside `analyze()` (F2, see "Person detection"): while it loads, the
+status phase is `loading` (log line `Loading the person detector ...`), then `analyzing`
+again with `total` and `done` restored and the counts kept. The draft size and the thread
+count follow the person-detection setting, not the detector object. If no photo needed an
+analysis (all from the cache, or only cache-scan errors), the log prints `Nothing new to
+analyze – ranking only.` and the status message is `NOTHING_NEW` during scoring and export.
 
 ### Scoring
 
@@ -1153,7 +1168,11 @@ search holds it, it exits with code 3 (`EXIT_BUSY`). Photo folders none of which
 are an error before the lock only if the output folder does not exist yet (no folder is
 created for a mistyped call); otherwise it is reported in the status file. A missing
 folder of several is left out with a log line (A25). The final phase comes from
-the exit code (`final_status`: 0 finished, 130 interrupted, others failed).
+the exit code (`final_status`: 0 finished, 130 interrupted, others failed). The `message`
+is also set during a run: `NOTHING_NEW` ("Nothing new to analyze – ranking only", F2) when
+no photo needed an analysis; `status_text` appends the message of a running (non-final)
+phase, e.g. `Scoring photos: 3/10 · Nothing new to analyze – ranking only`, while the
+message of a final phase is shown by the app in its own line. A successful finish clears it.
 
 ### Starting a search from the app
 
@@ -1302,7 +1321,10 @@ files (each downloads at least 605 MB; unit tests only, E38).
 Add focused tests without requiring full model downloads. Profile loading, reading/saving
 the app's `profiles.json` and `settings.json`, reference folders, prompt generation, slug
 handling, progress lines (A11), the run lock and status file (A4/A5), thumbnails of the
-export (E6), the cache signature, the pipeline helpers for batching/prefetching (E2), the
+export (E6), the cache signature, the pipeline helpers for batching/prefetching (E2) and the
+lazy value of the person detector (`Lazy`, F2, `test_pipeline.py`; the engine side only from the
+CPU smoke run: loaded for new photos, not loaded for a fully cached folder), the message
+in the status line (`status_text`, F2, `test_run_status.py`), the
 scoring (E4/E5) the result file with the gallery helpers (A12) the marks, copying and copy
 target folders (A17) with their deletion with a profile and no saves for a name that is no
 profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
