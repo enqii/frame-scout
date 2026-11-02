@@ -8,10 +8,11 @@ never a block.
 import os
 import re
 import shutil
+import sqlite3
 from pathlib import Path
 from typing import NamedTuple
 
-from .cleanup import size_text
+from .cleanup import _read_only_uri, size_text
 from .hub import model_cached
 
 # in the units size_text shows them in (and Windows Explorer shows free space in): a "GB"
@@ -56,23 +57,47 @@ def download_bytes(text):
     return round(float(match[1]) * (_GB if match[2] == 'GB' else _MB))
 
 
-def search_space_bytes(photos, top, profiles):
+def search_space_bytes(photos, top, profiles, analyzed=0):
     """Return about what a search writes to the results folder: cache rows and gallery thumbnails.
 
-    Every photo counts as not analyzed yet (the app does not open the cache for this), and
-    every gallery as new: min(top, photos) thumbnails for each profile.
+    Cache rows for the photos not analyzed yet (analyzed: how many of the photos have rows
+    of the search's settings, analyzed_photos), and every gallery counts as new: min(top,
+    photos) thumbnails for each profile.
     """
-    return photos * CACHE_BYTES_PER_PHOTO + min(top, photos) * profiles * THUMBNAIL_BYTES
+    return max(0, photos - analyzed) * CACHE_BYTES_PER_PHOTO + min(top, photos) * profiles * THUMBNAIL_BYTES
 
 
-def search_space_needs(results, photos, top, profiles, model, hub_cache, detector_weights=None):
+def analyzed_photos(cache_file, signature, paths):
+    """Return how many of the photo paths have a row of signature in the feature cache cache_file.
+
+    Read-only (a missing file is not created); a missing or unreadable cache counts as
+    empty, on the safe side. Paths are compared as the engine writes them (str of the path
+    of the scan), case-insensitively on Windows.
+    """
+    cache_file = Path(cache_file)
+    if not cache_file.is_file():
+        return 0
+    try:
+        con = sqlite3.connect(_read_only_uri(cache_file), uri=True, timeout=1)
+        try:
+            # the primary key (path, signature) covers this query: only the index is read
+            cached = {os.path.normcase(path) for (path,) in
+                      con.execute('SELECT path FROM features WHERE signature=?', (signature,))}
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return 0
+    return sum(os.path.normcase(str(path)) in cached for path in paths)
+
+
+def search_space_needs(results, photos, top, profiles, model, hub_cache, detector_weights=None, analyzed=0):
     """Return the (folder, bytes) pairs a search writes: results, a missing model, missing detector weights.
 
     model is the SearchModel of the search, hub_cache the Hugging Face cache folder it is
     loaded from (hub_cache_dir); detector_weights is the path the person detector loads its
-    weights from, or None with person detection off.
+    weights from, or None with person detection off; analyzed as in search_space_bytes.
     """
-    needs = [(Path(results), search_space_bytes(photos, top, profiles))]
+    needs = [(Path(results), search_space_bytes(photos, top, profiles, analyzed))]
     if not model_cached(model, hub_cache):
         needs.append((Path(hub_cache), download_bytes(model.download)))
     if detector_weights is not None and not Path(detector_weights).is_file():
