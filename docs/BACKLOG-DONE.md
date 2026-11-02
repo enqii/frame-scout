@@ -1261,3 +1261,29 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `test_torch_install.py`) and an `AppTest` render of the run tab. Not tested: a real
       full disk, a real CUDA install, a real disconnected network share. The CUDA size is an
       estimate. Open: I33, E51.)
+- [x] **F4 – "Keep the PC responsive" option:** a CPU search makes the PC sluggish for
+      the whole run. Sketch: an AI setting that starts the engine with
+      `subprocess.BELOW_NORMAL_PRIORITY_CLASS` on Windows (`os.nice` elsewhere) and one or two
+      fewer PyTorch threads on the CPU; the CLI gets `--low-priority`. Affected: `app.py`
+      (Popen flags, settings widget), `framescout_engine.py`, `settings.json`, user guide.
+      Risks: little effect on GPU runs; must not break the stop logic (process tree, PID in the
+      status file). Measure the slowdown with E17 (P10 B). Size S. No hold point.
+      (done 2026-11-02 in PR #65: new `framescout_core/priority.py` with `torch_threads`
+      (normal: `min(12, max(1, cores))` as before; low priority: also at most cores - 1, cores
+      - 2 from 8 cores on, never below 1) and `lower_priority` (Windows
+      `SetPriorityClass(BELOW_NORMAL_PRIORITY_CLASS)`, elsewhere `os.nice(10)`; returns the
+      error text instead of raising). The engine option `--low-priority` lowers the engine's
+      own process priority first, so scanning and model loading run low too, and logs the
+      result; the app does not set Popen flags, so a manual CLI run behaves the same and the
+      start/stop logic (process tree, PID, `engine_alive`) is unchanged. On Windows only the
+      interpreter behind the venv launcher is lowered. Decoding threads (E2) are not reduced.
+      New optional `settings.json` field `low_priority` (default off, not written while off;
+      in `AI_SETTINGS`, so "Reset to defaults" and "Changed from the default" cover it) and
+      the checkbox "Keep the PC responsive during a search" in the AI settings tab.
+      Compatibility: additive only. Tested with unit tests (`test_priority.py` incl. a child
+      process that really lowers and reads back its priority class, `test_settings.py`;
+      1052 passed, 2 skipped), a CPU smoke run with and without the option (the interpreter
+      went from NORMAL to BELOW_NORMAL_PRIORITY_CLASS) and a headless `AppTest` of the
+      checkbox. Not tested: the slowdown and the gain in responsiveness are NOT measured
+      (open: E52, with E17), stopping a low-priority search through the UI, `os.nice` in a
+      real run on Linux/macOS, CUDA.)

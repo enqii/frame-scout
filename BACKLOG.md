@@ -39,7 +39,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       detection), but the gain with detection shrinks and timings are noisy (PR #7
       review). Fix idea: measure on a real 4–8 core machine; derive the torch threads from
       the cores the process may use and the decoding threads, or convert crops to tensors
-      on the main thread.
+      on the main thread. Measure E52 (the F4 low-priority option) in the same session.
 - [ ] `hardware` **E18 – Person detection is still one photo per call:** since E14 YOLO runs on the
       CLIP device, but the decoding threads still call it one photo at a time under a lock,
       and with detection only two decoding threads run (`DETECTION_DECODE_THREADS`, chosen
@@ -224,6 +224,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 - [ ] `minor` **E51 – `framescout_eval.py` has no free disk space check:** it loads (and on
       first use downloads) search models without the F3 check; only app searches and the
       installer are covered. Found in F3 (PR #64).
+- [ ] `hardware` **E52 – The effect of `--low-priority` is not measured:** F4 lowers the engine's
+      process priority and leaves one or two cores free (`torch_threads`), but neither the
+      slowdown of the search (CPU and GPU) nor the gain in responsiveness of other programs
+      (e.g. a second CPU-heavy task running at the same time) was measured. Measure it on the
+      home PC together with E17 (P10 B); from the results adjust how many cores
+      `torch_threads` leaves free, or also lower the decoding threads (E2), which are not
+      reduced now. Found in F4 (PR #65).
 
 ### App (`app.py`)
 
@@ -473,13 +480,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 
 ### Features (from [docs/IDEAS.md](docs/IDEAS.md))
 
-- [ ] `ready` **F4 – "Keep the PC responsive" option:** a CPU search makes the PC sluggish for
-      the whole run. Sketch: an AI setting that starts the engine with
-      `subprocess.BELOW_NORMAL_PRIORITY_CLASS` on Windows (`os.nice` elsewhere) and one or two
-      fewer PyTorch threads on the CPU; the CLI gets `--low-priority`. Affected: `app.py`
-      (Popen flags, settings widget), `framescout_engine.py`, `settings.json`, user guide.
-      Risks: little effect on GPU runs; must not break the stop logic (process tree, PID in the
-      status file). Measure the slowdown with E17 (P10 B). Size S. No hold point.
 - [ ] `ready` **F5 – Export a result list (CSV / file list):** results can only leave the app
       by copying files (A17) or the HTML gallery; users who catalog in another program want
       the matched paths, scores and marks. Sketch: "Export list" per profile writes

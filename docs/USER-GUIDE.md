@@ -120,6 +120,11 @@ asking the Hugging Face Hub; missing files are downloaded with a note. Set
   otherwise the CPU.
 - **Batch size:** the number of image parts (whole photos and person crops) analyzed
   together; reduce it from 8 if memory runs short.
+- **Keep the PC responsive during a search:** off by default. When on, the search runs at
+  a lower priority and leaves one or two CPU cores to other programs, so the PC stays
+  usable while you work; the search may take longer. It helps little when the graphics card
+  does the work. How much it slows the search and how much it helps has not been measured
+  yet. The command line option is `--low-priority`.
 - **Person detection:** finds people with YOLO11n and compares each person separately,
   which helps with group photos. Turn it off for other motifs: JPEGs are then decoded
   at a reduced resolution, which is noticeably faster.
