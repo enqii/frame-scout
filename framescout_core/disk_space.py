@@ -14,8 +14,10 @@ from typing import NamedTuple
 from .cleanup import size_text
 from .hub import model_cached
 
-_MB = 1000 ** 2
-_GB = 1000 ** 3
+# in the units size_text shows them in (and Windows Explorer shows free space in): a "GB"
+# here is 1024 ** 3 bytes, so 1.2 GB in the code reads 1.2 GB in a warning (review)
+_MB = 1024 ** 2
+_GB = 1024 ** 3
 # what installing PyTorch writes, about (download, installed) per kind of build: pip
 # downloads the wheel into the temporary folder (.tmp in the project folder when
 # Install-FrameScout.bat runs it) and unpacks it into the venv, where requirements.txt adds
@@ -43,7 +45,11 @@ class LowSpace(NamedTuple):
 
 
 def download_bytes(text):
-    """Return the bytes of a size text like a SearchModel's download ("605 MB", "1.71 GB"); ValueError otherwise."""
+    """Return the bytes of a size text like a SearchModel's download ("605 MB", "1.71 GB"); ValueError otherwise.
+
+    Read in the units of this module (1 GB = 1024 ** 3 bytes): a label in decimal units comes
+    out up to 7 % larger, on the safe side.
+    """
     match = _SIZE.fullmatch(text) if isinstance(text, str) else None
     if not match:
         raise ValueError(f'Not a download size: {text!r}')

@@ -8,7 +8,7 @@ from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, S
                              TORCH_INSTALL_SPACE, LowSpace, download_bytes, low_space, low_space_lines,
                              search_space_bytes, search_space_needs, torch_install_needs)
 
-GB = 1000 ** 3
+MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text (review)
 Usage = namedtuple('Usage', 'total used free')
 Stat = namedtuple('Stat', 'st_dev')
 
@@ -38,10 +38,10 @@ class Drives:
 
 
 def test_download_sizes_of_the_model_labels():
-    assert download_bytes('605 MB') == 605 * 1000 ** 2
-    assert download_bytes('1.71 GB') == 1710 * 1000 ** 2
+    assert download_bytes('605 MB') == 605 * MB
+    assert download_bytes('1.71 GB') == round(1.71 * GB)
     for model in MODELS.values():  # every model's label can be read
-        assert download_bytes(model.download) > 100 * 1000 ** 2
+        assert download_bytes(model.download) > 100 * MB
     for text in ('', 'big', '5 TB', None):
         with pytest.raises(ValueError):
             download_bytes(text)
@@ -132,4 +132,7 @@ def test_the_real_drive_can_be_asked(tmp_path):
 
 def test_low_space_lines_name_folder_need_and_free_space(tmp_path):
     lines = low_space_lines([LowSpace(tmp_path, int(1.5 * GB), 2 * GB)])
-    assert lines == [f'{tmp_path}: about 1.4 GB needed, 1.9 GB free']
+    assert lines == [f'{tmp_path}: about 1.5 GB needed, 2.0 GB free']
+    # the sizes of the constants read the same in a warning (review: not 5.6 GB for 6 GB)
+    _, installed = TORCH_INSTALL_SPACE['cuda']
+    assert low_space_lines([LowSpace(tmp_path, installed, SPACE_RESERVE)]) == [f'{tmp_path}: about 6.0 GB needed, 1.0 GB free']
