@@ -14,10 +14,11 @@ import psutil
 import streamlit as st
 
 from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
-                             FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_FILE,
-                             PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES, SETTING_STEPS,
-                             SETTINGS_FILE, RunLock, StatusReporter, cache_paths, clean_up, cleanup_running,
-                             cleanup_summary_text,
+                             FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_BACKUP,
+                             MARKS_FILE, PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES,
+                             SETTING_STEPS, SETTINGS_FILE, RunLock, StatusReporter, cache_paths, check_cache,
+                             clean_up, cleanup_running, cleanup_summary_text, marks_backup, restore_marks,
+                             set_cache_aside,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              AI_SETTINGS, changed_from_defaults, setting_text,
@@ -427,6 +428,37 @@ def load_marks():
     except (OSError, ValueError) as exc:
         return {}, exc
 
+def marks_backup_offer(error):
+    """The text offering to restore marks.json.bak for the marks.json error, or None if there is nothing to offer (F1).
+
+    Only for a damaged file (ValueError; an OSError may pass, e.g. a file another program has
+    open) and a backup that can be read.
+    """
+    if not isinstance(error, ValueError):
+        return None
+    backup = marks_backup(MARKS)
+    try:
+        saved = time.strftime('%Y-%m-%d %H:%M', time.localtime(backup.stat().st_mtime))
+        marks = read_marks(backup)
+    except (OSError, ValueError):
+        return None
+    count = count_text(sum(len(m) for m in marks.values()), 'mark', 'marks')
+    return (f'The backup {MARKS_BACKUP} of {saved} holds {count}: the marks as they were before the last change '
+            f'that was saved. Restoring it replaces {MARKS_FILE} and keeps the damaged file next to it as '
+            f'{MARKS_FILE}.broken-<date and time>. FrameScout never restores it on its own.')
+
+def restore_marks_backup():
+    """Replace the damaged marks.json by its backup (on_click of "Restore marks from backup", F1)."""
+    try:
+        restored, kept = restore_marks(MARKS)
+    except (OSError, ValueError) as exc:
+        st.session_state.marks_notice = ('warning', f'The marks were not restored: {exc}')
+        return
+    text = f"Restored {count_text(restored, 'mark', 'marks')} from {MARKS_BACKUP}."
+    if kept:
+        text += f' The damaged file is kept as {kept.name} in the results folder; delete it once you no longer need it.'
+    st.session_state.marks_notice = ('success', text)
+
 def set_mark(profile, photo, key):
     """Save the mark the control key shows for photo of profile (on_change of the control)."""
     # no selection (the selected option clicked again) is "open"
@@ -701,9 +733,17 @@ def show_results(results, photo_folders):
         st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
     # read on every run of this part: another tab or session may have marked photos (A17)
     all_marks, marks_error = load_marks()
+    if 'marks_notice' in st.session_state:
+        kind, text = st.session_state.pop('marks_notice')
+        (st.success if kind == 'success' else st.warning)(plain(text))
     if marks_error:
+        offer = marks_backup_offer(marks_error)
         st.warning(f'{MARKS_FILE} cannot be read, so marks are not shown and cannot be changed; FrameScout does not '
-                   f'change the file. Fix or remove it in the results folder.\n\nDetails: {plain(str(marks_error))}')
+                   f'change the file. Fix or remove it in the results folder'
+                   f'{", or restore the backup below" if offer else ""}.\n\nDetails: {plain(str(marks_error))}')
+        if offer:
+            st.caption(plain(offer))
+            st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
     marks = all_marks.get(name, {})
     can_mark = marks_error is None and states[name] != 'missing'
     hide = st.checkbox('Hide photos marked as no match', key='hide_rejected',
@@ -929,6 +969,65 @@ def show_cleanup():
         st.session_state.cleanup_confirm = False
         delete_storage(scan, selected)
         st.rerun()
+
+def check_cache_now():
+    """Run the cache check (F1); its result is shown below the button until a search starts."""
+    try:
+        with st.spinner(f'Checking {CACHE_FILE} …'):
+            st.session_state.cache_check = check_cache(RESULTS, engine_alive)
+    except Exception as exc:  # e.g. the lock file cannot be created
+        st.session_state.pop('cache_check', None)
+        st.session_state.cache_notice = ('warning', f'The cache could not be checked: {exc}')
+
+def set_damaged_cache_aside(expected):
+    """Rename the damaged cache the check found (F1); the outcome is shown next run."""
+    st.session_state.pop('cache_check', None)
+    try:
+        done = set_cache_aside(RESULTS, engine_alive, expected)
+    except Exception as exc:
+        st.session_state.cache_notice = ('warning', f'{CACHE_FILE} was not renamed: {exc}')
+        return
+    if done['refused']:
+        st.session_state.cache_notice = ('warning', done['refused'] + ' Nothing was renamed.')
+        return
+    st.session_state.pop('cleanup_scan', None)  # the scan listed rows of the old cache
+    new, *sides = done['renamed']
+    st.session_state.cache_notice = (
+        'success', f'Renamed {CACHE_FILE} to {new}' + (f" (with {', '.join(sides)})" if sides else '') +
+        '. The next search builds a new cache and analyzes all photos again, which takes about as long as the '
+        f'first search. Delete {new} yourself once you no longer need it.')
+
+def show_cache_check():
+    """"Check cache" in "Clean up storage": SQLite's quick check of the cache, a damaged one set aside (F1)."""
+    st.caption(f'Check cache: looks for damage in {CACHE_FILE} (e.g. after a full disk or a power loss), which '
+               'otherwise shows only as errors during a search. It reads the whole file, which can take a few '
+               'seconds for a large cache, and cannot run while a search runs.')
+    if st.button('Check cache', disabled=active):
+        check_cache_now()
+    if 'cache_notice' in st.session_state:
+        kind, text = st.session_state.pop('cache_notice')
+        (st.success if kind == 'success' else st.warning)(plain(text))
+    result = st.session_state.get('cache_check')
+    if not result:
+        return
+    details = plain('; '.join(result['details'][:5]))
+    if result['refused']:
+        st.warning(plain(result['refused']))
+    elif result['state'] == 'missing':
+        st.info(f'There is no {CACHE_FILE} yet: the first search creates it.')
+    elif result['state'] == 'ok':
+        st.success(f"SQLite's quick check found no damage in {CACHE_FILE}.")
+    elif result['state'] == 'unchecked':
+        st.warning(f'{CACHE_FILE} could not be checked ({details}). Nothing was changed. Try again later, e.g. '
+                   'after closing other programs that may have the file open.')
+    else:
+        st.error(f'{CACHE_FILE} is damaged, so a search may fail or stop with an error. SQLite reports: {details}'
+                 '\n\n' + plain(f'You can rename it to {CACHE_FILE}.broken-<date and time>: it stays in the results '
+                                'folder (nothing is deleted), and the next search builds a new cache and analyzes all '
+                                'photos again, which takes about as long as the first search. Your marks, results, '
+                                'profiles and photos are not affected.'))
+        st.button(f'Rename the damaged {CACHE_FILE}', on_click=set_damaged_cache_aside, args=(result['file'],),
+                  disabled=active, key='cache_set_aside')
 
 def cache_env():
     env = os.environ.copy()
@@ -1346,6 +1445,7 @@ with run_tab:
         if not settings['person_detection']:
             cmd.append('--no-person-detection')
         st.session_state.pop('cleanup_scan', None)  # the search changes what a cleanup finds (E7)
+        st.session_state.pop('cache_check', None)  # and the cache a check looked at (F1)
         try:
             problem = start_run(cmd)
         except Exception as exc:
@@ -1372,8 +1472,8 @@ with run_tab:
             st.rerun()  # a search started or ended, also in another tab: update the whole page
         if now_active and cleanup_running(RESULTS):
             # "Clean up storage" of another tab holds the run lock, no search runs (review)
-            st.info('The storage is being cleaned up in another tab or window. You can start a search again '
-                    'when it is done.')
+            st.info('The storage is being cleaned up or the cache checked in another tab or window. You can start '
+                    'a search again when it is done.')
         elif now_active:
             st.info('Search running. You can reload this page or close the tab: the search continues and '
                     'is shown again when you come back. Photos that are already analyzed are kept in the cache.')
@@ -1433,3 +1533,5 @@ with run_tab:
                'the results folder together for the complete gallery.')
     with st.expander('Clean up storage'):
         show_cleanup()
+        st.divider()
+        show_cache_check()
