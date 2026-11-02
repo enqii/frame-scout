@@ -236,7 +236,9 @@ def _update_locked(filename, parse, update, attempts, retry_delay, lock_timeout,
     With backup, the previous content is first copied byte for byte to _backup_path(filename)
     (one generation: the file before this change). Only content parse() accepted gets there,
     so a file parse() rejects never replaces the backup; if the backup cannot be written, the
-    file stays unchanged.
+    file stays unchanged. The backup is not flushed to disk (durable=False), so a change costs
+    one fsync, not two: it is written on every change (e.g. each mark click), and only the file
+    itself must survive a power loss complete (F1 review).
     """
     with _file_lock(filename, lock_timeout):
         previous = _previous_content(filename, attempts, retry_delay)
@@ -244,7 +246,7 @@ def _update_locked(filename, parse, update, attempts, retry_delay, lock_timeout,
         if document is None:
             return
         if backup and previous is not None:
-            _replace_with_retry(_backup_path(filename), previous, attempts, retry_delay)
+            _replace_with_retry(_backup_path(filename), previous, attempts, retry_delay, durable=False)
         _replace_with_retry(filename, _json_bytes(document), attempts, retry_delay)
 
 
