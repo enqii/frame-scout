@@ -1,5 +1,6 @@
 """Marks of gallery photos in results/marks.json (framescout_core, A17)."""
 import json
+import os
 import re
 import threading
 import time
@@ -405,6 +406,27 @@ def test_a_save_keeps_the_previous_file_as_backup(tmp_path):
     save_marks(path, 'Red car', {'a.jpg': MARK_OPEN})
     assert marks_backup(path).read_bytes() == second  # one generation: the state before the latest save
     assert read_marks(marks_backup(path)) == {'Red car': {'a.jpg': MARK_MATCH, 'b.jpg': MARK_NO_MATCH}}
+
+
+def test_only_the_marks_file_is_flushed_to_disk_not_its_backup(tmp_path, monkeypatch):
+    # review: the backup is written on every mark click; one fsync per change, for the file
+    path = tmp_path / MARKS_FILE
+    save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
+    events = []
+    real_fsync, real_replace = os.fsync, os.replace
+
+    def fsync(fd):
+        events.append('fsync')
+        real_fsync(fd)
+
+    def replace(src, dst):
+        events.append(('replace', Path(dst).name))
+        real_replace(src, dst)
+
+    monkeypatch.setattr(os, 'fsync', fsync)
+    monkeypatch.setattr(os, 'replace', replace)
+    save_marks(path, 'Red car', {'b.jpg': MARK_MATCH})
+    assert events == [('replace', MARKS_BACKUP), 'fsync', ('replace', MARKS_FILE)]
 
 
 def test_a_save_that_changes_nothing_keeps_the_backup(tmp_path):
