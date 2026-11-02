@@ -828,14 +828,17 @@ def test_auto_cleanup_removes_temporary_files_of_a_stopped_run(project):
     (project.results / MARKS_FILE).write_text('{}', encoding='utf-8')
     (project.results / 'marks.json.bak').write_text('{}', encoding='utf-8')
     stale = [temp_file(project.results, name, 120)
-             for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, 'marks.json.bak', 'red-car.html', 'cat-2.html')]
+             for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, 'marks.json.bak', 'red-car.html', 'cat-2.html',
+                          # the copy of a damaged marks file restore_marks keeps (F1 review)
+                          'marks.json.broken-20261102-123045', 'marks.json.broken-20261102-123045-2')]
     # less than a minute old: possibly being written now (e.g. marks.json by an app session)
     fresh = [temp_file(project.results, name, 5) for name in (RUN_STATUS, MARKS_FILE, 'marks.json.bak',
                                                               'red-car.html')]
     # not FrameScout's temporary files: also none of a gallery name profile_slugs never gives
     mine = [project.results / name for name in ('notes.tmp', 'results.json.mine.tmp', 'settings.json.abcdefgh.tmp',
                                                'red-car.html.abcdefgh.bak', 'Cat & dog.html.abcdefgh.tmp',
-                                               'Red-car.html.abcdefgh.tmp')]
+                                               'Red-car.html.abcdefgh.tmp', 'marks.json.broken-x.abcdefgh.tmp',
+                                               'cache.sqlite3.broken-20261102-123045.abcdefgh.tmp')]
     for path in mine:
         path.write_text('mine', encoding='utf-8')
         os.utime(path, (time.time() - 120,) * 2)
