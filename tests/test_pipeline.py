@@ -3,7 +3,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 
 import pytest
 
-from framescout_core import draft_size, group_batches, prefetch, progress_due, store_group
+from framescout_core import Lazy, draft_size, group_batches, prefetch, progress_due, store_group
 
 
 # --- group_batches: crops of several photos go through CLIP together ---
@@ -216,3 +216,44 @@ def test_progress_due(before, after, total, expected):
 def test_progress_due_interval():
     assert progress_due(9, 10, 100, every=10) is True
     assert progress_due(10, 11, 100, every=10) is False
+
+
+# --- Lazy: the person detector is loaded only when a photo needs analysis (F2) ---
+
+def test_lazy_does_not_create_the_value_until_it_is_needed():
+    calls = []
+    lazy = Lazy(lambda: calls.append(1) or 'detector')
+    assert calls == [] and not lazy.created
+    assert lazy.get() == 'detector'
+    assert calls == [1] and lazy.created
+
+
+def test_lazy_creates_the_value_once():
+    calls = []
+    lazy = Lazy(lambda: calls.append(1) or object())
+    first = lazy.get()
+    assert lazy.get() is first and calls == [1]
+
+
+def test_lazy_keeps_a_none_value_without_creating_it_again():
+    # no person detection: the factory returns None, which is a value too
+    calls = []
+    lazy = Lazy(lambda: calls.append(1))
+    assert lazy.get() is None and lazy.get() is None
+    assert calls == [1]
+
+
+def test_lazy_tries_again_after_a_failed_creation():
+    attempts = []
+
+    def factory():
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise OSError('download failed')
+        return 'detector'
+
+    lazy = Lazy(factory)
+    with pytest.raises(OSError):
+        lazy.get()
+    assert not lazy.created
+    assert lazy.get() == 'detector'

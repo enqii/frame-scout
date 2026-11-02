@@ -26,6 +26,9 @@ PHASE_LABELS = {
     'interrupted': 'Interrupted',
 }
 FINAL_PHASES = frozenset({'finished', 'failed', 'interrupted'})
+# the message of a run whose photos all come from the cache: no person detector is
+# loaded, the search only ranks (F2)
+NOTHING_NEW = 'Nothing new to analyze – ranking only'
 
 
 def _timestamp():
@@ -163,8 +166,20 @@ def status_fraction(status):
 
 
 def status_text(status):
-    """Return the line the app shows for a status: the phase and, if it counts, its progress."""
+    """Return the line the app shows for a status: the phase, its progress if it counts.
+
+    A running phase also shows the message of the run (e.g. NOTHING_NEW, F2); the message
+    of a final phase is shown by the app in its own line.
+    """
     phase = status.get('phase')
+    text = _phase_text(status, phase)
+    message = status.get('message')
+    if phase not in FINAL_PHASES and isinstance(message, str) and message:
+        text += f' · {message}'
+    return text
+
+
+def _phase_text(status, phase):
     label = PHASE_LABELS.get(phase, str(phase))
     done, total = _count(status, 'done'), _count(status, 'total')
     if not total or done is None:
