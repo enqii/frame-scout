@@ -1021,11 +1021,18 @@ def show_cache_check():
         st.warning(f'{CACHE_FILE} could not be checked ({details}). Nothing was changed. Try again later, e.g. '
                    'after closing other programs that may have the file open.')
     else:
-        st.error(f'{CACHE_FILE} is damaged, so a search may fail or stop with an error. SQLite reports: {details}'
-                 '\n\n' + plain(f'You can rename it to {CACHE_FILE}.broken-<date and time>: it stays in the results '
-                                'folder (nothing is deleted), and the next search builds a new cache and analyzes all '
-                                'photos again, which takes about as long as the first search. Your marks, results, '
-                                'profiles and photos are not affected.'))
+        rename = plain(f'{CACHE_FILE}.broken-<date and time>: it stays in the results folder (nothing is deleted), '
+                       'and the next search builds a new cache and analyzes all photos again, which takes about as '
+                       'long as the first search. Your marks, results, profiles and photos are not affected.')
+        if result['state'] == 'unreadable':
+            # a disk I/O error: a bad sector, or a drive that is not reachable now (review)
+            st.error(f'{CACHE_FILE} could not be read, so a search may fail or stop with an error. SQLite reports: '
+                     f'{details}. This can be a damaged spot on the disk, or a drive or network share that is not '
+                     f'reachable at the moment.\n\nIf the error stays when you check again, you can rename it to '
+                     + rename)
+        else:
+            st.error(f'{CACHE_FILE} is damaged, so a search may fail or stop with an error. SQLite reports: '
+                     f'{details}\n\nYou can rename it to ' + rename)
         st.button(f'Rename the damaged {CACHE_FILE}', on_click=set_damaged_cache_aside, args=(result['file'],),
                   disabled=active, key='cache_set_aside')
 

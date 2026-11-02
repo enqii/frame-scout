@@ -31,13 +31,15 @@ def _file_key(path):
 
 
 def _quick_check(cache):
-    """Return ('ok' | 'damaged' | 'unchecked', details) of PRAGMA quick_check on the existing file cache.
+    """Return ('ok' | 'damaged' | 'unreadable' | 'unchecked', details) of PRAGMA quick_check on the existing file cache.
 
     Opened read-write (never created), so a hot journal of a stopped search is rolled back
     first, as the next search would do. An error SQLite reports as damage (sqlite3's
     DatabaseError: "file is not a database", "database disk image is malformed") makes the
-    file damaged; any other (OperationalError: e.g. the file cannot be opened, is locked or a
-    disk I/O error) leaves it unchecked, since setting the file aside would not help.
+    file damaged. A disk I/O error (SQLITE_IOERR) makes it unreadable: a bad sector, which
+    setting the file aside helps against, or a drive that is not reachable now (review). Any
+    other error (OperationalError: e.g. the file cannot be opened or is locked) leaves it
+    unchecked, since setting the file aside would not help.
     """
     try:
         con = sqlite3.connect(_sqlite_uri(cache, 'rw'), uri=True, timeout=5)
@@ -46,17 +48,26 @@ def _quick_check(cache):
         finally:
             con.close()
     except sqlite3.OperationalError as exc:
-        return 'unchecked', [str(exc)]
+        return ('unreadable' if _io_error(exc) else 'unchecked'), [str(exc)]
     except sqlite3.DatabaseError as exc:
         return 'damaged', [str(exc)]
     return ('ok', []) if rows == ['ok'] else ('damaged', rows[:CACHE_CHECK_LINES])
+
+
+def _io_error(exc):
+    """Whether the sqlite3 error exc is a disk I/O error (SQLITE_IOERR or one of its extended codes)."""
+    code = getattr(exc, 'sqlite_errorcode', None)
+    if code is not None:
+        return code & 0xff == sqlite3.SQLITE_IOERR
+    return str(exc).startswith('disk I/O error')
 
 
 def check_cache(results, alive, lock_timeout=CLEANUP_LOCK_TIMEOUT):
     """Check the cache file of the folder results with SQLite's quick_check; return the result (F1).
 
     The result has refused (why nothing was checked, else None), state ('missing': no cache
-    file; 'ok'; 'damaged'; 'unchecked': the check itself failed; None if refused), details
+    file; 'ok'; 'damaged'; 'unreadable': a disk I/O error; 'unchecked': the check itself
+    failed otherwise; None if refused), details
     (the problems or the error) and file (size and mtime_ns of the file after the check, for
     set_cache_aside). Holds the run lock of results like clean_up, so it is refused while a
     search runs or is being started (alive as for clean_up), and no search starts meanwhile.
