@@ -25,8 +25,10 @@ DEFAULT_REFERENCE_WEIGHT = 0.3
 # the settings of the app's AI settings tab, in the order it shows them: what its "Reset to
 # defaults" button resets (A26). Not the photo folders, the user's data location, which sit
 # in the Photo source tab.
-AI_SETTINGS = ('model', 'device', 'batch_size', 'top', 'person_detection', 'max_persons',
+AI_SETTINGS = ('model', 'device', 'batch_size', 'low_priority', 'top', 'person_detection', 'max_persons',
                'person_confidence', 'reference_weight')
+# the on/off settings (checkboxes)
+_BOOL_SETTINGS = ('person_detection', 'low_priority')
 # seconds save_settings waits for the lock around its read-merge-write
 SETTINGS_LOCK_TIMEOUT = 5.0
 
@@ -40,7 +42,9 @@ def default_settings(base):
     """Return the app's default settings; base is the project folder (photos/ is the default input)."""
     return {'photo_folders': [str(Path(base) / 'photos')], 'device': 'auto', 'batch_size': 8, 'top': 150,
             'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30,
-            'reference_weight': DEFAULT_REFERENCE_WEIGHT, 'model': DEFAULT_MODEL}
+            'reference_weight': DEFAULT_REFERENCE_WEIGHT, 'model': DEFAULT_MODEL,
+            # "Keep the PC responsive" (F4): the engine's --low-priority
+            'low_priority': False}
 
 
 def folder_lines(text):
@@ -58,7 +62,7 @@ def _setting_value(key, value):
         return value if isinstance(value, str) and value in DEVICES else None
     if key == 'model':  # a registry key, never a free-text OpenCLIP name (E22)
         return value if isinstance(value, str) and value in MODELS else None
-    if key == 'person_detection':
+    if key in _BOOL_SETTINGS:
         return value if isinstance(value, bool) else None
     if key not in SETTING_RANGES:
         return None
