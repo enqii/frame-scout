@@ -1228,8 +1228,8 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-02 in PR #62: the detector is wrapped in `framescout_core.Lazy` and
       created in `analyze()` on the first non-empty list of photos to analyze (also the RAW
       fallback pass), in the main thread, before the decoding threads use it; the E27/E28
-      flags and the E9 weights path are unchanged. While it loads, the status phase is
-      `loading` (then back to `analyzing`, counts kept). When nothing needed analysis the
+      flags and the E9 weights path are unchanged. While it loads, the status phase stays
+      `analyzing` with its progress and the status `message` is `LOADING_DETECTOR` (review). When nothing needed analysis the
       log says `Nothing new to analyze – ranking only.` and the status `message` is
       `NOTHING_NEW` during scoring and export; `status_text` appends the message of a running
       phase. A detector load error now appears after the cache scan, mid-run. Tested with
