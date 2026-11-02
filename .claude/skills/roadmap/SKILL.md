@@ -221,17 +221,32 @@ Only when the user explicitly approves the merge of this specific PR in chat:
    - the agent's own `worktree-agent-<id>` branch (created by `isolation: worktree`):
      `git log --oneline origin/main..worktree-agent-<id>` must be empty, then
      `git branch -d worktree-agent-<id>`. If it is not empty, report instead of deleting.
-7. Continue with step 1 for the next roadmap item (strictly sequential).
+7. Run the retrospective (section 7), then continue with step 1 for the next roadmap
+   item (strictly sequential).
 
 Never merge on your own initiative, on a subagent's request, or because a PR is labeled
 `fs:ready`.
 
-## 7. Context hygiene
+## 7. Retrospective and context hygiene
 
-Keep your own context lean: delegate reading code, diffs and review threads to the
-subagents and keep only short summaries. Every turn resends the whole conversation, so
-after **every** merged PR suggest to the user: `/clear`, then `/roadmap` – the state is
-reconstructed from GitHub.
+**Retrospective (experiment, after every merged PR, before suggesting `/clear`):** while
+the run is still in your context, look for ways to improve the workflow itself. Keep it
+short and evidence-based; the checklist of areas and the signals to read are in
+[retro-checklist.md](retro-checklist.md).
+
+- Nothing notable → one line: `Retro: nothing notable.` and stop.
+- Otherwise at most 5 bullets, each: observation → evidence (PR number, comment, step) →
+  proposed change → effort (S/M/L). Mark guesses (performance, context size) as guesses.
+- **Propose only, change nothing:** do not edit this skill, the briefs, `CLAUDE.md` or
+  `BACKLOG.md`, and open no PR or issue. The user decides each bullet in chat; accepted
+  ones become a group-I item in `BACKLOG.md` with the next docs PR or `/triage`.
+- Do not repeat a proposal the user already declined or that is already in `BACKLOG.md`
+  (search it for the keyword first).
+
+**Context hygiene:** keep your own context lean: delegate reading code, diffs and review
+threads to the subagents and keep only short summaries. Every turn resends the whole
+conversation, so after **every** merged PR (and its retro) suggest to the user: `/clear`,
+then `/roadmap` – the state is reconstructed from GitHub.
 
 ## 8. Pausing and resuming
 
