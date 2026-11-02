@@ -24,7 +24,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
-                             find_yolo_weights, hub_cache_dir, low_space, low_space_lines, search_space_needs,
+                             analyzed_photos, find_yolo_weights, hub_cache_dir, low_space, low_space_lines, search_space_needs,
                              hidden_text, hide_no_match, mark_style,
                              profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
@@ -1056,10 +1056,17 @@ def cache_env():
     env['PYTHONIOENCODING'] = 'utf-8'
     return env
 
-def low_space_warning(photos, top, profile_count, model, person_detection):
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_analyzed_photos(cache_key, signature, scan_key, _paths):
+    """analyzed_photos of the photo scan, counted again only when the cache file (cache_key:
+    file_key, or None without one), the settings or the photo count (scan_key) change (F3 review)."""
+    return analyzed_photos(cache_key[0], signature, _paths) if cache_key else 0
+
+def low_space_warning(photos, top, profile_count, model, person_detection, analyzed=0):
     """Return a warning if a search with these settings may leave little free disk space (F3), else None.
 
-    Counts cache rows and thumbnails in results/ and the downloads of a model or detector
+    Counts cache rows for the photos not analyzed yet (analyzed: those with cache rows of
+    these settings) and thumbnails in results/, and the downloads of a model or detector
     weights not in .cache/ yet, on the drives they are on (the folders cache_env sets). An
     estimate: a warning, never a block; a check that fails gives none.
     """
@@ -1072,7 +1079,7 @@ def low_space_warning(photos, top, profile_count, model, person_detection):
             found, cached = find_yolo_weights(DEFAULT_YOLO_MODEL, BASE, BASE, env)
             weights = found or cached
         low = low_space(search_space_needs(RESULTS, photos, top, profile_count, MODELS[model], hub_cache_dir(env),
-                                           weights))
+                                           weights, analyzed))
     except Exception:
         return None
     if not low:
@@ -1508,8 +1515,16 @@ with run_tab:
     if model_missing and not active:
         st.warning(model_missing)  # why Start is not available
     if folder_scans and not active:
+        try:
+            cache_key = file_key(RESULTS / CACHE_FILE)
+        except OSError:  # no cache yet
+            cache_key = None
+        # photos analyzed with these settings need no new cache rows (review: else a large,
+        # analyzed collection kept the warning for good)
+        analyzed = cached_analyzed_photos(cache_key, cleanup_signature(), (tuple(map(str, existing)), counted_at),
+                                          photo_scan.paths)
         space_warning = low_space_warning(len(photo_scan.paths), settings['top'], len(profiles), settings['model'],
-                                          settings['person_detection'])
+                                          settings['person_detection'], analyzed)
         if space_warning:
             st.warning(space_warning)
     @st.fragment(run_every='2s')

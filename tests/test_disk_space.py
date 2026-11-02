@@ -1,4 +1,5 @@
 """Free disk space checks before installing PyTorch and before a search (F3); no real drive is filled."""
+import sqlite3
 from collections import namedtuple
 from pathlib import Path
 
@@ -6,7 +7,7 @@ import pytest
 
 from framescout_core import disk_space
 from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, SPACE_RESERVE, THUMBNAIL_BYTES,
-                             TORCH_INSTALL_SPACE, LowSpace, download_bytes, low_space, low_space_lines,
+                             TORCH_INSTALL_SPACE, LowSpace, analyzed_photos, download_bytes, low_space, low_space_lines,
                              search_space_bytes, search_space_needs, torch_install_needs)
 
 MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text (review)
@@ -55,6 +56,42 @@ def test_search_space_counts_cache_rows_and_thumbnails():
     assert search_space_bytes(1000, 150, 2) == 1000 * CACHE_BYTES_PER_PHOTO + 150 * 2 * THUMBNAIL_BYTES
     # fewer photos than matches per profile: one thumbnail per photo and profile at most
     assert search_space_bytes(10, 150, 2) == 10 * CACHE_BYTES_PER_PHOTO + 10 * 2 * THUMBNAIL_BYTES
+
+
+def test_photos_in_the_cache_need_no_cache_rows(tmp_path):
+    # review: a repeat search of a large, analyzed collection writes almost nothing
+    assert search_space_bytes(1000, 150, 2, analyzed=1000) == 150 * 2 * THUMBNAIL_BYTES
+    assert search_space_bytes(1000, 150, 2, analyzed=400) == 600 * CACHE_BYTES_PER_PHOTO + 150 * 2 * THUMBNAIL_BYTES
+    results = tmp_path / 'results'
+    model = MODELS['vit-b-32-openai']
+    assert search_space_needs(results, 1000, 150, 2, model, tmp_path, analyzed=1000)[0] == (
+        results, 150 * 2 * THUMBNAIL_BYTES)
+
+
+def make_cache(path, rows):
+    """A feature cache with (photo path, signature) rows, as the engine writes it."""
+    con = sqlite3.connect(path)
+    con.execute('CREATE TABLE features (path TEXT NOT NULL, signature TEXT NOT NULL, mtime_ns INTEGER NOT NULL, '
+                'size INTEGER NOT NULL, labels TEXT NOT NULL, vectors BLOB NOT NULL, PRIMARY KEY(path, signature))')
+    con.executemany('INSERT INTO features VALUES (?,?,0,0,?,?)', [(p, s, '[]', b'') for p, s in rows])
+    con.commit()
+    con.close()
+
+
+def test_analyzed_photos_counts_the_photos_with_rows_of_the_signature(tmp_path):
+    photos = [tmp_path / 'photos' / f'{n}.jpg' for n in range(4)]
+    cache = tmp_path / 'cache.sqlite'
+    assert analyzed_photos(cache, 'abc', photos) == 0  # no cache yet
+    assert not cache.exists()  # not created
+    make_cache(cache, [(str(photos[0]), 'abc'), (str(photos[1]), 'abc'), (str(photos[2]), 'other'),
+                       (str(tmp_path / 'elsewhere.jpg'), 'abc')])
+    # rows of other settings or of photos outside this search do not count
+    assert analyzed_photos(cache, 'abc', photos) == 2
+    assert analyzed_photos(cache, 'other', photos) == 1
+    # a damaged file counts as no cache (on the safe side)
+    broken = tmp_path / 'broken.sqlite'
+    broken.write_bytes(b'not a database')
+    assert analyzed_photos(broken, 'abc', photos) == 0
 
 
 def test_search_needs_name_downloads_only_when_missing(tmp_path):
