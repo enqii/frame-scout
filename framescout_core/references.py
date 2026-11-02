@@ -4,9 +4,8 @@ import os
 import shutil
 from pathlib import Path
 
-from ._common import _path_key, _replace_atomically
+from ._common import _backup_path, _path_key, _replace_atomically
 from .names import slugify
-from .profiles import _backup_path
 
 
 def reference_folder(refs_root, name, others, base):

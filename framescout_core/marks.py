@@ -3,8 +3,8 @@ import json
 import re
 from pathlib import Path
 
-from ._common import (_broken_names, _file_lock, _publish_new, _publish_via_temp, _read_with_retry,
-                      _replace_with_retry)
+from ._common import (_backup_path, _broken_names, _file_lock, _previous_content, _publish_new, _publish_via_temp,
+                      _replace_with_retry, _update_locked)
 from .profiles import require_profile
 
 
@@ -35,16 +35,7 @@ MARK_STYLE_STREAMLIT = '1.66.1'
 
 def marks_backup(path):
     """Return the backup of the marks file path: <path>.bak, the file before its latest change (F1)."""
-    path = Path(path)
-    return path.with_name(path.name + '.bak')
-
-
-def _read_content(path, attempts, retry_delay):
-    """The bytes of the file path (read with retries), or None if it does not exist."""
-    try:
-        return _read_with_retry(Path(path).read_bytes, attempts, retry_delay)
-    except FileNotFoundError:
-        return None
+    return _backup_path(path)
 
 
 def _parse_marks(content, name):
@@ -72,30 +63,19 @@ def _parse_marks(content, name):
 
 def _read_marks_document(path, attempts=5, retry_delay=0.05):
     """Return the checked JSON object of the marks file ({'format': ..., 'profiles': {}} if missing)."""
-    return _parse_marks(_read_content(path, attempts, retry_delay), Path(path).name)
+    return _parse_marks(_previous_content(path, attempts, retry_delay), Path(path).name)
 
 
 def _update_marks(path, update, attempts, retry_delay, lock_timeout):
     """Read, change and replace the marks file path under its lock, keeping the previous file as backup.
 
-    update(document) returns the new document, or None to leave the file as it is. Before
-    the file is replaced, its previous content is copied byte for byte to marks_backup(path)
-    (F1; one generation, like profiles.json.bak): only content that was just read as a valid
-    marks file, so an unreadable file (ValueError, never replaced) never replaces the backup.
-    If the backup cannot be written, the file stays unchanged. Raises like _update_locked.
+    update(document) returns the new document, or None to leave the file as it is. The
+    previous content goes to marks_backup(path) first (F1; _update_locked with backup): only
+    content that was just read as a valid marks file, so an unreadable file (ValueError,
+    never replaced) never replaces the backup. Raises like _update_locked.
     """
-    with _file_lock(path, lock_timeout):
-        previous = _read_content(path, attempts, retry_delay)
-        document = update(_parse_marks(previous, path.name))
-        if document is None:
-            return
-        if previous is not None:
-            _replace_with_retry(marks_backup(path), previous, attempts, retry_delay)
-        _replace_with_retry(path, _dump(document), attempts, retry_delay)
-
-
-def _dump(document):
-    return (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+    _update_locked(path, lambda content: _parse_marks(content, path.name), update, attempts, retry_delay,
+                   lock_timeout, backup=True)
 
 
 def read_marks(path, attempts=5, retry_delay=0.05):
@@ -247,7 +227,7 @@ def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MAR
     path = Path(path)
     backup = marks_backup(path)
     with _file_lock(path, lock_timeout):
-        current = _read_content(path, attempts, retry_delay)
+        current = _previous_content(path, attempts, retry_delay)
         if current is not None:
             try:
                 _parse_marks(current, path.name)
@@ -255,7 +235,7 @@ def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MAR
                 pass
             else:
                 raise ValueError(f'{path.name} can be read again, so it was not replaced by {backup.name}')
-        content = _read_content(backup, attempts, retry_delay)
+        content = _previous_content(backup, attempts, retry_delay)
         if content is None:
             raise ValueError(f'There is no backup {backup.name}')
         try:

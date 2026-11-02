@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ._common import _path_key, _publish_new, _publish_via_temp, _update_locked
 from .profiles import require_profile
-from .settings import SETTINGS_LOCK_TIMEOUT, _read_settings_file
+from .settings import SETTINGS_LOCK_TIMEOUT, _parse_settings, _read_settings_file
 
 
 # Copying the photos marked as matches (A17): copies only, never moving or deleting an
@@ -161,8 +161,7 @@ def _update_copy_folders(filename, change, attempts, retry_delay, lock_timeout):
             document.pop(COPY_FOLDERS_KEY, None)
         return document if document or filename.exists() else None
 
-    _update_locked(filename, lambda: _read_settings_file(filename, attempts, retry_delay), update,
-                   attempts, retry_delay, lock_timeout)
+    _update_locked(filename, _parse_settings, update, attempts, retry_delay, lock_timeout)
 
 
 def save_copy_folder(filename, profile, folder, default, attempts=5, retry_delay=0.05,

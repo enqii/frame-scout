@@ -3,7 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from ._common import _file_lock, _publish_new, _publish_via_temp, _read_with_retry, _replace_with_retry
+from ._common import (_backup_path, _file_lock, _json_bytes, _previous_content, _publish_new, _publish_via_temp,
+                      _read_with_retry, _replace_with_retry)
 
 
 def create_from_example(target, example):
@@ -197,10 +198,7 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
     each read and replace is tried up to attempts times, retry_delay seconds apart (review).
     """
     with _file_lock(filename, lock_timeout):
-        try:
-            previous = _read_with_retry(filename.read_bytes, attempts, retry_delay)
-        except FileNotFoundError:
-            previous = None
+        previous = _previous_content(filename, attempts, retry_delay)
         if expected is not _UNCHECKED and _version_of(previous) != expected:
             raise ProfilesChangedError(
                 f'{filename.name} was changed in another tab or session, or by hand, since this page showed it')
@@ -215,7 +213,7 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
             # file, whose keys are profile names, is not merged (review)
             if isinstance(old, dict) and 'profiles' in old:
                 document = {**old, 'profiles': profiles}
-        data = (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+        data = _json_bytes(document)
         _replace_with_retry(filename, data, attempts, retry_delay)
     return _version_of(data)
 
@@ -223,8 +221,3 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
 def _version_of(content):
     """The version of a profiles file's content (bytes, or None for a missing file)."""
     return None if content is None else hashlib.sha256(content).hexdigest()
-
-
-def _backup_path(filename):
-    """Return the backup file of a profiles file: <filename>.bak."""
-    return filename.with_name(filename.name + '.bak')

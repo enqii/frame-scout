@@ -2,10 +2,11 @@
 
 Atomic file writes (_publish_via_temp, _publish_new, _replace_atomically,
 _replace_with_retry, _publish_together for several files), retrying an action (_retry),
-reading a file (_read_with_retry) or a JSON object file (_read_json_object) with retries, the
-save lock of a file (_file_lock), the locked read-change-write of a JSON file
-(_update_locked), the comparable form of a path (_path_key) and the names a damaged file is
-kept under (_broken_names).
+reading a file (_read_with_retry, _previous_content) or a JSON object file (_read_json_object,
+_json_object) with retries, the bytes of a JSON file (_json_bytes), the save lock of a file
+(_file_lock), the locked read-change-write of a JSON file with an optional backup
+(_update_locked, _backup_path), the comparable form of a path (_path_key) and the names a
+damaged file is kept under (_broken_names).
 """
 import itertools
 import json
@@ -123,7 +124,7 @@ def _publish_together(files, attempts, retry_delay, replace=os.replace):
 def _previous_content(target, attempts, retry_delay):
     """The bytes of target, or None if it does not exist (read with retries)."""
     try:
-        return _read_with_retry(target.read_bytes, attempts, retry_delay)
+        return _read_with_retry(Path(target).read_bytes, attempts, retry_delay)
     except FileNotFoundError:
         return None
 
@@ -194,27 +195,57 @@ def _read_json_object(filename, what, attempts=5, retry_delay=0.05):
         text = _read_with_retry(lambda: Path(filename).read_text(encoding='utf-8-sig'), attempts, retry_delay)
     except FileNotFoundError:
         return {}
-    data = json.loads(text)
+    return _json_object(text, what)
+
+
+def _json_object(content, what):
+    """Return the JSON object of a file's content (bytes or text; None: a missing file, {}); ValueError if it is none.
+
+    what names the file in the error for content that is not a JSON object.
+    """
+    if content is None:
+        return {}
+    data = json.loads(content.decode('utf-8-sig') if isinstance(content, bytes) else content)
     if not isinstance(data, dict):
         raise ValueError(f'The {what} must be a JSON object.')
     return data
 
 
-def _update_locked(filename, read, update, attempts, retry_delay, lock_timeout):
+def _json_bytes(document):
+    """The bytes of a JSON file FrameScout writes: document as UTF-8 text, indented, with a final newline."""
+    return (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+
+
+def _backup_path(filename):
+    """Return the backup of a file FrameScout saves: <filename>.bak, the file before its latest save."""
+    filename = Path(filename)
+    return filename.with_name(filename.name + '.bak')
+
+
+def _update_locked(filename, parse, update, attempts, retry_delay, lock_timeout, backup=False):
     """Read, change and replace the JSON file filename under a RunLock on <filename>.lock.
 
-    read() returns the current content, update(content) the new one, or None to leave the
-    file as it is. App sessions are threads of one process, and two RunLocks conflict there
-    too, so two sessions saving at the same moment cannot lose a change; the lock file stays
+    parse(content) returns the document of the file's current content (its bytes, read with
+    retries; None if it is missing), update(document) the new one, or None to leave the file
+    as it is. App sessions are threads of one process, and two RunLocks conflict there too,
+    so two sessions saving at the same moment cannot lose a change; the lock file stays
     (empty). The file is replaced atomically, tried up to attempts times. Raises OSError if
-    the lock is not free within lock_timeout seconds; errors of read() and update() (e.g.
+    the lock is not free within lock_timeout seconds; errors of parse() and update() (e.g.
     ValueError for an unreadable file, which is then never replaced) are passed on.
+
+    With backup, the previous content is first copied byte for byte to _backup_path(filename)
+    (one generation: the file before this change). Only content parse() accepted gets there,
+    so a file parse() rejects never replaces the backup; if the backup cannot be written, the
+    file stays unchanged.
     """
     with _file_lock(filename, lock_timeout):
-        document = update(read())
-        if document is not None:
-            data = (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
-            _replace_with_retry(filename, data, attempts, retry_delay)
+        previous = _previous_content(filename, attempts, retry_delay)
+        document = update(parse(previous))
+        if document is None:
+            return
+        if backup and previous is not None:
+            _replace_with_retry(_backup_path(filename), previous, attempts, retry_delay)
+        _replace_with_retry(filename, _json_bytes(document), attempts, retry_delay)
 
 
 @contextmanager
