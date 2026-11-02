@@ -15,6 +15,7 @@ negative, duplicate, burst, EXIF, date, re-rank, CSV, integrity, disk space, pri
 exclude, threshold). Closest existing items are named where they touch an idea.
 
 ### 1. "Not this" search texts per profile
+Disposition: take over → F6; tag decision (2026-11-02)
 - **Problem:** a profile "red car" also ranks toy cars, posters of cars or red buses
   high, and the user can only add more positive texts. A20 covers rejected *marks* as
   negative examples, but there is no way to say up front what a motif is *not*.
@@ -33,6 +34,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   search-quality change (needs the local evaluation set; λ is tuned there).
 
 ### 2. Group near-duplicate and burst shots in the results
+Disposition: take over → F7; tag decision (2026-11-02)
 - **Problem:** event and burst photography produces 5–20 nearly identical frames; they
   fill whole result pages with the same moment, so the user scrolls past duplicates
   and finds fewer *different* matches per page.
@@ -52,6 +54,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   gets an additive field (check the format-version rule of A25). No new dependency.
 
 ### 3. Skip loading the person detector when nothing needs analysis
+Disposition: take over → F2; roadmap P12 (A) (2026-11-02)
 - **Problem:** a repeat search on an already analyzed folder (e.g. after editing only a
   profile text or the reference weight) still loads the YOLO model
   (`framescout_engine.py`, `detector = YOLO(...)` before the cache is consulted), which
@@ -69,6 +72,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
 - **Hold point:** no (no schema, cache or quality change).
 
 ### 4. Exclude subfolders and filter by date
+Disposition: take over → F8; tag decision (2026-11-02)
 - **Problem:** large photo trees contain folders the user never wants searched
   (`_exports`, `edited`, `.thumbnails`, `Screenshots`), and users often know roughly
   *when* a motif was shot ("summer 2024") but today must search everything.
@@ -89,6 +93,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   optional keys; a product decision on mtime vs. EXIF fallback is needed.
 
 ### 5. Export a result list (CSV / file list)
+Disposition: take over → F5; roadmap P13 (2026-11-02)
 - **Problem:** the only way to take results elsewhere is copying files (A17) or the HTML
   gallery. Users who catalog photos in another program (Lightroom, digiKam, XnView,
   a spreadsheet) want a list of the matched paths, scores and marks.
@@ -106,6 +111,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
 - **Hold point:** no.
 
 ### 6. Backup of `marks.json` and a cache health check
+Disposition: take over → F1; roadmap P11 (2026-11-02)
 - **Problem:** `results/marks.json` holds hours of manual review but has no backup
   (A30 is about `profiles.json` only); a broken write or a hand edit loses all marks. A
   damaged `cache.sqlite3` (disk full, power loss) currently surfaces only as errors in
@@ -125,6 +131,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
   product decision).
 
 ### 7. "Run in the background" (lower priority) option
+Disposition: take over → F4; roadmap P12 (C) (2026-11-02)
 - **Problem:** a CPU search on thousands of photos makes the PC sluggish for the whole
   run; users who keep working meanwhile would rather wait longer. E17 tunes thread
   counts for speed, not for staying usable.
@@ -140,6 +147,7 @@ exclude, threshold). Closest existing items are named where they touch an idea.
 - **Hold point:** no; measure the slowdown on the home PC together with E17 (P10 (B)).
 
 ### 8. Free disk space check before installing and searching
+Disposition: take over → F3; roadmap P12 (B) (2026-11-02)
 - **Problem:** the CUDA install downloads about 2.5 GB, optional search models up to
   1.7 GB, and a search writes cache rows and thumbnails. A full disk mid-way leaves a
   broken `.venv`, a half-downloaded model or failed cache commits with confusing errors.

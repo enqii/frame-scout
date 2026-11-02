@@ -60,6 +60,21 @@ The items' IDs (E/A/I/F) are described in [BACKLOG.md](BACKLOG.md) (open) and
 - [ ] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
       detection results is a hold point)
 
+### P11 – Safety of marks and cache (added 2026-11-02)
+- [ ] Backup of `marks.json` with a restore offer, and a cache health check (F1)
+
+### P12 – Lighter runs (added 2026-11-02)
+- [ ] (A) No person detector load when nothing needs analysis (F2)
+- [ ] (B) Free disk space check before installing and searching (F3)
+- [ ] (C) "Keep the PC responsive" option, measured together with P10 (B) (F4)
+
+### P13 – Export (added 2026-11-02)
+- [ ] Export a result list as CSV / file list (F5)
+
+### P14 – Hygiene (`minor` items bundled per area, added 2026-11-02)
+- [ ] (A) Evaluation tool and workflow: E47, E48, I13, I28, I29
+- [ ] (B) App: A31, A32, A37, A39
+
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
       pool at home, search quality is a hold point) (tooling done 2026-10-26 in PR #32;
