@@ -185,10 +185,10 @@ the module of its area and to the re-exports in `__init__.py`.
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
 - `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`hide_no_match`/`hidden_text`/`mark_style`
-  (the user's marks, A17; every change goes through the private `_update_marks`, which first copies
-  the previous, validly read file byte for byte to `marks.json.bak` (F1); `marks_backup(path)` reads
-  the backup, `restore_marks` keeps a damaged file as `marks.json.broken-<date>` and restores the
-  backup; `delete_marks` removes all marks of a deleted profile, A22;
+  (the user's marks, A17; every change goes through `_common._update_locked(..., backup=True)`
+  (private `_update_marks`), which first copies the previous, validly read file byte for byte to
+  `marks.json.bak` (F1); `marks_backup(path)` names the backup, `restore_marks` keeps a damaged
+  file as `marks.json.broken-<date>` and restores the backup; `delete_marks` removes all marks of a deleted profile, A22;
   `remove_marks(path, entries)` removes single `(profile, photo path)` marks for the cleanup, E8;
   `save_marks(..., profiles_file=...)` saves only for a name that is a profile now;
   `hide_no_match(cards, marks)` returns the cards not marked as no match and how many it
@@ -204,7 +204,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`STALE_TEMP_AGE`/`ROOT_TIMEOUT`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14/E8; the unbound-photo check is the private `_PathCheck`;
   `_holding_run_lock` (the run lock shared with `cache_check`) and `_sqlite_uri` (F1)).
-- `cache_check.py` (F1): `CACHE_CHECK_LINES`/`CACHE_SIDE_FILES`/`check_cache`/`set_cache_aside`
+- `cache_check.py` (F1): `CACHE_CHECK_LINES`/`CACHE_SIDE_FILES`/`check_cache`/`cache_check_current`/`set_cache_aside`
   (the cache health check and renaming a damaged cache, see "Storage cleanup").
   `_common._broken_names` builds the `<name>.broken-<YYYYMMDD-HHMMSS>[-n]` names.
 - `portable_python.py` (P5 part C):
@@ -249,10 +249,14 @@ the module of its area and to the re-exports in `__init__.py`.
   `_replace_with_retry`, `_temp_path`, `_flush_to_disk`, and `_publish_together`, which
   writes several files in full to temporary files and only then renames them in order, each
   rename retried 40 x 50 ms, and restores the files renamed before a rename that fails every
-  try), retrying an action while it raises `OSError` (`_retry`), reading a file (`_read_with_retry`) or a JSON object file
-  (`_read_json_object`) with retries, the save lock of a file on `<file>.lock`
+  try), retrying an action while it raises `OSError` (`_retry`), reading a file (`_read_with_retry`,
+  `_previous_content`) or a JSON object file (`_read_json_object`, `_json_object`) with retries,
+  the bytes of a saved JSON file (`_json_bytes`), the save lock of a file on `<file>.lock`
   (`_file_lock`, used by `_update_locked` and `save_profiles`), the locked
-  read-change-write of a JSON file (`_update_locked`) and `_path_key`.
+  read-change-write of a JSON file (`_update_locked(filename, parse, update, ..., backup=False)`:
+  `parse` gets the raw bytes; with `backup`, the previous content parse accepted goes to
+  `_backup_path` = `<file>.bak` first, without its own fsync; used by settings, copy folders
+  and marks), `_path_key` and `_broken_names`.
 
 Dependencies between the modules go one way (no import cycles): `cleanup` uses most of the
 others, `_common` uses only `locks`. Private helpers (leading underscore) are not
@@ -794,7 +798,8 @@ the log come after this step. Galleries are written as bytes, so their line ends
 on Windows too. After `results.json` is published, still holding the run
 lock, the engine calls `auto_cleanup`: it removes temporary thumbnails
 (`<hash>.jpg.<random>.jpg`, left by a stop during the export, E13), stale temporary files
-(`run-status.json.*.tmp`, `results.json.*.tmp`, `marks.json.*.tmp`, `<slug>.html.*.tmp`
+(`run-status.json.*.tmp`, `results.json.*.tmp`, `marks.json.*.tmp`, `marks.json.bak.*.tmp`,
+`marks.json.broken-<YYYYMMDD-HHMMSS>[-n].*.tmp` of `restore_marks`, `<slug>.html.*.tmp`
 with a profile slug `[a-z0-9-]+`; random part exactly 8 chars of `[a-z0-9_]`, regex
 `cleanup._TEMP_FILE`) at least `STALE_TEMP_AGE` = 60 s old by mtime, even if
 `results.json` cannot be read (E26; the age limit protects a write the app is doing right
@@ -955,14 +960,17 @@ app then shows no marks. The file is user data in the results folder: the engine
 writes it, and the cleanup never deletes the file (`NEVER_DELETED`); it removes single marks of
 unbound photos only when the user selects that category (E8, `remove_marks`: under the
 same marks lock as `save_marks`, a profile left without marks is dropped, an unreadable
-file is never replaced). F1: `_update_marks` (all four writers) first copies the previous file
-to `marks.json.bak` (only content just read as valid; if the copy fails `marks.json` stays
-unchanged; one generation; in `NEVER_DELETED`, its stale `.tmp` files go with `auto_cleanup`).
-`restore_marks(path, now=None)` runs under the marks lock, raises `ValueError` when `marks.json`
-can be read or the backup cannot, keeps the damaged file as `marks.json.broken-<date>` and
-replaces `marks.json` atomically with the backup's bytes. The gallery offers it (never
-automatically) only for a `ValueError` read, not for `OSError`; a missing `marks.json` gets no
-offer (A40). A21 (marks follow the absolute path) is closed as won't do: a
+file is never replaced). F1: `_update_marks` (all four writers; `_update_locked` with
+`backup=True`) first copies the previous file to `marks.json.bak` (only content just read as
+valid; if the copy fails `marks.json` stays unchanged; one generation; the backup is replaced
+atomically but not fsynced, so a mark click costs one fsync; in `NEVER_DELETED`, its stale
+`.tmp` files go with `auto_cleanup`). `restore_marks(path, now=None)` runs under the marks
+lock, raises `ValueError` when `marks.json` can be read or the backup cannot, keeps the damaged
+file as `marks.json.broken-<date>` and replaces `marks.json` atomically with the backup's
+bytes; if that replace fails, the kept copy is removed again (no copy per failed try). The
+gallery offers it (never automatically) only for a `ValueError` read, not for `OSError`, and
+then advises "Restore the backup below, or fix the file" (not "remove": a missing
+`marks.json` gets no offer, A40). A21 (marks follow the absolute path) is closed as won't do: a
 renamed or moved photo counts as a new photo, its old mark stays until cleaned up. The control on each
 card is an `st.segmented_control` whose session state is set from the file before it is
 drawn on every run of the gallery fragment (no `default=`), so the file is the truth also
@@ -1113,11 +1121,16 @@ F1: below the cleanup, "Check cache" calls `check_cache(results, alive, lock_tim
 same run lock (`_holding_run_lock`; refused while a search runs or starts; `cleanup_running` is
 true meanwhile): `PRAGMA quick_check(20)` on `cache.sqlite3` opened read-write by URI (never
 created; a hot journal is rolled back first, as the next search would). States `missing`, `ok`,
-`damaged` (`sqlite3.DatabaseError` or problem lines), `unchecked` (`OperationalError`; no
-rename offered). `set_cache_aside(results, alive, expected)` renames the cache and its
+`damaged` (`sqlite3.DatabaseError` or problem lines), `unreadable` (an `OperationalError`
+with `SQLITE_IOERR`, "disk I/O error": a bad sector or an unreachable drive; rename offered),
+`unchecked` (any other `OperationalError`, e.g. locked; no rename offered).
+`set_cache_aside(results, alive, expected)` renames the cache and its
 `-journal`/`-wal`/`-shm` files (side files first, rolled back on failure) to
 `cache.sqlite3.broken-<date>[-n]`, only if size and mtime equal the checked file; it never
-deletes. Starting a search drops a shown check result, a rename drops a shown cleanup scan.
+deletes. Starting a search drops a shown check result, a rename drops a shown cleanup scan,
+and `cache_check_current(results, result)` (one `stat` per page run) drops a shown result
+once the cache's size or mtime differs from the checked file (a cleanup, a search of another
+tab, a rename; refused results stay).
 A search on a damaged cache still fails with SQLite's raw error (E50).
 While `clean_up` holds the lock it registers the results folder in the process
 (`cleanup_running`; app sessions are threads of one process), so other tabs show "The
@@ -1295,7 +1308,7 @@ target folders (A17) with their deletion with a profile and no saves for a name 
 profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files in `test_cache_check.py` (F1), unreachable roots simulated by patching
+`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the stale temporary files of
 `auto_cleanup` (E26, `test_cleanup.py`: removed; fresh ones, foreign ones and gallery names

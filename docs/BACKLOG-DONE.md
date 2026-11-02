@@ -1211,4 +1211,8 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `NEVER_DELETED` has `marks.json.bak`. Tested with unit tests (real damaged SQLite
       files, 983 passed, 2 skipped; CI green on py3.12/3.13/3.14) and the app flows with
       `AppTest`. Not tested: a real browser, the `quick_check` duration on a large cache, a
-      real search after the cache rename, the rollback of a hot journal. Open: E50, A40.)
+      real search after the cache rename, the rollback of a hot journal. Open: E50, A40.
+      Review fixes: a disk I/O error makes the cache "unreadable" with the rename offered;
+      a shown check result is dropped once the cache changes; no "remove it" advice when a
+      backup is offered; a failed restore leaves no `.broken-` copy; the backup is written
+      through the shared `_update_locked` without its own fsync.)
