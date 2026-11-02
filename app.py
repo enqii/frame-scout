@@ -18,7 +18,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              MARKS_FILE, PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES,
                              SETTING_STEPS, SETTINGS_FILE, RunLock, StatusReporter, cache_paths, check_cache,
                              clean_up, cleanup_running, cleanup_summary_text, marks_backup, restore_marks,
-                             set_cache_aside,
+                             cache_check_current, set_cache_aside,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              AI_SETTINGS, changed_from_defaults, setting_text,
@@ -971,7 +971,7 @@ def show_cleanup():
         st.rerun()
 
 def check_cache_now():
-    """Run the cache check (F1); its result is shown below the button until a search starts."""
+    """Run the cache check (F1); its result is shown below the button until a search starts or the file changes."""
     try:
         with st.spinner(f'Checking {CACHE_FILE} …'):
             st.session_state.cache_check = check_cache(RESULTS, engine_alive)
@@ -1009,6 +1009,12 @@ def show_cache_check():
         (st.success if kind == 'success' else st.warning)(plain(text))
     result = st.session_state.get('cache_check')
     if not result:
+        return
+    if not cache_check_current(RESULTS, result):
+        # e.g. compacted by a cleanup or written by a search of another tab: the result and
+        # its rename offer no longer apply (review)
+        st.session_state.pop('cache_check', None)
+        st.caption(f'{CACHE_FILE} changed since the check. Check it again.')
         return
     details = plain('; '.join(result['details'][:5]))
     if result['refused']:
