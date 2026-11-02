@@ -24,7 +24,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
-                             analyzed_photos, find_yolo_weights, hub_cache_dir, low_space, low_space_lines, search_space_needs,
+                             analyzed_photos, app_search_needs, low_space, low_space_lines,
                              hidden_text, hide_no_match, mark_style,
                              profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
@@ -1062,25 +1062,23 @@ def cached_analyzed_photos(cache_key, signature, scan_key, _paths):
     file_key, or None without one), the settings or the photo count (scan_key) change (F3 review)."""
     return analyzed_photos(cache_key[0], signature, _paths) if cache_key else 0
 
+# seconds the free disk space check of the run tab is reused: not asked again on every click (review)
+LOW_SPACE_TTL = 30
+
+@st.cache_data(show_spinner=False, max_entries=4, ttl=LOW_SPACE_TTL)
 def low_space_warning(photos, top, profile_count, model, person_detection, analyzed=0):
     """Return a warning if a search with these settings may leave little free disk space (F3), else None.
 
     Counts cache rows for the photos not analyzed yet (analyzed: those with cache rows of
     these settings) and thumbnails in results/, and the downloads of a model or detector
-    weights not in .cache/ yet, on the drives they are on (the folders cache_env sets). An
-    estimate: a warning, never a block; a check that fails gives none.
+    weights not in .cache/ yet, on the drives they are on (app_search_needs: the folders
+    cache_env sets). A drive that does not answer within SPACE_CHECK_TIMEOUT is left out. An
+    estimate: a warning, never a block; a check that fails (OSError, ValueError) gives none.
     """
     try:
-        paths = cache_paths(BASE)
-        env = {**os.environ, **{name: str(path) for name, path in paths.items()}}
-        weights = None
-        if person_detection:
-            # where the engine finds the weights (it runs in BASE with the cache_env variables)
-            found, cached = find_yolo_weights(DEFAULT_YOLO_MODEL, BASE, BASE, env)
-            weights = found or cached
-        low = low_space(search_space_needs(RESULTS, photos, top, profile_count, MODELS[model], hub_cache_dir(env),
-                                           weights, analyzed))
-    except Exception:
+        low = low_space(app_search_needs(BASE, RESULTS, os.environ, photos, top, profile_count, MODELS[model],
+                                         person_detection, analyzed))
+    except (OSError, ValueError):
         return None
     if not low:
         return None

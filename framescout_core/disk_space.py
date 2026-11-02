@@ -12,8 +12,10 @@ import sqlite3
 from pathlib import Path
 from typing import NamedTuple
 
-from .cleanup import _read_only_uri, size_text
-from .hub import model_cached
+from .cache_dirs import cache_paths, find_yolo_weights
+from .cleanup import _reachable_roots, _read_only_uri, _root_of, size_text
+from .hub import hub_cache_dir, model_cached
+from .signature import DEFAULT_YOLO_MODEL
 
 # in the units size_text shows them in (and Windows Explorer shows free space in): a "GB"
 # here is 1024 ** 3 bytes, so 1.2 GB in the code reads 1.2 GB in a warning (review)
@@ -34,6 +36,9 @@ THUMBNAIL_BYTES = 50_000
 DETECTOR_DOWNLOAD = 6 * _MB
 # a drive should keep at least this much free after the install or search
 SPACE_RESERVE = 1 * _GB
+# seconds a drive or share root may take to answer before the check leaves it out: a stat on
+# a disconnected network share can hang far longer, and the app checks on its page runs (review)
+SPACE_CHECK_TIMEOUT = 1.0
 
 _SIZE = re.compile(r'(\d+(?:\.\d+)?) (MB|GB)')
 
@@ -75,9 +80,9 @@ def analyzed_photos(cache_file, signature, paths):
     of the scan), case-insensitively on Windows.
     """
     cache_file = Path(cache_file)
-    if not cache_file.is_file():
-        return 0
     try:
+        if not cache_file.is_file():
+            return 0
         con = sqlite3.connect(_read_only_uri(cache_file), uri=True, timeout=1)
         try:
             # the primary key (path, signature) covers this query: only the index is read
@@ -85,24 +90,47 @@ def analyzed_photos(cache_file, signature, paths):
                       con.execute('SELECT path FROM features WHERE signature=?', (signature,))}
         finally:
             con.close()
-    except sqlite3.Error:
+    except (sqlite3.Error, OSError):
         return 0
     return sum(os.path.normcase(str(path)) in cached for path in paths)
 
 
-def search_space_needs(results, photos, top, profiles, model, hub_cache, detector_weights=None, analyzed=0):
+def search_space_needs(results, photos, top, profiles, model, hub_cache, detector_weights=None, analyzed=0,
+                       timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
     """Return the (folder, bytes) pairs a search writes: results, a missing model, missing detector weights.
 
     model is the SearchModel of the search, hub_cache the Hugging Face cache folder it is
     loaded from (hub_cache_dir); detector_weights is the path the person detector loads its
-    weights from, or None with person detection off; analyzed as in search_space_bytes.
+    weights from, or None with person detection off; analyzed as in search_space_bytes. The
+    hub cache and the weights are looked at only if their drive answers within timeout
+    seconds (reachable: cleanup's root probe); otherwise their download is left out.
     """
     needs = [(Path(results), search_space_bytes(photos, top, profiles, analyzed))]
-    if not model_cached(model, hub_cache):
+    folders = [Path(hub_cache)] + ([] if detector_weights is None else [Path(detector_weights).parent])
+    answers = _reachable(folders, timeout, reachable)
+    if answers[Path(hub_cache)] and not model_cached(model, hub_cache):
         needs.append((Path(hub_cache), download_bytes(model.download)))
-    if detector_weights is not None and not Path(detector_weights).is_file():
+    if detector_weights is not None and answers[Path(detector_weights).parent] and not Path(detector_weights).is_file():
         needs.append((Path(detector_weights).parent, DETECTOR_DOWNLOAD))
     return needs
+
+
+def app_search_needs(base, results, environ, photos, top, profiles, model, person_detection, analyzed=0,
+                     timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
+    """Return the search_space_needs of a search the app starts (F3 review: tested here, not in app.py).
+
+    The app runs the engine in base with the cache variables of cache_paths(base) set over
+    environ (cache_env), so the model comes from the Hugging Face cache those give (a
+    HF_HUB_CACHE of the user is kept) and the person detector's weights are looked up as
+    yolo_weights does (find_yolo_weights); person_detection False needs no weights.
+    """
+    environ = {**environ, **{name: str(path) for name, path in cache_paths(base).items()}}
+    weights = None
+    if person_detection:
+        found, cached = find_yolo_weights(DEFAULT_YOLO_MODEL, base, base, environ)
+        weights = found or cached
+    return search_space_needs(results, photos, top, profiles, model, hub_cache_dir(environ), weights, analyzed,
+                              timeout, reachable)
 
 
 def torch_install_needs(build, venv, temp):
@@ -120,17 +148,28 @@ def _existing_folder(path):
     return None
 
 
-def low_space(needs, reserve=SPACE_RESERVE, disk_usage=shutil.disk_usage, stat=os.stat):
+def _reachable(folders, timeout, reachable):
+    """{folder: whether its drive or share root answers within timeout seconds} (reachable: _reachable_roots)."""
+    roots = {folder: _root_of(os.path.abspath(folder)) for folder in folders}
+    answers = reachable(sorted(set(roots.values())), timeout) if roots else {}
+    return {folder: answers[root] for folder, root in roots.items()}
+
+
+def low_space(needs, reserve=SPACE_RESERVE, disk_usage=shutil.disk_usage, stat=os.stat, timeout=SPACE_CHECK_TIMEOUT,
+              reachable=_reachable_roots):
     """Return a LowSpace for every drive that would keep less than reserve bytes free.
 
     needs are (folder, bytes) pairs; a folder that does not exist yet counts on the drive of
     its nearest existing parent (nothing is created), and the needs of folders on the same
-    drive (volume, by device number and size) add up. A need of 0 bytes, and a drive that cannot be asked (e.g. a disconnected
-    network share), give no warning.
+    drive (volume, by device number and size) add up. A need of 0 bytes, and a drive that
+    cannot be asked or does not answer within timeout seconds (e.g. a disconnected network
+    share; reachable probes the roots in threads, see cleanup), give no warning.
     """
+    needs = [(folder, size) for folder, size in needs if size > 0]
+    answers = _reachable([folder for folder, _ in needs], timeout, reachable)
     drives = {}
     for folder, size in needs:
-        if size <= 0:
+        if not answers[folder]:
             continue
         try:
             existing = _existing_folder(folder)
