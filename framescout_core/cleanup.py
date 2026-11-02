@@ -4,6 +4,7 @@ import re
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import quote
 
@@ -349,7 +350,12 @@ def _unchecked_notes(unchecked):
 
 
 def _read_only_uri(path):
-    """Return the SQLite URI that opens the existing file path read-only (never creating it).
+    """Return the SQLite URI that opens the existing file path read-only (never creating it)."""
+    return _sqlite_uri(path, 'ro')
+
+
+def _sqlite_uri(path, mode):
+    """Return the SQLite URI that opens the existing file path in mode ('ro' or 'rw'; never creating it).
 
     Path.as_uri() gives a UNC path (\\\\server\\share\\...) a host authority, which SQLite
     rejects; the URI form with an empty authority and the server in the path works for both
@@ -358,7 +364,7 @@ def _read_only_uri(path):
     posix = Path(path).resolve().as_posix()
     if not posix.startswith('/'):
         posix = '/' + posix  # C:/... -> /C:/...
-    return 'file://' + quote(posix, safe='/:') + '?mode=ro'
+    return 'file://' + quote(posix, safe='/:') + '?mode=' + mode
 
 
 def _read_cache(cache):
@@ -679,8 +685,37 @@ _CLEANING = set()
 
 
 def cleanup_running(results):
-    """Return True if a clean_up of this process holds the run lock of the results folder now."""
+    """Return True if a clean_up or cache check of this process holds the run lock of the results folder now."""
     return _path_key(Path(results)) in _CLEANING
+
+
+# why _holding_run_lock did not take the lock, for the message of the caller
+_BUSY = {'running': 'A search is running.', 'starting': 'A search is being started.'}
+
+
+@contextmanager
+def _holding_run_lock(results, alive, lock_timeout):
+    """Hold the run lock of the folder results while the block runs, counted by cleanup_running.
+
+    Yields None, or why the block must do nothing (a key of _BUSY): 'running' if a search
+    holds the lock (not free within lock_timeout seconds), 'starting' if a search is being
+    started (alive(pid, status) tells whether the process of a "starting" status runs).
+    No search can start while the lock is held. Creates results for the lock file.
+    """
+    results = Path(results)
+    results.mkdir(parents=True, exist_ok=True)  # for the lock file
+    lock = RunLock(results / RUN_LOCK)
+    if not lock.acquire(timeout=lock_timeout):
+        yield 'running'
+        return
+    key = _path_key(results)
+    _CLEANING.add(key)
+    try:
+        status = read_status(results / RUN_STATUS)
+        yield 'starting' if run_active(status, False, lambda pid: alive(pid, status)) else None
+    finally:
+        _CLEANING.discard(key)
+        lock.release()
 
 
 def _galleries_and_thumbnails(results, shown, selected, profiles_file, summary):
@@ -727,17 +762,9 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     results = Path(results)
     summary = _new_summary()
     selected = set(selected) & set(CLEANUP_CATEGORIES)
-    results.mkdir(parents=True, exist_ok=True)  # for the lock file
-    lock = RunLock(results / RUN_LOCK)
-    if not lock.acquire(timeout=lock_timeout):
-        summary['refused'] = 'A search is running. Clean up after it has finished.'
-        return summary
-    key = _path_key(results)
-    _CLEANING.add(key)
-    try:
-        status = read_status(results / RUN_STATUS)
-        if run_active(status, False, lambda pid: alive(pid, status)):
-            summary['refused'] = 'A search is being started. Clean up after it has finished.'
+    with _holding_run_lock(results, alive, lock_timeout) as busy:
+        if busy:
+            summary['refused'] = f'{_BUSY[busy]} Clean up after it has finished.'
             return summary
 
         def temporary():
@@ -773,9 +800,6 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                 # e.g. a folder that cannot be listed: this step ends, the others still run,
                 # and the summary keeps what was already deleted (review)
                 summary['skipped'].append(f'{name}: stopped ({exc}).')
-    finally:
-        _CLEANING.discard(key)
-        lock.release()
     return summary
 
 
