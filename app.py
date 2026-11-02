@@ -24,6 +24,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
+                             hub_cache_dir, low_space, low_space_lines, search_space_needs,
                              hidden_text, hide_no_match, mark_style,
                              profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
@@ -1055,6 +1056,35 @@ def cache_env():
     env['PYTHONIOENCODING'] = 'utf-8'
     return env
 
+def low_space_warning(photos, top, profile_count, model, person_detection):
+    """Return a warning if a search with these settings may leave little free disk space (F3), else None.
+
+    Counts cache rows and thumbnails in results/ and the downloads of a model or detector
+    weights not in .cache/ yet, on the drives they are on (the folders cache_env sets). An
+    estimate: a warning, never a block; a check that fails gives none.
+    """
+    try:
+        paths = cache_paths(BASE)
+        env = {**os.environ, **{name: str(path) for name, path in paths.items()}}
+        weights = None
+        if person_detection:
+            # where the engine finds the weights (yolo_weights): a copy in BASE is moved, not downloaded
+            weights = BASE / DEFAULT_YOLO_MODEL
+            if not weights.is_file():
+                weights = paths['YOLO_CONFIG_DIR'] / DEFAULT_YOLO_MODEL
+        low = low_space(search_space_needs(RESULTS, photos, top, profile_count, MODELS[model], hub_cache_dir(env),
+                                           weights))
+    except Exception:
+        return None
+    if not low:
+        return None
+    return ('Little free disk space. This search writes about this much on the drive of\n\n'
+            + '\n'.join(f'- {plain(line)}' for line in low_space_lines(low))
+            + '\n\nIt stores the analyses of new photos in the feature cache and the gallery thumbnails, and '
+            'downloads a search model or the person detector the first time it is used. A full disk can make the '
+            'search fail or leave a model download or the cache incomplete. Free some disk space or lower "'
+            + AI_LABELS['top'] + '". You can still start the search.')
+
 st.title('🔎 FrameScout')
 st.caption('Local AI search in large photo collections · your images stay on your computer')
 
@@ -1478,6 +1508,11 @@ with run_tab:
         st.warning(st.session_state.pop('run_notice'))
     if model_missing and not active:
         st.warning(model_missing)  # why Start is not available
+    if folder_scans and not active:
+        space_warning = low_space_warning(len(photo_scan.paths), settings['top'], len(profiles), settings['model'],
+                                          settings['person_detection'])
+        if space_warning:
+            st.warning(space_warning)
     @st.fragment(run_every='2s')
     def show_status():
         # the state of this page run, read once at its top; fragment-only reruns read it again (review)
