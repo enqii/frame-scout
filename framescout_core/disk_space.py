@@ -100,7 +100,7 @@ def low_space(needs, reserve=SPACE_RESERVE, disk_usage=shutil.disk_usage, stat=o
 
     needs are (folder, bytes) pairs; a folder that does not exist yet counts on the drive of
     its nearest existing parent (nothing is created), and the needs of folders on the same
-    drive add up. A need of 0 bytes, and a drive that cannot be asked (e.g. a disconnected
+    drive (volume, by device number and size) add up. A need of 0 bytes, and a drive that cannot be asked (e.g. a disconnected
     network share), give no warning.
     """
     drives = {}
@@ -111,10 +111,15 @@ def low_space(needs, reserve=SPACE_RESERVE, disk_usage=shutil.disk_usage, stat=o
             existing = _existing_folder(folder)
             if existing is None:
                 continue
-            # the device number tells drives apart; the anchor too, should a file system report 0
-            key = (stat(existing).st_dev, existing.anchor.lower())
+            usage = disk_usage(existing)
+            # one volume is one drive, however it is reached (a subst or mapped drive letter, a
+            # UNC path): its device number (the volume serial number on Windows) with its size,
+            # since a cloned disk keeps the serial number; the anchor if a file system reports 0
+            # (review)
+            device = stat(existing).st_dev
+            key = (device or existing.anchor.lower(), usage.total)
             if key not in drives:
-                drives[key] = [Path(folder), 0, disk_usage(existing).free]
+                drives[key] = [Path(folder), 0, usage.free]
         except OSError:
             continue
         drives[key][1] += size
