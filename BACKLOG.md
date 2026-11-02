@@ -221,6 +221,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `run.log` shows "file is not a database" or "database disk image is malformed". The
       engine could catch `sqlite3.DatabaseError` when opening or reading the cache and point
       to "Clean up storage" -> "Check cache". Found in F1 (PR #60).
+- [ ] `minor` **E51 – `framescout_eval.py` has no free disk space check:** it loads (and on
+      first use downloads) search models without the F3 check; only app searches and the
+      installer are covered. Found in F3 (PR #64).
 
 ### App (`app.py`)
 
@@ -463,18 +466,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       a hold point (breaking change, folder rename): decide first whether thin wrappers stay in
       the root for a transition period. Best done after I30 and I31. Found on 2026-10-30 in a
       review of the folder structure.
+- [ ] `hardware` **I33 – Measure the CUDA install size for the disk space check:** the
+      unpacked size of the CUDA build of PyTorch and pip's peak space use are not measured;
+      `TORCH_INSTALL_SPACE['cuda']` (3 GB download, 6 GB installed) is an estimate. Measure on
+      the home PC and correct it; could go into the rest of I11. Found in F3 (PR #64).
 
 ### Features (from [docs/IDEAS.md](docs/IDEAS.md))
 
-- [ ] `ready` **F3 – Free disk space check before installing and searching:** the CUDA install
-      downloads about 2.5 GB, optional models up to 1.7 GB, and a search writes cache rows and
-      thumbnails; a full disk leaves a broken `.venv`, a half-downloaded model or failed cache
-      commits. Sketch: `shutil.disk_usage` checks with a clear message in `install_torch.py`
-      (size per variant) and in the app before a search (uncached photos × bytes per row +
-      top × profiles × thumbnail size + model weights not yet in `.cache/`) and before a first
-      model use; a warning, not a block. Check the drives of `results/` and `.cache/`. Affected:
-      `install_torch.py`, `framescout_core` (estimate, tested), `app.py`, README, user guide.
-      Size S. No hold point.
 - [ ] `ready` **F4 – "Keep the PC responsive" option:** a CPU search makes the PC sluggish for
       the whole run. Sketch: an AI setting that starts the engine with
       `subprocess.BELOW_NORMAL_PRIORITY_CLASS` on Windows (`os.nice` elsewhere) and one or two

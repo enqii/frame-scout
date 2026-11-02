@@ -31,7 +31,8 @@ shows them as a gallery.
    (or download the ZIP and extract it).
 2. Double-click `Install-FrameScout.bat`. It downloads a private Python into `.python`,
    creates `.venv` and installs the pinned dependencies. If it finds an NVIDIA driver,
-   it offers GPU support (about 2.5 GB more download).
+   it offers GPU support (about 2.5 GB more download). The installer and the app warn
+   when the free disk space looks too low.
 
 Do not move or rename the folder afterwards; if you did, run the installer again.
 Details, GPU support and updating: [user guide](docs/USER-GUIDE.md#installation-details).

@@ -208,6 +208,16 @@ the module of its area and to the re-exports in `__init__.py`.
 - `cache_check.py` (F1): `CACHE_CHECK_LINES`/`CACHE_SIDE_FILES`/`check_cache`/`cache_check_current`/`set_cache_aside`
   (the cache health check and renaming a damaged cache, see "Storage cleanup").
   `_common._broken_names` builds the `<name>.broken-<YYYYMMDD-HHMMSS>[-n]` names.
+- `disk_space.py` (F3): the free disk space estimate. `TORCH_INSTALL_SPACE` (download,
+  installed bytes per build: `cpu` 0.3 + 1.2 GB, `cuda` 3 + 6 GB; the CPU numbers are
+  measured, the CUDA ones an estimate, I33), `CACHE_BYTES_PER_PHOTO` (10 KB),
+  `THUMBNAIL_BYTES` (50 KB), `DETECTOR_DOWNLOAD` (6 MB), `SPACE_RESERVE` (1 GB),
+  `LowSpace(folder, needed, free)`, `download_bytes("605 MB")` (parses
+  `SearchModel.download`), `search_space_bytes(photos, top, profiles)` (every photo counts
+  as uncached), `search_space_needs`, `torch_install_needs`, `low_space` (groups the needs
+  by drive – `st_dev` plus the anchor of the nearest existing folder, nothing is created –
+  and returns the drives where free − needed < reserve; a need of 0 or a drive that cannot
+  be asked gives no warning) and `low_space_lines`.
 - `portable_python.py` (P5 part C):
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
   the installer downloads into `.python`; constants only, checked against the `.bat` by
@@ -386,8 +396,13 @@ for every GPU, else for the most capable one). Without an argument an installed 
 is kept and nothing is asked; otherwise it asks for GPU support only if `nvidia-smi` finds
 an NVIDIA driver. If no CUDA build fits, an installed CUDA build is kept, otherwise the
 CPU build is installed; **only an explicit `cpu` replaces a CUDA build** (PR #8 review). A
-matching installed build is not downloaded again. Exit code 0 done, 1 failed. Standard
-library only.
+matching installed build is not downloaded again. Before the pip call, and only if the
+build is not installed yet (F3), it checks the free space of the drives of `sys.prefix`
+(the venv) and `tempfile.gettempdir()` (`.tmp` under `Install-FrameScout.bat`) with
+`framescout_core.torch_install_needs`/`low_space`; on low space it prints the drives and
+asks `Install anyway? [Y/N]` (no console: continues; `--dry-run` only warns). N prints
+"PyTorch was not installed." and exits 1. Exit code 0 done, 1 failed or stopped on low
+disk space. Standard library only.
 
 ### `Uninstall-FrameScout.bat` and `framescout_uninstall.py`
 
@@ -1197,6 +1212,16 @@ page when the state changes. On Windows the venv's `python.exe` is a launcher: `
 is the launcher, the pid in the status file the engine (its child); killing the launcher
 also ends the engine (verified).
 
+Disk space warning (F3): while photo folders exist and no search runs, the run tab calls
+`low_space_warning(photos, top, profile_count, model, person_detection)` and shows an
+`st.warning` for the drives that would keep less than 1 GB free: what the search writes
+(cache, thumbnails, first-use model and detector downloads) and the hint to free space or
+lower "Maximum matches per search profile". Start stays enabled. It looks at `results/`,
+the Hub cache (`hub_cache_dir` with the `cache_paths(BASE)` variables, as `cache_env` sets
+them; a user's `HF_HUB_CACHE` is respected) and the detector weights (`BASE/yolo11n.pt` if
+present, else `.cache/ultralytics/yolo11n.pt`; none when person detection is off). Any
+exception in the check gives no warning.
+
 ### Stopping a search
 
 Stop (`stop_run`) reads the status again, terminates the session's process and the status
@@ -1332,7 +1357,7 @@ target folders (A17) with their deletion with a profile and no saves for a name 
 profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), unreachable roots simulated by patching
+`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate and drive grouping in `test_disk_space.py` and the installer's check and question in `test_torch_install.py` (F3), unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the stale temporary files of
 `auto_cleanup` (E26, `test_cleanup.py`: removed; fresh ones, foreign ones and gallery names
