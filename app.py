@@ -1433,10 +1433,10 @@ with settings_tab:
                     disabled=active, help=default_help('batch_size'))
     # F4: the engine's --low-priority; its effect on the search time is not measured yet
     st.checkbox(AI_LABELS['low_priority'], key=setting_key('low_priority'), disabled=active,
-                help=default_help('low_priority', 'Runs the search at a lower priority and leaves one or two CPU '
-                                                  'cores to other programs, so they stay usable. The search may take '
-                                                  'longer while you use the PC. Helps little when the GPU does the '
-                                                  'work.'))
+                help=default_help('low_priority', 'Runs the search at a lower priority, so other programs get the '
+                                                  'CPU first, and with fewer CPU threads for the AI models. The '
+                                                  'search may take longer while you use the PC. Helps little when '
+                                                  'the GPU does the work; how much it helps is not measured yet.'))
     st.number_input(AI_LABELS['top'], **number_range('top'), step=25, key=setting_key('top'), disabled=active,
                     help=default_help('top'))
     st.checkbox(AI_LABELS['person_detection'], key=setting_key('person_detection'), disabled=active,
