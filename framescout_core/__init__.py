@@ -56,6 +56,7 @@ from .copying import (COPY_FOLDERS_KEY, COPY_MAX_NAMES, default_copy_folder, cop
 from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLEANUP_CATEGORIES,
     CACHE_CATEGORIES, CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, ROOT_TIMEOUT, STALE_TEMP_AGE, scan_cleanup, cleanup_running, clean_up,
     auto_cleanup, size_text, count_text, cleanup_summary_text)
+from .cache_check import CACHE_CHECK_LINES, CACHE_SIDE_FILES, check_cache, set_cache_aside
 from .uninstall import (UNINSTALL_ITEMS, UNINSTALL_KEEP, UNINSTALL_FIRST, USER_DATA, ENVIRONMENT_PROGRAMS,
     PRIVATE_PYTHON_EXIT_CODE, UninstallItem, protected_folders, uninstall_plan, running_python, user_data,
     outside_leftovers, search_running, programs_in_use, remove_items)
