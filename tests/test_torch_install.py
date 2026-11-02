@@ -355,7 +355,7 @@ def low_drive(monkeypatch):
 
     def low(needs):
         asked.append(needs)
-        return [LowSpace(Path('X:/FrameScout/.venv'), 6 * 1000 ** 3, 2 * 1000 ** 3)]
+        return [LowSpace(Path('X:/FrameScout/.venv'), 6 * 1024 ** 3, 2 * 1024 ** 3)]
     monkeypatch.setattr(install_torch, 'low_space', low)
     return asked
 
@@ -370,7 +370,7 @@ def test_low_disk_space_is_named_before_the_download(monkeypatch, capsys):
     # the venv's drive and the temporary folder's drive, with the size of the CUDA build
     assert asked == [torch_install_needs('cu130', sys.prefix, tempfile.gettempdir())]
     out = capsys.readouterr().out
-    assert 'Little free disk space' in out and 'about 5.6 GB needed, 1.9 GB free' in out
+    assert 'Little free disk space' in out and 'about 6.0 GB needed, 2.0 GB free' in out
 
 
 def test_the_user_can_stop_on_low_disk_space(monkeypatch, capsys):
