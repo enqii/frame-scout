@@ -28,10 +28,11 @@ After `Install-FrameScout.bat`:
 - The engine takes one or more photo folders (also between or after the options), e.g.
   `framescout_engine.py D:\Event2024 E:\Holiday --profiles .\profiles.json --output .\results`.
   The output folder must neither be a listed folder nor contain one.
-- `--low-priority` lowers the engine process's priority (Windows: below normal; elsewhere
-  `os.nice(10)`) and leaves one or two CPU cores to other programs
-  (`framescout_core.torch_threads`). The engine does it itself, so the app starts it the
-  same way as a manual run. Its effect is not measured yet (E52).
+- `--low-priority` lowers the engine process's priority (Windows: below normal, an
+  inherited idle or below normal class is kept; elsewhere `os.nice(10)`) and keeps one or two
+  CPU cores out of the PyTorch threads (`framescout_core.torch_threads`, also for the person
+  detector); the decoding threads are not reduced. The engine does it itself, so the app
+  starts it the same way as a manual run. Its effect is not measured yet (E52).
 - Only one search at a time can use an output folder: the engine holds `<output>\run.lock`
   and writes its progress to `<output>\run-status.json`. A second engine on the same folder
   waits five seconds and exits with code 3. The app shows a command-line search into

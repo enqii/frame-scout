@@ -1269,21 +1269,27 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       Risks: little effect on GPU runs; must not break the stop logic (process tree, PID in the
       status file). Measure the slowdown with E17 (P10 B). Size S. No hold point.
       (done 2026-11-02 in PR #65: new `framescout_core/priority.py` with `torch_threads`
-      (normal: `min(12, max(1, cores))` as before; low priority: also at most cores - 1, cores
-      - 2 from 8 cores on, never below 1) and `lower_priority` (Windows
-      `SetPriorityClass(BELOW_NORMAL_PRIORITY_CLASS)`, elsewhere `os.nice(10)`; returns the
-      error text instead of raising). The engine option `--low-priority` lowers the engine's
-      own process priority first, so scanning and model loading run low too, and logs the
-      result; the app does not set Popen flags, so a manual CLI run behaves the same and the
-      start/stop logic (process tree, PID, `engine_alive`) is unchanged. On Windows only the
-      interpreter behind the venv launcher is lowered. Decoding threads (E2) are not reduced.
+      (normal: `min(12, max(1, cores))` as before; low priority: also at most cores minus 1,
+      cores minus 2 from 8 cores on, never below 1) and `lower_priority` (Windows
+      `SetPriorityClass(BELOW_NORMAL_PRIORITY_CLASS)` unless the process already runs at IDLE
+      or BELOW_NORMAL, elsewhere `os.nice(10)`; returns the error text instead of raising).
+      The engine option `--low-priority` lowers the engine's own process priority first, so
+      scanning and model loading run low too, and logs the result; the app does not set
+      Popen flags, so a manual CLI run behaves the same and the start/stop logic (process
+      tree, PID, `engine_alive`) is unchanged. On Windows only the interpreter behind the
+      venv launcher is lowered. Ultralytics resets the thread count
+      on its first CPU prediction, so `crops_for` sets it again around each detector call.
+      Decoding threads (E2) are not reduced, so no core is reserved; the UI, `--help`, log
+      and docs say "lower priority, fewer threads for the AI models" instead (review).
       New optional `settings.json` field `low_priority` (default off, not written while off;
       in `AI_SETTINGS`, so "Reset to defaults" and "Changed from the default" cover it) and
       the checkbox "Keep the PC responsive during a search" in the AI settings tab.
       Compatibility: additive only. Tested with unit tests (`test_priority.py` incl. a child
       process that really lowers and reads back its priority class, `test_settings.py`;
-      1052 passed, 2 skipped), a CPU smoke run with and without the option (the interpreter
+      1052 passed, 2 skipped; after the review 1059 passed, 2 skipped, incl. a child started
+      at IDLE that keeps it), a CPU smoke run with and without the option (the interpreter
       went from NORMAL to BELOW_NORMAL_PRIORITY_CLASS) and a headless `AppTest` of the
-      checkbox. Not tested: the slowdown and the gain in responsiveness are NOT measured
-      (open: E52, with E17), stopping a low-priority search through the UI, `os.nice` in a
-      real run on Linux/macOS, CUDA.)
+      checkbox; the thread count around the detector was checked by hand with an untrained
+      YOLO model (8 threads without the fix, 3 with it). Not tested: the slowdown and the
+      gain in responsiveness are NOT measured (open: E52, with E17), stopping a low-priority
+      search through the UI, `os.nice` in a real run on Linux/macOS, CUDA.)

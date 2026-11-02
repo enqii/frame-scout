@@ -232,13 +232,18 @@ the module of its area and to the re-exports in `__init__.py`.
   nothing is created; returns the drives where free − needed < reserve; a need of 0 or a
   drive that cannot be asked gives no warning) and `low_space_lines`.
 - `priority.py` (F4): `MAX_TORCH_THREADS` (12), `BELOW_NORMAL_PRIORITY_CLASS` (0x4000),
-  `LOW_PRIORITY_NICE` (10), `torch_threads(available, low_priority=False)` (normal:
+  `IDLE_PRIORITY_CLASS` (0x40), `LOW_PRIORITY_NICE` (10),
+  `torch_threads(available, low_priority=False)` (normal:
   `min(12, max(1, available))`; low priority additionally at most `available - 1`,
   `available - 2` from 8 cores on, never below 1, so a CPU above the cap keeps its thread
-  count) and `lower_priority(os_name=None, set_priority_class=None, nice=None)` (Windows:
-  `SetPriorityClass(BELOW_NORMAL_PRIORITY_CLASS)` via ctypes; elsewhere `os.nice(10)`;
-  returns None or the error text of an `OSError`, never raises; the parameters allow tests
-  to inject the calls). Standard library only.
+  count) and `lower_priority(os_name=None, set_priority_class=None, nice=None,
+  get_priority_class=None)` (Windows: `GetPriorityClass`, then
+  `SetPriorityClass(BELOW_NORMAL_PRIORITY_CLASS)` via ctypes unless the process already
+  runs at IDLE or BELOW_NORMAL, which Windows passes on to child processes and which is kept;
+  elsewhere `os.nice(10)`, which on Linux changes only the calling thread and the threads it
+  starts later, so it must run before other threads start; returns None or the error text of
+  an `OSError`, never raises; the parameters allow tests to inject the calls). Standard
+  library only.
 - `portable_python.py` (P5 part C):
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
   the installer downloads into `.python`; constants only, checked against the `.bat` by
@@ -1244,11 +1249,16 @@ Low priority (F4): the engine option `--low-priority` makes `search()` call
 `lower_priority()` first (scanning and model loading run low too) and log "Low priority:
 on, …" or, if it failed, "The priority could not be lowered (…); the search runs at normal
 priority."; `torch.set_num_threads` uses `torch_threads(torch.get_num_threads(),
-args.low_priority)`. The engine lowers its own priority, not the app via `Popen`
+args.low_priority)`. With OpenMP, `torch.set_num_threads` acts per thread for threads that
+already ran PyTorch code: the CLIP thread keeps its count, but Ultralytics sets
+`min(8, CPU count - 1)` in the decoding thread of its first prediction on the CPU, so with
+`--low-priority` `crops_for` sets the search's count before and after each detector call
+(checked by hand with an untrained detector: 8 threads without it, 3 with it). The engine
+lowers its own priority, not the app via `Popen`
 `creationflags`, so a manual CLI run behaves the same and the start/stop logic above (process
 tree, pid in the status file, `engine_alive`) is unchanged; on Windows only the interpreter
-behind the venv launcher is lowered. The decoding threads (E2) are not reduced. The effect
-is not measured (E52).
+behind the venv launcher is lowered. The decoding threads (E2) are not reduced, so the
+option lowers the priority but does not reserve cores. The effect is not measured (E52).
 
 Disk space warning (F3): while photo folders exist and no search runs, the run tab calls
 `low_space_warning(photos, top, profile_count, model, person_detection, analyzed)` and
@@ -1433,8 +1443,10 @@ CSS of `mark_style` and its Streamlit pin, `test_marks.py`) and the AI settings 
 generated style only, not in a browser),
 the thread counts and the priority (`torch_threads`, `lower_priority` with injected calls,
 the failure text, and a child process that really lowers and reads back its priority class:
-`test_priority.py`; `low_priority` in `test_settings.py`; F4; the slowdown and the gain in
-responsiveness are not measured, E52; `os.nice` is not run on a non-Windows OS),
+`test_priority.py`, also a child process started at IDLE that keeps it;
+`low_priority` in `test_settings.py`; F4; the thread count around the detector in `crops_for`
+was checked once by hand, not by a test, since the tests run without torch; the slowdown and
+the gain in responsiveness are not measured, E52; `os.nice` is not run on a non-Windows OS),
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as are the search
