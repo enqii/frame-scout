@@ -83,15 +83,18 @@ After the user has agreed to the plan:
 4. `ROADMAP.md`: new themed packages under "Open (priority order)" in the agreed order,
    each line naming its backlog IDs and the date (`added <date>`); keep the numbering
    scheme (`P<n>`).
-5. Check the links and IDs: every ID named in `ROADMAP.md` exists in `BACKLOG.md` or
-   `docs/BACKLOG-DONE.md`.
-6. Commits: Conventional Commits, e.g. `docs(backlog): triage … (F1–F4)`, pushed after
+5. `ROADMAP.md` tidy-up: move every package in which no `- [ ]` or `- [~]` line is left,
+   with its heading and lines unchanged, from "Open" to the end of
+   `docs/ROADMAP-DONE.md`. The next item must still be the first `- [ ]` line.
+6. Check the links and IDs: every ID named in `ROADMAP.md` or `docs/ROADMAP-DONE.md`
+   exists in `BACKLOG.md` or `docs/BACKLOG-DONE.md`.
+7. Commits: Conventional Commits, e.g. `docs(backlog): triage … (F1–F4)`, pushed after
    each commit (`git push -u origin chore/triage-<date>`). Stage files by name.
-7. Open a **non-draft PR** with the template `.github/pull_request_template.md`
+8. Open a **non-draft PR** with the template `.github/pull_request_template.md`
    (tests: "not applicable, Markdown only"). It is **not a roadmap PR**: no `fs:*`
    label and no review round, because the user decided every line in chat. Add the
    summary of decisions as a table (ID, decision, tag/roadmap package).
-8. Wait for green CI (`gh pr checks <n>`), report to the user and **merge only after
+9. Wait for green CI (`gh pr checks <n>`), report to the user and **merge only after
    explicit approval** (`gh pr merge <n> --rebase --delete-branch --match-head-commit
    <headRefOid>`; follow `/roadmap` → "Merge" for the cleanup).
 
