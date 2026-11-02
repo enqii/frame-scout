@@ -1,4 +1,5 @@
 """Free disk space checks before installing PyTorch and before a search (F3); no real drive is filled."""
+import os
 import sqlite3
 from collections import namedtuple
 from pathlib import Path
@@ -7,7 +8,7 @@ import pytest
 
 from framescout_core import disk_space
 from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, SPACE_RESERVE, THUMBNAIL_BYTES,
-                             TORCH_INSTALL_SPACE, LowSpace, analyzed_photos, download_bytes, low_space, low_space_lines,
+                             TORCH_INSTALL_SPACE, LowSpace, analyzed_photos, app_search_needs, download_bytes, low_space, low_space_lines,
                              search_space_bytes, search_space_needs, torch_install_needs)
 
 MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text (review)
@@ -114,6 +115,39 @@ def test_search_needs_name_downloads_only_when_missing(tmp_path):
     assert search_space_needs(results, 100, 150, 1, model, hub, weights) == [(results, search_space_bytes(100, 150, 1))]
 
 
+def test_a_hub_cache_that_does_not_answer_is_not_read(tmp_path, monkeypatch):
+    # review: a disconnected network share in HF_HUB_CACHE must not freeze the page
+    def never_read(*args):
+        raise AssertionError('must not read the hub cache')
+    monkeypatch.setattr(disk_space, 'model_cached', never_read)
+    results, hub = tmp_path / 'results', tmp_path / 'hub'
+    needs = search_space_needs(results, 10, 150, 1, MODELS['vit-b-32-openai'], hub,
+                               reachable=lambda roots, timeout: dict.fromkeys(roots, False))
+    # its drive is left out (low_space leaves out the others that do not answer)
+    assert needs == [(results, search_space_bytes(10, 150, 1))]
+
+
+def test_app_search_needs_use_the_folders_the_app_gives_the_engine(tmp_path):
+    base = tmp_path / 'project'
+    base.mkdir()
+    results, model = base / 'results', MODELS['vit-b-32-openai']
+    cache = base / '.cache'
+    # the variables cache_env sets: a YOLO_CONFIG_DIR of the user is replaced, as for the engine
+    environ = {'YOLO_CONFIG_DIR': str(tmp_path / 'own')}
+    assert app_search_needs(base, results, environ, 100, 150, 2, model, True, analyzed=40) == [
+        (results, search_space_bytes(100, 150, 2, 40)), (cache / 'huggingface' / 'hub', download_bytes(model.download)),
+        (cache / 'ultralytics', DETECTOR_DOWNLOAD)]
+    # a HF_HUB_CACHE of the user is kept (cache_env does not set it); weights an older version
+    # downloaded into the project folder are moved, not downloaded; detection off: no weights
+    (base / 'yolo11n.pt').write_bytes(b'w')
+    environ = {'HF_HUB_CACHE': str(tmp_path / 'hub')}
+    assert app_search_needs(base, results, environ, 100, 150, 2, model, True)[1:] == [
+        (tmp_path / 'hub', download_bytes(model.download))]
+    (base / 'yolo11n.pt').unlink()
+    assert app_search_needs(base, results, environ, 100, 150, 2, model, False)[1:] == [
+        (tmp_path / 'hub', download_bytes(model.download))]
+
+
 def test_torch_install_needs_per_build(tmp_path):
     venv, temp = tmp_path / '.venv', tmp_path / '.tmp'
     download, installed = TORCH_INSTALL_SPACE['cpu']
@@ -156,7 +190,8 @@ def test_one_volume_reached_through_two_paths_is_one_drive(monkeypatch):
     monkeypatch.setattr(disk_space, '_existing_folder', lambda path: Path(path).parent)
     drives = Drives(s=(Path('S:/'), 3 * GB, 7), c=(Path('C:/'), 3 * GB, 7))
     results, hub = Path('S:/FrameScout/results'), Path('C:/hub/models')
-    low = low_space([(results, GB), (hub, int(1.5 * GB))], disk_usage=drives.disk_usage, stat=drives.stat)
+    low = low_space([(results, GB), (hub, int(1.5 * GB))], disk_usage=drives.disk_usage, stat=drives.stat,
+                    reachable=lambda roots, timeout: dict.fromkeys(roots, True))
     assert low == [LowSpace(results, int(2.5 * GB), 3 * GB)]
 
 
@@ -181,6 +216,19 @@ def test_nothing_needed_or_an_unknown_drive_gives_no_warning(tmp_path):
     assert low_space([(tmp_path / 'c', 0)], disk_usage=drives.disk_usage, stat=drives.stat) == []
     # a drive that cannot be asked (e.g. a disconnected network share): no warning, no error
     assert low_space([(tmp_path / 'x', GB)], disk_usage=drives.disk_usage, stat=drives.stat) == []
+
+
+def test_a_drive_that_does_not_answer_in_time_gives_no_warning(tmp_path):
+    # review: a stat on a disconnected network share can hang; its root is probed with a timeout first
+    drives = Drives(c=(tmp_path, 0))
+    probed = []
+
+    def unreachable(roots, timeout):
+        probed.append((roots, timeout))
+        return dict.fromkeys(roots, False)
+    assert low_space([(tmp_path, GB)], disk_usage=drives.disk_usage, stat=drives.stat, timeout=0.5,
+                     reachable=unreachable) == []
+    assert drives.asked == [] and probed == [([os.path.splitdrive(str(tmp_path))[0] + os.sep], 0.5)]
 
 
 def test_the_real_drive_can_be_asked(tmp_path):
