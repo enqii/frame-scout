@@ -89,7 +89,7 @@ The roadmap is implemented semi-autonomously, **one pull request per roadmap ite
 Started by the user with `/triage` (`.claude/skills/triage/SKILL.md`), when the roadmap has no startable item left and after each new brainstorming run; the skill is user-invoked only, like `/roadmap`.
 - `docs/IDEAS.md` holds raw ideas without IDs. Earlier sections stay untouched except for **one `Disposition:` line** per idea (take over → `F<n>`, discarded, parked, each with a reason and date).
 - A taken-over idea becomes a `BACKLOG.md` item of group **F** (features). Every open backlog item carries a status tag: `ready`, `decision`, `hardware`, `minor` or `parked` (meanings: `BACKLOG.md` header).
-- `ROADMAP.md` is a rolling window of **about 10 open PRs at most**, built from themed packages (one PR per line); everything else stays in the backlog. Order: user data safety, then low effort for every user, then unblockers; hold-point items enter only after the decision.
+- `ROADMAP.md` is a rolling window of **about 10 open PRs at most**, built from themed packages (one PR per line); everything else stays in the backlog. A finished item is only checked off in `ROADMAP.md`; a package whose lines are all done moves unchanged to `docs/ROADMAP-DONE.md` at the next `/triage` run (not earlier, so that PRs touch only their own line). Order: user data safety, then low effort for every user, then unblockers; hold-point items enter only after the decision.
 - The triage result is one docs-only PR (`chore/triage-<date>`) without `fs:*` label and review round, because the user decides every line in chat; merge only after explicit approval.
 
 ## Git and commits

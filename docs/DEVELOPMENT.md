@@ -111,7 +111,7 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `requirements.txt`, `constraints.txt` | Dependencies (ranges, PyTorch pinned) and the exact versions of the verified runs |
 | `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
 | `.github/` | CI workflow and pull request template |
-| `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md` | Order of work, open items, finished items |
+| `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`, `docs/ROADMAP-DONE.md` | Order of work, open items, finished items, finished roadmap packages |
 | `docs/` | User guide, this file, architecture, feature ideas (`IDEAS.md`) |
 | `CLAUDE.md`, `.claude/` | Rules for Claude Code and the `/roadmap` workflow skill |
 | `profiles.json`, `settings.json`, `photos/`, `references/`, `results/`, `run.log` | User data and output (not in the repo) |
