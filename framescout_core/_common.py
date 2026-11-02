@@ -4,8 +4,10 @@ Atomic file writes (_publish_via_temp, _publish_new, _replace_atomically,
 _replace_with_retry, _publish_together for several files), retrying an action (_retry),
 reading a file (_read_with_retry) or a JSON object file (_read_json_object) with retries, the
 save lock of a file (_file_lock), the locked read-change-write of a JSON file
-(_update_locked) and the comparable form of a path (_path_key).
+(_update_locked), the comparable form of a path (_path_key) and the names a damaged file is
+kept under (_broken_names).
 """
+import itertools
 import json
 import os
 import tempfile
@@ -20,6 +22,20 @@ from .locks import RunLock
 def _path_key(path):
     """Comparable form of a path: resolved, and case-insensitive where the OS is (Windows)."""
     return os.path.normcase(path.resolve())
+
+
+def _broken_names(path, now=None):
+    """Yield the names to keep a damaged file path under: <name>.broken-<YYYYMMDD-HHMMSS>, then -2, -3, ... (F1).
+
+    The local time of now (a time.time() value; None: the current time). The caller takes
+    the first name that is free.
+    """
+    path = Path(path)
+    stamp = time.strftime('%Y%m%d-%H%M%S', time.localtime(time.time() if now is None else now))
+    base = f'{path.name}.broken-{stamp}'
+    yield path.with_name(base)
+    for number in itertools.count(2):
+        yield path.with_name(f'{base}-{number}')
 
 
 def _temp_path(target, suffix='.tmp'):

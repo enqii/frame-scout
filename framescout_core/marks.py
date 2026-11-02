@@ -1,8 +1,10 @@
-"""Marks of gallery photos in results/marks.json (A17)."""
+"""Marks of gallery photos in results/marks.json (A17), with a backup and its restore (F1)."""
+import json
 import re
 from pathlib import Path
 
-from ._common import _read_json_object, _update_locked
+from ._common import (_broken_names, _file_lock, _publish_new, _publish_via_temp, _read_with_retry,
+                      _replace_with_retry)
 from .profiles import require_profile
 
 
@@ -12,6 +14,9 @@ from .profiles import require_profile
 # across later searches; "open" is the absence of a mark. The file is user data: the engine
 # never writes it, and a cleanup of the results folder (E7) must never delete it.
 MARKS_FILE = 'marks.json'
+# the marks file before its latest change (F1): written by every change, restored only on the
+# user's request (restore_marks) when marks.json cannot be read; user data like MARKS_FILE
+MARKS_BACKUP = MARKS_FILE + '.bak'
 MARKS_FORMAT = 1
 MARK_OPEN, MARK_MATCH, MARK_NO_MATCH = 'open', 'match', 'no-match'
 MARK_STATES = (MARK_OPEN, MARK_MATCH, MARK_NO_MATCH)
@@ -28,21 +33,69 @@ MARK_COLORS = {MARK_MATCH: ('rgba(33, 195, 84, 0.25)', 'rgb(33, 195, 84)'),
 MARK_STYLE_STREAMLIT = '1.66.1'
 
 
-def _read_marks_document(path, attempts=5, retry_delay=0.05):
-    """Return the checked JSON object of the marks file ({'format': ..., 'profiles': {}} if missing)."""
-    data = _read_json_object(path, 'marks file', attempts, retry_delay)
+def marks_backup(path):
+    """Return the backup of the marks file path: <path>.bak, the file before its latest change (F1)."""
+    path = Path(path)
+    return path.with_name(path.name + '.bak')
+
+
+def _read_content(path, attempts, retry_delay):
+    """The bytes of the file path (read with retries), or None if it does not exist."""
+    try:
+        return _read_with_retry(Path(path).read_bytes, attempts, retry_delay)
+    except FileNotFoundError:
+        return None
+
+
+def _parse_marks(content, name):
+    """Return the checked JSON object of a marks file's content (bytes; None: a missing file).
+
+    {'format': ..., 'profiles': {}} for a missing or empty-object file; ValueError for one
+    that is not a marks file of this format (name names it).
+    """
+    data = {} if content is None else json.loads(content.decode('utf-8-sig'))
+    if not isinstance(data, dict):
+        raise ValueError('The marks file must be a JSON object.')
     if not data:
         return {'format': MARKS_FORMAT, 'profiles': {}}
     if data.get('format') != MARKS_FORMAT:
-        raise ValueError(f'{Path(path).name} is not a FrameScout marks file of format {MARKS_FORMAT}')
+        raise ValueError(f'{name} is not a FrameScout marks file of format {MARKS_FORMAT}')
     profiles = data.get('profiles')
     if not isinstance(profiles, dict):
         raise ValueError('"profiles" must be a JSON object')
-    for name, marks in profiles.items():
+    for profile, marks in profiles.items():
         if not isinstance(marks, dict) or any(
                 not isinstance(photo, str) or state not in (MARK_MATCH, MARK_NO_MATCH) for photo, state in marks.items()):
-            raise ValueError(f'invalid marks of {name!r}: {marks!r}'[:300])
+            raise ValueError(f'invalid marks of {profile!r}: {marks!r}'[:300])
     return data
+
+
+def _read_marks_document(path, attempts=5, retry_delay=0.05):
+    """Return the checked JSON object of the marks file ({'format': ..., 'profiles': {}} if missing)."""
+    return _parse_marks(_read_content(path, attempts, retry_delay), Path(path).name)
+
+
+def _update_marks(path, update, attempts, retry_delay, lock_timeout):
+    """Read, change and replace the marks file path under its lock, keeping the previous file as backup.
+
+    update(document) returns the new document, or None to leave the file as it is. Before
+    the file is replaced, its previous content is copied byte for byte to marks_backup(path)
+    (F1; one generation, like profiles.json.bak): only content that was just read as a valid
+    marks file, so an unreadable file (ValueError, never replaced) never replaces the backup.
+    If the backup cannot be written, the file stays unchanged. Raises like _update_locked.
+    """
+    with _file_lock(path, lock_timeout):
+        previous = _read_content(path, attempts, retry_delay)
+        document = update(_parse_marks(previous, path.name))
+        if document is None:
+            return
+        if previous is not None:
+            _replace_with_retry(marks_backup(path), previous, attempts, retry_delay)
+        _replace_with_retry(path, _dump(document), attempts, retry_delay)
+
+
+def _dump(document):
+    return (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
 
 
 def read_marks(path, attempts=5, retry_delay=0.05):
@@ -94,8 +147,7 @@ def save_marks(path, profile, changes, attempts=5, retry_delay=0.05, lock_timeou
             profiles.pop(profile, None)
         return document
 
-    _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
-                   attempts, retry_delay, lock_timeout)
+    _update_marks(path, update, attempts, retry_delay, lock_timeout)
     return result
 
 
@@ -119,8 +171,7 @@ def rename_marks(path, old, new, attempts=5, retry_delay=0.05, lock_timeout=MARK
         changed.append(True)
         return document
 
-    _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
-                   attempts, retry_delay, lock_timeout)
+    _update_marks(path, update, attempts, retry_delay, lock_timeout)
     return bool(changed)
 
 
@@ -145,8 +196,7 @@ def delete_marks(path, profile, attempts=5, retry_delay=0.05, lock_timeout=MARKS
         removed = len(marks)
         return document
 
-    _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
-                   attempts, retry_delay, lock_timeout)
+    _update_marks(path, update, attempts, retry_delay, lock_timeout)
     return removed
 
 
@@ -177,9 +227,54 @@ def remove_marks(path, entries, attempts=5, retry_delay=0.05, lock_timeout=MARKS
                     del profiles[profile]
         return document if removed else None
 
-    _update_locked(path, lambda: _read_marks_document(path, attempts, retry_delay), update,
-                   attempts, retry_delay, lock_timeout)
+    _update_marks(path, update, attempts, retry_delay, lock_timeout)
     return removed
+
+
+def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
+    """Replace the unreadable marks file path by its backup; return (marks restored, damaged copy or None) (F1).
+
+    Only on the user's request, never automatically. Under the lock of save_marks, the file
+    is read again: if it can be read now (fixed by hand, or restored in another tab),
+    ValueError is raised and nothing changes. The backup (marks_backup) must be a readable
+    marks file, else ValueError naming it. The damaged file is first copied byte for byte
+    to <path>.broken-<YYYYMMDD-HHMMSS> (of now, a time.time() value; -2, -3, ... if that
+    name exists), which is returned; then the file is replaced atomically by the backup's
+    content, which stays as the backup. A missing file (removed meanwhile) just gets the
+    backup (None is returned). Any error leaves the file as it was; OSError if the lock is
+    not free within lock_timeout seconds or a write keeps failing.
+    """
+    path = Path(path)
+    backup = marks_backup(path)
+    with _file_lock(path, lock_timeout):
+        current = _read_content(path, attempts, retry_delay)
+        if current is not None:
+            try:
+                _parse_marks(current, path.name)
+            except ValueError:
+                pass
+            else:
+                raise ValueError(f'{path.name} can be read again, so it was not replaced by {backup.name}')
+        content = _read_content(backup, attempts, retry_delay)
+        if content is None:
+            raise ValueError(f'There is no backup {backup.name}')
+        try:
+            restored = _parse_marks(content, backup.name)['profiles']
+        except ValueError as exc:
+            raise ValueError(f'{backup.name} cannot be read either ({exc})') from None
+        kept = None if current is None else _keep_copy(path, current, now)
+        _replace_with_retry(path, content, attempts, retry_delay)
+    return sum(len(marks) for marks in restored.values()), kept
+
+
+def _keep_copy(path, content, now):
+    """Write content to a new file <path>.broken-<date>[-n] next to path (never replacing one); return it."""
+    for candidate in _broken_names(path, now):
+        try:
+            _publish_via_temp(candidate, lambda tmp: tmp.write_bytes(content), _publish_new)
+        except FileExistsError:
+            continue
+        return candidate
 
 
 def hide_no_match(cards, marks):

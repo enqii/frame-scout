@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from ._common import _path_key, _temp_path
 from .locks import RunLock
-from .marks import MARKS_FILE, read_marks, remove_marks
+from .marks import MARKS_BACKUP, MARKS_FILE, read_marks, remove_marks
 from .names import EXT, profile_slugs
 from .profiles import _backup_path, _read_entries, read_profiles
 from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
@@ -50,8 +50,8 @@ ROOT_TIMEOUT = 5.0
 # a folder with at most this many photos to check gets one stat per photo, a fuller one is
 # listed once (see _PathCheck)
 _STAT_UP_TO = 4
-NEVER_DELETED = frozenset({MARKS_FILE, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE, CACHE_FILE,
-                           SETTINGS_FILE, SETTINGS_FILE + '.lock', 'profiles.json', 'profiles.json.bak',
+NEVER_DELETED = frozenset({MARKS_FILE, MARKS_BACKUP, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE,
+                           CACHE_FILE, SETTINGS_FILE, SETTINGS_FILE + '.lock', 'profiles.json', 'profiles.json.bak',
                            'profiles.json.lock'})
 # seconds clean_up waits for the run lock of the results folder
 CLEANUP_LOCK_TIMEOUT = 1.0
@@ -59,10 +59,11 @@ CLEANUP_LOCK_TIMEOUT = 1.0
 # during the export can leave it (E13)
 _TEMP_THUMBNAIL = re.compile(r'[0-9a-f]{24}\.jpg\.[a-z0-9_]+\.jpg')
 # the temporary files (<name>.<random>.tmp, _temp_path) of the atomic writes into the results
-# folder: status and result file and marks (one file each), the galleries of publish_export
-# (E24; only names profile_slugs gives, [a-z0-9-], so that no other tool's file in a chosen
-# output folder matches); terminate()/kill() during a write leaves one (E26)
-_TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name) for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE))
+# folder: status and result file, marks and their backup (F1; one file each), the galleries of
+# publish_export (E24; only names profile_slugs gives, [a-z0-9-], so that no other tool's file
+# in a chosen output folder matches); terminate()/kill() during a write leaves one (E26)
+_TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name)
+                                         for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, MARKS_BACKUP))
                         + r'|[a-z0-9-]+\.html)\.[a-z0-9_]{8}\.tmp')
 # seconds after which such a temporary file counts as left over: the write of an app
 # session (marks.json, a stopped status) takes a fraction of a second
