@@ -78,7 +78,9 @@ in `results/marks.json`), "Hide photos marked as no match" and copying of a prof
 matches to a folder (A17); below it the expander "Clean up storage" (E7). The AI settings tab ends
 with the expander "Check installation" (F15): a button runs `check_installation(BASE, os.environ)`
 (importing torch takes seconds, so never automatically) and shows each result as error with
-"Fix:", success or information; the results stay in `st.session_state['install_check']`.
+"Fix:", success or information; the results stay in `st.session_state['install_check']`, with a
+"Checked at" caption from `install_check_at`. The check runs in the script thread under a
+spinner (a first torch import can take long), so it blocks only that browser session.
 
 ### `framescout_engine.py`
 
@@ -291,18 +293,23 @@ the module of its area and to the re-exports in `__init__.py`.
   `tests/test_installer.py`).
 - `install_check.py` (F15): the read-only installation self-test. `CheckResult(name, ok, text,
   fix)` (`ok` True, False or None = information); `check_environment(base)` (`.venv/pyvenv.cfg`
-  `home` is this folder's `.python` or an installed Python of an older installer; a problem if
+  `home` is this folder's `.python` (compared with `os.path.samefile`, so a link, junction or
+  8.3 name counts) or an installed Python of an older installer; a problem if
   that Python is missing (moved folder or deleted Python: the installer repairs it) or is the
   `.python` of another folder (copied or moved folder: delete `.venv`, run the installer, which
   keeps a working `.venv`)); `check_packages` (installed metadata of `.venv`'s site-packages via
   `importlib.metadata.distributions(path=...)`: every package of `requirements.txt` installed,
   every installed package that `constraints.txt` pins in the pinned version, torch/torchvision
   with any build label; a pin of a package that is not installed is no problem unless
-  `requirements.txt` names it); `check_torch` (imports torch in a subprocess of `.venv`'s Python
-  with `-B`, `TORCH_CHECK_TIMEOUT` 180 s and the engine's cache variables; a CUDA build that
+  `requirements.txt` names it without an environment marker, which the standard library cannot
+  evaluate); `check_torch` (imports torch in a subprocess of `.venv`'s Python
+  with `-B`, `TORCH_CHECK_TIMEOUT` 180 s, the engine's cache variables and the FrameScout folder
+  as working folder, so its `sys.path` is the engine's; no `-I`, since a `PYTHONPATH` that breaks
+  torch breaks the engine too; a CUDA build that
   finds no GPU is a problem with the `cuda_hint`); `check_writable` (`.cache` and `results`, or
   the nearest existing parent; creates and deletes a temporary file, writes nothing else);
-  `check_models` (information: `downloaded_models`, `find_yolo_weights`); `check_disk_space`
+  `check_models` (information: `downloaded_models`, `find_yolo_weights`; "not known" if the
+  model cache's drive does not answer within `SPACE_CHECK_TIMEOUT`); `check_disk_space`
   (a problem below `SPACE_RESERVE`, 1 GB, on the drive of the folder); `check_installation`
   (all of them; packages and PyTorch are information "Not checked" when `.venv` has no Python or
   the environment check failed, so a broken environment counts once); `check_lines` (CLI text);
@@ -501,8 +508,11 @@ done, 1 failed, 3 stopped by the user on low disk space. Standard library only.
 (`-I -c "import sys"`), otherwise with the private Python in `.python` (the check is standard
 library only), otherwise it says to run `Install-FrameScout.bat`. The check runs with `-B -E -s`,
 so it writes no compiled files and reads no user site. `framescout_check.py` calls
-`check_installation(ROOT, os.environ)`, prints `check_lines` and a summary; exit code 0 no
-problem, 1 at least one problem. It never writes, downloads or repairs.
+`check_installation(ROOT, os.environ)`, prints `check_lines` (stdout reconfigured with
+`errors='replace'`, since redirected output uses the ANSI code page) and a summary; exit code 0
+no problem, `PROBLEMS_FOUND` (2) at least one problem. Any other exit code (1 is Python's for an
+uncaught exception) means the check could not run: the `.bat` then retries with `.python`, and
+if that fails too, it says to run `Install-FrameScout.bat`. It never writes, downloads or repairs.
 
 ### `Uninstall-FrameScout.bat` and `framescout_uninstall.py`
 
