@@ -62,7 +62,7 @@ from .disk_space import (TORCH_INSTALL_SPACE, OTHER_PACKAGES_SPACE,CACHE_BYTES_P
     SPACE_CHECK_TIMEOUT, LowSpace, analyzed_photos, app_search_needs, download_bytes, downloaded_models, search_space_bytes, search_space_needs, torch_install_needs, low_space, low_space_lines)
 from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE, torch_threads,
     lower_priority)
-from .estimate import (RATE_WINDOW, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS,
+from .estimate import (RATE_WINDOW, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS,
     AnalysisRate, duration_text, known_throughput, remaining_text, remember_throughput, run_throughput, start_summary,
     stored_throughput)
 from .cache_check import CACHE_CHECK_LINES, CACHE_SIDE_FILES, cache_check_current, check_cache, set_cache_aside
