@@ -538,7 +538,10 @@ def copy_matches(profile, key, photo_folders):
 def export_list(profile, gallery, cards, only_matches):
     """Write the result list of profile to results/exports/ (on_click of the export button, F5).
 
-    The marks are read now: another tab may have changed them since the page was drawn.
+    gallery and cards are the list the page showed when it was drawn, on purpose: the user
+    exports the list in front of them, under its own gallery name, even if a newer search
+    finished meanwhile. The marks are read now: they belong to a photo path, not to a
+    search, so another tab's later marks are the current ones for these photos too.
     Without readable marks the list of all photos is written with an empty mark column.
     """
     try:
