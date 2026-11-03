@@ -96,7 +96,9 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
   changed since its run gets no thumbnail (the page shows the original file).
 - `run --cache-dir` defaults to the `.cache` of the checkout whose `.venv` runs the tool (so a
   git worktree started with the main checkout's `.venv` reuses the main checkout's models),
-  otherwise to the `.cache` next to the script (E48). Pass `--cache-dir` to use another folder.
+  otherwise to the `.cache` next to the script (E48). The venv's checkout counts only when the
+  script lies in it (the checkout itself or a worktree inside it), never another clone's venv.
+  `run` prints the folder it uses; pass `--cache-dir` to use another one.
 - Status: runtime-tested on the home PC (E34, 2026-11-01): all four models on CUDA over
   4997 photos, then `pool`, the labelling page and `metrics` with the user's own labels.
   That collection used profiles chosen for its photos (a local studio-event photo set), not

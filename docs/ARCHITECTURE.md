@@ -563,8 +563,8 @@ true|false}}}`; an unreadable file is never saved over, the page refuses to star
   [--no-person-detection]` with `TORCH_HOME`/`HF_HOME`/`YOLO_CONFIG_DIR`/`XDG_CACHE_HOME`
   under the cache folder (`--cache-dir`, default `default_cache_dir()` (E48): `<checkout>/.cache`
   when the tool runs in a venv, `sys.prefix != sys.base_prefix`, whose parent folder holds
-  `framescout_engine.py`, e.g. the main checkout's `.venv` used from a worktree; otherwise
-  the `.cache` next to the script) and `PYTHONIOENCODING=utf-8`. A model with a
+  `framescout_engine.py` and contains the script, e.g. the main checkout's `.venv` used from
+  a worktree inside it; otherwise the `.cache` next to the script; `run` prints the folder) and `PYTHONIOENCODING=utf-8`. A model with a
   missing package (`model_problem`) is skipped; exit 1 if any model was not scored. A
   model's `scores/<model>.json` is removed before its run and again after a failed one, so a
   skipped or failed model keeps no scores of an older run. A model not yet cached downloads
