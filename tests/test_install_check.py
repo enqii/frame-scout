@@ -295,6 +295,14 @@ def test_models_names_cached_person_detector(tmp_path, monkeypatch):
     assert 'Downloaded: person detection' in result.text
 
 
+def test_models_of_a_drive_that_does_not_answer_are_not_called_missing(tmp_path, monkeypatch):
+    # downloaded_models returns no model for a cache it cannot reach: that is "not known" (review)
+    monkeypatch.setattr(install_check, 'downloaded_models', lambda base, environ: set())
+    [result] = check_models(tmp_path, {}, reachable=lambda roots, timeout: {root: False for root in roots})
+    assert result.ok is None
+    assert 'not known' in result.text and 'Not downloaded yet' not in result.text
+
+
 def test_enough_disk_space_is_fine(tmp_path):
     [result] = check_disk_space(tmp_path, disk_usage=lambda path: Usage(100 * 2 ** 30, 50 * 2 ** 30, 50 * 2 ** 30))
     assert result.ok is True and '50.0 GB' in result.text

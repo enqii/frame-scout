@@ -23,9 +23,11 @@ from pathlib import Path
 from typing import NamedTuple
 
 from .cache_dirs import CACHE_DIR, cache_paths, find_yolo_weights
-from .cleanup import size_text
+from .cleanup import _reachable_roots, size_text
 from .devices import cuda_hint
-from .disk_space import SPACE_RESERVE, _engine_environ, _existing_folder, downloaded_models
+from .disk_space import (SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _engine_environ, _existing_folder, _reachable,
+                         downloaded_models)
+from .hub import hub_cache_dir
 from .models import MODELS
 from .portable_python import PRIVATE_PYTHON
 from .signature import DEFAULT_YOLO_MODEL
@@ -224,8 +226,17 @@ def check_writable(folder, label):
     return [CheckResult(name, True, f'{folder} can be written{state}.', '')]
 
 
-def check_models(base, environ):
-    """Information: which search models and whether the person detection model are downloaded (none is a problem)."""
+def check_models(base, environ, timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
+    """Information only: which search models and whether the person detection model are downloaded.
+
+    A model that is not downloaded is no problem: a search downloads it on first use. If the
+    drive of the model cache does not answer within timeout seconds (reachable: cleanup's root
+    probe), the result says that it is not known instead of "not downloaded yet" (review).
+    """
+    hub_cache = hub_cache_dir(_engine_environ(base, environ))
+    if not _reachable([hub_cache], timeout, reachable)[hub_cache]:
+        return [CheckResult('Model files', None, f'The model folder {hub_cache} did not answer within {timeout:g} '
+                            'seconds, so which model files are downloaded is not known.', '')]
     downloaded = downloaded_models(base, environ)
     found, _ = find_yolo_weights(DEFAULT_YOLO_MODEL, base, base, _engine_environ(base, environ))
     have = [MODELS[key].label for key in MODELS if key in downloaded] + (['person detection'] if found else [])
