@@ -32,7 +32,8 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
       (done 2026-11-02 in PR #65; the effect is not measured yet: follow-up E52, with E17)
 
 ### P13 – Export (added 2026-11-02)
-- [ ] Export a result list as CSV / file list (F5)
+- [x] Export a result list as CSV / file list (F5)
+      (done 2026-11-03 in PR #67; follow-ups A41, A42)
 
 ### P14 – Hygiene (`minor` items bundled per area, added 2026-11-02)
 - [ ] (A) Evaluation tool and workflow: E47, E48, I13, I28, I29

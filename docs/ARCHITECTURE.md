@@ -202,6 +202,19 @@ the module of its area and to the re-exports in `__init__.py`.
   (copying marked matches and their saved target folders in `settings.json`, A17;
   `forget_copy_folder` removes only the saved entry of a deleted profile, A22;
   `save_copy_folder(..., profiles_file=...)` like `save_marks`).
+- `exporting.py` (F5):
+  `EXPORTS_DIR`/`EXPORT_COLUMNS`/`EXPORT_MARK_TEXT`/`EXPORT_MAX_NAMES`/`export_cards`/`export_csv`/`export_file_list`/`export_name`/`export_result_list`
+  (exporting the ranked list of one profile as `results/exports/<slug>-<YYYYMMDD-HHMMSS>[-matches].csv`
+  and `.txt`; `export_cards(cards, marks, only_matches)` picks the cards, with only matches just
+  those of this list marked as match, and raises `ValueError` if `marks` is `None`; photos marked in an
+  earlier search but absent from the list have no rank or score and are not exported, unlike
+  "Copy marked matches"; `export_csv` is comma-separated with CRLF line ends, scores with four decimals and a
+  `.` as decimal point, an empty image similarity for text-only searches and the mark as
+  `match`/`no match`/empty, written as UTF-8 with BOM; `export_file_list` is one absolute path per line
+  (LF line ends, UTF-8 without BOM). `export_result_list` never replaces a file: if either name of the pair is
+  taken both get `-2`, `-3`, ... (up to `EXPORT_MAX_NAMES`), each file is written atomically through
+  `_publish_via_temp`/`_publish_new`, and a failed second file removes the first. The paths are
+  machine-specific, as for the cache and marks, A21. Standard library only.)
 - `cleanup.py`:
   `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`STALE_TEMP_AGE`/`ROOT_TIMEOUT`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14/E8; the unbound-photo check is the private `_PathCheck`;
@@ -516,7 +529,9 @@ Runtime data (generated, not in the repo): `settings.json` and `settings.json.lo
 app's settings and the lock of their saves, A8), `photos/` (default input), `references/`,
 `results/`, `results/cache.sqlite3`, `results/thumbnails/` (older runs:
 `results/vorschaubilder/`), `results/run.lock` and `results/run-status.json` (A4/A5),
-`results/results.json` (the last finished search, A12), `results/marks.json` and
+`results/results.json` (the last finished search, A12), `results/exports/` (exported result lists, F5: user data, created on the first export; no cleanup
+category scans this subfolder, so neither `clean_up` nor `auto_cleanup` touches it, and it needs no
+`NEVER_DELETED` entry, which names files of the results folder itself), `results/marks.json` and
 `results/marks.json.lock` (the user's marks, A17: user data, never written by the engine
 and never deleted by the cleanup, E7), `results/marks.json.bak` (F1) and the `*.broken-*` files (damaged
 `marks.json`/`cache.sqlite3` set aside, never deleted by FrameScout), `profiles.json`, `run.log`, `.cache/`, `.tmp/`,
@@ -1090,6 +1105,14 @@ or another click stops it between photos. The default target is
 `<Pictures>\FrameScout\<gallery slug>` (Pictures from `SHGetKnownFolderPath`, `~/Pictures`
 elsewhere). Using marks as search feedback: A20.
 
+Export (F5, `show_export`, below "Copy marked matches" of each profile): the checkbox "Only
+photos marked as match" (key `export_matches_<id>`; disabled while `marks.json` cannot be read),
+the button "Export N photo(s)" (disabled for 0) and "Open exports folder". The marks are read
+at the click (`export_list`, an `on_click` callback); unreadable marks refuse an "only matches"
+export and otherwise export the full list with an empty mark column, said in the notice
+(`st.session_state.export_notice`, shown once). The file name slug is the gallery's name
+without `.html`. See "Storage cleanup" for why exports are never deleted.
+
 ### Storage cleanup
 
 Cleanup (E7, E11, E13, E23, A14, E8; user decisions at the PR #18 hold point): the expander
@@ -1112,6 +1135,8 @@ seen before the deletion, A35); `marks_unbound` ("Marks of unbound photos", **de
 `cache_missing` in `CLEANUP_CATEGORIES`; items are `(profile, photo path)` pairs, names
 `"profile: path"`; it is one category checkbox, marks are not chosen one by one; not
 offered with "Not offered: marks.json cannot be read (...)" if the file is unreadable);
+no category lists `results/exports/` (F5: exported result lists are user data; `test_cleanup.py`
+checks that a full cleanup and `auto_cleanup` keep it);
 `cache_old` and
 `cache_other` and `cache_models` (`classify_signatures(..., current_engine=)`: the side
 table decides, otherwise `known_signatures`, i.e. the signatures of the default engine id
@@ -1410,7 +1435,9 @@ CPU smoke run: loaded for new photos, not loaded for a fully cached folder), the
 in the status line (`status_text`, F2, `test_run_status.py`), the
 scoring (E4/E5) the result file with the gallery helpers (A12) the marks, copying and copy
 target folders (A17) with their deletion with a profile and no saves for a name that is no
-profile (A22, A33, `test_marks.py`, `test_copy.py`, `require_profile` in
+profile (A22, A33, `test_marks.py`, `test_copy.py`, the result list export in `test_export.py`
+(F5: the picked cards, CSV content and encoding, file list, naming without replacing a file, a
+failing second file, nothing to export; not run: Excel import, a real browser), `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
 `test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` in `test_cache_dirs.py`, and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching

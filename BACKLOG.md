@@ -339,6 +339,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       category for them (default off) could be added. Also, when `marks.json` is missing (e.g.
       the user removed the damaged file as the old warning advised) but `marks.json.bak`
       exists, no restore is offered. Found in F1 (PR #60).
+- [ ] `minor` **A41 – "Copy 1 marked photos" has no singular:** the copy button in `app.py`
+      (`show_copy`) reads "Copy 1 marked photos" for a single photo, unlike the export button
+      ("Export 1 photo"). Small wording fix. Found in F5 (PR #67).
+- [ ] `minor` **A42 – The exported file list cannot hold a path with a line break:** the `.txt`
+      of the result list export (F5, `export_file_list`) has one path per line, so a path that
+      contains a line break (possible on Linux/macOS file systems, not on Windows) would be
+      split; the CSV quotes it correctly. Only relevant for a later non-Windows build; then
+      skip such paths with a notice or offer a NUL-separated list. Found in F5 (PR #67).
 
 ### Installation / project
 
@@ -481,15 +489,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 
 ### Features (from [docs/IDEAS.md](docs/IDEAS.md))
 
-- [ ] `ready` **F5 – Export a result list (CSV / file list):** results can only leave the app
-      by copying files (A17) or the HTML gallery; users who catalog in another program want
-      the matched paths, scores and marks. Sketch: "Export list" per profile writes
-      `results/exports/<slug>-<date>.csv` (rank, path, score, crop, mark) and a `.txt` with one
-      path per line, for all ranked photos or only those marked as match. Standard library
-      only; never writes next to the photos. Affected: `framescout_core` (export, tested),
-      `app.py`, user guide, storage cleanup (exports are user data: add to `NEVER_DELETED` or
-      leave out of every category). Risks: CSV encoding (UTF-8 with BOM for Excel); absolute,
-      machine-specific paths (same limit as A21). Size S. No hold point.
 - [ ] `decision` **F6 – "Not this" search texts per profile:** a profile "red car" also ranks
       toy cars or posters high; A20 covers rejected marks, but there is no way to say up front
       what a motif is not. Sketch: an optional "Exclude texts" field per profile; in

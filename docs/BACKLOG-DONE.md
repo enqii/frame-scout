@@ -1293,3 +1293,20 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       YOLO model (8 threads without the fix, 3 with it). Not tested: the slowdown and the
       gain in responsiveness are NOT measured (open: E52, with E17), stopping a low-priority
       search through the UI, `os.nice` in a real run on Linux/macOS, CUDA.)
+- [x] **F5 – Export a result list (CSV / file list):** results could only leave the app
+      by copying files (A17) or the HTML gallery; users who catalog in another program want
+      the matched paths, scores and marks. Sketch: "Export list" per profile writes
+      `results/exports/<slug>-<date>.csv` (rank, path, score, crop, mark) and a `.txt` with one
+      path per line, for all ranked photos or only those marked as match. Standard library
+      only; never writes next to the photos. Risks: CSV encoding (UTF-8 with BOM for Excel);
+      absolute, machine-specific paths (same limit as A21). Size S.
+      (done 2026-11-03 in PR #67: `framescout_core/exporting.py` and an "Export list" section
+      below each gallery with "Only photos marked as match", "Export N photos" and "Open exports
+      folder". Files `results/exports/<slug>-<YYYYMMDD-HHMMSS>[-matches].csv` and `.txt`; CSV
+      UTF-8 with BOM, comma-separated, 4-decimal scores; the text file has one absolute path per
+      line. An export never replaces a file (`-2`, `-3`, ... for the pair). "Only matches"
+      exports only photos of this ranked list, unlike "Copy marked matches". No cleanup
+      category lists `results/exports/`, so it is never deleted (`test_cleanup.py`).
+      Compatibility: additive only. Tested with unit tests (`test_export.py`, `test_cleanup.py`;
+      1073 passed, 2 skipped) and a headless `AppTest` of the section. Not tested: a real
+      browser, the Excel import; follow-ups A41, A42.)
