@@ -114,8 +114,11 @@ def option(command, name):
     return command[command.index(name) + 1]
 
 
-def test_run_starts_the_engine_for_every_registered_model(tmp_path, setup):
+def test_run_starts_the_engine_for_every_registered_model(tmp_path, setup, monkeypatch, capsys):
     photos, profiles, calls = setup
+    # the default cache folder, independent of the interpreter that runs the tests (review)
+    cache = tmp_path / 'checkout' / '.cache'
+    monkeypatch.setattr(ev, 'default_cache_dir', lambda: cache)
     assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
                     '--device', 'cpu', '--no-person-detection']) == 0
     assert [option(command, '--model') for command, _ in calls] == list(MODEL_KEYS)
@@ -127,10 +130,18 @@ def test_run_starts_the_engine_for_every_registered_model(tmp_path, setup):
     assert option(command, '--scores-file') == str(collection.scores_file(MODEL_KEYS[0]))
     assert option(command, '--device') == 'cpu' and option(command, '--top') == str(ev.DEFAULT_TOP)
     assert '--no-person-detection' in command
-    # the model downloads and caches go where the app keeps them
-    cache = ev.default_cache_dir()
+    # the model downloads and caches go where the app keeps them, and the run names the folder
     assert env['TORCH_HOME'] == str(cache / 'torch') and env['PYTHONIOENCODING'] == 'utf-8'
     assert env['HF_HOME'] == str(cache / 'huggingface')
+    assert f'Model downloads and caches: {cache.resolve()}' in capsys.readouterr().out
+
+
+def test_run_takes_an_explicit_cache_folder(tmp_path, setup):
+    photos, profiles, calls = setup
+    cache = tmp_path / 'my-cache'
+    assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
+                    '--models', DEFAULT_MODEL, '--cache-dir', str(cache)]) == 0
+    assert calls[0][1]['TORCH_HOME'] == str(cache / 'torch')
 
 
 def checkout(path):
@@ -155,6 +166,10 @@ def test_the_cache_defaults_to_the_script_folder_outside_a_framescout_venv(tmp_p
     # a venv that does not belong to a FrameScout checkout
     other = tmp_path / 'other'; (other / 'venv').mkdir(parents=True)
     assert ev.default_cache_dir(prefix=str(other / 'venv'), base_prefix=str(tmp_path / 'python'),
+                                root=root) == root / '.cache'
+    # the venv of another FrameScout clone, which does not hold the tool (review)
+    clone = checkout(tmp_path / 'clone')
+    assert ev.default_cache_dir(prefix=str(clone / '.venv'), base_prefix=str(tmp_path / 'python'),
                                 root=root) == root / '.cache'
 
 

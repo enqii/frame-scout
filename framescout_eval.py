@@ -190,16 +190,20 @@ def label_warnings(scores, labels):
 
 # --- run ---
 
-def default_cache_dir(prefix=sys.prefix, base_prefix=sys.base_prefix, root=ROOT):
+def default_cache_dir(prefix=None, base_prefix=None, root=ROOT):
     """The .cache of the FrameScout checkout whose venv runs the tool, else the one next to the script (E48).
 
     The tool run from a git worktree with the main checkout's venv then uses the models the
-    main checkout already downloaded.
+    main checkout already downloaded. Only a checkout that holds the tool (the tool itself or
+    a worktree inside it) counts, so another clone's venv never receives the downloads (review).
     """
-    checkout = Path(prefix).parent
-    if Path(prefix) != Path(base_prefix) and (checkout / ENGINE.name).is_file():
+    prefix = Path(sys.prefix if prefix is None else prefix)
+    base_prefix = Path(sys.base_prefix if base_prefix is None else base_prefix)
+    checkout = prefix.parent
+    if (prefix != base_prefix and (checkout / ENGINE.name).is_file()
+            and Path(root).resolve().is_relative_to(checkout.resolve())):
         return checkout / '.cache'
-    return root / '.cache'
+    return Path(root) / '.cache'
 
 
 def engine_env(cache_dir, environ=os.environ):
@@ -245,6 +249,7 @@ def command_run(args):
               'run every model again so that their scores compare the same photos.', flush=True)
     collection.save_config(folders, profiles)
     env = engine_env(args.cache_dir)
+    print(f'Model downloads and caches: {Path(args.cache_dir).resolve()}', flush=True)
     failed = []
     for model in models:
         # a model's scores are those of its latest run: a skipped or failed run leaves none,
@@ -518,9 +523,10 @@ def report(name, result, k, weight, models):
                   f'images ({", ".join(result["sweep_profiles"])}); * = best per model', '']
         sweep = {model: result['sweep'].get(model, {}) for model in models}
         weights = list(next(iter(result['sweep'].values())))
-        # a tie at 0 (no weight finds a match) has no best weight (E47)
-        best = {model: max((v['ap'] for v in row.values() if v['ap'] is not None), default=None) or None
+        best = {model: max((v['ap'] for v in row.values() if v['ap'] is not None), default=None)
                 for model, row in sweep.items()}
+        # a tie at 0 (no weight finds a match) has no best weight (E47)
+        best = {model: ap if ap is not None and ap > 0 else None for model, ap in best.items()}
         rows = []
         for w in weights:
             row = [w]
