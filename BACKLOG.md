@@ -235,8 +235,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `profile_slugs` with a fallback for occupied folders – note that the order-based
       slugs change when profiles are deleted or reordered, which would then move folders
       (design decision, PR #6 review).
-- [ ] `parked` **A18 – ZIP export (roadmap P4 (C)): open decision.** Asked in PR #14 and deferred to
-      P4 (C). **Deferred by the user on 2026-10-25** ("skip this feature for now"): copying
+- [ ] `parked` **A18 – ZIP export (formerly roadmap P4 (C)): open decision.** Asked in PR #14 and deferred to
+      P4 (C); removed from the roadmap on 2026-11-03 at the user's request, to be planned again later. **Deferred by the user on 2026-10-25** ("skip this feature for now"): copying
       of P4 (B) already collects the photos; a ZIP only matters for sharing or archiving an
       overview. The Q6 decision below (content a/b/c, one vs. two buttons) is still pending
       and must be asked again when this item is picked up. Q6 – content: (a) the gallery HTML with its links rewritten to a
@@ -491,3 +491,65 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (`export_csv`), `app.py` (`show_export`), user guide, `tests/test_export.py`.
       **Question:** whether a second format is wanted at all, and which. Found in the review of
       F5 (PR #67). Size S.
+- [ ] `decision` **F10 – Quick search over the analyzed photos, without a profile:** trying a
+      search text means creating a profile and starting a full run that also analyzes every
+      uncached photo. Sketch: a "Quick search" field in "Search & results"; the engine gets an
+      option (e.g. `--quick-query "<text>"`) that skips the analysis phase, scores only photos with
+      cache rows of the current signature and writes gallery and result to `results/quick/`, so
+      profile results and `marks.json` stay untouched; the app says how many photos are not
+      analyzed and therefore not searched. Affected: `framescout_engine.py`, `framescout_core`
+      (result paths, cleanup must know `results/quick/`), `app.py`, user guide,
+      `docs/ARCHITECTURE.md`. Risks: z-scoring over fewer photos makes scores differ from a full
+      run (label it); the text model still loads; cleanup of the second results folder. **Question:**
+      the new `results/` folder (UX/product decision); the CLI option is additive. Size M.
+- [ ] `decision` **F11 – "Find similar" from a result card:** no way to ask for "more like this
+      one" short of copying the photo into a profile's references. Sketch: a button per card; the
+      engine ranks all cached photos by cosine similarity to that photo's cached embedding (full
+      image or the shown crop), no text, no new analysis, result like F10 (size S if F10 exists).
+      Closest item: A20 (changes profile scoring; this is a one-off query). Affected:
+      `framescout_engine.py` (`--like <path>`), `framescout_scoring.py` (rank by one vector),
+      `app.py`, user guide, `docs/ARCHITECTURE.md`. Risks: a photo with a cache row of another
+      signature has no usable vector (say so, never analyze silently); burst shots dominate the
+      top (see F7). **Question:** gallery UX; the CLI option is additive. Size M.
+- [ ] `ready` **F12 – Remaining-time estimate and a summary before the start:** a first CPU
+      search can take hours and the app only shows a progress bar. Sketch: (a) a remaining-time
+      estimate from the status file's progress and timestamps (moving average, shown as "about
+      25 min left" only after enough samples); (b) before "Start search" a short summary: photos
+      found, already analyzed for the current signature (read-only SQLite query), to analyze and,
+      if an earlier run recorded a throughput in `run-status.json`, a rough duration. Affected:
+      `framescout_core` (estimate/count helpers, tested), `app.py` (`show_status`, run tab),
+      engine status writes (optional throughput field), user guide. Risks: counting cached photos
+      needs `stat` per photo and must not rescan on every rerun (reuse the A6/A27 scan cache);
+      estimates jump on a busy PC: round generously, never show seconds. No hold point. Size S–M.
+- [ ] `decision` **F13 – Keep the previous search results:** every search replaces `results.json`
+      and the galleries, so a worse result cannot be compared with the earlier ranking. Sketch:
+      before `publish_export` replaces them, move the previous `results.json` and galleries to
+      `results/history/<run end timestamp>/`, keep the last N runs (setting); the results view
+      gets a "Run" selectbox (latest by default, older runs read-only); thumbnail cleanup keeps
+      what a kept run links, "Clean up storage" lists old runs. Affected: `framescout_core`
+      (export/publish, cleanup, `read_results`), `framescout_engine.py`, `app.py`, user guide,
+      `docs/ARCHITECTURE.md`. Risks: disk use; the move must be as safe as the E24 publish; marks
+      are per photo and profile, not per run. **Question:** number of runs kept, default on/off;
+      new `results/` folder. Size M.
+- [ ] `decision` **F14 – Export and import a search profile as one file:** a profile (texts plus
+      reference images) cannot be moved to another PC or shared except by copying parts of
+      `profiles.json` and `references/` by hand. Sketch: "Export profile" writes a ZIP with a small
+      JSON (fields, format version) and the reference images; "Import profile" validates like
+      `load_profiles`, gives a taken name a free suffix, stores references through
+      `reference_folder` (never overwriting, A1) and saves through the locked save (A13).
+      Affected: `framescout_core` (bundle read/write, `zipfile`, tested incl. path traversal),
+      `app.py` (profile tab), user guide. Risks: an imported ZIP is untrusted: reject absolute or
+      `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
+      may show people (say so in the guide). **Question:** the contents of the new bundle format
+      (no `profiles.json` schema change). Size M.
+- [ ] `ready` **F15 – "Check installation" self-test:** after a Windows update, a moved folder
+      or an interrupted install, users see a traceback in `run.log` and do not know whether to
+      reinstall. Sketch: `Check-FrameScout.bat` (and an expander in "AI settings") runs a
+      read-only check: `.python` and `.venv` belong to this folder, package versions equal
+      `constraints.txt` (`importlib.metadata`), torch imports and reports CUDA for a CUDA install,
+      `.cache/` and `results/` are writable, which model weights are cached, free disk space;
+      one plain sentence with the fix per problem. Affected: a small script or `framescout_core`
+      module (standard library, tested with fake metadata), a `.bat`, `app.py`, user guide
+      (troubleshooting), `docs/DEVELOPMENT.md`. Risks: never write, download or "repair"; importing
+      torch takes seconds and can crash on a broken install, so run it in a subprocess. No hold
+      point. Size S–M.
