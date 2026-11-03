@@ -541,6 +541,28 @@ def test_scan_finds_a_hard_linked_photo_once(tmp_path):
         pytest.skip(f'no hard links here: {exc}')
     assert scan_folders([tmp_path / 'one', tmp_path / 'two']).paths == [a]
     assert scan_photos(tmp_path).paths == [a]
+    # A37: the photo found again is counted, for the folder it was found again in
+    assert [s.found_again for s in scan_each_folder([tmp_path / 'one', tmp_path / 'two'])] == [0, 1]
+    assert scan_photos(tmp_path).found_again == 1
+
+
+def test_scan_counts_the_folders_reached_again_through_a_link(tmp_path):
+    # A37: a link into a folder already searched adds nothing; the scan says how many there were
+    root = tmp_path / 'photos'
+    touch(root / 'zz-event' / 'a.jpg'); touch(root / 'zz-event' / 'b.jpg')
+    link_folder(root / 'aa-link', root / 'zz-event')
+    link_folder(root / 'zz-event' / 'loop', root)
+    scan = scan_photos(root)
+    assert len(scan.paths) == 2
+    assert scan.folders_again == 2 and scan.found_again == 0
+    assert scan_photos(tmp_path / 'other').folders_again == 0
+
+
+def test_join_scans_adds_up_what_was_found_again():
+    a = PhotoScan([], [], collections.Counter(), found_again=2, folders_again=1)
+    b = PhotoScan([], [], collections.Counter(), found_again=3)
+    joined = join_scans([a, b])
+    assert (joined.found_again, joined.folders_again) == (5, 1)
 
 
 def test_scan_leaves_out_the_excluded_folder_through_a_link(tmp_path):
@@ -663,6 +685,16 @@ def test_skipped_lines_shorten_a_long_extension_list():
 def test_skipped_lines_both_kinds():
     lines = skipped_lines(scan_of(['a.dng', 'b.dng'], mov=1))
     assert len(lines) == 2
+
+
+def test_skipped_lines_name_photos_and_folders_found_again():
+    # A37: photos and folders reached through a second path are searched once; the log says so
+    lines = skipped_lines(PhotoScan([], [], collections.Counter(), found_again=12, folders_again=2))
+    assert lines == ['12 photos found again through another path (a link or hard link), analyzed once.',
+                     '2 folders reached again through a link, searched once.']
+    lines = skipped_lines(PhotoScan([], [], collections.Counter(), found_again=1, folders_again=1))
+    assert lines == ['1 photo found again through another path (a link or hard link), analyzed once.',
+                     '1 folder reached again through a link, searched once.']
 
 
 def test_skipped_lines_explain_files_of_a_missing_decoder_once():
