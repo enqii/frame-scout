@@ -12,6 +12,7 @@ import os
 import sqlite3
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -21,7 +22,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RAW_EXT, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
-                             Lazy, LOADING_DETECTOR, NOTHING_NEW,
+                             AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, remember_throughput,
                              final_status, yolo_weights,
                              RawFallback, SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
@@ -447,6 +448,10 @@ def search(args, parser, roots, dropped, output, status):
     # folder ranks only, without the seconds (or the download) of loading YOLO (F2)
     detector = Lazy(load_detector)
 
+    # the speed of the analysis of new photos: the app's "about 25 min left" (rate) and the
+    # duration it shows before the next search with these settings (throughput, F12)
+    speed = AnalysisRate()
+
     def finished(new=0, cached=0, failed=0):
         nonlocal fresh, reused, errors, done
         before = done
@@ -454,8 +459,15 @@ def search(args, parser, roots, dropped, output, status):
         done = fresh + reused + errors
         if progress_due(before, done, len(paths)):
             print(progress_line(done, len(paths), fresh, reused, errors), flush=True)
+        measured = {}
+        if new:
+            speed.add(fresh, time.monotonic())
+            measured['rate'] = speed.per_minute()
+            overall = speed.overall()
+            if overall is not None:
+                measured['throughput'] = remember_throughput(status.state['throughput'], signature, device, overall)
         # the status file is written at most once a second, the last photo always (A5)
-        status.update(done=done, new=fresh, cached=reused, errors=errors, force=done == len(paths))
+        status.update(done=done, new=fresh, cached=reused, errors=errors, force=done == len(paths), **measured)
 
     def cached(path):
         """True if the cache has the features of path with its current modification time and size."""
