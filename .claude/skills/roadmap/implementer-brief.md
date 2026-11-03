@@ -67,9 +67,9 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
 
 ## Working
 
-- End every commit message with the trailer line
-  `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`
-  (or the attribution line your session prescribes).
+- End every commit message with the `Co-Authored-By:` trailer that your session prescribes
+  (its attribution reminder names your own model); do not copy a trailer from this brief,
+  an older commit or another agent.
 - Atomic commits (tests + code of one behavior belong together), staged by file name,
   each pushed right after it is created.
 - Kind `docs`: no TDD and no smoke run; run `pytest` once if a test reads the files you
