@@ -325,6 +325,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       stays as a duplicate until the user deletes it by hand. Fix idea: finish the move on
       the next successful save (the backup then holds the new names) or offer such files
       in "Clean up storage". Review of PR #69, finding 4.
+- [ ] `minor` **A44 – "Already analyzed" ignores modification time and size:** the count of F3 and
+      the summary before the start (F12) use `analyzed_photos`, which counts cache rows of the
+      signature without a `stat`. A photo edited since its analysis counts as analyzed, so the
+      summary may undercount the photos to analyze (and the duration). Fix idea: compare size and
+      modification time like the engine does, reusing the scan cache (A6/A27) so that a rerun
+      does not stat every photo again. Found in F12 (PR #71).
 
 ### Installation / project
 
@@ -511,16 +517,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `app.py`, user guide, `docs/ARCHITECTURE.md`. Risks: a photo with a cache row of another
       signature has no usable vector (say so, never analyze silently); burst shots dominate the
       top (see F7). **Question:** gallery UX; the CLI option is additive. Size M.
-- [ ] `ready` **F12 – Remaining-time estimate and a summary before the start:** a first CPU
-      search can take hours and the app only shows a progress bar. Sketch: (a) a remaining-time
-      estimate from the status file's progress and timestamps (moving average, shown as "about
-      25 min left" only after enough samples); (b) before "Start search" a short summary: photos
-      found, already analyzed for the current signature (read-only SQLite query), to analyze and,
-      if an earlier run recorded a throughput in `run-status.json`, a rough duration. Affected:
-      `framescout_core` (estimate/count helpers, tested), `app.py` (`show_status`, run tab),
-      engine status writes (optional throughput field), user guide. Risks: counting cached photos
-      needs `stat` per photo and must not rescan on every rerun (reuse the A6/A27 scan cache);
-      estimates jump on a busy PC: round generously, never show seconds. No hold point. Size S–M.
 - [ ] `decision` **F13 – Keep the previous search results:** every search replaces `results.json`
       and the galleries, so a worse result cannot be compared with the earlier ranking. Sketch:
       before `publish_export` replaces them, move the previous `results.json` and galleries to
@@ -553,3 +549,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (troubleshooting), `docs/DEVELOPMENT.md`. Risks: never write, download or "repair"; importing
       torch takes seconds and can crash on a broken install, so run it in a subprocess. No hold
       point. Size S–M.
+- [ ] `minor` **F16 – The time estimate does not cover scoring and the gallery export:** the
+      "about N min left" of F12 and the duration before the start cover only the analysis of the
+      remaining photos. Scoring and especially the gallery export (thumbnails of top x profiles)
+      are not estimated, so a run can take noticeably longer after the estimate reached zero.
+      Idea: record an export rate in `run-status.json` like `throughput` and add it to the
+      summary. Found in F12 (PR #71).

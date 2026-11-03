@@ -1377,3 +1377,22 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       the cache. Idea: look for the weights file in the cache folder and show "downloaded"
       instead. Found in PR #56.
       (done 2026-11-03 in PR #69: `model_label(key, downloaded=False)` and new `downloaded_models(...)` in `disk_space.py`; the app caches the set for 30 s and shows "downloaded" in the list and caption of cached models. Compatibility: optional parameters only. Tested with unit tests (`test_disk_space.py`, `test_models.py`); the model list on a page was not run in a browser.)
+- [x] **F12 – Remaining-time estimate and a summary before the start:** a first CPU
+      search can take hours and the app only shows a progress bar. Sketch: (a) a remaining-time
+      estimate from the progress and timestamps (moving average, shown only after enough
+      samples); (b) before "Start search" a short summary: photos found, already analyzed for
+      the current signature, to analyze and, if an earlier run recorded a throughput, a rough
+      duration. Size S–M.
+      (done 2026-11-03 in PR #71: new module `framescout_core/estimate.py`. Run tab: an info box
+      "N photos found · A already analyzed with these settings · T to analyze." plus a rough
+      duration from the `throughput` record of the current cache signature and device in
+      `run-status.json`, or a hint that the search shows its time after the first minutes.
+      Progress line of the phase "analyzing": "· about 25 min left" once the engine measured a
+      rate (at least 16 new photos over at least 60 s, counted from the first stored group;
+      moving average over at least the last 300 s). Covers only the analysis, not scoring or
+      galleries; rounded generously (`duration_text`), never seconds. `run-status.json` gets the
+      additive fields `rate` and `throughput` (`STATUS_FORMAT` stays 1); `StatusReporter` keeps
+      valid `throughput` records across status files. Compatibility: additive only, no CLI,
+      profile, settings or cache signature change. Tested with unit tests (`test_estimate.py`,
+      `test_run_status.py`) and a headless `AppTest` of the run tab summary. Not tested: the live
+      engine estimate on a real run, a real browser; follow-ups F16, A44.)

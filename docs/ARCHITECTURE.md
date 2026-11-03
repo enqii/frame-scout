@@ -23,7 +23,9 @@ another machine and the edge cases in the backlog are **not** verified. Treat sy
 checks, unit tests and a real model run as distinct kinds of evidence, and do not call the
 app production-ready. The installer's download, extraction and `venv` creation with the private
 Python 3.14.9 (P5 part C) and the uninstall with it were run under `.tmp`; a full installation
-with PyTorch on it is **not runtime-tested**.
+with PyTorch on it is **not runtime-tested**. The time estimate (F12) is **not runtime-tested**:
+its helpers are unit-tested and the run tab summary was checked with Streamlit `AppTest`, but the
+engine's rate measurement and the "time left" of a live search were never run.
 
 Publishing the export (E24, E26, PR #45): one CPU smoke run (4 synthetic photos, 2 profiles,
 `.tmp/`) wrote both galleries and `results.json`, removed two stale temporary files and kept
@@ -146,6 +148,22 @@ the module of its area and to the re-exports in `__init__.py`.
 - `run_status.py`:
   `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`/`LOADING_DETECTOR`
   (one search per output folder, its phase and progress, A4/A5).
+- `estimate.py` (F12): the time estimate of a search, standard library only.
+  `AnalysisRate` (the engine's measure of the analysis speed: `add(fresh, now)` per stored
+  group, `per_minute()` a moving average over at least the last `RATE_WINDOW` = 300 s, falling
+  back to the whole run when that window holds fewer than `RATE_MIN_PHOTOS` = 16 photos, `None`
+  until 16 new photos over `RATE_MIN_SECONDS` = 60 s, counted from the first stored group so
+  that loading the models does not count; `overall()` the average of the whole analysis),
+  `duration_text` (generous rounding, never seconds: under 2 min "under 2 min", under 10 min
+  whole minutes, under 60 min steps of 5, under 5 h steps of 30 min as "about 1 h 30 min",
+  else whole hours), `remaining_text(status)` ("about 25 min left" from the status fields
+  `rate`, `done`, `total`; only in the phase `analyzing`, where `done` counts the cache hits
+  first, so `total - done` are the photos left to analyze), `stored_throughput`
+  (validates the `throughput` list of a status file), `remember_throughput`
+  (`THROUGHPUT_KEPT` = 8 records `{signature, device, per_minute}`, newest first, one per
+  signature and device), `known_throughput(status, signature, device)` (the matching record;
+  device `None` = any device of the signature) and `start_summary(photos, analyzed, per_minute)`
+  (the text of the box before the start).
 - `devices.py`: `detection_options` (YOLO arguments on the CLIP device, E14),
   `device_choices`/`cuda_status`/`cuda_hint` (the app's device choice, CUDA status and the
   way to GPU support, A7), `ULTRALYTICS_ENV`/`import_detector_class` (the engine's only
@@ -1265,6 +1283,16 @@ F2) when no photo needed an analysis; `status_text` appends the message of a run
 phase, e.g. `Scoring photos: 3/10 · Nothing new to analyze – ranking only`, while the
 message of a final phase is shown by the app in its own line. A successful finish clears it.
 
+Time estimate (F12, additive, `STATUS_FORMAT` stays 1): the status file has two more fields.
+`rate` is the photos per minute of this run's analysis (`AnalysisRate.per_minute()`, `null`
+until measured) and `throughput` a list of at most 8 records `{signature, device, per_minute}`
+(newest first; the average of a whole analysis, written by the engine's `finished()` through
+`remember_throughput`). `StatusReporter.__init__` reads the file it replaces and keeps its valid
+`throughput` records (`stored_throughput`), so the app's `starting` status, the engine's own
+status, a ranking-only run and a stopped run keep earlier speeds; `rate` starts at `null`
+again. The engine feeds `AnalysisRate` only for newly analyzed photos (`new` of `finished`),
+so cache hits do not count. Older versions ignore the fields.
+
 ### Starting a search from the app
 
 The frontend spawns the engine via `subprocess.Popen` and redirects stdout/stderr to
@@ -1318,6 +1346,20 @@ and working folder `BASE`, as the engine runs; none when person detection is off
 root that does not answer within `SPACE_CHECK_TIMEOUT` is left out, so a disconnected
 network share does not block the page runs (review). `OSError` and `ValueError` give no
 warning; other exceptions are not swallowed (review).
+
+Summary before the start (F12): in the same place, above the disk space warning, the run tab
+shows `st.info(start_summary(photos found, analyzed, known_throughput(run_status, cleanup_signature(), device)))`
+with the `analyzed` count of F3 (`analyzed_photos`: cache rows of the signature, no `stat`, so
+a changed photo still counts as analyzed). The device "auto" is resolved as CUDA if PyTorch
+can use it (`info['cuda']`), else CPU; without the system details (`info` is `None`) any
+device's record of the signature counts. The text is "N photos found · A already analyzed with
+these settings · T to analyze." plus the rough duration of the analysis from the throughput
+record (`duration_text`) or "The search shows how long it takes after its first minutes."; with
+nothing to analyze it says that the search only ranks and writes the galleries. In the progress
+line of a running search (`show_status`), `remaining_text(status)` is appended after
+`status_text` ("· about 25 min left") only when the run is active (`now_active`), because a
+crashed run keeps its last rate in the file. The estimate covers only the analysis of the
+remaining photos, not scoring or the gallery export (F16); the count ignores changed photos (A44).
 
 ### Stopping a search
 
@@ -1476,7 +1518,7 @@ and joined folders, and the deferred decision (`raw_fallbacks`, `RawFallback`, E
 `test_photos.py`; the engine side of the fallback is not runtime-tested),
 the identity-based dedup and link-safe scan, including the output folder as or inside a
 listed folder, repeated file ids, link loops without file ids and an unreadable path (A28,
-A29, `test_photos.py`), the counts of photos and folders found again (A37), the backup rewrite under the lock (A32, `test_reference_move.py`, `test_profile_file.py` with `profiles_changed_notice`, A31) and `downloaded_models` (A39, `test_disk_space.py`, `test_models.py`; the app side of A31/A39 was not run),
+A29, `test_photos.py`), the counts of photos and folders found again (A37), the backup rewrite under the lock (A32, `test_reference_move.py`, `test_profile_file.py` with `profiles_changed_notice`, A31) and `downloaded_models` (A39, `test_disk_space.py`, `test_models.py`; the app side of A31/A39 was not run), the time estimate (F12: `AnalysisRate` window and thresholds, `duration_text` rounding, `remaining_text`, throughput records and `start_summary` in `test_estimate.py`; the carry-over of `throughput` between status files in `test_run_status.py`; the run tab summary was checked with Streamlit `AppTest` only, the engine side and the live "time left" are not runtime-tested),
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
 hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the

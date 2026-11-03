@@ -151,6 +151,17 @@ A repeat search on a folder that is already analyzed (e.g. after changing only a
 text or the reference weight) skips loading the person detector and shows "Nothing new to
 analyze – ranking only"; the detector is loaded only when a photo has to be analyzed.
 
+Before a search the run tab summarizes what it will do: how many photos were found, how many
+are already analyzed with the current settings and how many remain to analyze. If an earlier
+search with the same settings (search model, person detection) ran on the same device, it also
+gives a rough duration for the analysis; otherwise it says the search shows how long it takes
+after its first minutes. While the search analyzes photos, the progress line adds "about 25 min
+left" once about a minute of analysis has been measured. These times are rough: they are
+rounded generously (never to seconds), change with what else the PC is doing, and cover only
+the analysis of new photos, not scoring and writing the galleries, which add a little time at
+the end. A photo that you edited after its analysis still counts as already analyzed in the
+summary.
+
 Before a search the run tab warns when a drive would keep less than 1 GB free after the
 search: it lists the drives with the space needed and the space free, and what the search
 writes (cache, thumbnails, and the search model or person detector if they still have to

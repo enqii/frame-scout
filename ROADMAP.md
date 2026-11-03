@@ -20,7 +20,7 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
 ### P15 – Orientation during runs (added 2026-11-03)
-- [ ] (A) Remaining-time estimate and a summary before the start (F12)
+- [x] (A) Remaining-time estimate and a summary before the start (F12)
 - [ ] (B) "Check installation" self-test (F15)
 
 ### P16 – Hygiene (`minor` items bundled per area, added 2026-11-03)
