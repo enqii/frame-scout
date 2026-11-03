@@ -1356,7 +1356,7 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       the page no longer shows is not delivered by Streamlit, and the app shows no
       message (found in the PR of A13, not reproduced beyond the reading of the code).
       Fix idea: tell the user when the profile list changed under an open page.
-      (done 2026-11-03 in PR #69: `framescout_core.profiles_changed_notice(shown, current)`; the profile tab warns when `profiles.json` changed since the page last showed the forms, unless a refused save (`profile_error`) already explains it. Compatibility: additive only. Tested with unit tests (`test_profile_file.py`); the warning on a page was not run in a browser.)
+      (done 2026-11-03 in PR #69: `framescout_core.profiles_changed_notice(shown, current)`; the profile tab warns when `profiles.json` changed since the page last showed the forms, unless a refused save (`profile_error`) already explains it; since a dropped click leaves no trace, the warning names it only as a possibility (review). Compatibility: additive only. Tested with unit tests (`test_profile_file.py`); the warning on a page was not run in a browser.)
 - [x] `minor` **A32 – `update_backup_references` runs outside the lock of `profiles.json`:** after
       a folder rename the paths in `profiles.json.bak` are rewritten without the
       `profiles.json.lock` that `save_profiles` holds (A13), so it could in theory
@@ -1371,7 +1371,7 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       shows. Idea: count the duplicates in the scan (e.g. a field of `PhotoScan`) and add a
       line like `skipped_lines` ("12 photos found again through another path, analyzed
       once"). Review of PR #50, finding 5.
-      (done 2026-11-03 in PR #69: `PhotoScan` has the fields `found_again` and `folders_again` (default 0), counted by `scan_each_folder`, summed by `join_scans`; `skipped_lines` adds "N photos found again through another path ... analyzed once." and "N folders reached again through a link, searched once." to the engine log and the photo source tab. Compatibility: defaulted fields only. Tested with unit tests (`test_photos.py`).)
+      (done 2026-11-03 in PR #69: `PhotoScan` has the fields `found_again` and `folders_again` (default 0), counted by `scan_each_folder`, summed by `join_scans` (`folders_again` counts folder links only, not a folder listed twice or nested, review); `skipped_lines` adds "N photos found again through another path ... analyzed once." and "N folders reached again through a link, searched once." to the engine log and the photo source tab. Compatibility: defaulted fields only. Tested with unit tests (`test_photos.py`).)
 - [x] `minor` **A39 – The model list shows a download size for cached models:** the app's
       model list shows "605 MB download" for a model even when its weights are already in
       the cache. Idea: look for the weights file in the cache folder and show "downloaded"
