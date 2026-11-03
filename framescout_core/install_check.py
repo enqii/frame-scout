@@ -143,8 +143,9 @@ def check_packages(site_packages, constraints_text, requirements_text):
     """Check that the packages of requirements.txt are installed and every installed pinned package has its pin.
 
     A pin of a package that is not installed is no problem unless requirements.txt names it
-    (constraints.txt may pin packages another Python version needs). torch and torchvision
-    count with any build label (+cpu, +cu130).
+    (constraints.txt may pin packages another Python version needs), and a requirement with an
+    environment marker is not required either. torch and torchvision count with any build
+    label (+cpu, +cu130).
     """
     name = 'Packages'
     installed = installed_versions(site_packages)
@@ -153,7 +154,10 @@ def check_packages(site_packages, constraints_text, requirements_text):
         match = _PIN.match(line.split('#', 1)[0])
         if match:
             pins[_canonical(match[1])] = match[2]
-    missing = [package for package in requirement_names(requirements_text) if _canonical(package) not in installed]
+    # a requirement with an environment marker (";") may not apply to this platform or Python,
+    # and the standard library cannot evaluate markers: it is not reported missing (review)
+    unconditional = '\n'.join(line for line in requirements_text.splitlines() if ';' not in line.split('#', 1)[0])
+    missing = [package for package in requirement_names(unconditional) if _canonical(package) not in installed]
     other = [f'{package} {installed[package]} instead of {version}' for package, version in sorted(pins.items())
              if package in installed and installed[package].partition('+')[0] != version]
     if not missing and not other:
