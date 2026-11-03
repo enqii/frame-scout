@@ -20,6 +20,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              clean_up, cleanup_running, cleanup_summary_text, marks_backup, restore_marks,
                              cache_check_current, set_cache_aside,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
+                             EXPORTS_DIR, export_cards, export_result_list,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
@@ -52,6 +53,8 @@ RESULTS_JSON = RESULTS / RESULTS_FILE
 THUMBS = RESULTS / 'thumbnails'
 # the user's marks of gallery photos (A17): user data, never deleted by FrameScout
 MARKS = RESULTS / MARKS_FILE
+# exported result lists (F5): user data, never deleted by FrameScout
+EXPORTS = RESULTS / EXPORTS_DIR
 # the three states of a mark, as the control on each gallery card shows them (A17)
 MARK_LABELS = {MARK_OPEN: 'Undecided', MARK_MATCH: 'Match', MARK_NO_MATCH: 'No match'}
 MARK_BY_LABEL = {label: state for state, label in MARK_LABELS.items()}
@@ -532,6 +535,31 @@ def copy_matches(profile, key, photo_folders):
     else:
         st.success(plain(text))
 
+def export_list(profile, gallery, cards, only_matches):
+    """Write the result list of profile to results/exports/ (on_click of the export button, F5).
+
+    The marks are read now: another tab may have changed them since the page was drawn.
+    Without readable marks the list of all photos is written with an empty mark column.
+    """
+    try:
+        marks = read_marks(MARKS).get(profile, {})
+    except (OSError, ValueError) as exc:
+        if only_matches:
+            st.session_state.export_notice = ('warning', f'Nothing was exported: {MARKS_FILE} cannot be read ({exc}).')
+            return
+        marks = None
+    try:
+        table, listing = export_result_list(RESULTS, Path(gallery).stem, cards, marks, only_matches)
+    except (OSError, ValueError) as exc:
+        st.session_state.export_notice = ('warning', f'Nothing was exported: {exc}.')
+        return
+    st.session_state.export_notice = (
+        'success', f'Exported to {table.name} and {listing.name} in {EXPORTS}.'
+                   + (f' The mark column is empty: {MARKS_FILE} cannot be read.' if marks is None else ''))
+
+def open_exports_folder():
+    gallery_action(open_path, EXPORTS if EXPORTS.is_dir() else None, f'The folder {EXPORTS}')
+
 def open_target_folder(key, photo_folders):
     target, _ = copy_target(st.session_state.get(key, ''), photo_folders)
     gallery_action(open_path, target if target is not None and target.is_dir() else None, f'The folder {target}')
@@ -799,6 +827,7 @@ def show_results(results, photo_folders):
                                          args=(name, card['path'], key), disabled=not can_mark,
                                          label_visibility='collapsed')
     show_copy(name, entry, marks, photo_folders, states[name] != 'missing')
+    show_export(name, entry, marks, marks_error)
 
 def show_copy(name, entry, marks, photo_folders, profile_exists):
     """Copying the photos of profile name marked as match to a folder, below its gallery (A17).
@@ -834,6 +863,29 @@ def show_copy(name, entry, marks, photo_folders, profile_exists):
               disabled=target is None or not target.is_dir(), width='stretch')
     if copy:
         copy_matches(name, key, photo_folders)
+
+def show_export(name, entry, marks, marks_error):
+    """Exporting the result list of profile name as a CSV table and a file list, below its gallery (F5)."""
+    st.markdown('**Export list**')
+    st.caption(f'Writes the ranked photos of "{plain(name)}" as a CSV table (rank, path, score, crop, mark) and as a '
+               'text file with one path per line, e.g. for a cataloging program, to the folder '
+               f'{plain(EXPORTS_DIR)} in the results folder. The paths are those of this computer; an export never '
+               'replaces an earlier one.')
+    key = 'export_matches_' + widget_id(name)
+    only = st.checkbox('Only photos marked as match', key=key, disabled=marks_error is not None,
+                       help='Only the photos of this list marked as match. Photos marked as match in an earlier '
+                            'search that are not in this list are not exported: they have no rank or score here.')
+    only = only and marks_error is None
+    count = len(export_cards(entry['cards'], marks, only))
+    if marks_error is not None:
+        st.caption(f'{MARKS_FILE} cannot be read: the mark column of the list stays empty.')
+    if 'export_notice' in st.session_state:
+        kind, text = st.session_state.pop('export_notice')
+        (st.success if kind == 'success' else st.warning)(plain(text))
+    c1, c2 = st.columns(2)
+    c1.button(f"Export {count:,} photo{'' if count == 1 else 's'}", on_click=export_list, args=(name, entry['gallery'], entry['cards'], only),
+              disabled=not count, width='stretch', key='export_list')
+    c2.button('Open exports folder', on_click=open_exports_folder, disabled=not EXPORTS.is_dir(), width='stretch')
 
 def cleanup_signature():
     """The cache signature of the current settings: its entries are never offered for deletion (E11)."""
