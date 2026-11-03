@@ -509,7 +509,10 @@ skill (`.claude/skills/triage/`, user-invoked; its result is a docs-only PR with
 
 `.claude/skills/roadmap/`: the `/roadmap` orchestrator skill plus implementer/reviewer
 briefs (the implementer brief also covers the fresh `docs-update` and `address-review`
-agents, I17). `.claude/settings.json`: shared permission rules for the workflow.
+agents, I17). The commit trailer comes from the session's attribution (I29), long runs start
+detached through WMI (I13), and a reviewer whose `/code-review` posted nothing posts one comment
+per finding, inline or as a general `Finding <n>` comment (I28). `.claude/settings.json`: shared
+permission rules for the workflow.
 
 ### `.github/pull_request_template.md`
 
@@ -558,7 +561,10 @@ true|false}}}`; an unreadable file is never saved over, the page refuses to star
 - `run`: per model `framescout_engine.py <folders> --profiles P --output engine/<model>
   --model <model> --scores-file scores/<model>.json --device --batch-size --top 150
   [--no-person-detection]` with `TORCH_HOME`/`HF_HOME`/`YOLO_CONFIG_DIR`/`XDG_CACHE_HOME`
-  under `<project>/.cache` (`--cache-dir`) and `PYTHONIOENCODING=utf-8`. A model with a
+  under the cache folder (`--cache-dir`, default `default_cache_dir()` (E48): `<checkout>/.cache`
+  when the tool runs in a venv, `sys.prefix != sys.base_prefix`, whose parent folder holds
+  `framescout_engine.py`, e.g. the main checkout's `.venv` used from a worktree; otherwise
+  the `.cache` next to the script) and `PYTHONIOENCODING=utf-8`. A model with a
   missing package (`model_problem`) is skipped; exit 1 if any model was not scored. A
   model's `scores/<model>.json` is removed before its run and again after a failed one, so a
   skipped or failed model keeps no scores of an older run. A model not yet cached downloads
@@ -595,7 +601,8 @@ true|false}}}`; an unreadable file is never saved over, the page refuses to star
   `DEFAULT_REFERENCE_WEIGHT`), warnings about labels no model run scored (another profile
   name, a moved or relative photo path: such a match counts as missed by every model,
   `label_warnings`), unlabelled photos in a top list count as no match, a
-  reference-weight sweep (`--sweep`, best per model marked `*`), the mean over several
+  reference-weight sweep (`--sweep`, best per model marked `*`, every tied weight, none when
+  the best AP is 0, E47), the mean over several
   collections; Markdown tables, `--json FILE`.
 
 ## Current search pipeline
