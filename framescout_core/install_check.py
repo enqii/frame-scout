@@ -103,6 +103,14 @@ def _read_cfg(path):
     return values
 
 
+def _same_folder(first, second):
+    """Whether both paths name the same existing folder, also through a link, junction or 8.3 short name."""
+    try:
+        return os.path.samefile(first, second)
+    except OSError:
+        return False
+
+
 def check_environment(base):
     """Check that .venv exists and its Python is there and belongs to this folder (or is an installed Python)."""
     name = 'Python environment'
@@ -121,8 +129,7 @@ def check_environment(base):
         return [CheckResult(name, False, f'The Python that .venv was created with is missing ({home}): the '
                             'FrameScout folder was moved, or that Python was deleted or uninstalled.',
                             'Run Install-FrameScout.bat; it repairs the environment. Or move the folder back.')]
-    if home.name.lower() == PRIVATE_PYTHON and os.path.normcase(os.path.abspath(home)) != os.path.normcase(
-            os.path.abspath(private)):
+    if home.name.lower() == PRIVATE_PYTHON and not _same_folder(home, private):
         return [CheckResult(name, False, f'.venv uses the private Python of another folder ({home}): the FrameScout '
                             'folder was copied or moved, and it stops working when that folder is deleted.',
                             f'Delete the folder {VENV_DIR} in this folder, then run Install-FrameScout.bat.')]
