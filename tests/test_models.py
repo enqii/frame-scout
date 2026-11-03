@@ -60,6 +60,16 @@ def test_labels_name_the_cpu_factor_the_download_and_the_evaluation():
         assert 'not evaluated' in label
 
 
+def test_labels_of_downloaded_models_name_no_download_size():
+    # A39: a model whose weights are in the cache is not offered as a download
+    label = model_label(DEFAULT_MODEL, downloaded=True)
+    assert label == f'{MODELS[DEFAULT_MODEL].label} (default, fastest; downloaded)'
+    for key in MODEL_KEYS[1:]:
+        label = model_label(key, downloaded=True)
+        assert 'downloaded' in label and MODELS[key].download not in label and 'download)' not in label
+        assert MODELS[key].cpu_factor in label and 'not evaluated' in label
+
+
 def test_missing_packages_and_problem():
     def none_installed(name):
         return None
