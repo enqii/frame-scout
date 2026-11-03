@@ -102,14 +102,14 @@ the module of its area and to the re-exports in `__init__.py`.
   can be read here), `supported_extensions` (`EXT` without the extensions of a missing
   decoder), `missing_decoder`, `scan_each_folder` (one `PhotoScan` per folder, A28/A29) and `scan_photos` (the photos
   of one folder as a `PhotoScan`, built on it), `remembered_scans` (A27: `scan_each_folder` result kept in a
-  caller-owned dict, scanned again only when the folders, extensions or output folder change or on `recount`; cleared without folders), `skipped_lines` (the log lines about skipped files),
+  caller-owned dict, scanned again only when the folders, extensions or output folder change or on `recount`; cleared without folders), `skipped_lines` (the log lines about skipped files, plus A37: photos and folders found again), `PhotoScan.found_again`/`folders_again` (A37, default 0, counted by `scan_each_folder`, summed by `join_scans`),
   `distinct_folders`/`output_folder_problem`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
   (several photo folders per search, A25; see "Several photo folders"),
   `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
   (the engine's RAW decoding; see "Photo formats"), `raw_fallbacks`/`RawFallback` (E30:
   the RAW file of a partner that cannot be analyzed; see "RAW+JPEG pairs").
 - `references.py`: `reference_folder` (one reference folder per profile, A1),
-  `stage_reference_move`/`update_backup_references`/`finish_reference_move`/`undo_reference_move`
+  `stage_reference_move`/`update_backup_references` (under `<filename>.lock`, A32)/`finish_reference_move`/`undo_reference_move`
   (a renamed profile's references follow its name, A1), `write_new_file` (reference
   uploads without overwriting).
 - `profiles.py`: `create_from_example` (first-start `profiles.json`), `generic_prompts`
@@ -155,7 +155,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `TORCH_VERSION`/`TORCHVISION_VERSION`/`CUDA_BUILDS`/`parse_gpu_query`/`cuda_build`/`unsupported_gpus`/`installed_build_matches`/`installed_cuda_build`/`torch_requirements`/`torch_index_url`
   (which PyTorch build the installer installs, A7/I3).
 - `models.py`:
-  `SearchModel`/`MODELS`/`DEFAULT_MODEL`/`MODEL_KEYS`/`model_label`/`results_model`/`missing_packages`/`model_problem`
+  `SearchModel`/`MODELS`/`DEFAULT_MODEL`/`MODEL_KEYS`/`model_label` (`downloaded=True` says "downloaded" instead of the download size, A39)/`results_model`/`missing_packages`/`model_problem`
   (the registry of the search models the engine's `--model` and the app's selectbox offer,
   E22; no imports beyond the standard library; fields: key, OpenCLIP name and pretrained
   weights, label, download size, CPU factor, image size, `requires`, `multilingual`
@@ -236,7 +236,7 @@ the module of its area and to the re-exports in `__init__.py`.
   cache and the detector weights only if their root answers in time), `app_search_needs`
   (the needs of a search the app starts: the `cache_paths(base)` variables over the
   environment, as `cache_env` sets them, the hub cache from `hub_cache_dir`, the weights
-  from `find_yolo_weights`), `torch_install_needs(build, venv, temp, torch=True)`,
+  from `find_yolo_weights`), `downloaded_models(base, environ, timeout, reachable)` (A39: model keys whose files are in the Hub cache the engine loads from, via `_engine_environ` shared with `app_search_needs`; a cache on a drive that does not answer is not read: empty set), `torch_install_needs(build, venv, temp, torch=True)`,
   `low_space` (probes the drive or share roots first with cleanup's threaded
   `_reachable_roots` and `SPACE_CHECK_TIMEOUT`, leaving out a root that does not answer;
   groups the needs by volume – device number, or the anchor if it is 0, plus the volume
@@ -675,8 +675,9 @@ modification time (`_file_identity`: hard links and file symlinks share all four
 different photos on a file system with repeated file ids stay apart; A28). One `os.stat` per
 walked folder and per photo file. The output folder is left out wherever it is reached: as
 a listed folder or inside one (by path, as the old `exclude in path.parents` check), or
-through a link or another path (by identity). Photos found twice are dropped silently (no
-count in the log or app; A37). Cache rows and marks under a link path of earlier runs are
+through a link or another path (by identity). Photos found twice are counted in
+`PhotoScan.found_again` and folders reached again in `folders_again` (counted for the listed folder
+that reached through again) and named by `skipped_lines` in the log and the photo source tab (A37). Cache rows and marks under a link path of earlier runs are
 no longer used (A21).
 
 The app: the "Photo source" tab has a text area (`setting_photo_folders`, one folder per
@@ -985,7 +986,12 @@ reruns; the message is shown at the top of the profile tab (not in the form's ex
 which a changed profile name redraws closed), the new-profile form keeps its input.
 Checked once with Streamlit's `AppTest` (refused save after another writer deleted a
 profile above the edited one). A click on a form that no longer exists after
-another session shortened the list is dropped by Streamlit without a message (A31).
+another session shortened the list is dropped by Streamlit; since A31 the profile tab shows a
+warning from `framescout_core.profiles_changed_notice(shown, current)` when `profiles.json`
+changed since the page last showed the forms (not when `profile_error` already explains it).
+`update_backup_references` takes the same `profiles.json.lock` as `save_profiles`
+(`_file_lock`, `lock_timeout=PROFILES_LOCK_TIMEOUT`) and raises `OSError` if it is not free in
+time; the app keeps the old reference names then (A32).
 
 `framescout_core.reconcile_settings` does the sync on every page run with two session
 records: `settings_seen` (the saved value last taken from or written to the file, as
@@ -1262,7 +1268,7 @@ The frontend spawns the engine via `subprocess.Popen` and redirects stdout/stder
 `run.log`, with `PYTHONIOENCODING=utf-8` (`cache_env`), as it reads `run.log` as UTF-8;
 it passes `--model` from the setting `model` (the AI settings tab starts with
 the "Search model" selectbox, key `setting_model`, `format_func=model_label`, with a
-caption per model and a warning from `model_problem`, E22; with such a problem Start is
+caption per model and a warning from `model_problem`, E22; `models_downloaded` (`st.cache_data`, `LOW_SPACE_TTL`) marks cached models "downloaded" in the list and the caption, A39; with such a problem Start is
 disabled and the run tab shows the same warning). `start_run` takes the run lock (1 s timeout: every open tab probes it every two
 seconds), truncates `run.log`, spawns the engine and writes the status `starting` with the
 child's pid, then releases the lock to the engine; if that status cannot be written it
@@ -1467,7 +1473,7 @@ and joined folders, and the deferred decision (`raw_fallbacks`, `RawFallback`, E
 `test_photos.py`; the engine side of the fallback is not runtime-tested),
 the identity-based dedup and link-safe scan, including the output folder as or inside a
 listed folder, repeated file ids, link loops without file ids and an unreadable path (A28,
-A29, `test_photos.py`),
+A29, `test_photos.py`), the counts of photos and folders found again (A37), the backup rewrite under the lock (A32, `test_reference_move.py`, `test_profile_file.py` with `profiles_changed_notice`, A31) and `downloaded_models` (A39, `test_disk_space.py`, `test_models.py`; the app side of A31/A39 was not run),
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
 hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the

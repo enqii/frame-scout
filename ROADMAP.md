@@ -38,7 +38,8 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
 ### P14 – Hygiene (`minor` items bundled per area, added 2026-11-02)
 - [x] (A) Evaluation tool and workflow: E47, E48, I13, I28, I29
       (done 2026-11-03 in PR #68)
-- [ ] (B) App: A31, A32, A37, A39
+- [x] (B) App: A31, A32, A37, A39
+      (done 2026-11-03 in PR #69)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new

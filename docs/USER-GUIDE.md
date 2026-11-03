@@ -80,7 +80,8 @@ few example profiles that you can edit or delete.
   Each save keeps the previous version as `profiles.json.bak` (one step only, so restore
   it right after a mistake). An unreadable `profiles.json` is shown as an error and left
   unchanged. If the file was changed elsewhere (by hand or in another tab) since the page
-  loaded, the app refuses to save over it and shows the current profiles instead. Leave
+  loaded, the app refuses to save over it and shows the current profiles instead; a page
+  left open while the file changed warns you that a click may not have been carried out. Leave
   the empty `profiles.json.lock` alone.
 
 ### Photo source
@@ -91,7 +92,7 @@ listed twice or inside another listed folder is searched once; a missing folder 
 disconnected drive) is left out with a note. The same folder reached by another path (another drive
 letter, a UNC path, a junction) is recognized and searched once. Links to folders inside a
 photo folder are followed, but each folder and each photo is searched once, even if it is
-reachable through several links or by a hard link.
+reachable through several links or by a hard link. The log and the "Photo source" tab say how many photos and folders were found again that way and searched once.
 
 The tab shows how many photos each folder holds. To keep the app fast on large or network
 folders, the count is made once per browser session and again only when you change the
@@ -111,7 +112,7 @@ asking the Hugging Face Hub; missing files are downloaded with a note. Set
 - **Search model:** the default, OpenAI CLIP ViT-B/32, is the fastest and the one the
   settings are tuned for. Optional: ViT-B/16 and ViT-L/14 (DataComp-XL) and SigLIP B/16,
   roughly 4×, 18× and 4× slower on a CPU, with a first download of about 0.6, 1.7 and
-  0.8 GB. They are marked "not evaluated", so treat them as an experiment. The first
+  0.8 GB (the list says "downloaded" for a model whose files are already there). They are marked "not evaluated", so treat them as an experiment. The first
   search with a new model analyzes every photo again; the cache keeps each model's
   analyses, so switching back is fast. Scores of different models are not comparable.
   SigLIP needs the package `transformers` (run the installer again on an older

@@ -272,17 +272,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       cleanup (E7, A14) must keep the reference images of all generations, and
       `update_backup_references` (rename of the photo/reference folder) must rewrite all
       of them. How many generations is a user decision. Split from A13.
-- [ ] `minor` **A31 – A click on a profile form that no longer exists is dropped silently:** if
-      another session shortened the profile list, a form submit or button of a form that
-      the page no longer shows is not delivered by Streamlit, and the app shows no
-      message (found in the PR of A13, not reproduced beyond the reading of the code).
-      Fix idea: tell the user when the profile list changed under an open page.
-- [ ] `minor` **A32 – `update_backup_references` runs outside the lock of `profiles.json`:** after
-      a folder rename the paths in `profiles.json.bak` are rewritten without the
-      `profiles.json.lock` that `save_profiles` holds (A13), so it could in theory
-      rewrite a `.bak` that another session has just replaced with newer state. Probably
-      harmless (it only rewrites paths of the moved folder); not analysed. Found in the
-      PR of A13.
 - [ ] `minor` **A34 – Marks left by profiles deleted before A22 stay in `marks.json`:** they still
       pass to a new profile of that name, and "Clean up storage" never offers them because
       `marks.json` is in `NEVER_DELETED`. No migration was done. Idea: offer to delete the
@@ -304,13 +293,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       ignores e.g. a `HF_HOME` the user exported, a manual run honours it. Probably intended
       (the app keeps the install self-contained), but undecided and undocumented; decide and
       document, or use `default_cache_env` in the app too. Review of PR #42, finding 12.
-- [ ] `minor` **A37 – Photos found through a second path are dropped silently:** since A28/A29
-      `scan_each_folder` lists a photo reached through a link, another path or a hard link
-      once, under the first path, and neither the engine log nor the app's per-folder
-      count says how many were dropped, so the count can be lower than what a file manager
-      shows. Idea: count the duplicates in the scan (e.g. a field of `PhotoScan`) and add a
-      line like `skipped_lines` ("12 photos found again through another path, analyzed
-      once"). Review of PR #50, finding 5.
 - [ ] `minor` **A38 – The style block of the mark colors may take a layout slot:** the gallery
       writes the `<style>` block of `mark_style` (A24) with `st.markdown` on every run of the
       gallery fragment, outside the keyed card container, so it may add an empty element
@@ -321,10 +303,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (light and dark theme) and switch if `st.html` is clean. One selector per card stays:
       the state of a mark is not in the DOM, and a page holds at most 48 cards. Review of
       PR #55, finding 6.
-- [ ] `minor` **A39 – The model list shows a download size for cached models:** the app's
-      model list shows "605 MB download" for a model even when its weights are already in
-      the cache. Idea: look for the weights file in the cache folder and show "downloaded"
-      instead. Found in PR #56.
 - [ ] `minor` **A40 – `*.broken-*` files are not offered by "Clean up storage"; no restore for a missing `marks.json`:**
       `marks.json.broken-*` and `cache.sqlite3.broken-*` are never deleted by FrameScout, so
       the user deletes them by hand in the results folder (the notices say so); a cleanup
