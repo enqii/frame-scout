@@ -225,13 +225,14 @@ def profiles_changed_notice(shown, current):
     page showed; current: the version read now. If another tab, session or a text editor
     changed the file in between, e.g. deleted a profile, a click on a form the page no
     longer shows is not delivered by Streamlit at all; the notice says so instead of the
-    page dropping it silently.
+    page dropping it silently. Such a click leaves no trace, so the notice cannot tell
+    whether one was dropped or which: it names the dropped click only as a possibility (review).
     """
     if shown == current:
         return None
-    return ('The search profiles were changed in another tab or session, or by hand, since this page showed '
-            'them; it now shows the current ones. A click on a profile that is no longer shown here was not '
-            'carried out: please check the profiles and repeat it if needed.')
+    return ('The search profiles were changed in another tab or session, or by hand, since this page last showed '
+            'them; it now shows the current ones. If you just clicked a button of a profile that is no longer '
+            'shown here, that click was not carried out: please check the profiles and repeat it if needed.')
 
 
 def _version_of(content):

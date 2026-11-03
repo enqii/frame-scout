@@ -189,6 +189,8 @@ def test_a_page_tells_when_the_profiles_changed_since_it_showed_them(tmp_path):
     save_profiles(path, [{'name': 'Dog'}])  # another session deletes "Cat"
     notice = profiles_changed_notice(shown, read_profiles_versioned(path)[1])
     assert 'changed in another tab or session' in notice and 'not carried out' in notice
+    # Streamlit leaves no trace of a dropped click: the notice says it only conditionally (review)
+    assert 'If you just clicked' in notice
     # a file that was created or deleted meanwhile counts too
     assert profiles_changed_notice(None, shown) and profiles_changed_notice(shown, None)
 
