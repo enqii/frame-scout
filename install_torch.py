@@ -20,7 +20,6 @@ all installed. --dry-run only prints the pip command. Standard library only. Exi
 0 done, 1 failed, STOPPED_EXIT_CODE (3) stopped by the user on low disk space.
 """
 import argparse
-import re
 import shutil
 import subprocess
 import sys
@@ -29,7 +28,8 @@ from importlib import metadata
 from pathlib import Path
 
 from framescout_core import (CUDA_BUILDS, cuda_build, driver_text, installed_build_matches, installed_cuda_build,
-                             low_space, low_space_lines, parse_gpu_query, torch_index_url, torch_install_needs,
+                             low_space, low_space_lines, parse_gpu_query, requirement_names, torch_index_url,
+                             torch_install_needs,
                              torch_requirements, unsupported_gpus)
 
 KNOWN_CUDA_BUILDS = {build for build, *_ in CUDA_BUILDS}
@@ -38,17 +38,6 @@ PYPI_INDEX = 'https://pypi.org/simple'
 # (review); not 1 (failure, also an uncaught exception) or 2 (argparse's usage error)
 STOPPED_EXIT_CODE = 3
 REQUIREMENTS = Path(__file__).resolve().parent / 'requirements.txt'
-_REQUIREMENT_NAME = re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)')
-
-
-def requirement_names(text):
-    """Return the package names of the requirements file text (comments and blank lines skipped)."""
-    names = []
-    for line in text.splitlines():
-        match = _REQUIREMENT_NAME.match(line.split('#', 1)[0])
-        if match:
-            names.append(match[1])
-    return names
 
 
 def other_packages_missing():
