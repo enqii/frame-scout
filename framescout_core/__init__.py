@@ -20,7 +20,7 @@ from .locks import (RunLock, lock_held)
 from .references import (reference_folder, stage_reference_move, finish_reference_move,
     undo_reference_move, update_backup_references, write_new_file)
 from .profiles import (PROFILES_LOCK_TIMEOUT, ProfilesChangedError, UnknownProfileError, create_from_example,
-    generic_prompts, load_profiles, read_profiles, read_profiles_versioned, require_profile, save_profiles)
+    generic_prompts, load_profiles, profiles_changed_notice, read_profiles, read_profiles_versioned, require_profile, save_profiles)
 from .models import (SearchModel, MODELS, DEFAULT_MODEL, MODEL_KEYS, model_label, missing_packages,
     model_problem, results_model)
 from .signature import (ENGINE_TEMPLATE, engine_id, ENGINE, MODEL_ENGINES,

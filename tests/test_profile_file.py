@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (NEVER_DELETED, ProfilesChangedError, RunLock, UnknownProfileError, load_profiles,
-                             read_profiles, read_profiles_versioned, require_profile, save_profiles)
+                             profiles_changed_notice, read_profiles, read_profiles_versioned, require_profile, save_profiles)
 
 
 def write(path, data, encoding='utf-8'):
@@ -178,6 +178,19 @@ def test_the_version_tells_whether_the_file_changed(tmp_path):
     assert read_profiles_versioned(path)[1] == version  # unchanged file: same version
     path.write_bytes(path.read_bytes() + b' ')  # any change counts, even one without effect
     assert read_profiles_versioned(path)[1] != version
+
+
+def test_a_page_tells_when_the_profiles_changed_since_it_showed_them(tmp_path):
+    # A31: a click on a profile form that the page no longer shows is not delivered by
+    # Streamlit; the page says that the list changed instead of dropping it silently
+    path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}, {'name': 'Cat'}]})
+    shown = read_profiles_versioned(path)[1]
+    assert profiles_changed_notice(shown, shown) is None
+    save_profiles(path, [{'name': 'Dog'}])  # another session deletes "Cat"
+    notice = profiles_changed_notice(shown, read_profiles_versioned(path)[1])
+    assert 'changed in another tab or session' in notice and 'not carried out' in notice
+    # a file that was created or deleted meanwhile counts too
+    assert profiles_changed_notice(None, shown) and profiles_changed_notice(shown, None)
 
 
 def test_a_missing_file_has_no_version(tmp_path):
