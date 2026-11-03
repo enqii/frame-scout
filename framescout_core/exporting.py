@@ -77,8 +77,12 @@ def export_result_list(results, slug, cards, marks, only_matches=False, now=None
 
     results: the results folder; slug: the profile's file name part (its gallery's name
     without .html); cards, marks, only_matches: as for export_cards. The CSV table
-    (export_csv) is UTF-8 with a byte order mark, so that Excel reads the paths right; the
-    file list (export_file_list) is UTF-8 without one. Both get the same name
+    (export_csv) is UTF-8 with a byte order mark, so that Excel decodes non-ASCII paths as
+    UTF-8; the byte order mark does not set the delimiter: Excel splits a double-clicked CSV
+    at the list separator of the system locale, which is ";" in German and other
+    comma-decimal locales, so there the whole row lands in one column (the user guide points
+    to Data -> From Text/CSV; a ";" option is F9). The file list (export_file_list) is UTF-8
+    without a byte order mark. Both get the same name
     (export_name, from now or the current time) plus "-2", "-3", ... while either name is
     taken: nothing is ever replaced. Raises ValueError if there is nothing to export
     (nothing is written then) and OSError if a file cannot be written.

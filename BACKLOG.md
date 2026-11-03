@@ -519,3 +519,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       every photo slows the scan (only when a date filter is set); copies inside excluded
       folders vs. the A17 check. **Question:** mtime vs. EXIF as the date; additive CLI options
       and `settings.json` keys. Size M.
+- [ ] `decision` **F9 – A CSV export that Excel opens in columns in every locale:** the result
+      list export (F5) writes a comma-separated CSV (RFC 4180). Excel splits a double-clicked
+      CSV at the list separator of the system locale, which is `;` in German and other
+      comma-decimal locales, so there every row lands in one column; the user guide points to
+      Data → From Text/CSV. Options: a "Separator: comma / semicolon" choice next to the export
+      button (a `setting_<name>` widget in `settings.json`), or a `sep=,` first line (Excel
+      only, breaks other CSV readers and RFC 4180). With `;` the decimal point stays `.`, so
+      Excel may still read the scores as text there. Affected: `framescout_core/exporting.py`
+      (`export_csv`), `app.py` (`show_export`), user guide, `tests/test_export.py`.
+      **Question:** whether a second format is wanted at all, and which. Found in the review of
+      F5 (PR #67). Size S.
