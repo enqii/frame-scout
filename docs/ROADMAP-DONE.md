@@ -126,3 +126,25 @@ decision in PR #14):
       (done 2026-10-30)
 - [x] (C) "Hide no match" keeps the pages stable, "Reset to defaults" for the AI settings
       (A24, A26) (done 2026-10-30)
+
+### P11 – Safety of marks and cache (added 2026-11-02)
+- [x] Backup of `marks.json` with a restore offer, and a cache health check (F1)
+      (done 2026-11-02 in PR #60; follow-ups E50, A40)
+
+### P12 – Lighter runs (added 2026-11-02)
+- [x] (A) No person detector load when nothing needs analysis (F2)
+      (done 2026-11-02 in PR #62)
+- [x] (B) Free disk space check before installing and searching (F3)
+      (done 2026-11-02 in PR #64; follow-ups I33, E51)
+- [x] (C) "Keep the PC responsive" option, measured together with P10 (B) (F4)
+      (done 2026-11-02 in PR #65; the effect is not measured yet: follow-up E52, with E17)
+
+### P13 – Export (added 2026-11-02)
+- [x] Export a result list as CSV / file list (F5)
+      (done 2026-11-03 in PR #67; follow-ups A41, A42)
+
+### P14 – Hygiene (`minor` items bundled per area, added 2026-11-02)
+- [x] (A) Evaluation tool and workflow: E47, E48, I13, I28, I29
+      (done 2026-11-03 in PR #68)
+- [x] (B) App: A31, A32, A37, A39
+      (done 2026-11-03 in PR #69)

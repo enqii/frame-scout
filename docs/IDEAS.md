@@ -171,6 +171,7 @@ previous run, import, export, share, self-test, repair, verify, undo, manifest).
 existing items are named where they touch an idea.
 
 ### 1. Quick search over the analyzed photos, without a profile
+Disposition: take over → F10; tag decision (2026-11-03)
 - **Problem:** trying out a search text ("person with umbrella", "sunset over water")
   means creating a profile, saving it and starting a full run, which also analyzes every
   photo not in the cache yet. Exploring a folder that is already analyzed feels slow.
@@ -191,6 +192,7 @@ existing items are named where they touch an idea.
   (UX/product decision).
 
 ### 2. "Find similar" from a result card
+Disposition: take over → F11; tag decision (2026-11-03)
 - **Problem:** a result shows exactly the kind of photo the user wants, but there is no
   way to ask for "more like this one" short of copying the photo into a profile's
   reference images and running the whole search again.
@@ -210,6 +212,7 @@ existing items are named where they touch an idea.
 - **Hold point:** CLI option is additive; gallery UX is a product decision.
 
 ### 3. Remaining-time estimate and a pre-start summary
+Disposition: take over → F12; roadmap P15 (A) (2026-11-03)
 - **Problem:** a first CPU search on thousands of photos can take hours, and the app
   only shows a progress bar. Users cannot tell whether to wait, leave the PC on overnight
   or reduce the folder.
@@ -231,6 +234,7 @@ existing items are named where they touch an idea.
   optional field).
 
 ### 4. Keep the previous search results
+Disposition: take over → F13; tag decision (2026-11-03)
 - **Problem:** every search replaces `results.json` and the galleries. A user who changes a
   profile or the search model and gets worse results cannot go back to the earlier
   ranking to compare or to copy matches from it.
@@ -250,6 +254,7 @@ existing items are named where they touch an idea.
   layout gains a folder.
 
 ### 5. Export and import a search profile as one file
+Disposition: take over → F14; tag decision (2026-11-03)
 - **Problem:** a good profile (search texts plus reference images) cannot be moved to
   another PC or a second FrameScout folder, or shared with someone else, except by copying
   parts of `profiles.json` and the `references/` folder by hand.
@@ -269,6 +274,7 @@ existing items are named where they touch an idea.
   product decision on its contents).
 
 ### 6. "Check installation" self-test
+Disposition: take over → F15; roadmap P15 (B) (2026-11-03)
 - **Problem:** when the app or a search fails after a Windows update, a moved folder or
   an interrupted install, users see a Python traceback in `run.log` and do not know
   whether to re-run the installer, free disk space or reinstall the GPU build.
@@ -286,6 +292,7 @@ existing items are named where they touch an idea.
 - **Hold point:** no (no new dependency, no download).
 
 ### 7. A copy log and "Undo last copy" for copied matches
+Disposition: parked: the app would delete files outside `results/` for the first time, a basic decision first (2026-11-03)
 - **Problem:** "Copy marked matches" (A17) copies photos into a target folder that may
   already hold the user's own files. Copying into the wrong folder, or with the wrong
   marks, leaves a mix that is hard to clean up by hand.
