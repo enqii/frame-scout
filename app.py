@@ -1555,6 +1555,11 @@ with settings_tab:
         if st.button('Check installation'):
             with st.spinner('Checking the installation ...'):
                 st.session_state['install_check'] = check_installation(BASE, dict(os.environ))
+                st.session_state['install_check_at'] = time.time()
+        if 'install_check' in st.session_state:
+            # the results are kept until the next click: say when they were found (review)
+            st.caption(f"Checked at {time.strftime('%H:%M:%S', time.localtime(st.session_state['install_check_at']))}"
+                       '. After you fix something, click the button again.')
         for result in st.session_state.get('install_check', []):
             text = plain(f'{result.name}: {result.text}')
             if result.ok is False:
