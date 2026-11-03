@@ -86,11 +86,15 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
 
 - **Long runs** (an engine or `framescout_eval.py run` over many photos, more than a few
   minutes): a background command of your session ends with your session, and the run with
-  it (I13). Start it detached instead: write a `.cmd` file under `.tmp\` that sets the
-  cache variables above (absolute paths) and runs the command with its output redirected
-  to a log under `.tmp\`, then start it with
-  `Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = 'cmd /c "<absolute path of the .cmd>"'; CurrentDirectory = '<worktree>'}`
-  (returns the `ProcessId`). Wait for its end before you return – with a background
+  it (I13). Start it detached instead: write a `.cmd` file under `.tmp\` with the Write
+  tool (ASCII only, `@echo off` first) that sets the cache variables above with
+  `set "NAME=<absolute path>"` and runs the command with every path in double quotes and
+  its output redirected (`> "<log>" 2>&1`) to a log under `.tmp\`, then start it with
+  `$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = 'cmd /c "<absolute path of the .cmd>"'; CurrentDirectory = '<worktree>'}`.
+  In this single-quoted PowerShell string write a `'` in a path as `''`; a path with
+  spaces needs nothing more than the double quotes shown. Check `$r.ReturnValue -eq 0`
+  (else the process did not start: report the value) and, a few seconds later, that the
+  log exists and is not empty; `$r.ProcessId` is the process id. Wait for its end before you return – with a background
   command that loops until the process is gone or `<output>\run-status.json` shows a final
   phase (`finished`/`failed`/`interrupted`) – and report the log's last lines. If you
   must return earlier, report the process id, the log and the status file so that the
