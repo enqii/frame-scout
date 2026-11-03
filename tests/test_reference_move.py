@@ -1,4 +1,5 @@
 """Moving a renamed profile's reference images to the folder of its new name (A1, review)."""
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -250,6 +251,29 @@ def test_the_backup_is_rewritten_under_the_lock_of_the_profiles_file(project):
     assert (project / 'profiles.json.bak').read_bytes() == before
     assert update_backup_references(path, staged, project, lock_timeout=0.05) is True
     backup = json.loads((project / 'profiles.json.bak').read_text(encoding='utf-8'))
+    assert backup['profiles'][0]['reference_images'] == ['references/blue-car/reference-1.jpg']
+
+
+def test_the_backup_is_read_only_once_the_lock_is_held(project, monkeypatch):
+    # A32 (review): another session's save replaces the .bak while this rewrite waits for the
+    # lock; the rewrite must start from that newer backup, not from one read before the lock
+    previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}]}
+    path, staged = rename_red_car(project, previous)
+    newer = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']},
+                          {'name': 'Added elsewhere', 'reference_images': []}]}
+    real_lock = framescout_core.references._file_lock
+
+    @contextlib.contextmanager
+    def lock_after_another_save(filename, timeout):
+        with real_lock(filename, timeout):
+            # the other session held the lock first and replaced the backup
+            (project / 'profiles.json.bak').write_text(json.dumps(newer), encoding='utf-8')
+            yield
+
+    monkeypatch.setattr(framescout_core.references, '_file_lock', lock_after_another_save)
+    assert update_backup_references(path, staged, project) is True
+    backup = json.loads((project / 'profiles.json.bak').read_text(encoding='utf-8'))
+    assert [p['name'] for p in backup['profiles']] == ['Red car', 'Added elsewhere']
     assert backup['profiles'][0]['reference_images'] == ['references/blue-car/reference-1.jpg']
 
 
