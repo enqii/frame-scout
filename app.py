@@ -1302,11 +1302,12 @@ with p_tab:
         st.warning(st.session_state.pop('notice'))
     if 'profile_error' in st.session_state:  # a save refused by store() (A13)
         st.error(st.session_state.pop('profile_error'))
-    elif profiles_changed_notice(profiles_shown, profiles_version):
+    elif profiles_notice := profiles_changed_notice(profiles_shown, profiles_version):
         # A31: the file changed since the last complete page, e.g. a profile was deleted in
         # another session: a click on a form this page no longer draws was dropped by
-        # Streamlit, so say so (a click on a form still drawn is refused by store instead)
-        st.warning(profiles_changed_notice(profiles_shown, profiles_version))
+        # Streamlit, so say so (a click on a form still drawn is refused by store instead).
+        # Only this first run after the change can carry such a click: it redraws the forms
+        st.warning(profiles_notice)
     # hint only, no check of the input (user decision on E3: English search terms only);
     # one box with the call to action on an empty list (review)
     st.info(('Create a search profile first. ' if not profiles else '') +
