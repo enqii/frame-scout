@@ -299,6 +299,23 @@ def test_metrics_sweep_the_reference_weight_per_model(collection):
     assert result['sweep_profiles'] == ['Dog']
 
 
+def sweep_result(*aps):
+    weights = ('0.0', '0.3', '0.6')
+    return {'profiles': {}, 'mean': {}, 'sweep_profiles': ['Dog'],
+            'sweep': {DEFAULT_MODEL: {w: {'ap': ap, 'unlabelled': 0} for w, ap in zip(weights, aps)}}}
+
+
+def test_the_sweep_marks_the_best_weights_of_a_model():
+    text = ev.report('cosplay', sweep_result(0.5, 1.0, 1.0), 2, 0.3, [DEFAULT_MODEL])
+    assert '| 0.0 | 0.500 |' in text and '| 0.3 | 1.000* |' in text and '| 0.6 | 1.000* |' in text
+
+
+def test_the_sweep_marks_no_weight_when_every_ap_is_zero():
+    # E47: a tie at 0 has no best weight
+    text = ev.report('cosplay', sweep_result(0.0, 0.0, None), 2, 0.3, [DEFAULT_MODEL])
+    assert '| 0.0 | 0.000 |' in text and '| 0.3 | 0.000 |' in text and '| 0.6 | – |' in text
+
+
 def test_labels_no_model_run_scored_are_warned_about(collection, capsys):
     write_model_scores(collection, DEFAULT_MODEL, [0.9, 0.8, 0.1, 0.2, 0.0])
     labelled(collection, 'Car', a=True)
