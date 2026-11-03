@@ -27,7 +27,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
                              analyzed_photos, app_search_needs, downloaded_models, low_space, low_space_lines,
                              hidden_text, hide_no_match, mark_style,
-                             profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
+                             profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
                              reconcile_settings, reference_folder,
@@ -1302,6 +1302,11 @@ with p_tab:
         st.warning(st.session_state.pop('notice'))
     if 'profile_error' in st.session_state:  # a save refused by store() (A13)
         st.error(st.session_state.pop('profile_error'))
+    elif profiles_changed_notice(profiles_shown, profiles_version):
+        # A31: the file changed since the last complete page, e.g. a profile was deleted in
+        # another session: a click on a form this page no longer draws was dropped by
+        # Streamlit, so say so (a click on a form still drawn is refused by store instead)
+        st.warning(profiles_changed_notice(profiles_shown, profiles_version))
     # hint only, no check of the input (user decision on E3: English search terms only);
     # one box with the call to action on an empty list (review)
     st.info(('Create a search profile first. ' if not profiles else '') +

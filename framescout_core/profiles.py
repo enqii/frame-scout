@@ -218,6 +218,22 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
     return _version_of(data)
 
 
+def profiles_changed_notice(shown, current):
+    """Return the notice for a page whose profiles file changed since it showed it, or None (A31).
+
+    shown: the version (read_profiles_versioned) the profile forms of the last complete
+    page showed; current: the version read now. If another tab, session or a text editor
+    changed the file in between, e.g. deleted a profile, a click on a form the page no
+    longer shows is not delivered by Streamlit at all; the notice says so instead of the
+    page dropping it silently.
+    """
+    if shown == current:
+        return None
+    return ('The search profiles were changed in another tab or session, or by hand, since this page showed '
+            'them; it now shows the current ones. A click on a profile that is no longer shown here was not '
+            'carried out: please check the profiles and repeat it if needed.')
+
+
 def _version_of(content):
     """The version of a profiles file's content (bytes, or None for a missing file)."""
     return None if content is None else hashlib.sha256(content).hexdigest()
