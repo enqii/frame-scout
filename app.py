@@ -26,7 +26,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
                              analyzed_photos, app_search_needs, downloaded_models, low_space, low_space_lines,
-                             known_throughput, remaining_text, start_summary,
+                             known_throughput, remaining_text, start_summary, check_installation,
                              hidden_text, hide_no_match, mark_style,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
@@ -1546,6 +1546,23 @@ with settings_tab:
         st.info('Recommendation: choose auto. A batch size of 8 is a conservative starting point; reduce it if memory runs short. Model weights are downloaded on the first run.')
     else:
         st.caption(f'System details could not be determined ({info_error}). Automatic device selection remains available.')
+    # F15: the read-only self-test of Check-FrameScout.bat; importing PyTorch in a subprocess
+    # takes a few seconds, so it runs only on the button
+    with st.expander('Check installation'):
+        st.caption('Checks the Python environment, the package versions, PyTorch (and the GPU for a CUDA build), '
+                   'whether .cache and results can be written, the downloaded model files and the free disk space. '
+                   'It changes nothing. Check-FrameScout.bat runs the same check when the app does not start.')
+        if st.button('Check installation'):
+            with st.spinner('Checking the installation ...'):
+                st.session_state['install_check'] = check_installation(BASE, dict(os.environ))
+        for result in st.session_state.get('install_check', []):
+            text = plain(f'{result.name}: {result.text}')
+            if result.ok is False:
+                st.error(text + (f'  \n**Fix:** {plain(result.fix)}' if result.fix else ''))
+            elif result.ok:
+                st.success(text)
+            else:
+                st.info(text)
 
 with run_tab:
     st.subheader('Start search')
