@@ -8,7 +8,8 @@ environment (.venv) belongs to this folder, the package versions equal constrain
 PyTorch imports (in a subprocess) and finds the GPU for a CUDA build, .cache and results can
 be written, which model files are downloaded and the free disk space, and names one fix per
 problem. Standard library only, so it also runs with the private Python (.python) when .venv
-does not work. Exit code 0 no problem found, 1 a problem found.
+does not work. Exit code 0 no problem found, 2 a problem found (1 and any other: the check
+itself failed).
 """
 import argparse
 import os
@@ -18,6 +19,9 @@ from pathlib import Path
 from framescout_core import check_installation, check_lines
 
 ROOT = Path(__file__).resolve().parent
+# not 1: Python exits with 1 on an uncaught exception, and Check-FrameScout.bat must tell a
+# check that found problems from a check that could not run (review)
+PROBLEMS_FOUND = 2
 
 
 def main(argv=None):
@@ -36,7 +40,7 @@ def main(argv=None):
         print(f'{problems} problem{"" if problems == 1 else "s"} found. The "Fix:" lines say what to do.')
     else:
         print('No problems found.')
-    return 1 if problems else 0
+    return PROBLEMS_FOUND if problems else 0
 
 
 if __name__ == '__main__':

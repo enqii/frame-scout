@@ -319,12 +319,14 @@ def test_check_lines_give_status_text_and_fix():
     assert lines == ['[OK]      A: fine', '[PROBLEM] B: broken', '          Fix: Do this.', '[INFO]    C: note']
 
 
-def test_check_script_prints_the_results_and_exits_1_on_a_problem(monkeypatch, capsys):
+def test_check_script_prints_the_results_and_exits_2_on_a_problem(monkeypatch, capsys):
+    # exit code 1 is Python's own for an uncaught exception: Check-FrameScout.bat tells the
+    # two apart (review)
     import framescout_check
     monkeypatch.setattr(framescout_check, 'check_installation',
                         lambda base, environ: [CheckResult('A', True, 'fine', ''),
                                                CheckResult('B', False, 'broken', 'Do this.')])
-    assert framescout_check.main([]) == 1
+    assert framescout_check.main([]) == framescout_check.PROBLEMS_FOUND == 2
     out = capsys.readouterr().out
     assert '[PROBLEM] B: broken' in out and '1 problem' in out
     monkeypatch.setattr(framescout_check, 'check_installation',
@@ -352,3 +354,6 @@ def test_check_bat_runs_the_check_script_without_writing_compiled_files():
     assert 'framescout_check.py' in text and '-B' in text
     assert 'setlocal enabledelayedexpansion' not in text.lower()
     assert all(ord(c) < 128 for c in text)
+    # a check that could not run (any exit code but 0 and PROBLEMS_FOUND) falls back to the
+    # private Python and then names the installer (review)
+    assert text.count('"%errorlevel%"=="2"') == 2 and 'goto failed' in text and ':failed' in text
