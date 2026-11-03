@@ -506,7 +506,8 @@ def report(name, result, k, weight, models):
                   f'images ({", ".join(result["sweep_profiles"])}); * = best per model', '']
         sweep = {model: result['sweep'].get(model, {}) for model in models}
         weights = list(next(iter(result['sweep'].values())))
-        best = {model: max((v['ap'] for v in row.values() if v['ap'] is not None), default=None)
+        # a tie at 0 (no weight finds a match) has no best weight (E47)
+        best = {model: max((v['ap'] for v in row.values() if v['ap'] is not None), default=None) or None
                 for model, row in sweep.items()}
         rows = []
         for w in weights:
@@ -514,7 +515,7 @@ def report(name, result, k, weight, models):
             for model in models:
                 entry = sweep[model].get(w)
                 row.append('n/a' if entry is None else cell(
-                    entry['ap'], entry['unlabelled'], '*' if entry['ap'] is not None and entry['ap'] == best[model] else ''))
+                    entry['ap'], entry['unlabelled'], '*' if best[model] is not None and entry['ap'] == best[model] else ''))
             rows.append(row)
         lines.append(table(['Weight'] + models, rows))
         unlabelled = unlabelled or any(v['unlabelled'] for row in sweep.values() for v in row.values())
