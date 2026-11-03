@@ -235,6 +235,28 @@ def test_the_status_file_is_json_with_a_format_version(tmp_path):
     assert data['format'] == 1
 
 
+def test_a_new_run_keeps_the_throughput_of_earlier_runs_but_not_their_rate(tmp_path):
+    # the run tab's duration before the start needs the speed of an earlier search, also
+    # after a search that analyzed nothing new (F12)
+    path = tmp_path / RUN_STATUS
+    record = {'signature': 's', 'device': 'cpu', 'per_minute': 30.0}
+    write_status(path, {'pid': 1, 'phase': 'finished', 'rate': 31.0, 'throughput': [record, 'broken'], 'done': 9})
+    StatusReporter(path, 2).update('starting')
+    StatusReporter(path, 3).update('scanning')  # the engine takes over the app's "starting"
+    status = read_status(path)
+    assert status['throughput'] == [record]
+    assert status['rate'] is None and status['done'] == 0 and status['pid'] == 3
+
+
+def test_a_first_run_or_an_unreadable_status_has_no_throughput(tmp_path):
+    path = tmp_path / RUN_STATUS
+    StatusReporter(path, 1).update('loading')
+    assert read_status(path)['throughput'] == []
+    path.write_text('{"broken', encoding='utf-8')
+    StatusReporter(path, 1).update('loading')
+    assert read_status(path)['throughput'] == []
+
+
 # --- run_active: is a search running in this output folder? ---
 
 def never(pid):
