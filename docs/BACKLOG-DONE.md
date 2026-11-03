@@ -1351,3 +1351,29 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       Compatibility: additive only. Tested with unit tests (`test_export.py`, `test_cleanup.py`;
       1073 passed, 2 skipped) and a headless `AppTest` of the section. Not tested: a real
       browser, the Excel import; follow-ups A41, A42.)
+- [x] `minor` **A31 – A click on a profile form that no longer exists is dropped silently:** if
+      another session shortened the profile list, a form submit or button of a form that
+      the page no longer shows is not delivered by Streamlit, and the app shows no
+      message (found in the PR of A13, not reproduced beyond the reading of the code).
+      Fix idea: tell the user when the profile list changed under an open page.
+      (done 2026-11-03 in PR #69: `framescout_core.profiles_changed_notice(shown, current)`; the profile tab warns when `profiles.json` changed since the page last showed the forms, unless a refused save (`profile_error`) already explains it. Compatibility: additive only. Tested with unit tests (`test_profile_file.py`); the warning on a page was not run in a browser.)
+- [x] `minor` **A32 – `update_backup_references` runs outside the lock of `profiles.json`:** after
+      a folder rename the paths in `profiles.json.bak` are rewritten without the
+      `profiles.json.lock` that `save_profiles` holds (A13), so it could in theory
+      rewrite a `.bak` that another session has just replaced with newer state. Probably
+      harmless (it only rewrites paths of the moved folder); not analysed. Found in the
+      PR of A13.
+      (done 2026-11-03 in PR #69: `update_backup_references` reads and rewrites `profiles.json.bak` under `profiles.json.lock` (`_file_lock`, `lock_timeout=PROFILES_LOCK_TIMEOUT`); `OSError` if the lock is not free in time, which the app already handles (old reference names kept, notice). Compatibility: optional parameter only. Tested with unit tests (`test_reference_move.py`).)
+- [x] `minor` **A37 – Photos found through a second path are dropped silently:** since A28/A29
+      `scan_each_folder` lists a photo reached through a link, another path or a hard link
+      once, under the first path, and neither the engine log nor the app's per-folder
+      count says how many were dropped, so the count can be lower than what a file manager
+      shows. Idea: count the duplicates in the scan (e.g. a field of `PhotoScan`) and add a
+      line like `skipped_lines` ("12 photos found again through another path, analyzed
+      once"). Review of PR #50, finding 5.
+      (done 2026-11-03 in PR #69: `PhotoScan` has the fields `found_again` and `folders_again` (default 0), counted by `scan_each_folder`, summed by `join_scans`; `skipped_lines` adds "N photos found again through another path ... analyzed once." and "N folders reached again through a link, searched once." to the engine log and the photo source tab. Compatibility: defaulted fields only. Tested with unit tests (`test_photos.py`).)
+- [x] `minor` **A39 – The model list shows a download size for cached models:** the app's
+      model list shows "605 MB download" for a model even when its weights are already in
+      the cache. Idea: look for the weights file in the cache folder and show "downloaded"
+      instead. Found in PR #56.
+      (done 2026-11-03 in PR #69: `model_label(key, downloaded=False)` and new `downloaded_models(...)` in `disk_space.py`; the app caches the set for 30 s and shows "downloaded" in the list and caption of cached models. Compatibility: optional parameters only. Tested with unit tests (`test_disk_space.py`, `test_models.py`); the model list on a page was not run in a browser.)
