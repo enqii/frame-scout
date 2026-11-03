@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import framescout_core
-from framescout_core import (finish_reference_move, save_profiles, stage_reference_move, undo_reference_move,
+from framescout_core import (RunLock, finish_reference_move, save_profiles, stage_reference_move, undo_reference_move,
                              update_backup_references)
 
 
@@ -232,6 +232,25 @@ def test_a_missing_backup_needs_no_update(project):
     _, staged = stage(project, ['references/red-car/reference-1.jpg'])
     assert update_backup_references(project / 'profiles.json', staged, project) is True
     assert not (project / 'profiles.json.bak').exists()
+
+
+def test_the_backup_is_rewritten_under_the_lock_of_the_profiles_file(project):
+    # A32: another session's save_profiles replaces the .bak under profiles.json.lock; the
+    # rewrite waits for that lock, so it never replaces a newer backup with an older state
+    previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}]}
+    path, staged = rename_red_car(project, previous)
+    before = (project / 'profiles.json.bak').read_bytes()
+    lock = RunLock(project / 'profiles.json.lock')
+    assert lock.acquire()
+    try:
+        with pytest.raises(OSError):
+            update_backup_references(path, staged, project, lock_timeout=0.05)
+    finally:
+        lock.release()
+    assert (project / 'profiles.json.bak').read_bytes() == before
+    assert update_backup_references(path, staged, project, lock_timeout=0.05) is True
+    backup = json.loads((project / 'profiles.json.bak').read_text(encoding='utf-8'))
+    assert backup['profiles'][0]['reference_images'] == ['references/blue-car/reference-1.jpg']
 
 
 def test_a_failed_backup_rewrite_raises_and_keeps_the_old_backup(project, monkeypatch):
