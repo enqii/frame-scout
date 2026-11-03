@@ -170,7 +170,8 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
 
     Each PhotoScan counts what was left out as found before (A37), for the folder it was
     reached through again: found_again, the photos found again by another path, and
-    folders_again, the folder links into a folder already walked (also a loop).
+    folders_again, the folder links into a folder already walked (also a loop); a folder
+    listed twice or inside another listed one is not counted (see distinct_folders).
     """
     exclude_path = None if exclude is None else Path(exclude)
     exclude_id = None if exclude is None else _identity(exclude)
@@ -187,10 +188,12 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
         return (folder == exclude_path or exclude_path in folder.parents
                 or (exclude_id is not None and identity == exclude_id))
 
-    def walk(index, folder):
+    def walk(index, folder, via_link):
         identity = _identity(folder) or _real_path_key(folder)
         if identity in seen_folders:
-            folders_again[index] += 1
+            # only a link is counted: a folder listed twice or inside another listed one is
+            # distinct_folders' case (A25), which the app and the engine name themselves (review)
+            folders_again[index] += via_link
             return
         if excluded(folder, identity):
             return
@@ -222,7 +225,7 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
                     found[index].append(path)
 
     while real or links:
-        walk(*(real.popleft() if real else links.popleft()))
+        walk(*(real.popleft() + (False,) if real else links.popleft() + (True,)))
     scans = []
     for paths, counts, again, folders_seen in zip(found, unsupported, found_again, folders_again):
         photos, pairs = _shot_pairs(paths)
