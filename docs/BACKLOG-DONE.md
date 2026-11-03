@@ -1396,3 +1396,15 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       profile, settings or cache signature change. Tested with unit tests (`test_estimate.py`,
       `test_run_status.py`) and a headless `AppTest` of the run tab summary. Not tested: the live
       engine estimate on a real run, a real browser; follow-ups F16, A44.)
+- [x] **F15 – "Check installation" self-test:** after a Windows update, a moved folder
+      or an interrupted install, users see a traceback in `run.log` and do not know whether to
+      reinstall. Sketch: `Check-FrameScout.bat` (and an expander in "AI settings") runs a
+      read-only check: `.python` and `.venv` belong to this folder, package versions equal
+      `constraints.txt` (`importlib.metadata`), torch imports and reports CUDA for a CUDA install,
+      `.cache/` and `results/` are writable, which model weights are cached, free disk space;
+      one plain sentence with the fix per problem. Affected: a small script or `framescout_core`
+      module (standard library, tested with fake metadata), a `.bat`, `app.py`, user guide
+      (troubleshooting), `docs/DEVELOPMENT.md`. Risks: never write, download or "repair"; importing
+      torch takes seconds and can crash on a broken install, so run it in a subprocess. No hold
+      point. Size S–M.
+      (done 2026-11-03 in PR #72: new Check-FrameScout.bat and ramescout_check.py (exit code 0 no problem, 1 a problem found) plus the expander "Check installation" in the AI settings tab, both on the new module ramescout_core/install_check.py. Read-only: it checks that .venv belongs to this folder, the installed packages against equirements.txt and constraints.txt (importlib.metadata, PyTorch in any build), that torch imports in a subprocess (and finds a GPU for a CUDA build), that .cache and esults can be written (a temporary file is created and deleted), the downloaded models (information) and the free disk space (problem below 1 GB), with one plain fix per problem. The .bat falls back to the private Python in .python when .venv does not start. equirement_names moved from install_torch.py into the core module. Compatibility: new files only. Tested with unit tests (	est_install_check.py, fake metadata, folders and subprocess), a real run of ramescout_check.py without .venv and of check_installation against another checkout, and a headless Streamlit AppTest of the expander. Not tested: the CUDA branch on a real GPU, Check-FrameScout.bat by double-click, the .python fallback of the .bat.)

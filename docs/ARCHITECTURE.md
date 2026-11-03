@@ -75,7 +75,10 @@ search from `results/results.json` (P4 (A), A12: thumbnail grid, 48 per page,
 download, a note for profiles changed since; results folders without the file list their
 HTML files by name) with a three-state mark per photo (Undecided / Match / No match, saved
 in `results/marks.json`), "Hide photos marked as no match" and copying of a profile's
-matches to a folder (A17); below it the expander "Clean up storage" (E7).
+matches to a folder (A17); below it the expander "Clean up storage" (E7). The AI settings tab ends
+with the expander "Check installation" (F15): a button runs `check_installation(BASE, os.environ)`
+(importing torch takes seconds, so never automatically) and shows each result as error with
+"Fix:", success or information; the results stay in `st.session_state['install_check']`.
 
 ### `framescout_engine.py`
 
@@ -286,6 +289,25 @@ the module of its area and to the re-exports in `__init__.py`.
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
   the installer downloads into `.python`; constants only, checked against the `.bat` by
   `tests/test_installer.py`).
+- `install_check.py` (F15): the read-only installation self-test. `CheckResult(name, ok, text,
+  fix)` (`ok` True, False or None = information); `check_environment(base)` (`.venv/pyvenv.cfg`
+  `home` is this folder's `.python` or an installed Python of an older installer; a problem if
+  that Python is missing (moved folder or deleted Python: the installer repairs it) or is the
+  `.python` of another folder (copied or moved folder: delete `.venv`, run the installer, which
+  keeps a working `.venv`)); `check_packages` (installed metadata of `.venv`'s site-packages via
+  `importlib.metadata.distributions(path=...)`: every package of `requirements.txt` installed,
+  every installed package that `constraints.txt` pins in the pinned version, torch/torchvision
+  with any build label; a pin of a package that is not installed is no problem unless
+  `requirements.txt` names it); `check_torch` (imports torch in a subprocess of `.venv`'s Python
+  with `-B`, `TORCH_CHECK_TIMEOUT` 180 s and the engine's cache variables; a CUDA build that
+  finds no GPU is a problem with the `cuda_hint`); `check_writable` (`.cache` and `results`, or
+  the nearest existing parent; creates and deletes a temporary file, writes nothing else);
+  `check_models` (information: `downloaded_models`, `find_yolo_weights`); `check_disk_space`
+  (a problem below `SPACE_RESERVE`, 1 GB, on the drive of the folder); `check_installation`
+  (all of them; packages and PyTorch are information "Not checked" when `.venv` has no Python or
+  the environment check failed, so a broken environment counts once); `check_lines` (CLI text);
+  `requirement_names` (moved here from `install_torch.py`, which imports it). Standard library
+  only.
 - `uninstall.py` (P5):
   `UNINSTALL_ITEMS`/`UNINSTALL_KEEP`/`UNINSTALL_FIRST`/`USER_DATA`/`ENVIRONMENT_PROGRAMS`/`UninstallItem`/`PRIVATE_PYTHON_EXIT_CODE`/`running_python`/`protected_folders`/`uninstall_plan`/`user_data`/`outside_leftovers`/`search_running`/`programs_in_use`/`remove_items`
   (what the uninstall script deletes, keeps and only reports; standard library only.
@@ -472,6 +494,15 @@ not installed.") and exits with `STOPPED_EXIT_CODE` 3; the `.bat` checks `errorl
 before `errorlevel 1` and says "Installation stopped. Free some disk space, then run
 Install-FrameScout.bat again." instead of "Installing PyTorch failed" (review). Exit code 0
 done, 1 failed, 3 stopped by the user on low disk space. Standard library only.
+
+### `Check-FrameScout.bat` and `framescout_check.py`
+
+`Check-FrameScout.bat` (F15) runs `framescout_check.py` with `.venv`'s Python if it starts
+(`-I -c "import sys"`), otherwise with the private Python in `.python` (the check is standard
+library only), otherwise it says to run `Install-FrameScout.bat`. The check runs with `-B -E -s`,
+so it writes no compiled files and reads no user site. `framescout_check.py` calls
+`check_installation(ROOT, os.environ)`, prints `check_lines` and a summary; exit code 0 no
+problem, 1 at least one problem. It never writes, downloads or repairs.
 
 ### `Uninstall-FrameScout.bat` and `framescout_uninstall.py`
 
@@ -1529,7 +1560,7 @@ and joined folders, and the deferred decision (`raw_fallbacks`, `RawFallback`, E
 `test_photos.py`; the engine side of the fallback is not runtime-tested),
 the identity-based dedup and link-safe scan, including the output folder as or inside a
 listed folder, repeated file ids, link loops without file ids and an unreadable path (A28,
-A29, `test_photos.py`), the counts of photos and folders found again (A37), the backup rewrite under the lock (A32, `test_reference_move.py`, `test_profile_file.py` with `profiles_changed_notice`, A31) and `downloaded_models` (A39, `test_disk_space.py`, `test_models.py`; the app side of A31/A39 was not run), the time estimate (F12: `AnalysisRate` window and thresholds, `duration_text` rounding, `remaining_text` (also its stale-status cut-off), throughput records with `run_throughput` (a short run keeps a longer run's record) and `start_summary` (also without photos) in `test_estimate.py`; the carry-over of `throughput` between status files in `test_run_status.py`; the run tab summary was checked with Streamlit `AppTest` only, the engine side and the live "time left" are not runtime-tested),
+A29, `test_photos.py`), the counts of photos and folders found again (A37), the backup rewrite under the lock (A32, `test_reference_move.py`, `test_profile_file.py` with `profiles_changed_notice`, A31) and `downloaded_models` (A39, `test_disk_space.py`, `test_models.py`; the app side of A31/A39 was not run), the installation self-test (F15, `test_install_check.py`: environment cases from `pyvenv.cfg`, pins and requirements with fake metadata, the torch probe with a fake subprocess (CPU, CUDA without a GPU, timeout, crash), writability and disk space with fake folders and usage, the combined result and its "not checked" cases; not run: the CUDA branch on a real GPU and `Check-FrameScout.bat` by double-click), the time estimate (F12: `AnalysisRate` window and thresholds, `duration_text` rounding, `remaining_text` (also its stale-status cut-off), throughput records with `run_throughput` (a short run keeps a longer run's record) and `start_summary` (also without photos) in `test_estimate.py`; the carry-over of `throughput` between status files in `test_run_status.py`; the run tab summary was checked with Streamlit `AppTest` only, the engine side and the live "time left" are not runtime-tested),
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
 hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the

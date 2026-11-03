@@ -22,6 +22,34 @@ delete `.python` and run it once more.
 When you update from a ZIP, extract it into a fresh folder instead of over an old one,
 so no files of earlier versions stay behind.
 
+### Checking the installation
+
+If the app does not start or a search fails after a Windows update, a moved or copied
+folder or an interrupted installation, double-click `Check-FrameScout.bat`, or open
+AI settings → "Check installation" when the app runs. The check changes nothing, installs
+nothing and downloads nothing (it only creates and deletes a small temporary file in
+`.cache` and `results` to see whether they can be written). It reports, with one sentence
+of what to do for each problem:
+
+- **Python environment:** `.venv` belongs to this folder and its Python still exists. After
+  a moved or copied folder, delete `.venv` and run `Install-FrameScout.bat`; if the Python is
+  missing, run the installer, which repairs it.
+- **Packages:** all packages of `requirements.txt` are installed, in the versions of
+  `constraints.txt` (PyTorch in any build).
+- **PyTorch:** it imports (this can take several seconds); an installation with GPU support
+  that finds no usable GPU is reported with the hint to update the driver or to run
+  `Install-FrameScout.bat cpu`.
+- **Writable folders:** `.cache` and `results`.
+- **Downloaded files (information only):** the search models and the person detection
+  weights that are already downloaded.
+- **Free disk space:** a problem below 1 GB on the drive of the FrameScout folder.
+
+`Check-FrameScout.bat` uses the Python of `.venv`, or the private Python in `.python` if
+`.venv` does not work, so it can also say why the environment is broken. If neither exists,
+it tells you to run `Install-FrameScout.bat`. A package version that differs from
+`constraints.txt` is a problem only because the verified versions are the tested ones; the
+app may still work.
+
 ### GPU support (NVIDIA, CUDA)
 
 If the installer finds an NVIDIA graphics driver (`nvidia-smi`), it asks whether to
@@ -130,6 +158,8 @@ asking the Hugging Face Hub; missing files are downloaded with a note. Set
 - **Person detection:** finds people with YOLO11n and compares each person separately,
   which helps with group photos. Turn it off for other motifs: JPEGs are then decoded
   at a reduced resolution, which is noticeably faster.
+- **Check installation:** an expander at the end of the tab that runs the check of
+  [Checking the installation](#checking-the-installation) and shows each result.
 - **Weight of the reference images:** see [What the numbers mean](#what-the-numbers-mean).
 - **Defaults:** the help text of each setting ends with its default, and a line below the
   settings lists the ones you changed. "Reset to defaults" (disabled while a search runs)

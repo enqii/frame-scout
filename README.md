@@ -35,6 +35,9 @@ shows them as a gallery.
    when the free disk space looks too low.
 
 Do not move or rename the folder afterwards; if you did, run the installer again.
+If something does not work after a Windows update, a move or an interrupted installation,
+double-click `Check-FrameScout.bat`: it checks the installation, changes nothing and names
+a fix per problem.
 Details, GPU support and updating: [user guide](docs/USER-GUIDE.md#installation-details).
 
 ## Quick start

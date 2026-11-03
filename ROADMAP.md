@@ -21,7 +21,7 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
 
 ### P15 – Orientation during runs (added 2026-11-03)
 - [x] (A) Remaining-time estimate and a summary before the start (F12)
-- [ ] (B) "Check installation" self-test (F15)
+- [x] (B) "Check installation" self-test (F15)
 
 ### P16 – Hygiene (`minor` items bundled per area, added 2026-11-03)
 - [ ] (A) Evaluation tool: E36, E49, E51, I25
