@@ -16,6 +16,9 @@ RATE_MIN_PHOTOS = 16
 RATE_MIN_SECONDS = 60
 # throughput records kept in the status file (newest first)
 THROUGHPUT_KEPT = 8
+# a run replaces the stored speed of its settings and device only after measuring this
+# many seconds: a search stopped after a minute is a poor sample of a whole analysis
+THROUGHPUT_MIN_SECONDS = RATE_WINDOW
 
 
 def _rate(first, last):
@@ -58,6 +61,10 @@ class AnalysisRate:
 
     def overall(self):
         return None if self.first is None else _rate(self.first, self.samples[-1])
+
+    def seconds(self):
+        """Seconds measured since the first sample."""
+        return 0.0 if self.first is None else self.samples[-1][0] - self.first[0]
 
 
 def _positive(value):
@@ -120,6 +127,22 @@ def remember_throughput(records, signature, device, per_minute):
     """Return records with the speed per_minute of signature and device first, replacing an older one of them."""
     kept = [r for r in stored_throughput(records) if (r['signature'], r['device']) != (signature, device)]
     return [{'signature': signature, 'device': device, 'per_minute': per_minute}, *kept][:THROUGHPUT_KEPT]
+
+
+def run_throughput(records, signature, device, speed):
+    """Return records with the speed of this run (speed: its AnalysisRate), or None to keep them as they are.
+
+    The first speed measured for signature and device is stored at once; an earlier record
+    of them is replaced only once the run measured THROUGHPUT_MIN_SECONDS, so a search
+    stopped after its first minute keeps the speed of an earlier, longer analysis (review).
+    """
+    per_minute = speed.overall()
+    if per_minute is None:
+        return None
+    known = any((r['signature'], r['device']) == (signature, device) for r in stored_throughput(records))
+    if known and speed.seconds() < THROUGHPUT_MIN_SECONDS:
+        return None
+    return remember_throughput(records, signature, device, per_minute)
 
 
 def known_throughput(status, signature, device):

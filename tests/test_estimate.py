@@ -1,9 +1,9 @@
 """The remaining-time estimate of a search and the summary before its start (F12)."""
 import pytest
 
-from framescout_core import (RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_WINDOW, THROUGHPUT_KEPT, AnalysisRate,
-                             duration_text, known_throughput, remaining_text, remember_throughput, start_summary,
-                             stored_throughput)
+from framescout_core import (RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_WINDOW, THROUGHPUT_KEPT,
+                             THROUGHPUT_MIN_SECONDS, AnalysisRate, duration_text, known_throughput, remaining_text,
+                             remember_throughput, run_throughput, start_summary, stored_throughput)
 
 
 # --- AnalysisRate: photos per minute of the analysis, measured in the engine ---
@@ -122,6 +122,36 @@ def test_remember_throughput_keeps_a_few_records_and_does_not_change_its_input()
     before = list(records)
     remember_throughput(records, 'new', 'cpu', 1.0)
     assert records == before
+
+
+def measured(seconds, per_minute=60.0):
+    rate = AnalysisRate()
+    rate.add(0, 0.0)
+    rate.add(int(per_minute * seconds / 60), float(seconds))
+    return rate
+
+
+def test_run_throughput_waits_for_a_measurement():
+    assert run_throughput([], 's', 'cpu', AnalysisRate()) is None
+    assert run_throughput([], 's', 'cpu', measured(RATE_MIN_SECONDS - 1)) is None
+
+
+def test_run_throughput_stores_the_first_speed_of_its_settings_at_once():
+    records = run_throughput([{'signature': 'other', 'device': 'cpu', 'per_minute': 5.0}], 's', 'cpu',
+                             measured(RATE_MIN_SECONDS))
+    assert records[0] == {'signature': 's', 'device': 'cpu', 'per_minute': pytest.approx(60.0)}
+    assert len(records) == 2
+
+
+def test_a_short_run_does_not_replace_the_speed_of_a_longer_one():
+    # a search stopped after its first minute measured too little to replace the record
+    # of a whole earlier analysis (review)
+    earlier = [{'signature': 's', 'device': 'cpu', 'per_minute': 30.0}]
+    assert run_throughput(earlier, 's', 'cpu', measured(THROUGHPUT_MIN_SECONDS - 1)) is None
+    records = run_throughput(earlier, 's', 'cpu', measured(THROUGHPUT_MIN_SECONDS))
+    assert records == [{'signature': 's', 'device': 'cpu', 'per_minute': pytest.approx(60.0)}]
+    # the record of another device does not count as one of these settings
+    assert run_throughput(earlier, 's', 'cuda', measured(RATE_MIN_SECONDS))[0]['device'] == 'cuda'
 
 
 def test_stored_throughput_drops_what_is_not_a_record():
