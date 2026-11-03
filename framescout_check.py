@@ -22,6 +22,10 @@ ROOT = Path(__file__).resolve().parent
 
 def main(argv=None):
     argparse.ArgumentParser(description='Check the FrameScout installation in this folder (read-only).').parse_args(argv)
+    # output redirected to a file or pipe uses the ANSI code page on Windows: a path with
+    # characters outside it is printed with "?" instead of ending the check (review)
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(errors='replace')
     print(f'Checking the FrameScout installation in {ROOT} ...', flush=True)
     results = check_installation(ROOT, dict(os.environ))
     for line in check_lines(results):
