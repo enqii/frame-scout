@@ -558,6 +558,16 @@ def test_scan_counts_the_folders_reached_again_through_a_link(tmp_path):
     assert scan_photos(tmp_path / 'other').folders_again == 0
 
 
+def test_scan_counts_no_folder_again_for_listed_folders_given_twice_or_nested(tmp_path):
+    # review of A37: only a link is named "reached again through a link"; a folder listed
+    # twice or inside another listed one is distinct_folders' case (A25), not this count's
+    (tmp_path / 'event' / 'day-1').mkdir(parents=True)
+    (tmp_path / 'event' / 'day-1' / 'a.jpg').write_bytes(b'x')
+    scans = scan_each_folder([tmp_path / 'event', tmp_path / 'event', tmp_path / 'event' / 'day-1'])
+    assert sum(len(s.paths) for s in scans) == 1
+    assert [s.folders_again for s in scans] == [0, 0, 0]
+
+
 def test_join_scans_adds_up_what_was_found_again():
     a = PhotoScan([], [], collections.Counter(), found_again=2, folders_again=1)
     b = PhotoScan([], [], collections.Counter(), found_again=3)
