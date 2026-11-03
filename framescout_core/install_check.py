@@ -171,18 +171,21 @@ def check_packages(site_packages, constraints_text, requirements_text):
                         f'{REINSTALL} It installs the versions of constraints.txt.')]
 
 
-def check_torch(python, environ, torch_version, run=subprocess.run, timeout=TORCH_CHECK_TIMEOUT):
+def check_torch(python, environ, torch_version, run=subprocess.run, timeout=TORCH_CHECK_TIMEOUT, cwd=None):
     """Import PyTorch with the environment's python in a subprocess; for a CUDA build, check that it finds a GPU.
 
     torch_version is the installed version from the package metadata (None: not installed,
-    nothing is run); environ the environment of the subprocess; run is subprocess.run.
+    nothing is run); environ the environment of the subprocess; run is subprocess.run; cwd
+    its working folder. The import sees the sys.path the engine gets: with cwd the FrameScout
+    folder, the first entry is that folder, as for the engine script, and environ is the
+    engine's environment; no -I, since a PYTHONPATH that breaks PyTorch breaks the engine too.
     """
     name = 'PyTorch'
     if torch_version is None:
         return [CheckResult(name, False, 'PyTorch is not installed.', REINSTALL)]
     try:
         result = run([str(python), '-B', '-c', TORCH_PROBE], capture_output=True, text=True, env=environ,
-                     timeout=timeout)
+                     timeout=timeout, cwd=None if cwd is None else str(cwd))
     except subprocess.TimeoutExpired:
         return [CheckResult(name, False, f'Importing PyTorch did not finish within {timeout} seconds.', REINSTALL)]
     except OSError as exc:
@@ -288,7 +291,7 @@ def check_installation(base, environ, run=subprocess.run):
     if results[0].ok:
         torch = installed_versions(site).get('torch')
         env = {**environ, **{key: str(path) for key, path in cache_paths(base).items()}}
-        results += check_torch(venv_python(base), env, torch, run=run)
+        results += check_torch(venv_python(base), env, torch, run=run, cwd=base)
     else:
         results.append(CheckResult('PyTorch', None, 'Not checked, since the Python environment does not work.', ''))
     results += check_writable(base / CACHE_DIR, CACHE_DIR)
