@@ -61,13 +61,18 @@ def _model(key):
         raise ValueError(f'Unknown search model {key!r}; known: {", ".join(MODEL_KEYS)}') from None
 
 
-def model_label(key):
-    """Return the label of the app's model choice, e.g. "ViT-B/16 · DataComp-XL (~4× slower on a CPU; ...)"."""
+def model_label(key, downloaded=False):
+    """Return the label of the app's model choice, e.g. "ViT-B/16 · DataComp-XL (~4× slower on a CPU; ...)".
+
+    downloaded: the model's files are in the cache already (hub.model_cached), so the label
+    says "downloaded" instead of the size of the first-use download (A39).
+    """
     model = _model(key)
+    download = 'downloaded' if downloaded else f'{model.download} download'
     if key == DEFAULT_MODEL:
-        return f'{model.label} (default, fastest; {model.download} download)'
+        return f'{model.label} (default, fastest; {download})'
     note = '' if model.evaluated else '; not evaluated'
-    return f'{model.label} ({model.cpu_factor} slower on a CPU; {model.download} download{note})'
+    return f'{model.label} ({model.cpu_factor} slower on a CPU; {download}{note})'
 
 
 def results_model(settings):

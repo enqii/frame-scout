@@ -8,7 +8,8 @@ import pytest
 
 from framescout_core import disk_space
 from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, OTHER_PACKAGES_SPACE, SPACE_RESERVE, THUMBNAIL_BYTES,
-                             TORCH_INSTALL_SPACE, LowSpace, analyzed_photos, app_search_needs, download_bytes, low_space, low_space_lines,
+                             TORCH_INSTALL_SPACE, LowSpace, analyzed_photos, app_search_needs, download_bytes,
+                             downloaded_models, low_space, low_space_lines,
                              search_space_bytes, search_space_needs, torch_install_needs)
 
 MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text (review)
@@ -146,6 +147,39 @@ def test_app_search_needs_use_the_folders_the_app_gives_the_engine(tmp_path):
     (base / 'yolo11n.pt').unlink()
     assert app_search_needs(base, results, environ, 100, 150, 2, model, False)[1:] == [
         (tmp_path / 'hub', download_bytes(model.download))]
+
+
+def cache_weights(hub, repo):
+    """Put the weights file of the Hub repo into the hub cache folder hub, as huggingface_hub does."""
+    folder = hub / ('models--' + repo.replace('/', '--'))
+    (folder / 'refs').mkdir(parents=True)
+    (folder / 'refs' / 'main').write_text('abc', encoding='utf-8')
+    (folder / 'snapshots' / 'abc').mkdir(parents=True)
+    (folder / 'snapshots' / 'abc' / 'open_clip_model.safetensors').write_bytes(b'x')
+
+
+def test_downloaded_models_look_in_the_cache_the_app_gives_the_engine(tmp_path):
+    # A39: the model list says "downloaded" for the models whose files are in that cache
+    base = tmp_path / 'project'
+    base.mkdir()
+    assert downloaded_models(base, {}) == set()
+    cache_weights(base / '.cache' / 'huggingface' / 'hub', MODELS['vit-b-32-openai'].weights_repo)
+    # SigLIP needs its tokenizer files too
+    cache_weights(base / '.cache' / 'huggingface' / 'hub', MODELS['vit-b-16-siglip'].weights_repo)
+    assert downloaded_models(base, {'HF_HOME': str(tmp_path / 'own')}) == {'vit-b-32-openai'}
+    # a HF_HUB_CACHE of the user is kept, as for the engine
+    hub = tmp_path / 'hub'
+    cache_weights(hub, MODELS['vit-l-14-datacomp'].weights_repo)
+    assert downloaded_models(base, {'HF_HUB_CACHE': str(hub)}) == {'vit-l-14-datacomp'}
+
+
+def test_downloaded_models_do_not_read_a_cache_that_does_not_answer(tmp_path, monkeypatch):
+    # a disconnected network share in HF_HUB_CACHE must not freeze the page: no model counts as downloaded
+    def never_read(*args):
+        raise AssertionError('must not read the hub cache')
+    monkeypatch.setattr(disk_space, 'model_cached', never_read)
+    assert downloaded_models(tmp_path, {'HF_HUB_CACHE': str(tmp_path / 'hub')},
+                             reachable=lambda roots, timeout: dict.fromkeys(roots, False)) == set()
 
 
 def test_torch_install_needs_per_build(tmp_path):

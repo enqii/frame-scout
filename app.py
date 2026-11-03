@@ -25,7 +25,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
-                             analyzed_photos, app_search_needs, low_space, low_space_lines,
+                             analyzed_photos, app_search_needs, downloaded_models, low_space, low_space_lines,
                              hidden_text, hide_no_match, mark_style,
                              profile_fingerprints, profile_state, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
@@ -1144,6 +1144,14 @@ def low_space_warning(photos, top, profile_count, model, person_detection, analy
             'search fail or leave a model download or the cache incomplete. Free some disk space or lower "'
             + AI_LABELS['top'] + '". You can still start the search.')
 
+@st.cache_data(show_spinner=False, max_entries=1, ttl=LOW_SPACE_TTL)
+def models_downloaded():
+    """The keys of the search models whose files are downloaded already (A39), asked again after LOW_SPACE_TTL."""
+    try:
+        return downloaded_models(BASE, dict(os.environ))
+    except (OSError, ValueError):
+        return set()
+
 st.title('🔎 FrameScout')
 st.caption('Local AI search in large photo collections · your images stay on your computer')
 
@@ -1443,7 +1451,10 @@ with settings_tab:
         info, info_error = None, exc
     # E22: the registry keys, the default first; the labels name the CPU factor, the download
     # and whether the model is evaluated
-    st.selectbox(AI_LABELS['model'], MODEL_KEYS, format_func=model_label, key=setting_key('model'), disabled=active,
+    # A39: a model already in the cache shows "downloaded" instead of its download size
+    downloaded = models_downloaded()
+    st.selectbox(AI_LABELS['model'], MODEL_KEYS, format_func=lambda key: model_label(key, key in downloaded),
+                 key=setting_key('model'), disabled=active,
                  help=default_help('model', 'The AI model that compares your search texts and reference images '
                                             'with the photos.'))
     chosen_model = MODELS[settings['model']]
@@ -1451,8 +1462,9 @@ with settings_tab:
         st.caption("The default search model: the fastest one, and the one FrameScout's settings were tuned for.")
     else:
         st.caption(f'{chosen_model.label} takes about {chosen_model.cpu_factor.lstrip("~")} as long as the default '
-                   'to analyze a photo on a CPU (not measured on a GPU) and downloads '
-                   f'{chosen_model.download} the first time it is used. '
+                   'to analyze a photo on a CPU (not measured on a GPU) and '
+                   + ('is downloaded already. ' if settings['model'] in downloaded else
+                      f'downloads {chosen_model.download} the first time it is used. ')
                    + ('' if chosen_model.evaluated else
                       "It is not evaluated on FrameScout's searches yet: its results may be better or worse than "
                       "the default's, and the default weight of reference images was tuned for the default."))

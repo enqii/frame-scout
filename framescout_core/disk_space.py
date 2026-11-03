@@ -15,6 +15,7 @@ from typing import NamedTuple
 from .cache_dirs import cache_paths, find_yolo_weights
 from .cleanup import _reachable_roots, _read_only_uri, _root_of, size_text
 from .hub import hub_cache_dir, model_cached
+from .models import MODELS
 from .signature import DEFAULT_YOLO_MODEL
 
 # in the units size_text shows them in (and Windows Explorer shows free space in): a "GB"
@@ -127,13 +128,31 @@ def app_search_needs(base, results, environ, photos, top, profiles, model, perso
     HF_HUB_CACHE of the user is kept) and the person detector's weights are looked up as
     yolo_weights does (find_yolo_weights); person_detection False needs no weights.
     """
-    environ = {**environ, **{name: str(path) for name, path in cache_paths(base).items()}}
+    environ = _engine_environ(base, environ)
     weights = None
     if person_detection:
         found, cached = find_yolo_weights(DEFAULT_YOLO_MODEL, base, base, environ)
         weights = found or cached
     return search_space_needs(results, photos, top, profiles, model, hub_cache_dir(environ), weights, analyzed,
                               timeout, reachable)
+
+
+def _engine_environ(base, environ):
+    """environ with the cache variables cache_env sets for the engine the app runs (cache_paths(base))."""
+    return {**environ, **{name: str(path) for name, path in cache_paths(base).items()}}
+
+
+def downloaded_models(base, environ, timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
+    """Return the keys of the MODELS whose files are in the Hugging Face cache the app's engine loads from (A39).
+
+    That cache is found as in app_search_needs. If its drive does not answer within timeout
+    seconds (reachable: cleanup's root probe), it is not read and no model counts as
+    downloaded, so the app's model list names the download sizes as before.
+    """
+    hub_cache = hub_cache_dir(_engine_environ(base, environ))
+    if not _reachable([hub_cache], timeout, reachable)[hub_cache]:
+        return set()
+    return {key for key, model in MODELS.items() if model_cached(model, hub_cache)}
 
 
 def torch_install_needs(build, venv, temp, torch=True):
