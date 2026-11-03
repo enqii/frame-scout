@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_YOLO_MODEL, ENGINE, MARKS_FILE, RESULTS_FILE, RUN_LOCK, RUN_STATUS,
-                             RunLock, auto_cleanup, clean_up, cleanup_summary_text, engine_id, feature_signature,
-                             prepare_cache,
+from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_YOLO_MODEL, ENGINE, EXPORTS_DIR, MARKS_FILE, RESULTS_FILE,
+                             RUN_LOCK, RUN_STATUS, RunLock, auto_cleanup, clean_up, cleanup_summary_text, engine_id,
+                             export_result_list, feature_signature, prepare_cache,
                              publish_export, result_card, results_document, save_profiles, scan_cleanup, size_text)
 
 CURRENT = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL)
@@ -661,6 +661,8 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
     project.thumb(T2)
     project.thumb(T3, project.legacy)
     temp_thumbnail(project.thumbs, T4)
+    # exported result lists are the user's files, also those of a deleted profile (F5)
+    exports = export_result_list(project.results, 'cat', [card(T2)], {})
     photo = project.photo('a.jpg')
     project.cache([(photo, CURRENT), (photo, OLD), (photo, OTHER), (project.photos / 'gone.jpg', CURRENT)])
     # the only mark is unbound: the entry goes, the file stays
@@ -679,7 +681,9 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
     assert summary['temporary'] == 1  # the temporary thumbnail, counted like in auto_cleanup
     assert (project.base / 'settings.json').exists() and project.profiles.exists()
     assert sorted(p.name for p in project.results.iterdir()) == sorted(
-        [*keep, 'marks.json.bak', CACHE_FILE, 'red-car.html', 'thumbnails'])
+        [*keep, 'marks.json.bak', CACHE_FILE, 'red-car.html', 'thumbnails', EXPORTS_DIR])
+    assert all(path.exists() for path in exports)
+    assert auto_cleanup(project.results)['files'] == 0 and all(path.exists() for path in exports)
     assert [p.name for p in project.thumbs.iterdir()] == [T1]
     assert not project.legacy.exists()  # emptied, and no kept gallery links it
     assert project.rows() == [(str(photo), CURRENT)]
