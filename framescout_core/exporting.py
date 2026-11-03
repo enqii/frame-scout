@@ -46,6 +46,11 @@ def export_csv(cards, marks):
 
     marks as for export_cards; None leaves the mark column empty. Comma-separated with
     "\\r\\n" line ends and a "." as decimal point (RFC 4180), quoted where needed.
+    Cells are written unchanged, without a guard against spreadsheet formulas: the engine
+    writes absolute paths (a drive letter, "\\\\" or "/" first) and the fixed crop labels
+    "Full image" / "Person N", so no text cell starts with "=", "+", "-" or "@"; a score
+    may start with "-" and must stay a number, and a "'" before a path would change the
+    path for a cataloging program.
     """
     out = io.StringIO(newline='')
     writer = csv.writer(out)
