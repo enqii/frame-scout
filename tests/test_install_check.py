@@ -333,6 +333,20 @@ def test_check_script_prints_the_results_and_exits_1_on_a_problem(monkeypatch, c
     assert 'No problems found' in capsys.readouterr().out
 
 
+def test_check_script_prints_characters_the_output_encoding_lacks(monkeypatch):
+    # redirected output on Windows uses the ANSI code page: a folder name outside it must
+    # not end the check with a UnicodeEncodeError (review)
+    import io
+    import framescout_check
+    buffer = io.BytesIO()
+    monkeypatch.setattr(framescout_check.sys, 'stdout', io.TextIOWrapper(buffer, encoding='cp1252'))
+    monkeypatch.setattr(framescout_check, 'check_installation',
+                        lambda base, environ: [CheckResult('A', False, 'C:\\写真 cannot be written', 'Do this.')])
+    assert framescout_check.main([]) != 0
+    framescout_check.sys.stdout.flush()
+    assert b'[PROBLEM] A: C:\\?? cannot be written' in buffer.getvalue()
+
+
 def test_check_bat_runs_the_check_script_without_writing_compiled_files():
     text = (ROOT / 'Check-FrameScout.bat').read_text(encoding='utf-8')
     assert 'framescout_check.py' in text and '-B' in text
