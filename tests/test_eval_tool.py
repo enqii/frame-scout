@@ -128,8 +128,34 @@ def test_run_starts_the_engine_for_every_registered_model(tmp_path, setup):
     assert option(command, '--device') == 'cpu' and option(command, '--top') == str(ev.DEFAULT_TOP)
     assert '--no-person-detection' in command
     # the model downloads and caches go where the app keeps them
-    assert env['TORCH_HOME'] == str(ev.ROOT / '.cache' / 'torch') and env['PYTHONIOENCODING'] == 'utf-8'
-    assert env['HF_HOME'] == str(ev.ROOT / '.cache' / 'huggingface')
+    cache = ev.default_cache_dir()
+    assert env['TORCH_HOME'] == str(cache / 'torch') and env['PYTHONIOENCODING'] == 'utf-8'
+    assert env['HF_HOME'] == str(cache / 'huggingface')
+
+
+def checkout(path):
+    path.mkdir(parents=True)
+    (path / 'framescout_engine.py').write_text('', encoding='utf-8')
+    (path / '.venv').mkdir()
+    return path
+
+
+def test_the_cache_defaults_to_the_checkout_of_the_venv_in_use(tmp_path):
+    # E48: the tool run from a git worktree with the main checkout's venv uses its .cache
+    main, worktree = checkout(tmp_path / 'main'), tmp_path / 'main' / '.claude' / 'worktrees' / 'w'
+    assert ev.default_cache_dir(prefix=str(main / '.venv'), base_prefix=str(tmp_path / 'python'),
+                                root=worktree) == main / '.cache'
+
+
+def test_the_cache_defaults_to_the_script_folder_outside_a_framescout_venv(tmp_path):
+    root = tmp_path / 'checkout'
+    # no venv: the interpreter's own prefix
+    assert ev.default_cache_dir(prefix=str(tmp_path / 'python'), base_prefix=str(tmp_path / 'python'),
+                                root=root) == root / '.cache'
+    # a venv that does not belong to a FrameScout checkout
+    other = tmp_path / 'other'; (other / 'venv').mkdir(parents=True)
+    assert ev.default_cache_dir(prefix=str(other / 'venv'), base_prefix=str(tmp_path / 'python'),
+                                root=root) == root / '.cache'
 
 
 def test_run_remembers_folders_and_profiles_of_the_collection(tmp_path, setup):

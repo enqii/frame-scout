@@ -190,6 +190,18 @@ def label_warnings(scores, labels):
 
 # --- run ---
 
+def default_cache_dir(prefix=sys.prefix, base_prefix=sys.base_prefix, root=ROOT):
+    """The .cache of the FrameScout checkout whose venv runs the tool, else the one next to the script (E48).
+
+    The tool run from a git worktree with the main checkout's venv then uses the models the
+    main checkout already downloaded.
+    """
+    checkout = Path(prefix).parent
+    if Path(prefix) != Path(base_prefix) and (checkout / ENGINE.name).is_file():
+        return checkout / '.cache'
+    return root / '.cache'
+
+
 def engine_env(cache_dir, environ=os.environ):
     """The engine's environment: model downloads and caches where the app keeps them, UTF-8 output."""
     env = dict(environ)
@@ -743,8 +755,9 @@ def parser():
     run.add_argument('--top', type=int, default=DEFAULT_TOP,
                      help='gallery length per model; their thumbnails are shown on the labelling page')
     run.add_argument('--no-person-detection', action='store_true')
-    run.add_argument('--cache-dir', type=Path, default=ROOT / '.cache',
-                     help='model downloads and caches (default: the app\'s .cache folder)')
+    run.add_argument('--cache-dir', type=Path, default=default_cache_dir(),
+                     help='model downloads and caches (default: the .cache folder of the checkout whose venv '
+                          'runs the tool, else the one next to the tool)')
     run.set_defaults(handler=command_run)
     pool = commands.add_parser('pool', parents=[common], help='pool the top photos of every model for labelling')
     pool.add_argument('collection')
