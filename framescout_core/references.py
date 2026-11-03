@@ -4,8 +4,9 @@ import os
 import shutil
 from pathlib import Path
 
-from ._common import _backup_path, _path_key, _replace_atomically
+from ._common import _backup_path, _file_lock, _path_key, _replace_atomically
 from .names import slugify
+from .profiles import PROFILES_LOCK_TIMEOUT
 
 
 def reference_folder(refs_root, name, others, base):
@@ -131,7 +132,7 @@ def undo_reference_move(staged):
             pass
 
 
-def update_backup_references(filename, staged, base):
+def update_backup_references(filename, staged, base, lock_timeout=PROFILES_LOCK_TIMEOUT):
     """After a move was saved, point the moved reference paths in <filename>.bak to the new names.
 
     Call it between save_profiles (which wrote the backup with the old paths) and
@@ -140,7 +141,10 @@ def update_backup_references(filename, staged, base):
     stage_reference_move; relative to base) change; everything else, including other
     top-level keys and their order, stays. The backup is replaced via a flushed temporary
     file, so a crash leaves the old or the new backup, and while the old names still
-    exist both point to existing files.
+    exist both point to existing files. The backup is read and replaced under the lock of
+    save_profiles (<filename>.lock), so a save of another session, which replaces the
+    backup too, cannot come in between (A32); OSError if that lock is not free within
+    lock_timeout seconds.
 
     Returns True if the backup now fits the moved files (also if nothing had to change,
     it is missing or in the v3 format without reference paths) and False if it cannot be
@@ -149,7 +153,12 @@ def update_backup_references(filename, staged, base):
     """
     if not staged:
         return True
-    backup = _backup_path(filename)
+    with _file_lock(filename, lock_timeout):
+        return _rewrite_backup(_backup_path(filename), staged, base)
+
+
+def _rewrite_backup(backup, staged, base):
+    """update_backup_references without the lock: rewrite the moved paths in the backup file backup."""
     try:
         data = backup.read_bytes()
     except FileNotFoundError:
