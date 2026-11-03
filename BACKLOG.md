@@ -538,17 +538,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
       may show people (say so in the guide). **Question:** the contents of the new bundle format
       (no `profiles.json` schema change). Size M.
-- [ ] `ready` **F15 – "Check installation" self-test:** after a Windows update, a moved folder
-      or an interrupted install, users see a traceback in `run.log` and do not know whether to
-      reinstall. Sketch: `Check-FrameScout.bat` (and an expander in "AI settings") runs a
-      read-only check: `.python` and `.venv` belong to this folder, package versions equal
-      `constraints.txt` (`importlib.metadata`), torch imports and reports CUDA for a CUDA install,
-      `.cache/` and `results/` are writable, which model weights are cached, free disk space;
-      one plain sentence with the fix per problem. Affected: a small script or `framescout_core`
-      module (standard library, tested with fake metadata), a `.bat`, `app.py`, user guide
-      (troubleshooting), `docs/DEVELOPMENT.md`. Risks: never write, download or "repair"; importing
-      torch takes seconds and can crash on a broken install, so run it in a subprocess. No hold
-      point. Size S–M.
 - [ ] `minor` **F16 – The time estimate does not cover scoring and the gallery export:** the
       "about N min left" of F12 and the duration before the start cover only the analysis of the
       remaining photos. Scoring and especially the gallery export (thumbnails of top x profiles)

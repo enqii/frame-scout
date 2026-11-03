@@ -17,7 +17,14 @@ After `Install-FrameScout.bat`:
 
 # All engine options
 .\.venv\Scripts\python.exe framescout_engine.py --help
+
+# Installation self-test (read-only; Check-FrameScout.bat runs it)
+.\.venv\Scripts\python.exe framescout_check.py
 ```
+
+`framescout_check.py` (F15) prints one line per check and a "Fix:" line per problem. Exit
+code 0: no problem found, 1: at least one problem. It is standard library only, so it also
+runs with the private Python (`.python\python.exe`).
 
 `profiles.json` exists once the app has been started; on a fresh clone use
 `--profiles .\profiles.example.json`.
@@ -114,6 +121,7 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `framescout_scoring.py` | Scoring (prompt ensemble, scaling, weighting); numpy only |
 | `framescout_eval.py`, `framescout_eval_page.html` | Model evaluation tool (see above); not used by the app |
 | `framescout_uninstall.py`, `Uninstall-FrameScout.bat` | Uninstaller |
+| `framescout_check.py`, `Check-FrameScout.bat` | Read-only installation self-test (`framescout_core/install_check.py`) |
 | `install_torch.py`, `Install-FrameScout.bat`, `Start-FrameScout.bat` | Installation (CPU or CUDA build of PyTorch) and start on Windows |
 | `profiles.example.json` | Example search profiles; copied to `profiles.json` on the first start |
 | `requirements.txt`, `constraints.txt` | Dependencies (ranges, PyTorch pinned) and the exact versions of the verified runs |
