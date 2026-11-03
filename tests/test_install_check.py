@@ -119,7 +119,7 @@ def test_environment_with_an_unreadable_pyvenv_cfg_is_a_problem(tmp_path):
 # --- package versions -------------------------------------------------------------------
 
 CONSTRAINTS = '# comment\nnumpy==2.5.4\npillow==12.3.0\ntorch==2.14.1\ntorchvision==0.29.1\nnot-needed==1.0\n'
-REQUIREMENTS = 'torch==2.14.1\ntorchvision==0.29.1\nnumpy>=2\npillow>=12 ; python_version>"3"\n'
+REQUIREMENTS = 'torch==2.14.1\ntorchvision==0.29.1\nnumpy>=2\npillow[extra]>=12\n'
 
 
 def test_installed_versions_reads_the_metadata_of_a_folder(tmp_path):
@@ -157,6 +157,20 @@ def test_other_versions_and_missing_packages_are_named(tmp_path):
     assert 'torch 2.13.0+cpu instead of 2.14.1' in result.text
     assert 'pillow' in result.text and 'missing' in result.text
     assert 'Install-FrameScout.bat' in result.fix
+
+
+def test_missing_requirement_with_an_environment_marker_is_no_problem(tmp_path):
+    # the standard library cannot evaluate a marker: a package that may not apply to this
+    # platform or Python is not reported missing, but its pin is checked once installed (review)
+    requirements = REQUIREMENTS + 'pywin32>=300 ; sys_platform == "win32"\n'
+    # two folders: importlib.metadata caches a folder's listing
+    for site, extra in [(tmp_path / 'without', []), (tmp_path / 'with', [('pywin32', '300')])]:
+        for name, version in [('numpy', '2.5.4'), ('pillow', '12.3.0'), ('torch', '2.14.1'),
+                              ('torchvision', '0.29.1'), *extra]:
+            dist(site, name, version)
+    assert check_packages(tmp_path / 'without', CONSTRAINTS + 'pywin32==311\n', requirements)[0].ok is True
+    [result] = check_packages(tmp_path / 'with', CONSTRAINTS + 'pywin32==311\n', requirements)
+    assert result.ok is False and 'pywin32 300 instead of 311' in result.text
 
 
 def test_requirement_names_skip_comments_markers_and_extras():
