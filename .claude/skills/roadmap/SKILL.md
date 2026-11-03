@@ -280,11 +280,11 @@ A reviewer report saying "not posted" / "nothing posted" is never treated as don
 neither is a PR labeled `fs:review-done` without findings on it. Check
 `gh api repos/enqii/frame-scout/pulls/<n>/comments --jq length` and
 `gh pr view <n> --json comments --jq '.comments | length'`. If the findings are not there,
-post the findings from the reviewer's report yourself as one numbered comment
-(`gh pr comment <n> --body-file <file>`: number, `file:line`, severity, issue) and set
-`fs:review-done`. Do not rerun `/code-review` (one review round).
+post the findings from the reviewer's report yourself, one comment per finding, as the
+reviewer brief describes (step 2: inline on `file:line`, else a general comment
+`Finding <n> – <file>:<line>`), and set `fs:review-done`. Do not rerun `/code-review` (one review round).
 
 The orchestrator is stateless: if the report is gone (new session), read the findings from
 the reviewer's output file when its path is known. Otherwise ask the user to choose between
 accepting the PR without review findings and a fresh reviewer that only reads the PR and
-posts its own numbered findings (no `/code-review` run).
+posts its own findings, one comment per finding (no `/code-review` run).

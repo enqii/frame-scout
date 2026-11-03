@@ -25,17 +25,21 @@ nothing, by you as below) and the label change.
 2. Verify that the findings are on the PR: `gh api repos/enqii/frame-scout/pulls/{PR}/comments --jq length`
    (inline comments) and `gh pr view {PR} --json comments --jq '.comments | length'` (general
    comments); read the new ones and check that they contain the findings. If the skill returned
-   only a findings list and posted nothing, post your own findings yourself as **one**
-   numbered PR comment (`gh pr comment {PR} --body-file <file>`; per finding: number,
-   `file:line`, severity, one-sentence issue). Never run `/code-review` or `claude -p` a
-   second time for the PR (one review round). If there are no findings, say so in a PR
-   comment.
+   only a findings list and posted nothing, post the findings yourself, **one comment per
+   finding**, so that each can be answered on its own thread. Body: `Finding <n> (<severity>):
+   <one-sentence issue>`. Post it as an inline comment on the PR's head commit
+   (`gh api repos/enqii/frame-scout/pulls/{PR}/comments -F body=@<file> -f commit_id=<head sha>
+   -f path=<file> -F line=<line> -f side=RIGHT`; head sha: `gh pr view {PR} --json headRefOid --jq .headRefOid`);
+   if GitHub refuses it (HTTP 422: the line is not part of the diff), post it as a general
+   comment that starts with `Finding <n> – <file>:<line>` (`gh pr comment {PR} --body-file <file>`).
+   Never run `/code-review` or `claude -p` a second time for the PR (one review round). If
+   there are no findings, say so in a PR comment.
 3. Only after the findings (or the "no findings" comment) are on the PR, swap the state label:
    `gh pr edit {PR} --remove-label fs:needs-review --add-label fs:review-done`
    (if `gh` is not on `PATH`, use the path given in `CLAUDE.md` → "Git and commits").
 4. Return a short summary to the orchestrator: number of findings by severity, one line
    per finding (file:line – issue), whether any finding looks like a blocker, and where the
-   comments are (inline, or your numbered comment). Do not paste the full review.
+   comments are (inline, or your own per-finding comments). Do not paste the full review.
 
 Review against `CLAUDE.md` as well: project language English, Conventional Commits,
 user data untouched, tests executed vs. claimed, general-purpose wording, and the
