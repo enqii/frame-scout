@@ -26,6 +26,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
                              analyzed_photos, app_search_needs, downloaded_models, low_space, low_space_lines,
+                             known_throughput, remaining_text, start_summary,
                              hidden_text, hide_no_match, mark_style,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
                              read_copy_folders,
@@ -1603,6 +1604,14 @@ with run_tab:
         # analyzed collection kept the warning for good)
         analyzed = cached_analyzed_photos(cache_key, cleanup_signature(), (tuple(map(str, existing)), counted_at),
                                           photo_scan.paths)
+        # what the search will do and, if an earlier search with these settings measured its
+        # speed on this device, roughly how long its analysis takes (F12). "auto" picks CUDA
+        # if PyTorch can use it; without the system details any device's record counts
+        chosen_device = st.session_state[setting_key('device')]
+        if chosen_device == 'auto':
+            chosen_device = ('cuda' if info['cuda'] else 'cpu') if info else None
+        st.info(start_summary(len(photo_scan.paths), analyzed,
+                              known_throughput(run_status, cleanup_signature(), chosen_device)))
         space_warning = low_space_warning(len(photo_scan.paths), settings['top'], len(profiles), settings['model'],
                                           settings['person_detection'], analyzed)
         if space_warning:
@@ -1640,10 +1649,15 @@ with run_tab:
         if status and status.get('phase') != 'finished':
             # the phase and its progress: analysis, scoring and gallery export (A5)
             fraction = status_fraction(status)
+            text = status_text(status)
+            # only for a running search: a run that crashed keeps its last rate (F12)
+            left = remaining_text(status) if now_active else None
+            if left:
+                text += f' · {left}'
             if fraction is None:
-                st.caption(status_text(status) + (' …' if now_active else ''))
+                st.caption(text + (' …' if now_active else ''))
             else:
-                st.progress(fraction, text=status_text(status))
+                st.progress(fraction, text=text)
         if LOG.exists():
             lines = LOG.read_text(encoding='utf-8', errors='replace').splitlines()
             with st.expander('Live log', expanded=now_active):
