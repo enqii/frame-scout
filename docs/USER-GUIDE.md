@@ -156,7 +156,10 @@ are already analyzed with the current settings and how many remain to analyze. I
 search with the same settings (search model, person detection) ran on the same device, it also
 gives a rough duration for the analysis; otherwise it says the search shows how long it takes
 after its first minutes. While the search analyzes photos, the progress line adds "about 25 min
-left" once about a minute of analysis has been measured. These times are rough: they are
+left" once about a minute of analysis has been measured; if no photo is finished for five
+minutes (e.g. a very large file), it leaves the time out until the search moves on again. The
+duration before the start comes from the last search with these settings that measured at
+least five minutes (or from a shorter one if there was none). These times are rough: they are
 rounded generously (never to seconds), change with what else the PC is doing, and cover only
 the analysis of new photos, not scoring and writing the galleries, which add a little time at
 the end. A photo that you edited after its analysis still counts as already analyzed in the
