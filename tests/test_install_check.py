@@ -334,6 +334,9 @@ def test_check_installation_runs_every_check_and_writes_nothing(tmp_path, monkey
     # the engine's cache variables point into the folder, a value of the user is overridden as the app does
     env = calls[0][1]['env']
     assert env['PATH'] == 'x' and env['HF_HOME'] == str(tmp_path / '.cache' / 'huggingface')
+    # PyTorch is imported with the sys.path the engine gets: its first entry is the FrameScout
+    # folder, not the caller's working folder (review)
+    assert calls[0][1]['cwd'] == str(tmp_path)
 
 
 def test_check_installation_skips_pytorch_without_an_environment(tmp_path, monkeypatch):
