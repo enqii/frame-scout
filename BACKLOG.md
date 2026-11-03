@@ -201,14 +201,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       file, broken HEIC) fall back. Idea: for partners of a RAW file, detect truncation
       (Pillow's truncation warning, or a decode with `LOAD_TRUNCATED_IMAGES` off) and
       prefer the RAW file then. Found in PR #46.
-- [ ] `minor` **E47 – The best-weight mark of `framescout_eval.py metrics` is set on a tie at 0:**
-      in the reference-weight sweep, every weight gets the `*` (best) mark when a model's
-      best AP is 0 (all weights tie at 0). Fix: mark nothing then. Found in PR #56.
-- [ ] `ready` **E48 – `framescout_eval.py run --cache-dir` follows the script folder, not the venv's checkout:**
-      the default is the `.cache` next to the script, so running the tool from a git
-      worktree downloads the models again unless the main checkout's `.cache` is passed
-      with `--cache-dir`. Document it in `docs/DEVELOPMENT.md` (done in PR #56) and/or make
-      the default follow the checkout of the Python environment in use. Found in PR #56.
 - [ ] `minor` **E49 – `framescout_eval.py pool` imports the whole engine to render thumbnails:**
       `load_renderer` imports `framescout_engine` (torch, numpy, Pillow, a few seconds) for
       `render_thumbnail` alone, and the import sets the cache variables of the process
@@ -401,14 +393,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       recognises the RTX 4070 with compute capability 8.9, `cpu` would replace it); all four
       search models and the evaluation tool ran on CUDA with real models. The speed numbers
       feed E18 and P10 (B).)
-- [ ] `minor` **I13 – Background runs die with the agent session:** a long engine run that an
-      agent starts as a background command of Claude Code ends when that agent session
-      ends; the first evaluation run of PR #11 stopped at 1,110 of 4,997 photos (stale
-      `run-status.json` in phase "analyzing", the lock released by the OS). It completed
-      when started detached through WMI (`Win32_Process.Create` with a `.cmd` file that
-      sets the cache variables). Long smoke or evaluation runs in the PR workflow should be
-      started detached (and the agent should wait for their end) — document it in the
-      implementer brief or `CLAUDE.md`.
 - [ ] `minor` **I16 – A ZIP update leaves the old `framescout_core.py` behind:** since I15 the
       shared code is the package `framescout_core/`. A user who extracts a new ZIP over an
       older folder (instead of a fresh folder or `git pull`) keeps the old single file next
@@ -450,15 +434,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       derives the same four variables from `--cache-dir`; it takes a cache folder, not the
       project folder, so it was left alone in E9/I10. It could share
       `framescout_core.cache_paths`. Found in the PR of E9/I10.
-- [ ] `minor` **I28 – The reviewer posts one comment for all findings (optional):** when
-      `/code-review` posts nothing, the reviewer posts one numbered comment (I26), so
-      `address-review` can only answer in one comment. One comment per finding (numbered,
-      `file:line`) would allow a reply on each thread. Found in the PR of I26.
-- [ ] `minor` **I29 – The briefs hard-code the commit trailer's model name:** `implementer-brief.md`
-      prescribes `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`, which
-      conflicts with the attribution the session gives a subagent (a Sonnet implementer
-      noticed). Take the trailer from the session's attribution instead and drop the literal
-      line. Found in the PR of I26.
 - [ ] `ready` **I30 – Repository layout, step 1: scoring module outside the package (low risk):**
       `framescout_scoring.py` (numpy only) lies loose in the root next to the standard-library-only
       package `framescout_core/`. Move it into a package of its own (e.g. `framescout_scoring/`,

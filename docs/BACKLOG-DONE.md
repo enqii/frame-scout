@@ -487,6 +487,22 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       on the home PC: with a short gallery (`run --top 20`) 372 pool entries had no
       thumbnail, 5 of them HEIC; after the fix 0. No cache signature, CLI, profiles or
       results change; labels are untouched.)
+- [x] **E47 – The best-weight mark of `framescout_eval.py metrics` is set on a tie at 0:**
+      in the reference-weight sweep, every weight got the `*` (best) mark when a model's
+      best AP is 0 (all weights tie at 0). Found in PR #56. (Done 2026-11-03 in PR #68: no
+      weight is marked when the best AP is 0; ties at a positive AP still mark every tied
+      weight. Tested with `test_eval_tool.py` (the new test was seen failing first); no
+      cache, CLI or file format change.)
+- [x] **E48 – `framescout_eval.py run --cache-dir` follows the script folder, not the venv's checkout:**
+      the default was the `.cache` next to the script, so running the tool from a git
+      worktree downloaded the models again unless the main checkout's `.cache` was passed.
+      Found in PR #56. (Done 2026-11-03 in PR #68: new `framescout_eval.default_cache_dir()`;
+      the default is `<checkout>/.cache` when the tool runs in a venv (`sys.prefix !=
+      sys.base_prefix`) whose parent folder holds `framescout_engine.py`, e.g. the main
+      checkout's `.venv` used from a worktree, otherwise the `.cache` next to the script as
+      before. `--cache-dir` keeps its name and still wins; `docs/DEVELOPMENT.md` describes
+      the default. Unit-tested (`test_eval_tool.py`, both cases seen failing first); no
+      real `run` with models was made.)
 
 ### App (`app.py`)
 
@@ -1189,6 +1205,31 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (E22), since it sits on the same tab. Tested with unit tests of `reconcile_settings`
       with `reset`, `changed_from_defaults`, `setting_text` and `AI_SETTINGS`; the button
       itself was run with Streamlit's `AppTest` only, not in a real browser.)
+- [x] **I13 – Background runs die with the agent session:** a long engine run that an
+      agent starts as a background command of Claude Code ends when that agent session
+      ends; the first evaluation run of PR #11 stopped at 1,110 of 4,997 photos (stale
+      `run-status.json` in phase "analyzing", the lock released by the OS). It completed
+      when started detached through WMI. (Done 2026-11-03 in PR #68: `implementer-brief.md`
+      → "Working" has a "Long runs" bullet: start long engine or evaluation runs detached
+      via `Invoke-CimMethod Win32_Process Create` with a `.cmd` under `.tmp\` (cache
+      variables, log redirect) and wait for the process or a final phase in
+      `run-status.json`. Markdown only; the WMI start was checked with a harmless `.cmd`
+      (ReturnValue 0, log written), no long run was made.)
+- [x] **I28 – The reviewer posts one comment for all findings (optional):** when
+      `/code-review` posts nothing, the reviewer posted one numbered comment (I26), so
+      `address-review` could only answer in one comment. Found in the PR of I26. (Done
+      2026-11-03 in PR #68: the reviewer (`reviewer-brief.md` step 2) and the orchestrator
+      fallback (`SKILL.md` → "Review posting check" and the fresh-reviewer option) post one
+      comment per finding, inline on the head commit's `file:line` via `gh api
+      .../pulls/<n>/comments`, or a general comment `Finding <n> – <file>:<line>` when
+      GitHub refuses the line (422). `address-review` answers each general finding comment
+      with its own `Re: finding <n>` reply; an old single numbered comment is still
+      answered in one comment. Markdown only, not exercised in a real review.)
+- [x] **I29 – The briefs hard-code the commit trailer's model name:**
+      `implementer-brief.md` prescribed `Co-Authored-By: Claude Opus 5.5 (1M context)
+      <noreply@anthropic.com>`, which conflicted with the attribution the session gives a
+      subagent. Found in the PR of I26. (Done 2026-11-03 in PR #68: the literal line is
+      gone; the agent uses the trailer its session prescribes. Markdown only.)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
