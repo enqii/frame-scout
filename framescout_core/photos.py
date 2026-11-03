@@ -25,8 +25,11 @@ SKIPPED_EXTENSIONS_SHOWN = 5
 
 # paths: the photos to analyze, sorted; raw_pairs: the RAW files skipped for a partner of
 # the same name, sorted; unsupported: Counter {extension: files} of the other files ('' for
-# files without an extension)
-PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported')
+# files without an extension); found_again: the photos found again through another path (a
+# link or hard link) and analyzed once; folders_again: the folders reached again through a
+# link, searched once (A37; both 0 by default)
+PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported found_again folders_again',
+                                   defaults=(0, 0))
 
 # Whether this Python environment can read AVIF (Pillow built with libavif), HEIC/HEIF
 # (pillow-heif) and camera RAW (rawpy) files.
@@ -164,11 +167,16 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
     The output folder exclude is left out wherever it is reached: as one of folders or
     inside one (by path), or through a link or another path (by identity). A folder that
     cannot be read through one path is tried again through another (review).
+
+    Each PhotoScan counts what was left out as found before (A37), for the folder it was
+    reached through again: found_again, the photos found again by another path, and
+    folders_again, the folder links into a folder already walked (also a loop).
     """
     exclude_path = None if exclude is None else Path(exclude)
     exclude_id = None if exclude is None else _identity(exclude)
     found = [[] for _ in folders]
     unsupported = [collections.Counter() for _ in folders]
+    found_again, folders_again = [0] * len(folders), [0] * len(folders)
     seen_folders, seen_files = set(), set()
     real = collections.deque((index, Path(folder)) for index, folder in enumerate(folders))
     links = collections.deque()
@@ -181,7 +189,10 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
 
     def walk(index, folder):
         identity = _identity(folder) or _real_path_key(folder)
-        if identity in seen_folders or excluded(folder, identity):
+        if identity in seen_folders:
+            folders_again[index] += 1
+            return
+        if excluded(folder, identity):
             return
         try:
             with os.scandir(folder) as listing:
@@ -204,16 +215,18 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
                     unsupported[index][suffix] += 1
                     continue
                 file_identity = _file_identity(path) or _real_path_key(path)
-                if file_identity not in seen_files:
+                if file_identity in seen_files:
+                    found_again[index] += 1
+                else:
                     seen_files.add(file_identity)
                     found[index].append(path)
 
     while real or links:
         walk(*(real.popleft() if real else links.popleft()))
     scans = []
-    for paths, counts in zip(found, unsupported):
+    for paths, counts, again, folders_seen in zip(found, unsupported, found_again, folders_again):
         photos, pairs = _shot_pairs(paths)
-        scans.append(PhotoScan(sorted(photos), sorted(pairs), counts))
+        scans.append(PhotoScan(sorted(photos), sorted(pairs), counts, again, folders_seen))
     return scans
 
 
@@ -466,12 +479,14 @@ def remembered_scans(memory, folders, extensions=EXT, exclude=None, recount=Fals
 
 def join_scans(scans):
     """Return one PhotoScan of the PhotoScans of several folders (the app counts each folder on its own)."""
-    paths, pairs, unsupported = [], [], collections.Counter()
+    paths, pairs, unsupported, found_again, folders_again = [], [], collections.Counter(), 0, 0
     for scan in scans:
         paths += scan.paths
         pairs += scan.raw_pairs
         unsupported.update(scan.unsupported)
-    return PhotoScan(sorted(paths), sorted(pairs), unsupported)
+        found_again += scan.found_again
+        folders_again += scan.folders_again
+    return PhotoScan(sorted(paths), sorted(pairs), unsupported, found_again, folders_again)
 
 
 def _files(count, kind=''):
@@ -484,6 +499,8 @@ def skipped_lines(scan, decoders=ALL_DECODERS):
 
     Files of a missing decoder (see decoders) get one line with the reason, and only if the
     folder has such files; they are not named again as an unsupported extension (review).
+    Photos and folders reached again through another path get a line each (A37), so a
+    count lower than a file manager's is explained.
     """
     lines = []
     if scan.raw_pairs:
@@ -506,6 +523,13 @@ def skipped_lines(scan, decoders=ALL_DECODERS):
         if more > 0:
             shown.append(f'{more} more extension' + ('' if more == 1 else 's'))
         lines.append(f'{_files(sum(other.values()))} skipped (unsupported extension): ' + ', '.join(shown) + '.')
+    if scan.found_again:
+        noun = 'photo' if scan.found_again == 1 else 'photos'
+        lines.append(f'{scan.found_again} {noun} found again through another path (a link or hard link), '
+                     'analyzed once.')
+    if scan.folders_again:
+        noun = 'folder' if scan.folders_again == 1 else 'folders'
+        lines.append(f'{scan.folders_again} {noun} reached again through a link, searched once.')
     return lines
 
 
