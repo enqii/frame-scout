@@ -86,6 +86,29 @@ def test_environment_using_the_private_python_of_another_folder_is_a_problem(tmp
     assert '.venv' in result.fix and 'Install-FrameScout.bat' in result.fix
 
 
+def link_folder(link, target):
+    """A directory symlink, or on Windows without that privilege a junction; skip if neither can be made."""
+    try:
+        os.symlink(target, link, target_is_directory=True)
+    except OSError:
+        try:
+            import _winapi
+            _winapi.CreateJunction(str(target), str(link))
+        except (ImportError, OSError):
+            pytest.skip('cannot create a symlink or junction here')
+
+
+def test_environment_created_through_a_link_to_this_folder_is_fine(tmp_path):
+    # framescout_check.py passes the resolved folder; pyvenv.cfg names the path the installer
+    # ran from, here a link to the same folder: not "another folder" (review)
+    base = tmp_path / 'real'
+    make_python(base / '.python')
+    link_folder(tmp_path / 'link', base)
+    make_venv(base, tmp_path / 'link' / '.python')
+    [result] = check_environment(base)
+    assert result.ok is True
+
+
 def test_environment_with_an_unreadable_pyvenv_cfg_is_a_problem(tmp_path):
     make_venv(tmp_path, make_python(tmp_path / '.python'))
     (tmp_path / '.venv' / 'pyvenv.cfg').unlink()
