@@ -46,7 +46,9 @@ of what to do for each problem:
 
 `Check-FrameScout.bat` uses the Python of `.venv`, or the private Python in `.python` if
 `.venv` does not work, so it can also say why the environment is broken. If neither exists,
-it tells you to run `Install-FrameScout.bat`. A package version that differs from
+or the check cannot run with either, it tells you to run `Install-FrameScout.bat`. In the app,
+the results stay until you click the button again; a line above them says when they were
+found. A package version that differs from
 `constraints.txt` is a problem only because the verified versions are the tested ones; the
 app may still work.
 

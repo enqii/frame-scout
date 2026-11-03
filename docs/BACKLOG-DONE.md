@@ -1407,4 +1407,23 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (troubleshooting), `docs/DEVELOPMENT.md`. Risks: never write, download or "repair"; importing
       torch takes seconds and can crash on a broken install, so run it in a subprocess. No hold
       point. Size S–M.
-      (done 2026-11-03 in PR #72: new Check-FrameScout.bat and ramescout_check.py (exit code 0 no problem, 1 a problem found) plus the expander "Check installation" in the AI settings tab, both on the new module ramescout_core/install_check.py. Read-only: it checks that .venv belongs to this folder, the installed packages against equirements.txt and constraints.txt (importlib.metadata, PyTorch in any build), that torch imports in a subprocess (and finds a GPU for a CUDA build), that .cache and esults can be written (a temporary file is created and deleted), the downloaded models (information) and the free disk space (problem below 1 GB), with one plain fix per problem. The .bat falls back to the private Python in .python when .venv does not start. equirement_names moved from install_torch.py into the core module. Compatibility: new files only. Tested with unit tests (	est_install_check.py, fake metadata, folders and subprocess), a real run of ramescout_check.py without .venv and of check_installation against another checkout, and a headless Streamlit AppTest of the expander. Not tested: the CUDA branch on a real GPU, Check-FrameScout.bat by double-click, the .python fallback of the .bat.)
+      (done 2026-11-03 in PR #72: new `Check-FrameScout.bat` and `framescout_check.py` (exit
+      code 0 no problem, 2 a problem found, any other: the check could not run) plus the
+      expander "Check installation" in the AI settings tab, both on the new module
+      `framescout_core/install_check.py`. Read-only: it checks that `.venv` belongs to this
+      folder, the installed packages against `requirements.txt` and `constraints.txt`
+      (`importlib.metadata`, PyTorch in any build), that torch imports in a subprocess (and
+      finds a GPU for a CUDA build), that `.cache` and `results` can be written (a temporary
+      file is created and deleted), the downloaded models (information) and the free disk
+      space (problem below 1 GB), with one plain fix per problem. The `.bat` falls back to the
+      private Python in `.python` when `.venv` does not start or the check cannot run with it.
+      `requirement_names` moved from `install_torch.py` into the core module. Review fixes:
+      output the console code page lacks is printed as `?`, a `.python` named through a link
+      counts as this folder's, marker requirements are not reported missing, "not known" for
+      models on a drive that does not answer, the torch probe runs in the FrameScout folder,
+      a "Checked at" time in the app. Compatibility: new files only. Tested with unit tests
+      (`test_install_check.py`, fake metadata, folders and subprocess), a real run of
+      `framescout_check.py` without `.venv` and of `check_installation` against another
+      checkout, the `.bat` with stub check scripts, and a headless Streamlit `AppTest` of the
+      expander. Not tested: the CUDA branch on a real GPU, `Check-FrameScout.bat` by
+      double-click with the real check.)

@@ -23,8 +23,9 @@ After `Install-FrameScout.bat`:
 ```
 
 `framescout_check.py` (F15) prints one line per check and a "Fix:" line per problem. Exit
-code 0: no problem found, 1: at least one problem. It is standard library only, so it also
-runs with the private Python (`.python\python.exe`).
+code 0: no problem found, 2: at least one problem; 1 (Python's code for an uncaught
+exception) or any other: the check itself could not run. It is standard library only, so it
+also runs with the private Python (`.python\python.exe`).
 
 `profiles.json` exists once the app has been started; on a fresh clone use
 `--profiles .\profiles.example.json`.
