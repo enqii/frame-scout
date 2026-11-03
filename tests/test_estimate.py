@@ -1,7 +1,9 @@
 """The remaining-time estimate of a search and the summary before its start (F12)."""
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
-from framescout_core import (RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_WINDOW, THROUGHPUT_KEPT,
+from framescout_core import (RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, RATE_WINDOW, THROUGHPUT_KEPT,
                              THROUGHPUT_MIN_SECONDS, AnalysisRate, duration_text, known_throughput, remaining_text,
                              remember_throughput, run_throughput, start_summary, stored_throughput)
 
@@ -86,21 +88,42 @@ def test_duration_text_never_names_seconds():
 
 # --- remaining_text: the line the app adds to the progress of a running search ---
 
+NOW = datetime(2026, 11, 3, 12, 0, tzinfo=timezone(timedelta(hours=1)))
+
+
 def analyzing(**fields):
-    return {'phase': 'analyzing', 'done': 100, 'total': 1100, 'rate': 40.0, **fields}
+    return {'phase': 'analyzing', 'done': 100, 'total': 1100, 'rate': 40.0,
+            'updated': (NOW - timedelta(seconds=5)).isoformat(timespec='seconds'), **fields}
 
 
 def test_remaining_text_from_the_rate_and_the_photos_left():
-    assert remaining_text(analyzing()) == 'about 25 min left'
+    assert remaining_text(analyzing(), NOW) == 'about 25 min left'
+
+
+def test_no_remaining_text_while_the_analysis_stalls():
+    # the rate changes only when the engine stores photos: a status that has not changed
+    # for a while keeps a rate that no longer says anything (review)
+    stalled = (NOW - timedelta(seconds=RATE_STALE + 1)).isoformat(timespec='seconds')
+    assert remaining_text(analyzing(updated=stalled), NOW) is None
+    recent = (NOW - timedelta(seconds=RATE_STALE - 1)).isoformat(timespec='seconds')
+    assert remaining_text(analyzing(updated=recent), NOW) == 'about 25 min left'
+    # the same moment in another time zone
+    other_zone = (NOW - timedelta(seconds=5)).astimezone(timezone.utc).isoformat()
+    assert remaining_text(analyzing(updated=other_zone), NOW) == 'about 25 min left'
+
+
+def test_remaining_text_uses_the_current_time_by_default():
+    assert remaining_text(analyzing(updated=datetime.now().astimezone().isoformat())) == 'about 25 min left'
 
 
 @pytest.mark.parametrize('status', [
     analyzing(rate=None), analyzing(rate=0), analyzing(rate=-3.0), analyzing(rate='fast'), analyzing(rate=True),
     analyzing(rate=float('nan')), analyzing(rate=float('inf')), analyzing(done=1100), analyzing(done=None),
     analyzing(total=0), analyzing(phase='scoring'), analyzing(phase='finished'), {},
+    analyzing(updated=None), analyzing(updated='yesterday'), analyzing(updated='2026-11-03T12:00:00'),
 ])
 def test_no_remaining_text_without_a_usable_rate_or_outside_the_analysis(status):
-    assert remaining_text(status) is None
+    assert remaining_text(status, NOW) is None
 
 
 # --- throughput of earlier searches, kept in the status file ---

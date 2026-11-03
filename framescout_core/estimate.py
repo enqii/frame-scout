@@ -1,6 +1,7 @@
 """How long a search takes: the remaining-time estimate of a run and the summary before its start (F12)."""
 import collections
 import math
+from datetime import datetime
 
 
 # A first search on a CPU can take hours. The engine measures how many new photos it
@@ -14,6 +15,8 @@ RATE_WINDOW = 300
 # a rate needs at least this many new photos over at least this many seconds
 RATE_MIN_PHOTOS = 16
 RATE_MIN_SECONDS = 60
+# the app names no time left once the status has not changed for this many seconds
+RATE_STALE = RATE_WINDOW
 # throughput records kept in the status file (newest first)
 THROUGHPUT_KEPT = 8
 # a run replaces the stored speed of its settings and device only after measuring this
@@ -93,17 +96,30 @@ def duration_text(minutes):
     return f'about {hours} h {rest} min' if rest else f'about {hours} h'
 
 
-def remaining_text(status):
+def _stalled(status, now):
+    """True if status was last written more than RATE_STALE seconds before now (or has no usable time)."""
+    try:
+        return (now - datetime.fromisoformat(status['updated'])).total_seconds() > RATE_STALE
+    except (KeyError, TypeError, ValueError):  # TypeError: also a time without its time zone
+        return True
+
+
+def remaining_text(status, now=None):
     """Return e.g. "about 25 min left" for the analysis of a status (A5), or None without a usable rate.
 
     Only during the phase "analyzing": the engine counts the photos of the cache first, so
     the photos left are the ones to analyze. Scoring and the galleries are not included.
+    now: the current time (an aware datetime; default now). The rate changes only when the
+    engine stores photos, so a status not written for RATE_STALE seconds names no time
+    (review: else a stalled analysis kept "about 25 min left").
     """
     if status.get('phase') != 'analyzing':
         return None
     rate = _positive(status.get('rate'))
     done, total = status.get('done'), status.get('total')
     if rate is None or not all(isinstance(n, int) and not isinstance(n, bool) for n in (done, total)):
+        return None
+    if _stalled(status, now or datetime.now().astimezone()):
         return None
     left = total - done
     if left <= 0:
