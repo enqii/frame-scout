@@ -22,7 +22,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              DEVICES, DRAFT_REDUCING_GAP, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RAW_EXT, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, available_decoders, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
-                             AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, remember_throughput,
+                             AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, run_throughput,
                              final_status, yolo_weights,
                              RawFallback, SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
@@ -463,9 +463,10 @@ def search(args, parser, roots, dropped, output, status):
         if new:
             speed.add(fresh, time.monotonic())
             measured['rate'] = speed.per_minute()
-            overall = speed.overall()
-            if overall is not None:
-                measured['throughput'] = remember_throughput(status.state['throughput'], signature, device, overall)
+            # a short run keeps the speed an earlier, longer one measured (review)
+            throughput = run_throughput(status.state['throughput'], signature, device, speed)
+            if throughput is not None:
+                measured['throughput'] = throughput
         # the status file is written at most once a second, the last photo always (A5)
         status.update(done=done, new=fresh, cached=reused, errors=errors, force=done == len(paths), **measured)
 
