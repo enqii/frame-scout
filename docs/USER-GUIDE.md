@@ -189,6 +189,28 @@ moves, changes, deletes or overwrites anything: a different photo with the same 
 saved as `name (2).jpg`, an identical one counts as "already there". A target folder
 inside a photo folder is refused, since the next search would find the copies again.
 
+### Exporting a result list
+
+Below each gallery, **Export list** writes the ranked photos of the profile to the
+`exports` folder inside `results`, e.g. for a program you catalog photos with. Each
+export makes two files with the same name, `<profile>-<date>-<time>.csv` and `.txt` (with
+"-matches" in the name if you export only matches):
+
+- the **CSV table** has the columns rank, path, score, text similarity, image similarity
+  (empty for searches by text only), crop and mark (match, no match or empty);
+- the **text file** has one full photo path per line, in rank order.
+
+Tick **Only photos marked as match** to export just the photos of this list you marked as
+Match. Photos marked in an earlier search that are not in this list are not exported, since
+they have no rank or score here (use "Copy N marked photos" for those). If the marks cannot
+be read, only the full list can be exported, with an empty mark column.
+
+An export never replaces a file: if the name is taken, `-2`, `-3`, ... is added. The paths
+are those of this computer, so a list may not fit after moving photos or on another PC. The
+CSV is comma-separated UTF-8 with a decimal point. Excel with a German (or other `;`) locale
+may show everything in one column when you double-click it: use **Data → From Text/CSV**
+instead. **Clean up storage** never deletes exports; delete them yourself.
+
 ## Supported formats
 
 JPG, JPEG, PNG, WebP, BMP, TIF, TIFF, AVIF, HEIC/HEIF and camera RAW (DNG, CR2, CR3, NEF,
@@ -233,6 +255,7 @@ Everything a search writes lands in `results/`:
 | `marks.json.bak` | The state of `marks.json` before your last change of a mark (one generation). If `marks.json` is damaged, the gallery offers to restore it. The cleanup never deletes it. |
 | `marks.json.broken-<date>`, `cache.sqlite3.broken-<date>` | Damaged files FrameScout set aside when you restored the marks or renamed the cache. They are never deleted for you: delete them yourself in the `results` folder once you no longer need them. |
 | `cache.sqlite3` | Analyses of photos already seen. An interrupted search resumes from here, and new profiles reuse them. Updates that change the image analysis analyze every photo again; the old entries stay until you clean them up. |
+| `exports/` | Result lists you exported (CSV and text files, see above). Created on the first export; the cleanup never deletes them. |
 | `run.lock`, `run-status.json` | Mark a running search and its progress. They stay after a run and can be deleted when no search runs. |
 
 With several photo folders, galleries name each photo by its folder and path, e.g.
