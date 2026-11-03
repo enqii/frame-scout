@@ -147,6 +147,9 @@ def start_summary(photos, analyzed, per_minute):
     current settings (analyzed_photos); per_minute: known_throughput of these settings, or
     None. The duration covers only the analysis of the new photos.
     """
+    if photos <= 0:
+        # not "all already analyzed": there is nothing to analyze or rank (review)
+        return 'No supported photos found in these folders: the search has nothing to analyze.'
     analyzed = min(analyzed, photos)
     todo = photos - analyzed
     if not todo:

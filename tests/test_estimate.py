@@ -174,3 +174,10 @@ def test_start_summary_with_everything_analyzed():
 
 def test_start_summary_of_one_photo():
     assert '1 photo found' in start_summary(1, 0, None)
+
+
+def test_start_summary_without_photos_does_not_call_them_analyzed():
+    # folders that hold no supported photo (review)
+    text = start_summary(0, 0, 20.0)
+    assert 'No supported photos found' in text
+    assert 'analyzed' not in text and 'about' not in text
