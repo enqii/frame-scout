@@ -29,9 +29,13 @@ nothing, by you as below) and the label change.
    finding**, so that each can be answered on its own thread. Body: `Finding <n> (<severity>):
    <one-sentence issue>`. Post it as an inline comment on the PR's head commit
    (`gh api repos/enqii/frame-scout/pulls/{PR}/comments -F body=@<file> -f commit_id=<head sha>
-   -f path=<file> -F line=<line> -f side=RIGHT`; head sha: `gh pr view {PR} --json headRefOid --jq .headRefOid`);
-   if GitHub refuses it (HTTP 422: the line is not part of the diff), post it as a general
-   comment that starts with `Finding <n> – <file>:<line>` (`gh pr comment {PR} --body-file <file>`).
+   -f path=<file> -F line=<line> -f side=RIGHT`; head sha: `gh pr view {PR} --json headRefOid --jq .headRefOid`).
+   For a finding that spans lines, add `-F start_line=<first line> -f start_side=RIGHT` and
+   pass the last line as `line`. If GitHub refuses it (HTTP 422), read the head sha again:
+   if it changed since you read it, the line numbers may be stale – re-check the line in
+   the new head and retry once with the new sha. Only if the line is still refused (it is
+   not part of the diff), post the finding as a general comment that starts with
+   `Finding <n> – <file>:<line>` (`gh pr comment {PR} --body-file <file>`).
    Never run `/code-review` or `claude -p` a second time for the PR (one review round). If
    there are no findings, say so in a PR comment.
 3. Only after the findings (or the "no findings" comment) are on the PR, swap the state label:
