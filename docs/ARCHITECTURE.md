@@ -676,8 +676,8 @@ different photos on a file system with repeated file ids stay apart; A28). One `
 walked folder and per photo file. The output folder is left out wherever it is reached: as
 a listed folder or inside one (by path, as the old `exclude in path.parents` check), or
 through a link or another path (by identity). Photos found twice are counted in
-`PhotoScan.found_again` and folders reached again in `folders_again` (counted for the listed folder
-that reached through again) and named by `skipped_lines` in the log and the photo source tab (A37). Cache rows and marks under a link path of earlier runs are
+`PhotoScan.found_again` and folder links into a folder already walked in `folders_again` (counted for the listed folder
+that reached through again; a folder listed twice or inside another listed one is not counted, `distinct_folders` handles it) and named by `skipped_lines` in the log and the photo source tab (A37). Cache rows and marks under a link path of earlier runs are
 no longer used (A21).
 
 The app: the "Photo source" tab has a text area (`setting_photo_folders`, one folder per
@@ -989,6 +989,9 @@ profile above the edited one). A click on a form that no longer exists after
 another session shortened the list is dropped by Streamlit; since A31 the profile tab shows a
 warning from `framescout_core.profiles_changed_notice(shown, current)` when `profiles.json`
 changed since the page last showed the forms (not when `profile_error` already explains it).
+A dropped click leaves no trace, so the warning appears on the first run after any change and
+names the lost click only as a possibility ("If you just clicked ..."); only that run can
+carry such a click, since it redraws the forms (review).
 `update_backup_references` takes the same `profiles.json.lock` as `save_profiles`
 (`_file_lock`, `lock_timeout=PROFILES_LOCK_TIMEOUT`) and raises `OSError` if it is not free in
 time; the app keeps the old reference names then (A32).

@@ -317,6 +317,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       contains a line break (possible on Linux/macOS file systems, not on Windows) would be
       split; the CSV quotes it correctly. Only relevant for a later non-Windows build; then
       skip such paths with a notice or offer a NUL-separated list. Found in F5 (PR #67).
+- [ ] `minor` **A43 – Old reference names kept after a failed backup rewrite are never removed:**
+      when `update_backup_references` fails after a profile rename was saved (a write error,
+      or since A32 the `profiles.json.lock` not free within 5 s), `store()` in `app.py`
+      keeps the old reference names on purpose, so `profiles.json.bak` still points to
+      existing files, and says so in a notice. Nothing removes them later: the old folder
+      stays as a duplicate until the user deletes it by hand. Fix idea: finish the move on
+      the next successful save (the backup then holds the new names) or offer such files
+      in "Clean up storage". Review of PR #69, finding 4.
 
 ### Installation / project
 
