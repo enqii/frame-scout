@@ -3,7 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from framescout_core import DEFAULT_YOLO_MODEL, cache_paths, default_cache_env, find_yolo_weights, yolo_weights
+from framescout_core import (DEFAULT_YOLO_MODEL, cache_folder_paths, cache_paths, default_cache_env, find_yolo_weights,
+                             yolo_weights)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -13,6 +14,14 @@ def test_cache_paths_are_under_the_project_cache(tmp_path):
     cache = tmp_path / '.cache'
     assert paths == {'TORCH_HOME': cache / 'torch', 'HF_HOME': cache / 'huggingface',
                      'YOLO_CONFIG_DIR': cache / 'ultralytics', 'XDG_CACHE_HOME': cache}
+
+
+def test_cache_folder_paths_take_the_cache_folder_itself(tmp_path):
+    # I25: the evaluation tool's --cache-dir names the cache folder, not the project folder
+    assert cache_folder_paths(tmp_path / 'my-cache') == {
+        'TORCH_HOME': tmp_path / 'my-cache' / 'torch', 'HF_HOME': tmp_path / 'my-cache' / 'huggingface',
+        'YOLO_CONFIG_DIR': tmp_path / 'my-cache' / 'ultralytics', 'XDG_CACHE_HOME': tmp_path / 'my-cache'}
+    assert cache_folder_paths(tmp_path / '.cache') == cache_paths(tmp_path)
 
 
 def test_default_cache_env_sets_unset_variables(tmp_path):

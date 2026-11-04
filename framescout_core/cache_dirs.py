@@ -14,7 +14,15 @@ CACHE_DIR = '.cache'
 
 def cache_paths(base):
     """The cache variables and their folders under base/.cache, as the .bat files set them."""
-    cache = Path(base) / CACHE_DIR
+    return cache_folder_paths(Path(base) / CACHE_DIR)
+
+
+def cache_folder_paths(cache):
+    """The cache variables and their folders under the cache folder cache itself (I25).
+
+    The evaluation tool's --cache-dir names the cache folder, not the project folder.
+    """
+    cache = Path(cache)
     return {'TORCH_HOME': cache / 'torch', 'HF_HOME': cache / 'huggingface',
             'YOLO_CONFIG_DIR': cache / 'ultralytics', 'XDG_CACHE_HOME': cache}
 
