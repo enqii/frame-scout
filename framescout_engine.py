@@ -556,6 +556,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
             if name in photo_visual:
                 visual_scores[name].append(photo_visual[name])
     con.close()
+    if unreadable and not scored:
+        # not a single row could be read (e.g. the root page of the table is damaged): the
+        # search stops as for a cache that cannot be opened, and the galleries of the previous
+        # search stay instead of being replaced by empty ones (E50, review)
+        raise next(iter(unreadable.values()))
     if args.scores_file:
         # the same per-crop scores rank_photos combines below, so the evaluation ranks as
         # the galleries do, up to near-ties within the rounding to SCORE_DIGITS (E32)
