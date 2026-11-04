@@ -1,11 +1,13 @@
 """Model and config files stay under the project's .cache folder, also for manual runs (E9, I10)."""
+import ast
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
-from framescout_core import (DEFAULT_YOLO_MODEL, cache_folder_paths, cache_paths, default_cache_env, find_yolo_weights,
-                             yolo_weights)
+from framescout_core import (DEFAULT_MODEL, DEFAULT_YOLO_MODEL, MODELS, cache_folder_paths, cache_paths,
+                             default_cache_env, find_yolo_weights, open_clip_cache_dir, yolo_weights)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -169,3 +171,24 @@ def test_yolo_weights_paths_and_urls_are_used_as_given(tmp_path):
         names.append(r'models\w.pt')
     for name in names:
         assert yolo_weights(name, tmp_path, tmp_path, {}) == name
+
+
+def test_open_clip_downloads_from_a_url_into_the_project_cache(tmp_path):
+    # E39: open_clip fetches weights without a Hub repository from their URL into
+    # ~/.cache/clip unless it gets cache_dir; a Hub model gets none, or its weights would
+    # leave the Hugging Face cache (HF_HOME) and be downloaded again
+    url_model = replace(MODELS[DEFAULT_MODEL], weights_repo='')
+    assert open_clip_cache_dir(url_model, {'XDG_CACHE_HOME': str(tmp_path / 'own')}, tmp_path) == str(
+        tmp_path / 'own' / 'clip')
+    assert open_clip_cache_dir(url_model, {}, tmp_path) == str(tmp_path / '.cache' / 'clip')
+    for model in MODELS.values():
+        assert open_clip_cache_dir(model, {'XDG_CACHE_HOME': str(tmp_path)}, tmp_path) is None
+
+
+def test_the_engine_passes_the_url_cache_folder_to_open_clip():
+    tree = ast.parse((ROOT / 'framescout_engine.py').read_text(encoding='utf-8'))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and getattr(node.func, 'attr', None) == 'create_model_and_transforms']
+    assert len(calls) == 1 and 'cache_dir' in {keyword.arg for keyword in calls[0].keywords}
+    assert any(isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'open_clip_cache_dir'
+               for node in ast.walk(tree))
