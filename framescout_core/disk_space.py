@@ -1,8 +1,8 @@
 """Free disk space checks before installing PyTorch and before a search (F3).
 
 A full disk leaves a broken .venv, a half-downloaded model or failed cache commits, so
-install_torch.py and the app compare what they are about to write with the free space of
-each drive involved. The sizes are estimates on the safe side; the result is a warning,
+install_torch.py, the app and the evaluation tool (framescout_eval.py run, E51) compare
+what they are about to write with the free space of each drive involved. The sizes are estimates on the safe side; the result is a warning,
 never a block.
 """
 import os
@@ -109,11 +109,33 @@ def search_space_needs(results, photos, top, profiles, model, hub_cache, detecto
     hub cache and the weights are looked at only if their drive answers within timeout
     seconds (reachable: cleanup's root probe); otherwise their download is left out.
     """
-    needs = [(Path(results), search_space_bytes(photos, top, profiles, analyzed))]
+    return ([(Path(results), search_space_bytes(photos, top, profiles, analyzed))]
+            + _download_needs([model], hub_cache, detector_weights, timeout, reachable))
+
+
+def eval_run_needs(runs, photos, top, profiles, hub_cache, detector_weights=None, timeout=SPACE_CHECK_TIMEOUT,
+                   reachable=_reachable_roots):
+    """Return the (folder, bytes) pairs the runs of the evaluation tool write (E51).
+
+    runs are (output folder, SearchModel) pairs, one per model the tool runs: each has an
+    output folder and feature cache of its own, and every photo counts as new in each (on
+    the safe side). The models missing in hub_cache add their downloads up there, and
+    detector_weights (as in search_space_needs) is downloaded once for all runs.
+    """
+    models = list({id(model): model for _, model in runs}.values())
+    return ([(Path(output), search_space_bytes(photos, top, profiles)) for output, _ in runs]
+            + _download_needs(models, hub_cache, detector_weights, timeout, reachable))
+
+
+def _download_needs(models, hub_cache, detector_weights, timeout, reachable):
+    """The (folder, bytes) pairs of the models missing in hub_cache (added up) and of missing detector weights."""
     folders = [Path(hub_cache)] + ([] if detector_weights is None else [Path(detector_weights).parent])
     answers = _reachable(folders, timeout, reachable)
-    if answers[Path(hub_cache)] and not model_cached(model, hub_cache):
-        needs.append((Path(hub_cache), download_bytes(model.download)))
+    needs = []
+    if answers[Path(hub_cache)]:
+        downloads = sum(download_bytes(model.download) for model in models if not model_cached(model, hub_cache))
+        if downloads:
+            needs.append((Path(hub_cache), downloads))
     if detector_weights is not None and answers[Path(detector_weights).parent] and not Path(detector_weights).is_file():
         needs.append((Path(detector_weights).parent, DETECTOR_DOWNLOAD))
     return needs

@@ -9,7 +9,7 @@ import pytest
 from framescout_core import disk_space
 from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, OTHER_PACKAGES_SPACE, SPACE_RESERVE, THUMBNAIL_BYTES,
                              TORCH_INSTALL_SPACE, LowSpace, analyzed_photos, app_search_needs, download_bytes,
-                             downloaded_models, low_space, low_space_lines,
+                             downloaded_models, eval_run_needs, low_space, low_space_lines,
                              search_space_bytes, search_space_needs, torch_install_needs)
 
 MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text (review)
@@ -126,6 +126,27 @@ def test_a_hub_cache_that_does_not_answer_is_not_read(tmp_path, monkeypatch):
                                reachable=lambda roots, timeout: dict.fromkeys(roots, False))
     # its drive is left out (low_space leaves out the others that do not answer)
     assert needs == [(results, search_space_bytes(10, 150, 1))]
+
+
+def test_evaluation_runs_need_room_for_every_model(tmp_path):
+    # E51: framescout_eval.py run gives each model an output folder (and feature cache) of its own
+    first, second = MODELS['vit-b-32-openai'], MODELS['vit-b-16-datacomp']
+    hub, weights = tmp_path / 'hub', tmp_path / 'ultralytics' / 'yolo11n.pt'
+    a, b = tmp_path / 'engine' / 'a', tmp_path / 'engine' / 'b'
+    results = search_space_bytes(100, 150, 2)
+    assert eval_run_needs([(a, first), (b, second)], 100, 150, 2, hub, weights) == [
+        (a, results), (b, results), (hub, download_bytes(first.download) + download_bytes(second.download)),
+        (weights.parent, DETECTOR_DOWNLOAD)]
+    # person detection off, and a model whose files are in the cache: nothing to download
+    snapshot = hub / 'models--timm--vit_base_patch32_clip_224.openai'
+    (snapshot / 'refs').mkdir(parents=True)
+    (snapshot / 'refs' / 'main').write_text('abc', encoding='utf-8')
+    (snapshot / 'snapshots' / 'abc').mkdir(parents=True)
+    (snapshot / 'snapshots' / 'abc' / 'open_clip_model.safetensors').write_bytes(b'x')
+    assert eval_run_needs([(a, first)], 100, 150, 2, hub, None) == [(a, results)]
+    # a hub cache that does not answer is left out
+    assert eval_run_needs([(b, second)], 100, 150, 2, hub, None,
+                          reachable=lambda roots, timeout: dict.fromkeys(roots, False)) == [(b, results)]
 
 
 def test_app_search_needs_use_the_folders_the_app_gives_the_engine(tmp_path):
