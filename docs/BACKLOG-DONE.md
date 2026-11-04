@@ -824,6 +824,49 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       "Copy to folder" field is disabled for a profile that is no longer a search profile.
       Tests in `tests/test_marks.py`, `tests/test_copy.py`, `tests/test_profile_file.py`;
       the stale-tab click itself was not reproduced in a browser.)
+- [x] **A34 – Marks left by profiles deleted before A22 stay in `marks.json`:** they still
+      pass to a new profile of that name, and "Clean up storage" never offers them because
+      `marks.json` is in `NEVER_DELETED`. No migration was done. Idea: offer to delete the
+      marks of names that are no profile (asking first), or show them when such a profile
+      is created. Found in the PR of A22.
+      (done 2026-11-04 in PR #77: cleanup category `marks_profiles` "Marks of deleted profiles", default off; marks under a name that is no profile in `profiles.json` now, listed as "<profile>: N marks"; deleting re-reads `profiles.json` under the marks lock (`remove_marks(..., unless_profile_of=)`), so a profile created since the scan keeps its marks. Tests in `tests/test_cleanup.py`, `tests/test_marks.py`.)
+- [x] **A38 – The style block of the mark colors may take a layout slot:** the gallery
+      writes the `<style>` block of `mark_style` (A24) with `st.markdown` on every run of the
+      gallery fragment, outside the keyed card container, so it may add an empty element
+      with the block gap above the cards. `st.html` with only style tags goes to Streamlit's
+      event container and takes no space, but whether a fragment rerun then replaces the
+      old block or keeps stale rules of earlier marks next to the new ones was not checked;
+      `st.markdown` in the fragment is replaced on every run. Check both in a browser
+      (light and dark theme) and switch if `st.html` is clean. One selector per card stays:
+      the state of a mark is not in the DOM, and a page holds at most 48 cards. Review of
+      PR #55, finding 6.
+      (done 2026-11-04 in PR #77: the `<style>` block of `mark_style` is prepended to the existing caption above the cards instead of an own `st.markdown` element, so it takes no layout slot; `st.html` was not used, its fragment-rerun behavior stays unchecked. Not verified in a browser (mark colors, light/dark theme, gap); only Streamlit `AppTest`.)
+- [x] **A40 – `*.broken-*` files are not offered by "Clean up storage"; no restore for a missing `marks.json`:**
+      `marks.json.broken-*` and `cache.sqlite3.broken-*` are never deleted by FrameScout, so
+      the user deletes them by hand in the results folder (the notices say so); a cleanup
+      category for them (default off) could be added. Also, when `marks.json` is missing (e.g.
+      the user removed the damaged file as the old warning advised) but `marks.json.bak`
+      exists, no restore is offered. Found in F1 (PR #60).
+      (done 2026-11-04 in PR #77: cleanup category `broken_files` "Damaged files set aside", default off, for `marks.json.broken-*` and `cache.sqlite3.broken-*` (with side files) directly in the results folder; the notices now point to it. `marks_restore_offer` offers the restore of `marks.json.bak` also for a missing `marks.json` whose backup holds a mark; never automatic. `CACHE_SIDE_FILES` moved to `signature.py`. Tests in `tests/test_cleanup.py`, `tests/test_marks.py`.)
+- [x] **A41 – "Copy 1 marked photos" has no singular:** the copy button in `app.py`
+      (`show_copy`) reads "Copy 1 marked photos" for a single photo, unlike the export button
+      ("Export 1 photo"). Small wording fix. Found in F5 (PR #67).
+      (done 2026-11-04 in PR #77: `count_text` gives "Copy 1 marked photo" and "Marked: 1 photo of ...".)
+- [x] **A42 – The exported file list cannot hold a path with a line break:** the `.txt`
+      of the result list export (F5, `export_file_list`) has one path per line, so a path that
+      contains a line break (possible on Linux/macOS file systems, not on Windows) would be
+      split; the CSV quotes it correctly. Only relevant for a later non-Windows build; then
+      skip such paths with a notice or offer a NUL-separated list. Found in F5 (PR #67).
+      (done 2026-11-04 in PR #77: `export_file_list` leaves out a path with a line break (every break `str.splitlines` knows); `unlisted_paths(cards)` names them, the CSV keeps them and the export notice says how many only the CSV lists. Non-Windows paths only by unit test, `tests/test_export.py`.)
+- [x] **A43 – Old reference names kept after a failed backup rewrite are never removed:**
+      when `update_backup_references` fails after a profile rename was saved (a write error,
+      or since A32 the `profiles.json.lock` not free within 5 s), `store()` in `app.py`
+      keeps the old reference names on purpose, so `profiles.json.bak` still points to
+      existing files, and says so in a notice. Nothing removes them later: the old folder
+      stays as a duplicate until the user deletes it by hand. Fix idea: finish the move on
+      the next successful save (the backup then holds the new names) or offer such files
+      in "Clean up storage". Review of PR #69, finding 4.
+      (done 2026-11-04 in PR #77: no new mechanism: the next save of the profiles replaces `profiles.json.bak`, after which "Reference images no profile uses" offers the old names; pinned by a test in `tests/test_reference_move.py`, and the notice after a failed backup rewrite says so.)
 
 ### Installation / project
 

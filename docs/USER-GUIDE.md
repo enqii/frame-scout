@@ -225,10 +225,12 @@ are hidden, and a page where every photo was rejected says so (see the next page
 Before each change of a mark FrameScout keeps the previous `marks.json` as `marks.json.bak`
 (one generation). If `marks.json` is damaged, the gallery warns that no marks are shown
 and, when the backup is readable, offers **Restore marks from backup** with the backup's
-date and number of marks. Nothing is restored on its own. The damaged file is kept as
-`marks.json.broken-<date>` in the `results` folder; delete it yourself when you no longer
-need it. Do not delete the damaged `marks.json` before restoring: if `marks.json` is
-missing, no restore is offered.
+date and number of marks. The same offer appears, below the marks, when `marks.json` is
+missing but the backup holds at least one mark (e.g. after deleting the file by mistake).
+Nothing is restored on its own; until you restore, the next mark you set starts a new
+`marks.json` and the backup is kept. The damaged file is kept as `marks.json.broken-<date>`
+in the `results` folder; **Clean up storage → Damaged files set aside** offers to delete
+it when you no longer need it.
 
 "Copy N marked photos" copies all photos marked as match into the folder in "Copy to
 folder" (default `Pictures\FrameScout\<profile>`, saved per profile). Copying never
@@ -246,6 +248,10 @@ export makes two files with the same name, `<profile>-<date>-<time>.csv` and `.t
 - the **CSV table** has the columns rank, path, score, text similarity, image similarity
   (empty for searches by text only), crop and mark (match, no match or empty);
 - the **text file** has one full photo path per line, in rank order.
+
+A photo whose path contains a line break is left out of the text file, since it would
+split into two lines; the CSV keeps it, and the notice after the export says how many paths
+only the CSV lists.
 
 Tick **Only photos marked as match** to export just the photos of this list you marked as
 Match. Photos marked in an earlier search that are not in this list are not exported, since
@@ -300,7 +306,7 @@ Everything a search writes lands in `results/`:
 | `results.json` | What the galleries of the last finished search show; the app reads it. Replaced only when a search finishes, so a stopped search keeps the previous results. |
 | `marks.json` | Your Match / No match marks. The search never changes it and the cleanup never deletes it. Marks belong to a photo's full path, so moving or renaming a photo drops them. |
 | `marks.json.bak` | The state of `marks.json` before your last change of a mark (one generation). If `marks.json` is damaged, the gallery offers to restore it. The cleanup never deletes it. |
-| `marks.json.broken-<date>`, `cache.sqlite3.broken-<date>` | Damaged files FrameScout set aside when you restored the marks or renamed the cache. They are never deleted for you: delete them yourself in the `results` folder once you no longer need them. |
+| `marks.json.broken-<date>`, `cache.sqlite3.broken-<date>` | Damaged files FrameScout set aside when you restored the marks or renamed the cache. They are never deleted on their own: **Clean up storage → Damaged files set aside** lists them (unselected). |
 | `cache.sqlite3` | Analyses of photos already seen. An interrupted search resumes from here, and new profiles reuse them. Updates that change the image analysis analyze every photo again; the old entries stay until you clean them up. |
 | `exports/` | Result lists you exported (CSV and text files, see above). Created on the first export; the cleanup never deletes them. |
 | `run.lock`, `run-status.json` | Mark a running search and its progress. They stay after a run and can be deleted when no search runs. |
@@ -329,7 +335,9 @@ analyses and marks are listed as "unbound".
 | Cache entries of older versions or unknown settings | yes | Analyses of an earlier FrameScout version or of command-line-only settings |
 | Cache entries of other AI settings | no | Analyses with other person detection settings; used again if you switch back |
 | Cache entries of other search models | no | Analyses of another search model; used again if you switch back |
-| Reference images no profile uses | no | Images in `references/` that neither `profiles.json` nor its backup names |
+| Marks of deleted profiles | no | Your marks saved under a profile name that no profile in `profiles.json` has now, listed as "<profile>: N marks" (only these marks, never `marks.json` itself; not offered if `profiles.json` or `marks.json` cannot be read). If you create a profile of that name before deleting, its marks are kept |
+| Reference images no profile uses | no | Images in `references/` that neither `profiles.json` nor its backup names. After a rename whose backup rewrite failed, the old names are offered after the next save of the profiles |
+| Damaged files set aside | no | `marks.json.broken-<date>` and `cache.sqlite3.broken-<date>` (with their `-journal`/`-wal`/`-shm` files) in `results` |
 
 "Compact cache.sqlite3 afterwards" (on by default) shrinks the cache file. Only what the
 scan listed and is still unused when deleting is deleted. Never deleted: `marks.json`,
@@ -346,8 +354,8 @@ disk, or a drive or network share that is not reachable now), or damaged. For a 
 unreadable cache, **Rename the damaged cache.sqlite3** renames it (and its
 `-journal`/`-wal`/`-shm` files) to `cache.sqlite3.broken-<date>`; nothing is deleted. For
 an unreadable cache, check again first if the drive may just have been unreachable. The
-next search then analyzes all photos again. Delete the `.broken-` file yourself when you do
-not need it. A shown result disappears once the cache changes (e.g. after a cleanup or a
+next search then analyzes all photos again. Delete the `.broken-` file when you do not need it:
+**Damaged files set aside** in the cleanup lists it. A shown result disappears once the cache changes (e.g. after a cleanup or a
 search); check again then. A search on a cache that cannot be opened or written stops with a
 message that points here; if only some photos cannot be read from it, the search leaves them
 out, finishes, and the app shows a warning that names their number and points here.

@@ -249,11 +249,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       cleanup (E7, A14) must keep the reference images of all generations, and
       `update_backup_references` (rename of the photo/reference folder) must rewrite all
       of them. How many generations is a user decision. Split from A13.
-- [ ] `minor` **A34 – Marks left by profiles deleted before A22 stay in `marks.json`:** they still
-      pass to a new profile of that name, and "Clean up storage" never offers them because
-      `marks.json` is in `NEVER_DELETED`. No migration was done. Idea: offer to delete the
-      marks of names that are no profile (asking first), or show them when such a profile
-      is created. Found in the PR of A22.
 - [ ] `decision` **A35 – A drive letter now used by another disk counts as reachable:** e.g. a USB
       disk that got the letter of an earlier disk, or a network drive mapped to another
       share; the photos of the earlier disk then look unbound and are offered by "Cache
@@ -270,38 +265,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       ignores e.g. a `HF_HOME` the user exported, a manual run honours it. Probably intended
       (the app keeps the install self-contained), but undecided and undocumented; decide and
       document, or use `default_cache_env` in the app too. Review of PR #42, finding 12.
-- [ ] `minor` **A38 – The style block of the mark colors may take a layout slot:** the gallery
-      writes the `<style>` block of `mark_style` (A24) with `st.markdown` on every run of the
-      gallery fragment, outside the keyed card container, so it may add an empty element
-      with the block gap above the cards. `st.html` with only style tags goes to Streamlit's
-      event container and takes no space, but whether a fragment rerun then replaces the
-      old block or keeps stale rules of earlier marks next to the new ones was not checked;
-      `st.markdown` in the fragment is replaced on every run. Check both in a browser
-      (light and dark theme) and switch if `st.html` is clean. One selector per card stays:
-      the state of a mark is not in the DOM, and a page holds at most 48 cards. Review of
-      PR #55, finding 6.
-- [ ] `minor` **A40 – `*.broken-*` files are not offered by "Clean up storage"; no restore for a missing `marks.json`:**
-      `marks.json.broken-*` and `cache.sqlite3.broken-*` are never deleted by FrameScout, so
-      the user deletes them by hand in the results folder (the notices say so); a cleanup
-      category for them (default off) could be added. Also, when `marks.json` is missing (e.g.
-      the user removed the damaged file as the old warning advised) but `marks.json.bak`
-      exists, no restore is offered. Found in F1 (PR #60).
-- [ ] `minor` **A41 – "Copy 1 marked photos" has no singular:** the copy button in `app.py`
-      (`show_copy`) reads "Copy 1 marked photos" for a single photo, unlike the export button
-      ("Export 1 photo"). Small wording fix. Found in F5 (PR #67).
-- [ ] `minor` **A42 – The exported file list cannot hold a path with a line break:** the `.txt`
-      of the result list export (F5, `export_file_list`) has one path per line, so a path that
-      contains a line break (possible on Linux/macOS file systems, not on Windows) would be
-      split; the CSV quotes it correctly. Only relevant for a later non-Windows build; then
-      skip such paths with a notice or offer a NUL-separated list. Found in F5 (PR #67).
-- [ ] `minor` **A43 – Old reference names kept after a failed backup rewrite are never removed:**
-      when `update_backup_references` fails after a profile rename was saved (a write error,
-      or since A32 the `profiles.json.lock` not free within 5 s), `store()` in `app.py`
-      keeps the old reference names on purpose, so `profiles.json.bak` still points to
-      existing files, and says so in a notice. Nothing removes them later: the old folder
-      stays as a duplicate until the user deletes it by hand. Fix idea: finish the move on
-      the next successful save (the backup then holds the new names) or offer such files
-      in "Clean up storage". Review of PR #69, finding 4.
 - [ ] `minor` **A44 – "Already analyzed" ignores modification time and size:** the count of F3 and
       the summary before the start (F12) use `analyzed_photos`, which counts cache rows of the
       signature without a `stat`. A photo edited since its analysis counts as analyzed, so the

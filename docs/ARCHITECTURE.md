@@ -234,12 +234,16 @@ the module of its area and to the re-exports in `__init__.py`.
   (the result file of a search and the app's gallery: validation of the file (plain
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
-- `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`hide_no_match`/`hidden_text`/`mark_style`
+- `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`marks_restore_offer`/`hide_no_match`/`hidden_text`/`mark_style`
   (the user's marks, A17; every change goes through `_common._update_locked(..., backup=True)`
   (private `_update_marks`), which first copies the previous, validly read file byte for byte to
   `marks.json.bak` (F1); `marks_backup(path)` names the backup, `restore_marks` keeps a damaged
   file as `marks.json.broken-<date>` and restores the backup; `delete_marks` removes all marks of a deleted profile, A22;
-  `remove_marks(path, entries)` removes single `(profile, photo path)` marks for the cleanup, E8;
+  `remove_marks(path, entries)` removes single `(profile, photo path)` marks for the cleanup, E8; with
+  `unless_profile_of=profiles_file` it reads `profiles.json` again under the marks lock and keeps the marks of a name that is a profile now
+  (`ValueError` if the file is missing or unreadable; the cleanup category `marks_profiles`, A34);
+  `marks_restore_offer(path, error)` returns `(marks in the backup, its mtime)` if restoring the backup can be offered: for a
+  `ValueError` read (damaged file) or for a missing `marks.json` whose readable backup holds at least one mark, else `None` (A40);
   `save_marks(..., profiles_file=...)` saves only for a name that is a profile now;
   `hide_no_match(cards, marks)` returns the cards not marked as no match and how many it
   left out, applied to the cards of one gallery page, and `hidden_text` the caption of that
@@ -251,7 +255,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `forget_copy_folder` removes only the saved entry of a deleted profile, A22;
   `save_copy_folder(..., profiles_file=...)` like `save_marks`).
 - `exporting.py` (F5):
-  `EXPORTS_DIR`/`EXPORT_COLUMNS`/`EXPORT_MARK_TEXT`/`EXPORT_MAX_NAMES`/`export_cards`/`export_csv`/`export_file_list`/`export_name`/`export_result_list`
+  `EXPORTS_DIR`/`EXPORT_COLUMNS`/`EXPORT_MARK_TEXT`/`EXPORT_MAX_NAMES`/`export_cards`/`export_csv`/`export_file_list`/`unlisted_paths`/`export_name`/`export_result_list`
   (exporting the ranked list of one profile as `results/exports/<slug>-<YYYYMMDD-HHMMSS>[-matches].csv`
   and `.txt`; `export_cards(cards, marks, only_matches)` picks the cards, with only matches just
   those of this list marked as match, and raises `ValueError` if `marks` is `None`; photos marked in an
@@ -259,7 +263,8 @@ the module of its area and to the re-exports in `__init__.py`.
   "Copy marked matches"; `export_csv` is comma-separated with CRLF line ends, scores with four decimals and a
   `.` as decimal point, an empty image similarity for text-only searches and the mark as
   `match`/`no match`/empty, written as UTF-8 with BOM; `export_file_list` is one absolute path per line
-  (LF line ends, UTF-8 without BOM). `export_result_list` never replaces a file: if either name of the pair is
+  (LF line ends, UTF-8 without BOM), leaving out a path with a line break (every break `str.splitlines` knows); `unlisted_paths(cards)`
+  returns those paths, the CSV keeps them and the export notice says how many only the CSV lists, A42. `export_result_list` never replaces a file: if either name of the pair is
   taken both get `-2`, `-3`, ... (up to `EXPORT_MAX_NAMES`), each file is written atomically through
   `_publish_via_temp`/`_publish_new`, and a failed second file removes the first. The paths are
   machine-specific, as for the cache and marks, A21. Standard library only.)
@@ -285,13 +290,15 @@ the module of its area and to the re-exports in `__init__.py`.
   once per app start (`clean_project_folder`, `st.cache_resource`) before `create_from_example`; errors
   never stop the app, lock files and `profiles.json.bak` itself are never touched;
   `_holding_run_lock` (the run lock shared with `cache_check`) and `_sqlite_uri` (F1)).
-- `cache_check.py` (F1): `CACHE_CHECK_LINES`/`CACHE_SIDE_FILES`/`check_cache`/`cache_check_current`/`set_cache_aside`
+- `cache_check.py` (F1): `CACHE_CHECK_LINES`/`check_cache`/`cache_check_current`/`set_cache_aside`
   (the cache health check and renaming a damaged cache, see "Storage cleanup").
   E50: `cache_error(exc)` is `'damaged'` for exactly `sqlite3.DatabaseError`, `'unreadable'` for a
   disk I/O error, else `None` (as `_quick_check` tells them apart); `cache_error_message(cache, exc)`
   names the file and points to "Clean up storage" -> "Check cache" (for a disk I/O error to the drive first);
   `cache_read_warning(cache, exc, count)` is the warning of a search that finished although
   `count` photos could not be read from the cache (review).
+  `CACHE_SIDE_FILES` (the `-journal`/`-wal`/`-shm` suffixes) lives in `signature.py` since A40 (the cleanup needs it too) and is
+  re-exported by `framescout_core`.
   `_common._broken_names` builds the `<name>.broken-<YYYYMMDD-HHMMSS>[-n]` names.
 - `disk_space.py` (F3): the free disk space estimate. Sizes are 1024-based, the units
   `size_text` shows (1 GB = 1024³ bytes). `TORCH_INSTALL_SPACE` (download, installed bytes
@@ -648,7 +655,7 @@ category scans this subfolder, so neither `clean_up` nor `auto_cleanup` touches 
 `NEVER_DELETED` entry, which names files of the results folder itself), `results/marks.json` and
 `results/marks.json.lock` (the user's marks, A17: user data, never written by the engine
 and never deleted by the cleanup, E7), `results/marks.json.bak` (F1) and the `*.broken-*` files (damaged
-`marks.json`/`cache.sqlite3` set aside, never deleted by FrameScout), `profiles.json`, `run.log`, `.cache/`, `.tmp/`,
+`marks.json`/`cache.sqlite3` set aside; deleted only by the cleanup category `broken_files`, A40), `profiles.json`, `run.log`, `.cache/`, `.tmp/`,
 `.venv/`, `yolo11n.pt` (older installs; now `.cache/ultralytics/`); `.tmp/eval/<collection>/` of the evaluation tool (below).
 
 ### Model evaluation tool
@@ -1218,7 +1225,7 @@ file as `marks.json.broken-<date>` and replaces `marks.json` atomically with the
 bytes; if that replace fails, the kept copy is removed again (no copy per failed try). The
 gallery offers it (never automatically) only for a `ValueError` read, not for `OSError`, and
 then advises "Restore the backup below, or fix the file" (not "remove": a missing
-`marks.json` gets no offer, A40). A21 (marks follow the absolute path) is closed as won't do: a
+`marks.json` gets the same offer only if the backup holds a mark, `marks_restore_offer`, A40: caption plus "Restore marks from backup" below the marks; never automatic, the next mark starts a new `marks.json` and the backup stays). A21 (marks follow the absolute path) is closed as won't do: a
 renamed or moved photo counts as a new photo, its old mark stays until cleaned up. The control on each
 card is an `st.segmented_control` whose session state is set from the file before it is
 drawn on every run of the gallery fragment (no `default=`), so the file is the truth also
@@ -1230,7 +1237,7 @@ page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[kind
 with `!important`; this relies on Streamlit internals (the key class and the button kind,
 read from the 1.66.1 frontend bundle), so `test_marks.py` fails once `constraints.txt` pins
 another Streamlit than `MARK_STYLE_STREAMLIT`: check the selectors against the new version,
-then raise that constant (not verified in a real browser or the dark theme). A rename in the profile tab calls `rename_marks`
+then raise that constant (not verified in a real browser or the dark theme). A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The result is **not verified in a browser** (light/dark theme, mark colors, gap). A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
 that are no longer search profiles cannot be marked and their "Copy to folder" field is
 disabled. A gallery drawn before its profile was renamed or deleted (another tab) still
@@ -1259,9 +1266,9 @@ replaced) and `forget_copy_folder` (under the settings lock; writes nothing with
 entry) and drops the session's unsaved copy folder of that name; a different number of
 deleted marks (marked or unmarked since the question was shown) and a part that fails
 are named in the notice at the top of the profile tab. `marks.json` stays in
-`NEVER_DELETED`. Marks that profiles deleted before A22 left behind stay (A34); marks of
+`NEVER_DELETED`. Marks that profiles deleted before A22 left behind are offered only by the cleanup category `marks_profiles` (A34); marks of
 photos that no longer exist at their path are removed only on request by the cleanup
-category `marks_unbound` (`remove_marks`, see "Storage cleanup").
+category `marks_unbound` (`remove_marks`, see "Storage cleanup"). A43: a failed backup rewrite after a rename keeps the old reference names and says so; the next save of the profiles replaces `profiles.json.bak`, after which "Reference images no profile uses" offers the old names (pinned by a test in `test_reference_move.py`).
 `marks.json` and the copy folders are read through `st.cache_data`, keyed by path, mtime,
 size and file id (`version_key`). Copying (`copy_photos`): flat into the target,
 `shutil.copy2` via a temporary file published with `_publish_new` (never replaces a file),
@@ -1304,6 +1311,8 @@ seen before the deletion, A35); `marks_unbound` ("Marks of unbound photos", **de
 `cache_missing` in `CLEANUP_CATEGORIES`; items are `(profile, photo path)` pairs, names
 `"profile: path"`; it is one category checkbox, marks are not chosen one by one; not
 offered with "Not offered: marks.json cannot be read (...)" if the file is unreadable);
+`marks_profiles` ("Marks of deleted profiles", **default off**, after `marks_unbound`, A34: `_profile_marks` lists marks saved under a name that is no profile in `profiles.json` now (exact name, like `require_profile`), names "<profile>: N marks"; not offered if `profiles.json` or `marks.json` cannot be read; `_delete_profile_marks` deletes with `remove_marks(..., unless_profile_of=profiles_file)`, so a profile of that name created since the scan keeps its marks, and a `ValueError` skips the step with "Marks of deleted profiles were kept: ...");
+`broken_files` ("Damaged files set aside", **default off**, last in `CLEANUP_CATEGORIES`, A40: `marks.json.broken-<YYYYMMDD-HHMMSS>[-n]` and `cache.sqlite3.broken-...` with `-journal`/`-wal`/`-shm`, matched by `_BROKEN_FILE` directly in the results folder; only files the scan showed are deleted; the notices of a marks restore and of "Set cache aside" point to this category);
 no category lists `results/exports/` (F5: exported result lists are user data; `test_cleanup.py`
 checks that a full cleanup and `auto_cleanup` keep it);
 `cache_old` and
@@ -1681,7 +1690,7 @@ A29, `test_photos.py`), the counts of photos and folders found again (A37), the 
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
 hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the
-CSS of `mark_style` and its Streamlit pin, `test_marks.py`) and the AI settings reset
+CSS of `mark_style` and its Streamlit pin, `marks_restore_offer`, `remove_marks(unless_profile_of=)`, `test_marks.py`; the cleanup categories `marks_profiles` and `broken_files`, `test_cleanup.py`; `unlisted_paths`, `test_export.py`) and the AI settings reset
 (`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
 `test_settings.py`; A24, A26; the buttons and the mark colors were run with `AppTest`/the
 generated style only, not in a browser),

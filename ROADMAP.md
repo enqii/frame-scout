@@ -26,7 +26,7 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
 ### P16 – Hygiene (`minor` items bundled per area, added 2026-11-03)
 - [x] (A) Evaluation tool: E36, E49, E51, I25 (done 2026-11-04 in PR #73)
 - [x] (B) Engine and cache: E37, E39, E40, E44, E46, E50 (done 2026-11-04 in PR #74)
-- [ ] (C) App: A34, A38, A40, A41, A42, A43
+- [x] (C) App: A34, A38, A40, A41, A42, A43 (done 2026-11-04 in PR #77; A38 not verified in a browser)
 - [ ] (D) Installer: I4, I16
 
 ### P17 – Repository layout (added 2026-11-03)
