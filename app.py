@@ -193,8 +193,12 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False):
         update_backup_references(PROFILES, staged, BASE)
     except OSError as exc:
         # keep the old names too, so the backup still points to existing files
+        # the next save replaces the backup: the old names are then offered by "Clean up
+        # storage" as reference images no profile uses (A43)
         st.session_state.notice = (f'Saved. profiles.json.bak could not be updated ({exc}), so the moved '
-                                   'reference images also keep their old names for now.')
+                                   'reference images also keep their old names for now. After the next save of '
+                                   'the search profiles, "Clean up storage" offers these old files as reference '
+                                   'images no profile uses.')
     else:
         problems = finish_reference_move(staged, REFS)
         if problems:
