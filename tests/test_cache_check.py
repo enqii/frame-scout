@@ -8,8 +8,8 @@ import pytest
 
 import framescout_core
 from framescout_core import (CACHE_FILE, CACHE_SIDE_FILES, DEFAULT_YOLO_MODEL, MARKS_FILE, RUN_LOCK, RUN_STATUS,
-                             RunLock, cache_check_current, check_cache, cleanup_running, prepare_cache,
-                             set_cache_aside)
+                             RunLock, cache_check_current, cache_error, cache_error_message, check_cache,
+                             cleanup_running, prepare_cache, set_cache_aside)
 
 # 2026-11-02 12:30:45 local time
 NOW = time.mktime((2026, 11, 2, 12, 30, 45, 0, 0, -1))
@@ -267,3 +267,60 @@ def test_a_failed_rename_puts_the_side_files_back(tmp_path, monkeypatch):
         set_cache_aside(tmp_path, no_engine, result['file'], now=NOW)
     assert (tmp_path / CACHE_FILE).exists() and (tmp_path / (CACHE_FILE + '-journal')).read_bytes() == b'journal'
     assert not list(tmp_path.glob('*.broken-*'))
+
+
+# the engine's message for a damaged cache (E50)
+
+def engine_error(cache, read_rows=False):
+    """The sqlite3 error the engine gets when it opens the cache (and reads its rows), or None."""
+    con = sqlite3.connect(cache)
+    try:
+        prepare_cache(con, True, 12, .3, DEFAULT_YOLO_MODEL)
+        if read_rows:
+            con.execute('SELECT count(*), sum(length(vectors)) FROM features').fetchone()
+    except sqlite3.Error as exc:
+        return exc
+    finally:
+        con.close()
+    return None
+
+
+def test_a_search_on_a_file_that_is_no_database_points_to_check_cache(tmp_path):
+    cache = tmp_path / CACHE_FILE
+    cache.write_bytes(b'x' * 4096)
+    error = engine_error(cache)
+    assert cache_error(error) == 'damaged'
+    message = cache_error_message(cache, error)
+    assert str(cache) in message and 'damaged' in message and str(error) in message
+    assert '"Clean up storage"' in message and '"Check cache"' in message
+    assert cache.read_bytes() == b'x' * 4096  # nothing is changed
+
+
+def test_a_search_on_damaged_pages_points_to_check_cache(tmp_path):
+    cache = healthy_cache(tmp_path)
+    damage(cache)
+    error = engine_error(cache, read_rows=True)
+    assert cache_error(error) == 'damaged' and '"Check cache"' in cache_error_message(cache, error)
+
+
+@pytest.mark.parametrize('code', [sqlite3.SQLITE_IOERR, sqlite3.SQLITE_IOERR | (2 << 8), None])
+def test_a_disk_io_error_of_a_search_points_to_the_drive_and_check_cache(tmp_path, code):
+    error = sqlite3.OperationalError('disk I/O error')
+    if code is not None:
+        error.sqlite_errorcode = code
+    assert cache_error(error) == 'unreadable'
+    message = cache_error_message(tmp_path / CACHE_FILE, error)
+    assert 'disk I/O error' in message and 'drive' in message and '"Check cache"' in message
+
+
+@pytest.mark.parametrize('error', [sqlite3.OperationalError('database is locked'),
+                                   sqlite3.OperationalError('database or disk is full'),
+                                   sqlite3.IntegrityError('UNIQUE constraint failed'),
+                                   ValueError('x'), OSError('x'), KeyboardInterrupt()])
+def test_other_errors_of_a_search_keep_their_own_message(tmp_path, error):
+    # "Check cache" would not help: e.g. a locked or full cache, or an error of a photo
+    assert cache_error(error) is None and cache_error_message(tmp_path / CACHE_FILE, error) is None
+
+
+def test_a_healthy_cache_gives_the_engine_no_error(tmp_path):
+    assert engine_error(healthy_cache(tmp_path), read_rows=True) is None

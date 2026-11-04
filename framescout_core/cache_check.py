@@ -62,6 +62,38 @@ def _io_error(exc):
     return str(exc).startswith('disk I/O error')
 
 
+def cache_error(exc):
+    """Whether the exception exc of a search is an error of the cache file itself (E50).
+
+    'damaged' for an error SQLite reports as damage (exactly sqlite3.DatabaseError: "file is
+    not a database", "database disk image is malformed"), 'unreadable' for a disk I/O error,
+    as _quick_check tells them apart; None for anything else (e.g. a locked or full cache,
+    or an error of a photo), which "Check cache" would not help against.
+    """
+    if type(exc) is sqlite3.DatabaseError:
+        return 'damaged'
+    if isinstance(exc, sqlite3.OperationalError) and _io_error(exc):
+        return 'unreadable'
+    return None
+
+
+def cache_error_message(cache, exc):
+    """The message of a search that stopped on the error exc of the cache file cache, or None (E50).
+
+    Points to "Check cache" in the app instead of leaving SQLite's raw error alone; None if
+    exc is no error of the cache file itself (cache_error).
+    """
+    kind = cache_error(exc)
+    check = ('In the app, open "Clean up storage" and click "Check cache": it can set a damaged cache aside, and the '
+             'next search then analyzes every photo again. Your photos are not affected.')
+    if kind == 'damaged':
+        return f'The feature cache {cache} is damaged ({exc}). {check}'
+    if kind == 'unreadable':
+        return (f'The feature cache {cache} could not be read or written ({exc}). Check that the drive of the results '
+                f'folder is connected and working, then start the search again. If the error stays: {check}')
+    return None
+
+
 def check_cache(results, alive, lock_timeout=CLEANUP_LOCK_TIMEOUT):
     """Check the cache file of the folder results with SQLite's quick_check; return the result (F1).
 
