@@ -91,6 +91,7 @@ Started by the user with `/triage` (`.claude/skills/triage/SKILL.md`), when the 
 - A taken-over idea becomes a `BACKLOG.md` item of group **F** (features). Every open backlog item carries a status tag: `ready`, `decision`, `hardware`, `minor` or `parked` (meanings: `BACKLOG.md` header).
 - `ROADMAP.md` is a rolling window of **about 10 open PRs at most**, built from themed packages (one PR per line); everything else stays in the backlog. A finished item is only checked off in `ROADMAP.md`; a package whose lines are all done moves unchanged to `docs/ROADMAP-DONE.md` at the next `/triage` run (not earlier, so that PRs touch only their own line). Order: user data safety, then low effort for every user, then unblockers; hold-point items enter only after the decision.
 - The triage result is one docs-only PR (`chore/triage-<date>`) without `fs:*` label and review round, because the user decides every line in chat; merge only after explicit approval.
+- After the triage PR is merged, the skill proposes a GitHub release for the finished round (`vX.Y.0`, pre-release while the project is a prototype); it is published only after the user's explicit approval, with `gh release create --target <sha>` (no local tag push).
 
 ## Git and commits
 - Repository: public GitHub repo `enqii/frame-scout` (AGPL-3.0), default branch `main`.
