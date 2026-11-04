@@ -2,8 +2,8 @@
 
 A full disk leaves a broken .venv, a half-downloaded model or failed cache commits, so
 install_torch.py, the app and the evaluation tool (framescout_eval.py run, E51) compare
-what they are about to write with the free space of each drive involved. The sizes are estimates on the safe side; the result is a warning,
-never a block.
+what they are about to write with the free space of each drive involved. The sizes are
+estimates on the safe side; the result is a warning, never a block.
 """
 import os
 import re

@@ -41,6 +41,8 @@ default_cache_env(os.environ, Path(__file__).resolve().parent)
 
 import numpy as np
 import torch
+# PIL.Image only for import_detector_class; importing framescout_images registers the
+# HEIF decoder and sets Pillow's limits (MAX_IMAGE_PIXELS, LOAD_TRUNCATED_IMAGES)
 from PIL import Image
 
 from framescout_images import DECODERS, open_image, render_thumbnail
