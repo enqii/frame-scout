@@ -45,8 +45,8 @@ LOAD_RENDERER = ev.load_renderer
 
 @pytest.fixture(autouse=True)
 def no_engine(monkeypatch):
-    """pool never loads the engine (torch) here: no thumbnails are rendered unless a test gives a renderer."""
-    monkeypatch.setattr(ev, 'load_renderer', lambda: (None, 'no engine in the tests'))
+    """pool never loads the image decoders (Pillow) here: no thumbnails are rendered unless a test gives a renderer."""
+    monkeypatch.setattr(ev, 'load_renderer', lambda: (None, 'no decoders in the tests'))
 
 
 # --- collections ---
@@ -562,35 +562,30 @@ def test_pool_names_a_reference_image_that_cannot_be_read(session, collection, m
     assert '1 reference image(s) cannot be read' in out and str(collection.root / 'dog.jpg') in out
 
 
-def test_pool_without_the_engine_names_the_photos_left_without_a_thumbnail(session, collection, capsys):
+def test_pool_without_the_decoders_names_the_photos_left_without_a_thumbnail(session, collection, capsys):
     assert ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3']) == 0
     out = capsys.readouterr().out
     assert f'{len(pool_files(session))} photo(s) or reference image(s) have no thumbnail' in out
-    assert 'no engine in the tests' in out and out.rstrip().splitlines()[-1].startswith('Pool of')
+    assert 'no decoders in the tests' in out and out.rstrip().splitlines()[-1].startswith('Pool of')
     assert not collection.thumbnails.exists()
 
 
-def test_the_renderer_is_the_engines_or_none_with_the_reason():
+def test_the_renderer_is_the_image_modules_or_none_with_the_reason():
+    # E49: framescout_images, not the engine, which imports torch and sets the cache variables
     def render(path, target):
         pass
 
     names = []
 
-    def engine(name):
+    def images(name):
         names.append(name)
-        return type('Engine', (), {'render_thumbnail': staticmethod(render)})
+        return type('Images', (), {'render_thumbnail': staticmethod(render)})
 
-    def no_torch(name):
-        raise ImportError("No module named 'torch'")
+    def no_pillow(name):
+        raise ImportError("No module named 'PIL'")
 
-    assert LOAD_RENDERER(engine) == (render, None) and names == ['framescout_engine']
-    assert LOAD_RENDERER(no_torch) == (None, "ImportError: No module named 'torch'")
-
-
-def test_the_engine_renders_thumbnails_with_a_function_of_its_own():
-    import ast
-    tree = ast.parse(Path(ev.ENGINE).read_text(encoding='utf-8'))
-    assert 'render_thumbnail' in {node.name for node in tree.body if isinstance(node, ast.FunctionDef)}
+    assert LOAD_RENDERER(images) == (render, None) and names == ['framescout_images']
+    assert LOAD_RENDERER(no_pillow) == (None, "ImportError: No module named 'PIL'")
 
 
 @pytest.mark.parametrize('route', ['photo/0/99', 'photo/5/0', 'photo/x/0', 'reference/0/0', 'nothing'])
