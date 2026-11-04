@@ -264,18 +264,21 @@ def engine_command(collection, model, folders, profiles, args):
     return command
 
 
-def space_warning(collection, models, folders, profiles, args, env):
+def space_warning(collection, models, folders, profiles, args, env, log):
     """Return the lines of a warning if the runs of models may leave little free disk space (E51), else [].
 
     The F3 check of the app for every model that is run: its output folder (feature cache
     and gallery thumbnails for the photos of folders, all counted as new), the downloads
     of the models not in the Hugging Face cache of env yet, and the person detector's
-    weights as the engine looks them up. An estimate: a warning, never a block; a check
-    that fails (OSError, ValueError) gives none.
+    weights as the engine looks them up. log says first that the photos are counted, which
+    takes as long as the engine's own scan of them (review). An estimate: a warning, never
+    a block; a check that fails (OSError, ValueError) gives none, any other error a note
+    instead of stopping the runs (review).
     """
     runnable = [model for model in models if model_problem(model) is None]
     if not runnable:
         return []
+    log('Counting the photos for the free disk space check ...')
     try:
         roots, _ = distinct_folders(folders)
         photos = len(scan_folders(roots, supported_extensions(available_decoders()), exclude=collection.root).paths)
@@ -288,6 +291,8 @@ def space_warning(collection, models, folders, profiles, args, env):
         low = low_space(eval_run_needs(runs, photos, args.top, profiles, hub_cache_dir(env), weights))
     except (OSError, ValueError):
         return []
+    except Exception as exc:  # an advisory check: never stops the runs
+        return [f'Note: the free disk space check failed ({type(exc).__name__}: {exc}); the runs start anyway.']
     if not low:
         return []
     return (['Little free disk space. The model runs write about this much on the drive of']
@@ -322,7 +327,8 @@ def command_run(args):
     collection.save_config(folders, profiles)
     env = engine_env(args.cache_dir)
     print(f'Model downloads and caches: {Path(args.cache_dir).resolve()}', flush=True)
-    for line in space_warning(collection, models, folders, profile_count, args, env):
+    for line in space_warning(collection, models, folders, profile_count, args, env,
+                              lambda message: print(message, flush=True)):
         print(line, flush=True)
     failed = []
     for model in models:
