@@ -105,7 +105,7 @@ GitHub release. Only after the triage PR is merged and `main` is up to date:
 
 1. Find the last release: `gh release list --limit 1` (none yet: this is the first one).
 2. Propose the version to the user in German: SemVer `v<major>.<minor>.0`, the minor
-   number counts up once per round (first release: `v1.2.0`). While `CLAUDE.md` calls the
+   number counts up once per round (the first release is `v1.1.0`, the current state named in `CLAUDE.md`). While `CLAUDE.md` calls the
    project a prototype, the release is a **pre-release** (`--prerelease`).
 3. Draft the release notes from the commits and merged PRs since the last release
    (`gh release create … --generate-notes --notes-start-tag <last tag>` as a base, then
