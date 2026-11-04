@@ -9,7 +9,7 @@ import pytest
 
 import framescout_eval as ev
 from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, MODELS, LowSpace, cache_folder_paths, download_bytes,
-                             motif, read_labels, read_motifs, search_space_bytes, save_labels, scores_document, thumbnail_name,
+                             motif, read_label_file, read_labels, search_space_bytes, save_labels, scores_document, thumbnail_name,
                              write_scores)
 from framescout_scoring import rank_photos
 
@@ -422,17 +422,23 @@ def test_labels_made_for_another_motif_are_warned_about(collection, tmp_path, ca
     collection.save_config([str(tmp_path)], str(profiles))
     write_model_scores(collection, DEFAULT_MODEL, [0.9, 0.8, 0.1, 0.2, 0.0])
     labels = {'Car': {photo(collection, 'a.jpg'): True}}
-    save_labels(collection.labels_file, labels, {'Car': motif('Vehicles', 'red', [])})
     assert ev.current_motifs(collection, collection.scores()) == {'Car': motif('Vehicles', 'red', [])}
-    assert ev.motif_warnings(collection, collection.scores()) == []
+    assert ev.motif_warnings(collection, collection.scores(), {'Car': motif('Vehicles', 'red', [])}) == []
     save_labels(collection.labels_file, labels, {'Car': motif('Vehicles', 'blue', [])})
-    [warning] = ev.motif_warnings(collection, collection.scores())
+    [warning] = ev.motif_warnings(collection, collection.scores(), read_label_file(collection.labels_file)[1])
     assert 'Car' in warning and 'features' in warning and 'new profile name' in warning
     dir_option = ['--dir', str(collection.root.parent)]
     assert ev.main(['metrics', 'cosplay', *dir_option]) == 0
     assert f'Warning: cosplay: {warning}' in capsys.readouterr().out
     assert ev.main(['pool', 'cosplay', *dir_option]) == 0
     assert f'Warning: {warning}' in capsys.readouterr().out
+    # motifs that cannot be read: one warning, the labels are still evaluated (review)
+    [unreadable] = ev.motif_warnings(collection, collection.scores(), None)
+    assert 'cannot be read' in unreadable
+    # a profile renamed or removed in the profiles file has no known motif: nothing compared (review)
+    profiles.write_text(json.dumps({'profiles': [{'name': 'Truck', 'franchise': 'Vehicles'}]}), encoding='utf-8')
+    assert ev.current_motifs(collection, collection.scores()) == {}
+    assert ev.motif_warnings(collection, collection.scores(), {'Car': motif('Vehicles', 'blue', [])}) == []
 
 
 def test_a_profile_without_hits_has_no_ap(collection):
@@ -512,11 +518,36 @@ def test_a_label_is_saved_right_away_and_can_be_cleared(session, collection):
     body = json.dumps({'profile': 1, 'photo': 2, 'value': False}).encode()
     status, _, answer = session.handle('POST', f'/{session.token}/label', body)
     assert status == 200 and json.loads(answer) == {'ok': True}
-    assert read_labels(collection.labels_file) == {'Dog': {target: False}}
-    # E36: with the motif the label was made for
-    assert read_motifs(collection.labels_file) == {'Dog': motif('', '', [str(collection.root / 'dog.jpg')])}
+    # no profiles file: the motif is not known, so none is recorded (review of E36)
+    assert read_label_file(collection.labels_file) == ({'Dog': {target: False}}, {})
     session.handle('POST', f'/{session.token}/label', json.dumps({'profile': 1, 'photo': 2, 'value': None}).encode())
-    assert read_labels(collection.labels_file) == {} and read_motifs(collection.labels_file) == {}
+    assert read_labels(collection.labels_file) == {}
+
+
+def test_a_label_records_the_motif_the_page_shows(session, collection, tmp_path):
+    # E36: the motif of the pool; a profile changed after pool is warned about before labelling (review)
+    profiles = tmp_path / 'profiles.json'
+    profiles.write_text(json.dumps({'profiles': [{'name': 'Dog', 'franchise': 'Animals', 'features': 'brown'}]}),
+                        encoding='utf-8')
+    collection.save_config([str(tmp_path)], str(profiles))
+    assert ev.main(['pool', 'cosplay', '--dir', str(collection.root.parent), '--depth', '3']) == 0
+    session = ev.LabelSession(collection)
+    assert session.warnings == [] and session.known == {'Dog'}
+    for index in (0, 1):  # Car is not in the profiles file: its motif is not recorded
+        session.handle('POST', f'/{session.token}/label',
+                       json.dumps({'profile': index, 'photo': 0, 'value': True}).encode())
+    assert read_label_file(collection.labels_file)[1] == {
+        'Dog': motif('Animals', 'brown', [str(collection.root / 'dog.jpg')])}
+    profiles.write_text(json.dumps({'profiles': [{'name': 'Dog', 'franchise': 'Animals', 'features': 'black'}]}),
+                        encoding='utf-8')
+    [warning] = ev.LabelSession(collection).warnings
+    assert 'Dog' in warning and 'features' in warning and 'pool cosplay' in warning
+
+
+def test_the_labelling_page_refuses_to_save_over_unreadable_motifs(session, collection):
+    collection.labels_file.write_text('{"format": 1, "labels": {}, "motifs": []}', encoding='utf-8')
+    with pytest.raises(ValueError, match='motifs'):
+        ev.LabelSession(collection)
 
 
 @pytest.mark.parametrize('body', [b'not json', b'{"profile": 9, "photo": 0, "value": true}',

@@ -37,11 +37,11 @@ from urllib.parse import unquote, urlsplit
 
 import numpy as np
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EVAL_K, MODEL_KEYS, MODELS,
-                             SKIP_LOG_LIMIT, available_decoders, average_precision, build_pool, cache_folder_paths,
-                             changed_motifs, collection_name_problem, distinct_folders, ensure_thumbnail,
-                             eval_run_needs, find_yolo_weights, hub_cache_dir, load_profiles, low_space,
-                             low_space_lines, model_problem, motif, read_document, read_labels, read_motifs,
+from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EVAL_K, LABELS_FORMAT, MODEL_KEYS,
+                             MODELS, SKIP_LOG_LIMIT, available_decoders, average_precision, build_pool,
+                             cache_folder_paths, changed_motifs, collection_name_problem, distinct_folders,
+                             ensure_thumbnail, eval_run_needs, find_yolo_weights, hub_cache_dir, load_profiles,
+                             low_space, low_space_lines, model_problem, motif, read_document, read_label_file,
                              read_profiles, read_scores, record_motif, save_labels, scan_folders, set_label,
                              supported_extensions, thumbnail_name, write_document)
 from framescout_scoring import rank_photos
@@ -194,24 +194,40 @@ def label_warnings(scores, labels):
 def current_motifs(collection, scores):
     """{profile name: motif} of the scored profiles as pool_document records them: context and
     features from the collection's profiles file, the reference images of the latest model
-    run; {} if the profiles file cannot be read, so nothing is compared (E36)."""
+    run (E36). A profile the file does not have (renamed or removed since the run), or every
+    profile if the file cannot be read, is left out: its motif is not known (review)."""
     details = profile_details(collection)
-    if not details:
-        return {}
-    return {name: motif(*details.get(name, ('', '')), next(reversed(models.values()))['references'])
-            for name, models in profile_entries(scores).items()}
+    return {name: motif(*details[name], next(reversed(models.values()))['references'])
+            for name, models in profile_entries(scores).items() if name in details}
 
 
-def motif_warnings(collection, scores):
+def motif_warnings(collection, scores, motifs):
     """Warnings about labels made for another motif than the profile of that name describes now (E36).
 
-    Prompts may be reworded under the same name (the labels are kept for comparing the
-    wordings); another context, other features or reference images make a new motif.
+    motifs are those of the labels file (read_label_file; None: not readable). Prompts may
+    be reworded under the same name (the labels are kept for comparing the wordings);
+    another context, other features or reference images make a new motif.
     """
-    changes = changed_motifs(read_motifs(collection.labels_file), current_motifs(collection, scores))
-    return [f'The labels of {name} were made for another motif: its {" and ".join(fields)} changed since its '
-            'first label. Use a new profile name for a new motif, or clear its labels on the labelling page.'
-            for name, fields in changes.items()]
+    if motifs is None:
+        return [f'The motifs the labels were made for cannot be read from {collection.labels_file}, so a changed '
+                'motif is not detected; the labelling page does not start until the file is fixed.']
+    changes = changed_motifs(motifs, current_motifs(collection, scores))
+    return [f'The labels of {name} were made for another motif: the profile\'s {" and ".join(fields)} differ from '
+            'those of its first label. Use a new profile name for a new motif, or clear its labels on the labelling '
+            'page.' for name, fields in changes.items()]
+
+
+def pool_motif_warnings(collection, pool, scores):
+    """Warnings about pool profiles shown with another motif than their profile describes now (review of E36).
+
+    A label records the motif the labelling page shows (that of the pool file), so a
+    profile changed after pool would get labels of its old motif.
+    """
+    shown = {profile['name']: motif(profile['context'], profile['features'], profile['references'])
+             for profile in pool['profiles']}
+    return [f'The pool shows {name} with another motif than its profile describes now (its {" and ".join(fields)} '
+            f'changed): run "python framescout_eval.py pool {collection.name}" again before labelling it.'
+            for name, fields in changed_motifs(shown, current_motifs(collection, scores)).items()]
 
 
 # --- run ---
@@ -490,11 +506,11 @@ def command_pool(args):
     if args.depth < EVAL_K:
         print(f'Note: with --depth below {EVAL_K}, the top {EVAL_K} of AP@{EVAL_K} holds unlabelled photos.', flush=True)
     weights = parse_weights(args.weights)
-    for warning in run_warnings(scores) + motif_warnings(collection, scores):
+    labels, motifs = read_label_file(collection.labels_file)
+    for warning in run_warnings(scores) + motif_warnings(collection, scores, motifs):
         print(f'Warning: {warning}', flush=True)
     document = pool_document(collection, scores, args.depth, weights)
     write_document(collection.pool_file, document, indent=1)
-    labels = read_labels(collection.labels_file)
     total = todo = 0
     for profile in document['profiles']:
         done = sum(photo['path'] in labels.get(profile['name'], {}) for photo in profile['photos'])
@@ -611,8 +627,8 @@ def command_metrics(args):
         scores = collection.scores()
         if not scores:
             raise UsageError(f'No scores in {collection.root}.')
-        labels = read_labels(collection.labels_file)
-        for warning in run_warnings(scores) + label_warnings(scores, labels) + motif_warnings(collection, scores):
+        labels, motifs = read_label_file(collection.labels_file)
+        for warning in run_warnings(scores) + label_warnings(scores, labels) + motif_warnings(collection, scores, motifs):
             print(f'Warning: {name}: {warning}', flush=True)
         results[name] = evaluate(scores, labels, args.k, args.weight, weights)
         models += [model for model in scores if model not in models]
@@ -646,8 +662,17 @@ class LabelSession:
         self.pool = read_document(collection.pool_file, 'pool file', POOL_FORMAT)
         if self.pool is None:
             raise UsageError(f'No pool in {collection.root}: run "python framescout_eval.py pool {collection.name}" first.')
-        self.labels = read_labels(collection.labels_file)  # ValueError: never saved over
-        self.motifs = read_motifs(collection.labels_file)
+        self.labels, self.motifs = read_label_file(collection.labels_file)  # ValueError: never saved over
+        if self.motifs is None:
+            raise ValueError(f'{collection.labels_file} is not a labels file of format {LABELS_FORMAT}: unreadable '
+                             'motifs; fix or remove its "motifs" key, which would be saved over.')
+        try:
+            scores = collection.scores()
+            # the profiles whose motif is known now; a label records the motif the page shows
+            self.known = set(current_motifs(collection, scores))
+            self.warnings = pool_motif_warnings(collection, self.pool, scores)
+        except (OSError, ValueError):  # no comparison: nothing recorded, the labels are still saved
+            self.known, self.warnings = set(), []
         self.token = secrets.token_urlsafe(16)
         self.lock = threading.Lock()
         self.thumb_folders = collection.thumbnail_folders(self.pool['models'])
@@ -703,9 +728,11 @@ class LabelSession:
         profile, photo = found
         with self.lock:
             labels = set_label(self.labels, profile['name'], photo['path'], value)
-            # the motif of the pool the label is set in (E36): pool and metrics warn when it changes
+            # the motif of the pool the label is set in (E36): pool and metrics warn when it changes;
+            # not recorded for a profile the profiles file does not have (its context is not known)
+            shown = motif(profile['context'], profile['features'], profile['references'])
             motifs = record_motif(self.motifs, labels, profile['name'],
-                                  motif(profile['context'], profile['features'], profile['references']))
+                                  shown if profile['name'] in self.known else None)
             save_labels(self.collection.labels_file, labels, motifs)
             self.labels, self.motifs = labels, motifs
         return 200, 'application/json', b'{"ok": true}'
@@ -801,6 +828,8 @@ def command_label(args):
     if not 0 <= args.port <= 65535:
         raise UsageError('--port must be from 0 to 65535 (0: any free port).')
     session = LabelSession(Collection(args.dir, args.collection))
+    for warning in session.warnings:
+        print(f'Warning: {warning}', flush=True)
     serve(session, args.port, not args.no_browser)
     return 0
 

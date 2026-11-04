@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (EVAL_K, LABELS_FORMAT, SCORES_FORMAT, average_precision, build_pool, changed_motifs,
-                             collection_name_problem, motif, read_document, read_labels, read_motifs, read_scores,
+                             collection_name_problem, motif, read_document, read_label_file, read_labels, read_scores,
                              record_motif, save_labels, scores_document, set_label, write_document, write_scores)
 
 
@@ -220,17 +220,19 @@ def test_the_motif_of_the_first_label_of_a_profile_is_kept(tmp_path):
     labels = set_label(labels, 'Red car', 'b.jpg', False)
     assert record_motif(motifs, labels, 'Red car', motif('Vehicles', 'blue paint', [])) == {'Red car': CAR}
     save_labels(path, labels, motifs)
-    assert read_labels(path) == labels and read_motifs(path) == {'Red car': CAR}
+    assert read_label_file(path) == (labels, {'Red car': CAR})
     # once every label of the profile is cleared, its motif goes too
     labels = set_label(set_label(labels, 'Red car', 'a.jpg', None), 'Red car', 'b.jpg', None)
     assert record_motif(motifs, labels, 'Red car', CAR) == {}
+    # a motif that is not known (None) is not recorded (review)
+    assert record_motif({}, set_label({}, 'Red car', 'a.jpg', True), 'Red car', None) == {}
 
 
 def test_a_labels_file_without_motifs_has_none(tmp_path):
     # files of an earlier version: the next label of a profile records its motif
     path = tmp_path / 'labels.json'
     save_labels(path, {'Red car': {'a.jpg': True}})
-    assert read_motifs(path) == {} and read_motifs(tmp_path / 'missing.json') == {}
+    assert read_label_file(path)[1] == {} and read_label_file(tmp_path / 'missing.json') == ({}, {})
     assert 'motifs' not in json.loads(path.read_text(encoding='utf-8'))
 
 
@@ -238,11 +240,20 @@ def test_a_labels_file_without_motifs_has_none(tmp_path):
                                     '{"Red car": {"context": 1, "features": "", "references": []}}',
                                     '{"Red car": {"context": "", "features": "", "references": [1]}}',
                                     '{"Red car": {"context": "", "features": ""}}'])
-def test_unreadable_motifs_raise(tmp_path, motifs):
+def test_unreadable_motifs_leave_the_labels_usable(tmp_path, motifs):
+    # review: pool and metrics still work, without comparing the motifs
     path = tmp_path / 'labels.json'
-    path.write_text(f'{{"format": 1, "labels": {{}}, "motifs": {motifs}}}', encoding='utf-8')
-    with pytest.raises(ValueError):
-        read_motifs(path)
+    path.write_text(f'{{"format": 1, "labels": {{"X": {{"a.jpg": true}}}}, "motifs": {motifs}}}', encoding='utf-8')
+    assert read_label_file(path) == ({'X': {'a.jpg': True}}, None)
+    assert read_labels(path) == {'X': {'a.jpg': True}}
+
+
+def test_keys_a_later_version_adds_to_a_motif_are_kept_and_not_compared(tmp_path):
+    path = tmp_path / 'labels.json'
+    later = {**CAR, 'prompts_hash': 'abc'}
+    save_labels(path, {'Red car': {'a.jpg': True}}, {'Red car': later})
+    assert read_label_file(path)[1] == {'Red car': later}
+    assert changed_motifs({'Red car': later}, {'Red car': CAR}) == {}
 
 
 def test_changed_motifs_name_what_changed():
