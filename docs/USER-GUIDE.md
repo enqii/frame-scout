@@ -267,7 +267,7 @@ ARW, ORF, RW2, RAF, PEF, SRW).
   1024 pixels long, otherwise it decodes the RAW data at half size. Colors are the
   camera's, not your own RAW development.
 - If a JPEG or HEIC of the same name is next to a RAW file ("RAW+JPEG" mode), only the
-  JPEG/HEIC is searched. If that JPEG cannot be read, the RAW file is analyzed instead.
+  JPEG/HEIC is searched. If that JPEG cannot be read, or its data ends early (a truncated file), the RAW file is analyzed instead.
 - The search log and the "Photo source" tab name skipped files and why.
 - Browsers cannot show HEIC or RAW files: in the HTML gallery the thumbnail works, but a
   click downloads the file. "Open" in the app uses the program Windows has for it.
@@ -324,7 +324,7 @@ analyses and marks are listed as "unbound".
 | Temporary thumbnail files | yes | Left by a search stopped while writing the galleries |
 | Galleries of renamed or deleted profiles | yes | HTML galleries that belong neither to a current profile nor to the last search |
 | Thumbnails no gallery shows | yes | Thumbnails neither the last search nor a kept gallery shows |
-| Cache entries of unbound photos | no | Analyses of photos no longer at their path. Unreachable drives are not checked; if a drive letter now belongs to another disk, its photos look unbound too |
+| Cache entries of unbound photos | no | Analyses of photos no longer at their path. Unreachable drives, folders that do not answer within 30 seconds and links (junctions, mounted drives) whose target cannot be reached are not checked (a note names them); if a drive letter now belongs to another disk, its photos look unbound too |
 | Marks of unbound photos | no | Your marks of photos no longer at their path (only these marks, never `marks.json` itself) |
 | Cache entries of older versions or unknown settings | yes | Analyses of an earlier FrameScout version or of command-line-only settings |
 | Cache entries of other AI settings | no | Analyses with other person detection settings; used again if you switch back |
@@ -348,7 +348,7 @@ unreadable cache, **Rename the damaged cache.sqlite3** renames it (and its
 an unreadable cache, check again first if the drive may just have been unreachable. The
 next search then analyzes all photos again. Delete the `.broken-` file yourself when you do
 not need it. A shown result disappears once the cache changes (e.g. after a cleanup or a
-search); check again then.
+search); check again then. A search on a damaged cache stops with a message that points here.
 
 ### What the numbers mean
 

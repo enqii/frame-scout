@@ -211,7 +211,11 @@ the module of its area and to the re-exports in `__init__.py`.
   `engine_env` use it)/`default_cache_env`/`yolo_weights`/`find_yolo_weights`
   (the project's `.cache/` folders and the engine's defaults for them; `find_yolo_weights`
   is `yolo_weights`' lookup without moving anything, also used by the disk space check; see
-  "Environment variables and caches").
+  "Environment variables and caches"). E39: `open_clip_cache_dir(model, environ, base)` is the
+  `cache_dir=` the engine passes to `open_clip.create_model_and_transforms`: `XDG_CACHE_HOME/clip`
+  (`.cache/clip`) for a model without `weights_repo` (open_clip's URL download path, which
+  otherwise writes to `~/.cache/clip`), `None` for Hub models (their weights stay in the Hub
+  cache, `HF_HOME`). No model needs the URL path today.
 - `hub.py` (E16/E31/E33): `HUB_QUIET_ENV`/`WEIGHTS_FILES`/`TOKENIZER_FILES`/`OFFLINE_VARIABLES`/`hub_cache_dir`/`hub_file_cached`/`model_cached`/`import_open_clip`/`hub_go_online`/`hub_file_error`/`load_with_hub_fallback`
   (loading a search model without a Hub request once it is cached; see "Environment
   variables and caches").
@@ -260,11 +264,25 @@ the module of its area and to the re-exports in `__init__.py`.
   `_publish_via_temp`/`_publish_new`, and a failed second file removes the first. The paths are
   machine-specific, as for the cache and marks, A21. Standard library only.)
 - `cleanup.py`:
-  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`STALE_TEMP_AGE`/`ROOT_TIMEOUT`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
+  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`STALE_TEMP_AGE`/`ROOT_TIMEOUT`/`FOLDER_TIMEOUT`/`project_temp_cleanup`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
   (the storage cleanup, E7/E11/E13/E23/A14/E8; the unbound-photo check is the private `_PathCheck`;
+  E37: its folder pass runs in a daemon thread per root (`_FolderWorker`, `_pass`); a folder that
+  does not answer within `FOLDER_TIMEOUT` (30 s) is not checked (its photos are kept, a note
+  names the folder), then the root is probed again and, if it is silent, its other folders
+  are not checked either; `_dead_link(folder)`: photos behind a junction, volume mount
+  point or symbolic link whose target cannot be reached count as not checked (note names the
+  link). Only ever fewer photos are offered as unbound. E44: `project_temp_cleanup(folder, now=None)`
+  removes `profiles.json`, `profiles.json.bak` and `settings.json` temp files (`<name>.<8 chars>.tmp`,
+  pattern `_PROJECT_TEMP_FILE`) at least `STALE_TEMP_AGE` old by the folder's clock
+  (`_file_system_now(folder, name)`, `_stale_temp_files(results, now, pattern)`); `app.py` calls it
+  once per app start (`clean_project_folder`, `st.cache_resource`) before `create_from_example`; errors
+  never stop the app, lock files and `profiles.json.bak` itself are never touched;
   `_holding_run_lock` (the run lock shared with `cache_check`) and `_sqlite_uri` (F1)).
 - `cache_check.py` (F1): `CACHE_CHECK_LINES`/`CACHE_SIDE_FILES`/`check_cache`/`cache_check_current`/`set_cache_aside`
   (the cache health check and renaming a damaged cache, see "Storage cleanup").
+  E50: `cache_error(exc)` is `'damaged'` for exactly `sqlite3.DatabaseError`, `'unreadable'` for a
+  disk I/O error, else `None` (as `_quick_check` tells them apart); `cache_error_message(cache, exc)`
+  names the file and points to "Clean up storage" -> "Check cache" (for a disk I/O error to the drive first).
   `_common._broken_names` builds the `<name>.broken-<YYYYMMDD-HHMMSS>[-n]` names.
 - `disk_space.py` (F3): the free disk space estimate. Sizes are 1024-based, the units
   `size_text` shows (1 GB = 1024³ bytes). `TORCH_INSTALL_SPACE` (download, installed bytes
@@ -844,8 +862,24 @@ reference image of such a format fails with the reason (`missing_decoder`).
   which names it in its partner's place, so cache row, card, thumbnail, link and
   `--scores-file` use the RAW path. The partner has no cache row, so every run retries it
   first (one failed decode and its `ERROR` per run) and a repaired JPEG wins again.
-  Because the engine sets `ImageFile.LOAD_TRUNCATED_IMAGES = True`, a merely truncated
-  JPEG usually decodes and does not fall back (E46).
+  Truncated JPEG partners (E46): the engine sets `ImageFile.LOAD_TRUNCATED_IMAGES = True`, which
+  cannot be switched per photo while the decoding threads run, so
+  `open_image(path, min_size=None, complete=False)` with `complete=True` detects a JPEG whose data
+  ends early itself (Pillow's private `_ended` flag of `JpegImageFile.load_read`; pinned by
+  `tests/test_images.py`, which runs only where Pillow is installed, not in CI) and raises
+  `framescout_core.TruncatedImageError(OSError)`. `RawFallback.strict(path)` is true for a partner
+  with a RAW file: it decodes with `complete=True`, a truncated one fails and its RAW file is
+  analyzed (E30 path). If that RAW file fails too, `defer(path, truncated=True)` keeps the failure,
+  `retry()` returns the partner (attributes `truncated`/`lenient`) and the engine analyzes it as
+  far as its data goes (log `The RAW file of … could not be analyzed either; analyzing the readable
+  part of the photo instead.`), counted once for the shot. Photos without a RAW partner decode as
+  before; a truncated partner analyzed by an earlier version stays in the cache. A truncated JPEG that
+  is not the shot's chosen partner counts as an error (E53).
+- **Damaged cache (E50):** the engine does not treat `sqlite3.DatabaseError` / a disk I/O error
+  as a per-photo error (cache scan, `analyzed`, storing and scoring re-raise it, `cache_error`);
+  `main()` prints `cache_error_message` to stderr (`run.log`), writes it as the status message
+  (phase `failed`, exit code 1) and returns 1 without a traceback. Other SQLite errors (locked, full)
+  keep their old handling. The cache is opened only after the model load (E56).
 - **Skipped files:** the log names the RAW files skipped for a partner (count and one
   example), the files of a missing decoder with the reason (only if the folder has such
   files), and the files of other extensions by extension (`skipped_lines`); the app's
@@ -1277,7 +1311,12 @@ normcased); of the names missing from the listing the first 4 are confirmed by a
 and only if one of them exists (e.g. another Unicode normalization) every missing name
 gets its own `stat`; a folder with at most 4 photos gets one `stat` per photo; a folder
 that does not exist makes all its photos gone; a folder that cannot be listed (e.g. no
-permission) keeps them. After the pass the gone photos are checked once more (a share
+permission) keeps them. E37: the folder pass of each root runs in a daemon thread (`_FolderWorker`); a folder
+that does not answer within `FOLDER_TIMEOUT` = 30 s is not checked (note with the folder, its photos kept),
+the root is probed again, and a silent root ends the pass for its other folders (note with the root);
+photos behind a junction, mount point or symbolic link whose target cannot be reached (`_dead_link`) count
+as not checked (note names the link). `FOLDER_TIMEOUT` is not measured: a legitimately slow folder is
+not checked, the safe side (E54). After the pass the gone photos are checked once more (a share
 that dropped during the pass and is back shows them again), then their roots are probed
 again, and a root that is still offline makes its photos count as not checked. Measured on Windows 11 with 30,000 files in 100 folders: stat
 0.12-0.21 s vs listing 0.08-0.11 s locally; through the share `\\localhost\C$` (SMB) 13.8 s vs
@@ -1336,13 +1375,15 @@ deletes. Starting a search drops a shown check result, a rename drops a shown cl
 and `cache_check_current(results, result)` (one `stat` per page run) drops a shown result
 once the cache's size or mtime differs from the checked file (a cleanup, a search of another
 tab, a rename; refused results stay).
-A search on a damaged cache still fails with SQLite's raw error (E50).
+A search on a damaged cache stops with exit code 1 and a message pointing to "Check cache" (E50).
 While `clean_up` holds the lock it registers the results folder in the process
 (`cleanup_running`; app sessions are threads of one process), so other tabs show "The
 storage is being cleaned up" instead of a running search and disable Stop (A23). The
 app's "Temporary thumbnails" category does not list the temporary files `auto_cleanup`
 removes (E26); the temporary files of the app's own atomic writes in the project folder
-(`profiles.json.<random>.tmp`, `settings.json.<random>.tmp`) are never cleaned up: E44.
+(`profiles.json.<random>.tmp`, `settings.json.<random>.tmp`) are cleaned up once per app start by `project_temp_cleanup` (E44): files of the three names
+(`profiles.json`, `profiles.json.bak`, `settings.json`) plus `.<8 chars>.tmp`, at least `STALE_TEMP_AGE` old by the
+folder's clock; lock files and `profiles.json.bak` itself stay.
 
 ### Run state (lock and status file)
 
@@ -1590,7 +1631,7 @@ profile (A22, A33, `test_marks.py`, `test_copy.py`, the result list export in `t
 failing second file, nothing to export; not run: Excel import, a real browser), `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` in `test_cache_dirs.py`, and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching
+`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` and `open_clip_cache_dir` (E39) in `test_cache_dirs.py`, `cache_error`/`cache_error_message` with real damaged files (E50) in `test_cache_check.py`, the folder timeout, dead links and `project_temp_cleanup` (E37, E44) in `test_cleanup.py`, `RawFallback.strict/defer/retry` (E46) in `test_photos.py`, `open_image(complete=True)` with a truncated JPEG in `test_images.py` (needs Pillow, so skipped in CI), and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the stale temporary files of
 `auto_cleanup` (E26, `test_cleanup.py`: removed; fresh ones, foreign ones and gallery names

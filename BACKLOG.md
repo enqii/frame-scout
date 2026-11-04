@@ -129,13 +129,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       missing. A key trimmed from the registry falls back to the default with
       a warning in a user's `settings.json` (`read_settings`); its cache rows then count as
       "older version" in the cleanup. Search quality is a hold point.
-- [ ] `minor` **E37 – The unbound check guards only the root probe with a timeout:** a folder
-      listing or `stat` on a share that hangs during the pass stalls the scan (the page
-      run) until the OS gives up; a junction or mount point inside a reachable root that
-      leads to a disconnected volume can make its photos look gone (the deletion
-      re-checks, but the volume would have to be back by then). Idea: run the pass in a
-      worker thread with a per-folder timeout, or treat folders on other volumes than
-      their root as their own root. Found in the PR of E8.
 - [ ] `hardware` **E38 – The online fallback and the first download are not runtime-tested:**
       `framescout_core.model_cached` decides from the hub cache whether a model loads
       offline (E16, P7 A). An engine search ran with the default model only; SigLIP
@@ -146,16 +139,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       downloading what is missing) and the first download into an empty cache were covered
       by unit tests only, since a real run downloads at least 605 MB. Verify on the home PC
       (P10 A, next to E34) and fix what shows up. Found in the PR of E16.
-- [ ] `minor` **E39 – open_clip's URL download path ignores the cache variables (minor):** a model
-      without an `hf_hub` config would be fetched by `download_pretrained_from_url` into
-      `~/.cache/clip` regardless of `TORCH_HOME`/`XDG_CACHE_HOME`. Not hit today: every
-      `framescout_core.MODELS` entry downloads through the Hugging Face Hub. A future model
-      without `hf_hub` would need `cache_dir=` passed to open_clip. Found in the PR of E9/I10.
-- [ ] `minor` **E40 – A `yolo_weights` test only holds on Windows (minor):** `test_yolo_weights_paths_and_urls_are_used_as_given`
-      passes `r'models\w.pt'` and expects it back unchanged; on Linux/macOS `Path(name).name`
-      is the whole string, so `yolo_weights` treats it as a bare name and the test fails
-      (CI runs on Windows only). Fix: check the backslash case with `PureWindowsPath` or skip
-      it off Windows. Review of PR #42, finding 6.
 - [ ] `decision` **E41 – A user's own `yolo11n.pt` in the working folder is ignored once a cached copy
       exists:** `yolo_weights` looks in the cache folder first and in the working folder only
       afterwards, so the "used as before" file of the working folder loses against any copy in
@@ -174,28 +157,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       path, but this was not run; if it does not, the first download fails. Check on the first
       download into an empty cache (P10 A, next to E38) or create the folder in
       `yolo_weights`/the engine. Review of PR #42, finding 10.
-- [ ] `minor` **E44 – Temporary files of the app's atomic writes in the project folder stay after a
-      kill (minor):** `profiles.json.<random>.tmp`, `settings.json.<random>.tmp` (and the
-      write of `profiles.json.bak`) remain if the app process is killed during a write. No
-      cleanup removes them: `auto_cleanup` only looks at `results/`. Small and rare. Found
-      in PR #45.
 - [ ] `parked` **E45 – `publish_export` is not one step across files (minor):** a kill between the
       renames (milliseconds) can still leave some galleries newer than `results.json`. A
       rename that fails every retry (a file held open for over 2 s; the run then fails)
       restores the files renamed before it, but if a restore fails too, they stay new.
       Idea, if it ever matters: a versioned gallery subfolder that `results.json` names.
       Found in PR #45.
-- [ ] `minor` **E46 – A merely truncated JPEG partner does not trigger the RAW fallback:** the
-      engine sets `ImageFile.LOAD_TRUNCATED_IMAGES = True`, so a JPEG with an intact header
-      but missing data decodes without an error (the missing part gray) and the E30
-      fallback never runs; only partners that fail to decode (corrupt header, unreadable
-      file, broken HEIC) fall back. Idea: for partners of a RAW file, detect truncation
-      (Pillow's truncation warning, or a decode with `LOAD_TRUNCATED_IMAGES` off) and
-      prefer the RAW file then. Found in PR #46.
-- [ ] `minor` **E50 – A search on a damaged `cache.sqlite3` fails with SQLite's raw error:**
-      `run.log` shows "file is not a database" or "database disk image is malformed". The
-      engine could catch `sqlite3.DatabaseError` when opening or reading the cache and point
-      to "Clean up storage" -> "Check cache". Found in F1 (PR #60).
 - [ ] `hardware` **E52 – The effect of `--low-priority` is not measured:** F4 lowers the engine's
       process priority and keeps one or two cores out of the PyTorch threads (`torch_threads`,
       also for the person detector), but neither the
@@ -204,6 +171,26 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       home PC together with E17 (P10 B); from the results adjust how many cores
       `torch_threads` leaves free, or also lower the decoding threads (E2), which are not
       reduced now. Found in F4 (PR #65).
+- [ ] `minor` **E53 – E46 detects only a JPEG whose data ends early:** a partner whose JPEG
+      data is damaged in the middle so that libjpeg gives up (`err_code < 0`) still decodes
+      with a gray part, since `LOAD_TRUNCATED_IMAGES` also suppresses that error; a truncated
+      HEIC partner was not tested. A truncated JPEG that is not the chosen partner of its shot
+      (another partner failed first and got the RAW file) is not retried if the RAW file
+      fails, so that shot is lost. Found in the PR of E46 (PR #74).
+- [ ] `minor` **E54 – The unbound check on Linux/macOS and the folder timeout:** E37 handles
+      junctions, mount points and links on Windows; on Linux/macOS an unmounted mount point
+      that stays as an empty folder makes its photos look gone. `FOLDER_TIMEOUT` (30 s) is
+      not measured: a legitimately slow folder (e.g. many absent names each confirmed by a
+      `stat` on a slow share) is not checked (the safe side). Found in the PR of E37 (PR #74).
+- [ ] `minor` **E55 – A model without `weights_repo` needs more than E39's download folder:**
+      such a model would also fail `test_every_model_names_its_hub_repositories`, and
+      `model_cached`/the offline import (E16), the disk space estimate and "Check
+      installation" assume Hub files. Only needed when such a model is ever added. Found in
+      the PR of E39 (PR #74).
+- [ ] `minor` **E56 – A damaged cache is reported only after the model load:** the engine
+      opens the cache after loading the model, so E50's message comes a few seconds (or a
+      first download) later than it could; opening the cache before the model load would
+      report it at once. Found in the PR of E50 (PR #74).
 
 ### App (`app.py`)
 
