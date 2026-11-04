@@ -895,7 +895,9 @@ reference image of such a format fails with the reason (`missing_decoder`).
   line, as before E50), since a damaged page can hit only a few rows; the photos are collected and
   the finished search prints `cache_read_warning` (count, file, "Check cache") before `Done.` and
   passes it to `final_status(0, warnings)` as the message of the `finished` status, which the app
-  shows as a warning under the success note. Other SQLite errors (locked, full) keep their old
+  shows as a warning under the success note. If no photo could be scored and some rows could not
+  be read (e.g. the table's root page is damaged), the first such error is raised after the scoring,
+  so the search stops as above and the previous galleries stay. Other SQLite errors (locked, full) keep their old
   handling. The cache is opened only after the model load (E56).
 - **Skipped files:** the log names the RAW files skipped for a partner (count and one
   example), the files of a missing decoder with the reason (only if the folder has such

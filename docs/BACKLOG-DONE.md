@@ -1554,5 +1554,7 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (a failed group store raises at once, `store_group(..., fatal=)`, without embedding its
       photos one by one); a row that cannot be read leaves out its photo as before, and the
       finished search ends with `cache_read_warning` (count, file, "Check cache"), which the app
-      shows under the success note. Smoke run with one overwritten table page: 2 of 8 photos
-      left out, galleries written, exit code 0, the warning in the log and the status.)
+      shows under the success note; if not a single row could be read, the search stops as
+      before (the previous galleries stay). Smoke runs: one overwritten table leaf page: 2 of 8
+      photos left out, galleries written, exit code 0, the warning in the log and the status;
+      the table's root page overwritten: exit code 1 with the message.)
