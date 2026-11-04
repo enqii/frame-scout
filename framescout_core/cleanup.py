@@ -37,16 +37,17 @@ THUMBNAILS_DIR = 'thumbnails'
 LEGACY_THUMBNAILS_DIR = 'vorschaubilder'
 # every gallery the engine has written (also v1.1) has this title
 GALLERY_MARKER = '<title>FrameScout – '
-CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missing', 'marks_unbound', 'cache_old',
-                      'cache_other', 'cache_models', 'references', 'broken_files')
+CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missing', 'marks_unbound', 'marks_profiles',
+                      'cache_old', 'cache_other', 'cache_models', 'references', 'broken_files')
 # the categories of cache rows (deleted by signature, except cache_missing: by path and signature)
 CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
 # selected when a scan is shown; cache rows and marks of unbound photos (any folder searched so
 # far; a drive letter another disk got makes photos look unbound, A35), reference images, rows
-# of other current settings, rows of other search models (E22) and the damaged files set aside
-# (A40: the user may want to repair one) are not
+# of other current settings, rows of other search models (E22), marks of names that are no
+# profile (A34: a profile of that name may come back) and the damaged files set aside (A40: the
+# user may want to repair one) are not
 CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': False,
-                    'marks_unbound': False, 'cache_old': True, 'cache_other': False, 'cache_models': False,
+                    'marks_unbound': False, 'marks_profiles': False, 'cache_old': True, 'cache_other': False, 'cache_models': False,
                     'references': False, 'broken_files': False}
 # seconds the reachability probe of the drive and share roots may take (all roots together); a
 # stat on a disconnected network share can hang much longer
@@ -711,6 +712,26 @@ def _unbound_marks(entries, check, among=None):
     return category
 
 
+def _profile_marks(entries, profiles):
+    """The marks_profiles category: the marks of names that are no profile of profiles (A34).
+
+    E.g. of a profile deleted before deleting a profile also deleted its marks (A22): a new
+    profile of that name would get them. entries: _attempt(_read_marks_entries); profiles:
+    the current profile list, or a ValueError if it cannot be read (nothing is offered then).
+    Names are compared exactly, like require_profile.
+    """
+    for problem in (profiles, entries):
+        if isinstance(problem, ValueError):
+            return _category('marks_profiles', problem=f'Not offered: {problem}.')
+    names = {p.get('name') for p in profiles}
+    items = sorted(entry for entry in entries if entry[0] not in names)
+    counts = {}
+    for profile, _ in items:
+        counts[profile] = counts.get(profile, 0) + 1
+    return _category('marks_profiles', items,
+                     names=[f"{profile}: {count_text(count, 'mark', 'marks')}" for profile, count in counts.items()])
+
+
 def _referenced_files(profiles_file, profiles):
     """The _path_key of every reference image of profiles (of profiles_file) and of its .bak; ValueError if unknown."""
     profiles_file = Path(profiles_file)
@@ -767,7 +788,8 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
     found = {'temp_thumbnails': _category('temp_thumbnails', temps, sum(_file_size(p) for p in temps))}
     profiles = None
     try:
-        profiles = _load_profile_file(profiles_file)  # read once for galleries and references (review)
+        # read once for galleries, references and the marks of deleted profiles (review)
+        profiles = _load_profile_file(profiles_file)
         orphaned, kept, listed = _gallery_state(results, profiles)
     except ValueError as exc:
         problem = f'Not offered: {exc}.'
@@ -792,6 +814,8 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
                 {photo for _, photo in ([] if isinstance(entries, ValueError) else entries)}, progress)
     found.update(_cache_categories(cache, current_signature, current_model, check))
     found['marks_unbound'] = _unbound_marks(entries, check)
+    found['marks_profiles'] = _profile_marks(entries, _attempt(lambda: profiles if profiles is not None
+                                                               else _load_profile_file(profiles_file)))
     try:
         refs = _unreferenced_references(refs_root, profiles_file, profiles)
     except ValueError as exc:
@@ -915,6 +939,19 @@ def _delete_marks(results, shown, summary):
     summary['marks'] += remove_marks(results / MARKS_FILE, fresh['items'])
 
 
+def _delete_profile_marks(results, shown, profiles_file, summary):
+    """Remove the marks of names that are no profile the scan shown listed and that still are none now (A34).
+
+    profiles_file is read again under the marks lock (remove_marks), so a profile of such a
+    name created since the scan keeps its marks; only these entries leave marks.json.
+    """
+    entries = [tuple(item) for item in shown['marks_profiles']['items']]
+    try:
+        summary['marks'] += remove_marks(results / MARKS_FILE, entries, unless_profile_of=profiles_file)
+    except ValueError as exc:
+        summary['skipped'].append(f'Marks of deleted profiles were kept: {exc}.')
+
+
 # results folders a clean_up of this process works on now: the app's sessions are threads of
 # one process, so another tab can tell a cleanup holding the run lock from a search (review)
 _CLEANING = set()
@@ -1032,6 +1069,8 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                  ('Cache entries', True,
                   lambda: _delete_rows(results, shown, selected, current_signature, current_model, vacuum, summary)),
                  ('Marks', 'marks_unbound' in selected, lambda: _delete_marks(results, shown, summary)),
+                 ('Marks of deleted profiles', 'marks_profiles' in selected,
+                  lambda: _delete_profile_marks(results, shown, profiles_file, summary)),
                  ('Reference images', 'references' in selected, references),
                  ('Damaged files set aside', 'broken_files' in selected, broken_files)]
         for name, wanted, step in steps:

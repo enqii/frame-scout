@@ -100,7 +100,13 @@ CLEANUP_LABELS = {
                       'moved). They are kept in case the photos come back. Deleting removes only these marks from '
                       'marks.json, never the file or other marks. Photos on a drive or network share that is not '
                       'reachable now are not checked.'),
-    'cache_old': ('Cache entries of older versions or unknown settings',
+    'marks_profiles': ('Marks of deleted profiles',
+                       'Your match/no-match marks saved under a name that is none of your search profiles now, e.g. '
+                       'of a profile deleted before FrameScout deleted the marks together with their profile. A new '
+                       'profile of that name would get them. Deleting removes only these marks from marks.json, '
+                       'never the file or other marks; the marks of a profile of that name created since the scan '
+                       'are kept.'),
+    'cache_old':('Cache entries of older versions or unknown settings',
                   'Analyses made by an earlier FrameScout version, which are never used again, or with settings '
                   'only the command line offers (e.g. another --yolo-model), which are analyzed again when such a '
                   'search runs.'),
@@ -1001,7 +1007,7 @@ def show_cleanup():
             continue
         if key.startswith('cache_'):
             amount = f"{count_text(category['rows'], 'entry', 'entries')} · about {size_text(category['size'])}"
-        elif key == 'marks_unbound':
+        elif key.startswith('marks_'):
             amount = count_text(len(category['items']), 'mark', 'marks')
         else:
             amount = f"{count_text(len(category['items']), 'file', 'files')} · {size_text(category['size'])}"

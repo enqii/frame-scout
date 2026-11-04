@@ -223,6 +223,23 @@ def test_removing_marks_removes_only_the_named_entries(tmp_path):
     assert read_marks(path) == {'Dog': {'a.jpg': MARK_MATCH}}
 
 
+def test_removing_marks_of_deleted_profiles_keeps_those_of_a_current_profile(tmp_path):
+    # the cleanup of marks of names that are no profile (A34): checked under the lock
+    path, profiles = tmp_path / MARKS_FILE, tmp_path / 'profiles.json'
+    save_marks(path, 'Dog', {'a.jpg': MARK_MATCH})
+    save_marks(path, 'Cat', {'a.jpg': MARK_MATCH})
+    profiles.write_text(json.dumps({'profiles': [{'name': 'Cat', 'reference_images': []}]}), encoding='utf-8')
+    assert remove_marks(path, {('Dog', 'a.jpg'), ('Cat', 'a.jpg')}, unless_profile_of=profiles) == 1
+    assert read_marks(path) == {'Cat': {'a.jpg': MARK_MATCH}}
+    profiles.write_text('{broken', encoding='utf-8')
+    with pytest.raises(ValueError, match='profiles.json'):
+        remove_marks(path, {('Cat', 'a.jpg')}, unless_profile_of=profiles)
+    profiles.unlink()  # a missing file is no proof that no profile has the name
+    with pytest.raises(ValueError, match='profiles.json does not exist'):
+        remove_marks(path, {('Cat', 'a.jpg')}, unless_profile_of=profiles)
+    assert read_marks(path) == {'Cat': {'a.jpg': MARK_MATCH}}
+
+
 def test_removing_no_mark_changes_nothing(tmp_path):
     path = tmp_path / 'results' / MARKS_FILE
     assert remove_marks(path, {('Red car', 'a.jpg')}) == 0  # no results folder: nothing is created
