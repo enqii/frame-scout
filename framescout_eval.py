@@ -38,7 +38,7 @@ from urllib.parse import unquote, urlsplit
 import numpy as np
 
 from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EVAL_K, MODEL_KEYS, MODELS, SKIP_LOG_LIMIT,
-                             average_precision, build_pool, collection_name_problem, ensure_thumbnail, load_profiles,
+                             average_precision, build_pool, cache_folder_paths, collection_name_problem, ensure_thumbnail, load_profiles,
                              model_problem, read_document, read_labels, read_profiles, read_scores, save_labels,
                              set_label, thumbnail_name, write_document)
 from framescout_scoring import rank_photos
@@ -208,12 +208,8 @@ def default_cache_dir(prefix=None, base_prefix=None, root=ROOT):
 
 def engine_env(cache_dir, environ=os.environ):
     """The engine's environment: model downloads and caches where the app keeps them, UTF-8 output."""
-    env = dict(environ)
-    cache_dir = Path(cache_dir)
-    env.update({'TORCH_HOME': str(cache_dir / 'torch'), 'HF_HOME': str(cache_dir / 'huggingface'),
-                'YOLO_CONFIG_DIR': str(cache_dir / 'ultralytics'), 'XDG_CACHE_HOME': str(cache_dir),
-                'PYTHONIOENCODING': 'utf-8'})
-    return env
+    return {**environ, **{name: str(path) for name, path in cache_folder_paths(cache_dir).items()},
+            'PYTHONIOENCODING': 'utf-8'}
 
 
 def engine_command(collection, model, folders, profiles, args):

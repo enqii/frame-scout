@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 import framescout_eval as ev
-from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, read_labels, save_labels, scores_document, thumbnail_name,
+from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, cache_folder_paths, read_labels, save_labels, scores_document, thumbnail_name,
                              write_scores)
 from framescout_scoring import rank_photos
 
@@ -142,6 +142,13 @@ def test_run_takes_an_explicit_cache_folder(tmp_path, setup):
     assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
                     '--models', DEFAULT_MODEL, '--cache-dir', str(cache)]) == 0
     assert calls[0][1]['TORCH_HOME'] == str(cache / 'torch')
+
+
+def test_the_engine_gets_the_cache_variables_of_the_shared_helper(tmp_path):
+    # I25: the same four variables as the .bat files and the app set, from cache_folder_paths
+    env = ev.engine_env(tmp_path / 'my-cache', environ={'PATH': 'x', 'HF_HOME': 'own'})
+    assert env == {'PATH': 'x', 'PYTHONIOENCODING': 'utf-8',
+                   **{name: str(path) for name, path in cache_folder_paths(tmp_path / 'my-cache').items()}}
 
 
 def checkout(path):
