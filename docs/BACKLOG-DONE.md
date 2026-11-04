@@ -1497,7 +1497,12 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       note names it; a root that then does not answer ends the pass for its other folders;
       photos behind a junction, mount point or symbolic link whose target cannot be reached
       (`_dead_link`) count as not checked. Only ever fewer photos are offered. Unit-tested
-      with simulated hangs and links; not run against a real hanging share. Follow-up: E54.)
+      with simulated hangs and links; not run against a real hanging share. Follow-up: E54.
+      Review: after a folder times out, the first junction, mount point or link above it
+      (`_link_above`), not only the root, is probed again, so the folders behind a share that
+      stops answering are given up together; a folder an abandoned worker still hangs on
+      (`_HANGING`) gets no second thread; the notes tell a folder that timed out and a link
+      that cannot be reached from an unreachable root.)
 - [x] **E39 – open_clip's URL download path ignores the cache variables (minor):** a model
       without an `hf_hub` config would be fetched by `download_pretrained_from_url` into
       `~/.cache/clip` regardless of `TORCH_HOME`/`XDG_CACHE_HOME`. Not hit today: every
@@ -1521,7 +1526,9 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-04 in PR #74: `framescout_core.project_temp_cleanup(folder, now=None)`
       removes `profiles.json`, `profiles.json.bak` and `settings.json` temp files at least
       `STALE_TEMP_AGE` old by the folder's clock; `app.py` runs it once per app start before
-      the profiles are read. Lock files and `profiles.json.bak` itself are never touched.)
+      the profiles are read. Lock files and `profiles.json.bak` itself are never touched.
+      Review: the folder's clock (a probe file) is read only if such a file exists, so a normal
+      start writes nothing into the project folder.)
 - [x] **E46 – A merely truncated JPEG partner does not trigger the RAW fallback:** the
       engine sets `ImageFile.LOAD_TRUNCATED_IMAGES = True`, so a JPEG with an intact header
       but missing data decodes without an error (the missing part gray) and the E30
@@ -1533,7 +1540,9 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `TruncatedImageError` for a JPEG whose data ends early (Pillow's private `_ended` flag);
       `RawFallback.strict/defer/retry`: a partner with a RAW file decodes strictly, a truncated
       one falls back to its RAW file, and if that fails too the partner is analyzed as far as
-      its data goes. Not detected: a JPEG damaged in the middle, a truncated HEIC (E53).)
+      its data goes. Not detected: a JPEG damaged in the middle, a truncated HEIC (E53).
+      Review: a JPEG that lacks only its end marker counts as truncated too, since Pillow does
+      not tell them apart; the error names it, and the limitation is E57.)
 - [x] **E50 – A search on a damaged `cache.sqlite3` fails with SQLite's raw error:**
       `run.log` shows "file is not a database" or "database disk image is malformed". The
       engine could catch `sqlite3.DatabaseError` when opening or reading the cache and point
@@ -1541,4 +1550,9 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-04 in PR #74: `cache_error`/`cache_error_message`; a damaged or unreadable
       cache ends the search with exit code 1, a status message and a stderr line pointing to
       "Clean up storage" -> "Check cache", without a traceback. Other SQLite errors keep their
-      old handling. Follow-up: E56.)
+      old handling. Follow-up: E56. Review: only opening and writing the cache stop the search
+      (a failed group store raises at once, `store_group(..., fatal=)`, without embedding its
+      photos one by one); a row that cannot be read leaves out its photo as before, and the
+      finished search ends with `cache_read_warning` (count, file, "Check cache"), which the app
+      shows under the success note. Smoke run with one overwritten table page: 2 of 8 photos
+      left out, galleries written, exit code 0, the warning in the log and the status.)
