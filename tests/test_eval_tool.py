@@ -8,7 +8,8 @@ import numpy as np
 import pytest
 
 import framescout_eval as ev
-from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, cache_folder_paths, read_labels, save_labels, scores_document, thumbnail_name,
+from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, MODELS, LowSpace, cache_folder_paths, download_bytes,
+                             read_labels, search_space_bytes, save_labels, scores_document, thumbnail_name,
                              write_scores)
 from framescout_scoring import rank_photos
 
@@ -142,6 +143,41 @@ def test_run_takes_an_explicit_cache_folder(tmp_path, setup):
     assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
                     '--models', DEFAULT_MODEL, '--cache-dir', str(cache)]) == 0
     assert calls[0][1]['TORCH_HOME'] == str(cache / 'torch')
+
+
+def test_run_warns_about_little_free_disk_space_and_runs_anyway(tmp_path, setup, monkeypatch, capsys):
+    # E51: the F3 check of the app, for the photos, models and downloads of the runs
+    photos, profiles, calls = setup
+    for name in ('a.jpg', 'b.jpg'):
+        (photos / name).write_bytes(b'x')
+    asked = []
+
+    def low(needs):
+        asked.append(needs)
+        return [LowSpace(needs[0][0], 3 * 1024 ** 3, 2 * 1024 ** 3)]
+
+    monkeypatch.setattr(ev, 'low_space', low)
+    cache = tmp_path / 'cache'
+    assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
+                    '--models', DEFAULT_MODEL, '--cache-dir', str(cache), '--no-person-detection']) == 0
+    collection = ev.Collection(tmp_path / 'eval', 'cosplay')
+    assert asked == [[(collection.engine_output(DEFAULT_MODEL), search_space_bytes(2, ev.DEFAULT_TOP, 1)),
+                      (cache / 'huggingface' / 'hub', download_bytes(MODELS[DEFAULT_MODEL].download))]]
+    out = capsys.readouterr().out
+    assert 'Little free disk space' in out and f'{collection.engine_output(DEFAULT_MODEL)}: about 3.0 GB needed' in out
+    assert len(calls) == 1  # a warning, never a block
+
+
+def test_a_disk_space_check_that_fails_gives_no_warning(tmp_path, setup, monkeypatch, capsys):
+    photos, profiles, calls = setup
+
+    def broken(needs):
+        raise OSError('drive gone')
+
+    monkeypatch.setattr(ev, 'low_space', broken)
+    assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
+                    '--models', DEFAULT_MODEL, '--cache-dir', str(tmp_path / 'cache')]) == 0
+    assert 'disk space' not in capsys.readouterr().out and len(calls) == 1
 
 
 def test_the_engine_gets_the_cache_variables_of_the_shared_helper(tmp_path):

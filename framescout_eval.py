@@ -37,10 +37,12 @@ from urllib.parse import unquote, urlsplit
 
 import numpy as np
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEVICES, EVAL_K, MODEL_KEYS, MODELS, SKIP_LOG_LIMIT,
-                             average_precision, build_pool, cache_folder_paths, collection_name_problem, ensure_thumbnail, load_profiles,
-                             model_problem, read_document, read_labels, read_profiles, read_scores, save_labels,
-                             set_label, thumbnail_name, write_document)
+from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EVAL_K, MODEL_KEYS, MODELS,
+                             SKIP_LOG_LIMIT, available_decoders, average_precision, build_pool, cache_folder_paths,
+                             collection_name_problem, distinct_folders, ensure_thumbnail, eval_run_needs,
+                             find_yolo_weights, hub_cache_dir, load_profiles, low_space, low_space_lines, model_problem,
+                             read_document, read_labels, read_profiles, read_scores, save_labels, scan_folders,
+                             set_label, supported_extensions, thumbnail_name, write_document)
 from framescout_scoring import rank_photos
 
 ROOT = Path(__file__).resolve().parent
@@ -222,6 +224,40 @@ def engine_command(collection, model, folders, profiles, args):
     return command
 
 
+def space_warning(collection, models, folders, profiles, args, env):
+    """Return the lines of a warning if the runs of models may leave little free disk space (E51), else [].
+
+    The F3 check of the app for every model that is run: its output folder (feature cache
+    and gallery thumbnails for the photos of folders, all counted as new), the downloads
+    of the models not in the Hugging Face cache of env yet, and the person detector's
+    weights as the engine looks them up. An estimate: a warning, never a block; a check
+    that fails (OSError, ValueError) gives none.
+    """
+    runnable = [model for model in models if model_problem(model) is None]
+    if not runnable:
+        return []
+    try:
+        roots, _ = distinct_folders(folders)
+        photos = len(scan_folders(roots, supported_extensions(available_decoders()), exclude=collection.root).paths)
+        weights = None
+        if not args.no_person_detection:
+            # the engine runs in this working folder and looks the weights up as yolo_weights does
+            found, cached = find_yolo_weights(DEFAULT_YOLO_MODEL, ROOT, Path.cwd(), env)
+            weights = found or cached
+        runs = [(collection.engine_output(model), MODELS[model]) for model in runnable]
+        low = low_space(eval_run_needs(runs, photos, args.top, profiles, hub_cache_dir(env), weights))
+    except (OSError, ValueError):
+        return []
+    if not low:
+        return []
+    return (['Little free disk space. The model runs write about this much on the drive of']
+            + [f'  {line}' for line in low_space_lines(low)]
+            + ['They store the analyses of the photos and the gallery thumbnails per model, and download a search '
+               'model or the person detector the first time it is used. A full disk can make a run fail or leave a '
+               'model download or the cache incomplete. The runs start anyway; stop with Ctrl+C to free some space '
+               'first.'])
+
+
 def command_run(args):
     collection = Collection(args.dir, args.collection)
     config = collection.config() or {}
@@ -233,7 +269,7 @@ def command_run(args):
     if missing:
         raise UsageError(f'Photo folder not found: {", ".join(missing)}')
     try:
-        load_profiles(profiles, [])
+        profile_count = len(load_profiles(profiles, []))
     except (OSError, ValueError) as exc:
         raise UsageError(f'The profiles file {profiles} cannot be used: {exc}')
     models = args.models.split(',') if args.models else list(MODEL_KEYS)
@@ -246,6 +282,8 @@ def command_run(args):
     collection.save_config(folders, profiles)
     env = engine_env(args.cache_dir)
     print(f'Model downloads and caches: {Path(args.cache_dir).resolve()}', flush=True)
+    for line in space_warning(collection, models, folders, profile_count, args, env):
+        print(line, flush=True)
     failed = []
     for model in models:
         # a model's scores are those of its latest run: a skipped or failed run leaves none,
