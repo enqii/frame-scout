@@ -318,11 +318,75 @@ def _look_at(folder, members):
     return gone, (_dead_link(folder) if gone else None)
 
 
+def _link_above(folder):
+    """The first junction, mount point or symbolic link on the way from the root of folder down to folder (review).
+
+    The share or volume behind it is what a folder that hangs waits for, so the other folders
+    behind it can be given up together. Only the parts up to that link are looked at (lstat,
+    which does not follow it), all on the root's own volume; a part on another file system
+    than its parent (a POSIX mount point) counts as such a link too. The root of folder if
+    there is none or a part cannot be looked at.
+    """
+    root = _root_of(folder)
+    try:
+        device = os.lstat(root).st_dev
+        path = root
+        for part in os.path.normpath(folder)[len(root):].split(os.sep):
+            if not part:
+                continue
+            path = os.path.join(path, part)
+            info = os.lstat(path)
+            if _is_link(info) or info.st_dev != device:
+                return path
+    except (OSError, ValueError):
+        pass
+    return root
+
+
+def _within(timeout, function, *args):
+    """function(*args) in a daemon thread: its result, or None if it has not returned within timeout seconds."""
+    answer = []
+    thread = threading.Thread(target=lambda: answer.append(function(*args)), daemon=True, name='FrameScout link check')
+    thread.start()
+    thread.join(timeout)
+    return answer[0] if answer else None
+
+
+def _inside(path, folder):
+    """Whether path is folder or lies below it (by name only, nothing is looked at)."""
+    path, folder = os.path.normcase(path), os.path.normcase(folder)
+    return path == folder or path.startswith(folder.rstrip(os.sep) + os.sep)
+
+
+# the folders whose look still hangs in an abandoned _FolderWorker: a later pass gives such a
+# folder up at once instead of starting another thread blocked on it, so the threads of a
+# share that hangs do not pile up over the scans (review; like _PROBES for the roots)
+_HANGING = {}
+_HANGING_LOCK = threading.Lock()
+_STILL_HANGING = object()
+
+
+def _still_hanging(folder):
+    with _HANGING_LOCK:
+        thread = _HANGING.get(folder)
+        if thread is not None and not thread.is_alive():
+            del _HANGING[folder]
+            thread = None
+    return thread is not None
+
+
+def _hangs(folder, thread):
+    with _HANGING_LOCK:
+        _HANGING[folder] = thread
+
+
 class _FolderWorker:
     """Looks at folders one after another in a daemon thread (_look_at), so a hanging one can be waited for with a timeout (E37).
 
     results gets (answer, error) per folder in order. Once cancelled, it stops before the next
-    folder; a folder that hangs ends on its own later, like a root probe.
+    folder; a folder that hangs ends on its own later, like a root probe. A folder an earlier
+    worker still hangs on (_still_hanging) is not looked at again: the answer _STILL_HANGING
+    is put instead, and the worker stops.
     """
 
     def __init__(self, folders):
@@ -334,6 +398,9 @@ class _FolderWorker:
     def _run(self, folders):
         for folder, members in folders:
             if self.cancelled:
+                return
+            if _still_hanging(folder):
+                self.results.put((_STILL_HANGING, None))
                 return
             try:
                 self.results.put((_look_at(folder, members), None))
@@ -373,8 +440,9 @@ class _PathCheck:
         self._folder_timeout = FOLDER_TIMEOUT if folder_timeout is None else folder_timeout
         self._gone = set()
         self._checked = set()  # paths with an answer: gone, there or never gone
-        # path -> what it waits for: its root that was not reachable, a folder that did not
-        # answer or a link that leads nowhere (E37)
+        # path -> what it waits for, (kind, path) as _unchecked_notes words it: ('root', its
+        # root that was not reachable), ('folder', a folder that did not answer) or ('link', a
+        # link that leads nowhere or does not answer) (E37, review)
         self._unreachable = {}
 
     def _not_checked(self, paths, reason):
@@ -384,11 +452,13 @@ class _PathCheck:
         """Return the paths of folders ({folder: members}) that are gone; progress(done, total) per folder.
 
         The folders of each root are looked at one after another in a _FolderWorker (E37). A
-        folder that has not answered within the folder timeout is not checked; its root is
-        then probed again, and if it does not answer either, its other folders are not
-        checked either (no timeout per folder of a dead share). Paths not checked, also those
-        behind a link that leads nowhere (_look_at), go to _unreachable with the folder, root
-        or link they wait for.
+        folder that has not answered within the folder timeout (or that an earlier pass still
+        hangs on) is not checked; then the first junction, mount point or link above it
+        (_link_above, review), else its root, is probed again, and if that does not answer
+        either, the other folders behind it are not checked either (no timeout per folder of
+        a dead share). Paths not checked, also those behind a link that leads nowhere
+        (_look_at), go to _unreachable with what they wait for: ('root', root), ('folder',
+        folder) for a folder that did not answer, ('link', link).
         """
         gone, done, total = set(), 0, len(folders)
         step = max(1, total // 100)
@@ -410,6 +480,9 @@ class _PathCheck:
                         answer, error = worker.results.get(timeout=self._folder_timeout)
                     except queue.Empty:
                         worker.cancelled = True
+                        _hangs(folder, worker.thread)
+                        break
+                    if answer is _STILL_HANGING:
                         break
                     if error is not None:
                         worker.cancelled = True
@@ -418,19 +491,23 @@ class _PathCheck:
                     if link is None:
                         gone |= found
                     else:
-                        self._not_checked(found, link)
+                        self._not_checked(found, ('link', link))
                     answered += 1
                     tick(1)
                 else:
                     break
                 hung, rest = items[answered], items[answered + 1:]
-                self._not_checked(hung[1], hung[0])
+                self._not_checked(hung[1], ('folder', hung[0]))
                 tick(1)
-                if rest and not _reachable_roots([root], self._timeout)[root]:
-                    for _, members in rest:
-                        self._not_checked(members, root)
-                    tick(len(rest))
-                    rest = []
+                if rest:
+                    # the share or volume the folder is on: behind a link, or the root itself
+                    above = _within(self._timeout, _link_above, hung[0]) or root
+                    if not _reachable_roots([above], self._timeout)[above]:
+                        given_up = [item for item in rest if _inside(item[0], above)]
+                        for _, members in given_up:
+                            self._not_checked(members, ('root', root) if above == root else ('link', above))
+                        tick(len(given_up))
+                        rest = [item for item in rest if not _inside(item[0], above)]
                 items = rest
         return gone
 
@@ -448,7 +525,7 @@ class _PathCheck:
             if reachable[root]:
                 checked += members
             else:
-                self._not_checked(members, root)
+                self._not_checked(members, ('root', root))
         gone = self._pass(_by_folder(checked), progress)
         # a share that went offline during the pass makes its folders look missing: the gone
         # paths are looked at once more (a share back by now shows them again, review), then
@@ -458,27 +535,44 @@ class _PathCheck:
         lost = {root for root, up in _reachable_roots(sorted(suspects), self._timeout).items() if not up}
         for path in [p for p in gone if _root_of(p) in lost]:
             gone.discard(path)
-            self._unreachable[path] = _root_of(path)
+            self._unreachable[path] = ('root', _root_of(path))
         self._gone |= gone
         self._checked |= {p for p in absolute if p not in self._unreachable}
 
     def result(self, paths):
-        """Return (the paths of paths that are gone, {root: number of paths not checked}); checks them first."""
+        """Return (the paths of paths that are gone, {(kind, path): number of paths not checked}); checks them first.
+
+        The keys are what the paths not checked wait for (see _unreachable).
+        """
         paths = set(paths)
         self.check(paths)
         unchecked = {}
         for path in paths:
             if path in self._unreachable:
-                root = self._unreachable[path]
-                unchecked[root] = unchecked.get(root, 0) + 1
+                reason = self._unreachable[path]
+                unchecked[reason] = unchecked.get(reason, 0) + 1
         return paths & self._gone, unchecked
 
 
 def _unchecked_notes(unchecked):
-    """The notes of the roots that were not reachable ({root: number of photos})."""
-    return [f'{root} is not reachable now (e.g. a disconnected drive or an offline network share), so '
-            f'{count_text(count, "photo", "photos")} there {"was" if count == 1 else "were"} not checked.'
-            for root, count in sorted(unchecked.items())]
+    """The notes of the photos not checked ({(kind, path): number of photos}, _PathCheck.result), by path.
+
+    Worded by what they wait for (review): a root that is not reachable, a folder that did not
+    answer within FOLDER_TIMEOUT, or a junction, mount point or link that cannot be reached.
+    """
+    notes = []
+    for (kind, path), count in sorted(unchecked.items(), key=lambda item: (item[0][1], item[0][0])):
+        photos = f'{count_text(count, "photo", "photos")} {"was" if count == 1 else "were"} not checked'
+        if kind == 'folder':
+            notes.append(f'{path} did not answer within {FOLDER_TIMEOUT:g} seconds (e.g. a busy drive or a slow network '
+                         f'share), so {photos} there. The next scan tries again.')
+        elif kind == 'link':
+            notes.append(f'{path} cannot be reached now (a junction, mount point or link to e.g. a disconnected drive '
+                         f'or an offline network share), so {photos} behind it.')
+        else:
+            notes.append(f'{path} is not reachable now (e.g. a disconnected drive or an offline network share), so '
+                         f'{photos} there.')
+    return notes
 
 
 def _read_only_uri(path):
