@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 import framescout_core
-from framescout_core import (RunLock, finish_reference_move, save_profiles, stage_reference_move, undo_reference_move,
-                             update_backup_references)
+from framescout_core import (DEFAULT_MODEL, RunLock, clean_up, finish_reference_move, read_profiles, save_profiles,
+                             scan_cleanup, stage_reference_move, undo_reference_move, update_backup_references)
 
 
 @pytest.fixture
@@ -289,3 +289,25 @@ def test_a_failed_backup_rewrite_raises_and_keeps_the_old_backup(project, monkey
     with pytest.raises(PermissionError):
         update_backup_references(path, staged, project)
     assert (project / 'profiles.json.bak').read_bytes() == before
+
+
+def test_old_names_kept_after_a_failed_backup_rewrite_are_offered_by_the_cleanup_after_the_next_save(project):
+    # A43: the app keeps the old names while profiles.json.bak still lists them; the next
+    # save replaces that backup, and "Reference images no profile uses" then offers them
+    previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg',
+                                                                      'references/red-car/reference-2.png']}]}
+    path, staged = rename_red_car(project, previous)  # update_backup_references failed: nothing more done
+    results, refs = project / 'results', project / 'references'
+
+    def scan():
+        return scan_cleanup(results, path, refs, 'x' * 64, current_model=DEFAULT_MODEL)
+
+    assert scan()['references']['items'] == []  # the backup still names the old files
+    save_profiles(path, read_profiles(path))  # the next save of any profile
+    shown = scan()
+    assert shown['references']['items'] == sorted(refs / 'red-car' / name
+                                                  for name in ('reference-1.jpg', 'reference-2.png'))
+    summary = clean_up(results, shown, {'references'}, False, lambda pid, status: False, path, refs, 'x' * 64,
+                       current_model=DEFAULT_MODEL)
+    assert summary['files'] == 2 and not (refs / 'red-car').exists()
+    assert all((project / ref).is_file() for ref in read_profiles(path)[0]['reference_images'])
