@@ -17,7 +17,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_BACKUP,
                              MARKS_FILE, PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES,
                              SETTING_STEPS, SETTINGS_FILE, RunLock, StatusReporter, cache_paths, check_cache,
-                             clean_up, cleanup_running, cleanup_summary_text, marks_backup, restore_marks,
+                             clean_up, cleanup_running, cleanup_summary_text, marks_restore_offer, restore_marks,
                              cache_check_current, set_cache_aside,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
                              EXPORTS_DIR, export_cards, export_result_list, unlisted_paths,
@@ -439,26 +439,26 @@ def load_marks():
         return {}, exc
 
 def marks_backup_offer(error):
-    """The text offering to restore marks.json.bak for the marks.json error, or None if there is nothing to offer (F1).
+    """The text offering to restore marks.json.bak, or None if there is nothing to offer (F1, A40).
 
-    Only for a damaged file (ValueError; an OSError may pass, e.g. a file another program has
-    open) and a backup that can be read.
+    error: the error of load_marks, or None. For a damaged marks.json and for a missing one
+    whose backup holds marks (marks_restore_offer).
     """
-    if not isinstance(error, ValueError):
+    offer = marks_restore_offer(MARKS, error)
+    if offer is None:
         return None
-    backup = marks_backup(MARKS)
-    try:
-        saved = time.strftime('%Y-%m-%d %H:%M', time.localtime(backup.stat().st_mtime))
-        marks = read_marks(backup)
-    except (OSError, ValueError):
-        return None
-    count = count_text(sum(len(m) for m in marks.values()), 'mark', 'marks')
-    return (f'The backup {MARKS_BACKUP} of {saved} holds {count}: the marks as they were before the last change '
-            f'that was saved. Restoring it replaces {MARKS_FILE} and keeps the damaged file next to it as '
+    count, saved = offer
+    text = (f"The backup {MARKS_BACKUP} of {time.strftime('%Y-%m-%d %H:%M', time.localtime(saved))} holds "
+            f"{count_text(count, 'mark', 'marks')}: the marks as they were before the last change that was saved.")
+    if error is None:
+        return (f'{MARKS_FILE} does not exist (e.g. it was removed by hand), so no photo is marked. {text} '
+                'Restoring it brings these marks back. FrameScout never restores it on its own; your next mark '
+                f'starts a new {MARKS_FILE} instead.')
+    return (f'{text} Restoring it replaces {MARKS_FILE} and keeps the damaged file next to it as '
             f'{MARKS_FILE}.broken-<date and time>. FrameScout never restores it on its own.')
 
 def restore_marks_backup():
-    """Replace the damaged marks.json by its backup (on_click of "Restore marks from backup", F1)."""
+    """Replace the damaged or missing marks.json by its backup (on_click of "Restore marks from backup", F1, A40)."""
     try:
         restored, kept = restore_marks(MARKS)
     except (OSError, ValueError) as exc:
@@ -779,16 +779,16 @@ def show_results(results, photo_folders):
     if 'marks_notice' in st.session_state:
         kind, text = st.session_state.pop('marks_notice')
         (st.success if kind == 'success' else st.warning)(plain(text))
+    # also for a missing marks.json whose backup holds marks, e.g. removed by hand (A40)
+    offer = marks_backup_offer(marks_error)
     if marks_error:
-        offer = marks_backup_offer(marks_error)
-        # with a backup, no "remove it": without marks.json the restore is not offered (review, A40)
         advice = ('Restore the backup below, or fix the file in the results folder' if offer
                   else 'Fix or remove it in the results folder')
         st.warning(f'{MARKS_FILE} cannot be read, so marks are not shown and cannot be changed; FrameScout does not '
                    f'change the file. {advice}.\n\nDetails: {plain(str(marks_error))}')
-        if offer:
-            st.caption(plain(offer))
-            st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
+    if offer:
+        st.caption(plain(offer))
+        st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
     marks = all_marks.get(name, {})
     can_mark = marks_error is None and states[name] != 'missing'
     hide = st.checkbox('Hide photos marked as no match', key='hide_rejected',

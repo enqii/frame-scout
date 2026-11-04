@@ -253,6 +253,31 @@ def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MAR
     return sum(len(marks) for marks in restored.values()), kept
 
 
+def marks_restore_offer(path, error):
+    """Return (marks in the backup, its mtime) if restoring marks_backup(path) can be offered, else None (F1, A40).
+
+    error: what read_marks(path) raised, or None if it read the file or found none. Offered
+    for a damaged file (a ValueError; an OSError may pass, e.g. a file another program has
+    open) and for a missing file whose backup holds at least one mark (e.g. removed by
+    hand), in both cases only with a backup that can be read. Nothing is changed.
+    """
+    path = Path(path)
+    if error is None:
+        if path.exists():
+            return None
+    elif not isinstance(error, ValueError):
+        return None
+    backup = marks_backup(path)
+    try:
+        saved = backup.stat().st_mtime
+        count = sum(len(marks) for marks in read_marks(backup).values())
+    except (OSError, ValueError):
+        return None
+    if error is None and not count:
+        return None
+    return count, saved
+
+
 def _keep_copy(path, content, now):
     """Write content to a new file <path>.broken-<date>[-n] next to path (never replacing one); return it."""
     for candidate in _broken_names(path, now):

@@ -10,7 +10,8 @@ import pytest
 
 from framescout_core import (MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
                              MARKS_BACKUP, MARKS_FILE, NEVER_DELETED, RunLock, UnknownProfileError, delete_marks,
-                             hidden_text, hide_no_match, lock_held, mark_style, marks_backup, page_cards, read_marks,
+                             hidden_text, hide_no_match, lock_held, mark_style, marks_backup, marks_restore_offer, page_cards,
+                             read_marks,
                              remove_marks, rename_marks, restore_marks, save_marks)
 
 
@@ -517,6 +518,30 @@ def test_a_missing_file_gets_the_backup(tmp_path):
     path.unlink()
     assert restore_marks(path, now=NOW) == (2, None)
     assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH, 'b.jpg': MARK_NO_MATCH}}
+
+
+def test_the_restore_is_offered_for_a_damaged_file_with_a_readable_backup(tmp_path):
+    path = damaged(tmp_path)
+    saved = marks_backup(path).stat().st_mtime
+    assert marks_restore_offer(path, ValueError('damaged')) == (2, saved)
+    # e.g. a file another program has open: no damage, nothing to restore
+    assert marks_restore_offer(path, OSError('in use')) is None
+    marks_backup(path).write_text('{broken', encoding='utf-8')
+    assert marks_restore_offer(path, ValueError('damaged')) is None
+    marks_backup(path).unlink()
+    assert marks_restore_offer(path, ValueError('damaged')) is None
+
+
+def test_the_restore_is_offered_for_a_missing_file_whose_backup_holds_marks(tmp_path):
+    # e.g. removed by hand as an older warning advised (A40)
+    path = damaged(tmp_path)
+    assert marks_restore_offer(path, None) is None  # the file exists (read without an error)
+    path.unlink()
+    assert marks_restore_offer(path, None) == (2, marks_backup(path).stat().st_mtime)
+    marks_backup(path).write_text(json.dumps({'format': 1, 'profiles': {}}), encoding='utf-8')
+    assert marks_restore_offer(path, None) is None  # nothing to bring back
+    marks_backup(path).unlink()
+    assert marks_restore_offer(path, None) is None
 
 
 def test_restoring_waits_for_the_lock_and_gives_up(tmp_path):
