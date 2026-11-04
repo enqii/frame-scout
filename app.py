@@ -1667,6 +1667,8 @@ with run_tab:
             if phase == 'finished':
                 finished_at = str(status.get('updated', '')).replace('T', ' ')[:19]
                 st.success(f'The last search run finished successfully ({finished_at}).')
+                if message:  # e.g. photos the cache could not be read for (E50, review)
+                    st.warning(message)
             elif phase == 'interrupted':
                 st.warning(f"The last search run was interrupted{': ' + message if message else '.'} "
                            'Photos analyzed so far are in the cache; start again to resume.')

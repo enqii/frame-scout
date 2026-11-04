@@ -125,10 +125,14 @@ def started_in_time(status, create_time, tolerance=2.0):
     return create_time <= started + tolerance
 
 
-def final_status(code):
-    """Return (phase, message) of the engine's final status for its exit code."""
+def final_status(code, warnings=()):
+    """Return (phase, message) of the engine's final status for its exit code.
+
+    A finished search carries its warnings (e.g. photos the cache could not be read for,
+    E50) as its message, which the app shows with the success note.
+    """
     if code == 0:
-        return 'finished', None
+        return 'finished', ' '.join(warnings) or None
     if code == 130:
         return 'interrupted', 'Interrupted (Ctrl+C).'
     return 'failed', f'The search ended with exit code {code}.'

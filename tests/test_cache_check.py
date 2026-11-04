@@ -8,8 +8,8 @@ import pytest
 
 import framescout_core
 from framescout_core import (CACHE_FILE, CACHE_SIDE_FILES, DEFAULT_YOLO_MODEL, MARKS_FILE, RUN_LOCK, RUN_STATUS,
-                             RunLock, cache_check_current, cache_error, cache_error_message, check_cache,
-                             cleanup_running, prepare_cache, set_cache_aside)
+                             RunLock, cache_check_current, cache_error, cache_error_message, cache_read_warning,
+                             check_cache, cleanup_running, prepare_cache, set_cache_aside)
 
 # 2026-11-02 12:30:45 local time
 NOW = time.mktime((2026, 11, 2, 12, 30, 45, 0, 0, -1))
@@ -320,6 +320,15 @@ def test_a_disk_io_error_of_a_search_points_to_the_drive_and_check_cache(tmp_pat
 def test_other_errors_of_a_search_keep_their_own_message(tmp_path, error):
     # "Check cache" would not help: e.g. a locked or full cache, or an error of a photo
     assert cache_error(error) is None and cache_error_message(tmp_path / CACHE_FILE, error) is None
+
+
+@pytest.mark.parametrize('count, text', [(1, '1 photo was left out'), (3, '3 photos were left out')])
+def test_unreadable_rows_of_a_finished_search_point_to_check_cache(tmp_path, count, text):
+    # review: a damaged page that hits a few rows leaves out those photos, not the search
+    error = sqlite3.DatabaseError('database disk image is malformed')
+    warning = cache_read_warning(tmp_path / CACHE_FILE, error, count)
+    assert warning.startswith(text) and 'malformed' in warning and '"Check cache"' in warning
+    assert str(tmp_path / CACHE_FILE) in warning
 
 
 def test_a_healthy_cache_gives_the_engine_no_error(tmp_path):
