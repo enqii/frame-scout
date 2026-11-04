@@ -94,14 +94,19 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 - In the labelling page `Y`/`1` marks a match, `N`/`2` no match, `U`/`Delete` clears,
   `Space`/`→` and `←` move, `Enter` jumps to the next unlabelled photo and `O` opens the
   original. If port 8765 is taken, use `label --port`.
-- Labels belong to a profile **name**: editing the prompts keeps them, so give a profile
-  a new name when its motif changes.
+- Labels belong to a profile **name**: editing the prompts keeps them. The labelling page
+  records the profile's context, features and reference images with its first label; if they
+  change later, `pool` and `metrics` warn that the labels were made for another motif (E36).
+  Give the profile a new name or clear its labels then. Labels made before E36 have no
+  recorded motif until the next label is set.
+- `run` warns ("Little free disk space") before the model runs when the model outputs, the
+  missing model downloads and the detector weights may not fit (E51); it only warns.
 - Files go to `.tmp/eval/<collection>/` (gitignored; `--dir` chooses another place).
 - `pool` also renders a thumbnail for every pool photo that no gallery has and for every
   reference image into `<collection>/thumbnails/`, so the page can show HEIC/HEIF and RAW
-  files (E35). It loads the engine for that (imports torch, only when thumbnails are
-  missing); without a loadable engine it prints how many photos stay without one. A photo
-  changed since its run gets no thumbnail (the page shows the original file).
+  files (E35). It uses `framescout_images` for that (Pillow, no torch; E49); without Pillow it
+  prints how many photos stay without one. A photo changed since its run gets no thumbnail
+  (the page shows the original file).
 - `run --cache-dir` defaults to the `.cache` of the checkout whose `.venv` runs the tool (so a
   git worktree started with the main checkout's `.venv` reuses the main checkout's models),
   otherwise to the `.cache` next to the script (E48). The venv's checkout counts only when the
@@ -120,6 +125,7 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `framescout_engine.py` | Search engine as a standalone CLI |
 | `framescout_core/` | Shared helpers of app and engine, one module per area; standard library only |
 | `framescout_scoring.py` | Scoring (prompt ensemble, scaling, weighting); numpy only |
+| `framescout_images.py` | Image decoding and thumbnails (Pillow, optional HEIF/RAW); no torch; used by the engine and the evaluation tool |
 | `framescout_eval.py`, `framescout_eval_page.html` | Model evaluation tool (see above); not used by the app |
 | `framescout_uninstall.py`, `Uninstall-FrameScout.bat` | Uninstaller |
 | `framescout_check.py`, `Check-FrameScout.bat` | Read-only installation self-test (`framescout_core/install_check.py`) |

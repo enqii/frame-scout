@@ -1427,3 +1427,57 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       checkout, the `.bat` with stub check scripts, and a headless Streamlit `AppTest` of the
       expander. Not tested: the CUDA branch on a real GPU, `Check-FrameScout.bat` by
       double-click with the real check.)
+- [x] **E36 – Labels do not record the motif they were made for:** `labels.json` keys a
+      label by profile name and photo path only. Editing the prompts under the same name
+      keeps the labels (intended: prompt wordings can be compared on the same labels), but
+      a profile whose motif changes under the same name (context, features, reference
+      images) silently reuses labels made for the old motif, and the "profile has changed"
+      warning of `pool`/`metrics` disappears once every model has been run again. Today
+      `docs/DEVELOPMENT.md` asks for a new profile name instead. Fix idea: store each profile's
+      context, features and reference images in `labels.json` when a label is set and warn
+      in `pool`/`metrics` when they differ. Found in the review of PR #32 (E32).
+      (done 2026-11-04 in PR #73: `labels.json` (format still 1) gets an optional `motifs` key,
+      `{profile: {"context", "features", "references"}}`, recorded by the labelling page from the
+      pool profile when a profile's first label is set (kept while the profile has labels,
+      removed when all are cleared). `pool` and `metrics` print "The labels of <name> were made
+      for another motif: its <context/features/reference images> changed since its first
+      label ..." (current context and features from the collection's profiles file, references
+      from the latest model run; nothing compared if the profiles file cannot be read). Prompts
+      are not part of the motif. New core functions `motif`, `read_motifs`, `record_motif`,
+      `changed_motifs`; `save_labels(path, labels, motifs=None)`. Compatibility: a labels file
+      of an earlier version has no motifs, the next label set on a profile records the
+      then-current motif; an older tool version drops the key when it saves; unreadable motifs
+      make the labelling page refuse to start, like unreadable labels. Unit-tested.)
+- [x] **E49 – `framescout_eval.py pool` imports the whole engine to render thumbnails:**
+      `load_renderer` imports `framescout_engine` (torch, numpy, Pillow, a few seconds) for
+      `render_thumbnail` alone, and the import sets the cache variables of the process
+      (E42). Only when thumbnails are missing, once per pool run. Fix idea: move the image
+      decoding (`open_image`, `open_raw`, `raw_preview`, `render_thumbnail`, the decoder
+      registration) into a torch-free module that the engine and the evaluation tool both
+      import; that also drops the fallback for a missing engine and the ast-based test. An
+      engine refactor with its own smoke run. Review of PR #56, finding 2.
+      (done 2026-11-04 in PR #73: new torch-free root module `framescout_images.py` (Pillow plus
+      the optional pillow-heif/rawpy) holds `open_image`, `open_raw`, `raw_preview`,
+      `render_thumbnail`, `DECODERS`, `ORIENTATION`, `THUMBNAIL_SIZE`, the HEIF registration and
+      Pillow's `MAX_IMAGE_PIXELS`/`LOAD_TRUNCATED_IMAGES`, moved unchanged from
+      `framescout_engine.py`, which imports them from there. `framescout_eval.py pool` loads
+      `render_thumbnail` from it (`load_renderer`): no torch import, no cache variables set
+      (E42 effect gone for pool); without Pillow it still notes the missing thumbnails. The ast
+      test of the engine's own renderer is replaced by `tests/test_images.py`.)
+- [x] **E51 – `framescout_eval.py` has no free disk space check:** it loads (and on
+      first use downloads) search models without the F3 check; only app searches and the
+      installer are covered. Found in F3 (PR #64).
+      (done 2026-11-04 in PR #73: `framescout_eval.py run` prints a "Little free disk space"
+      warning before the model runs: `framescout_core.eval_run_needs` counts each model's output
+      folder (cache rows and gallery thumbnails, every photo as new), the downloads of models
+      missing in the Hugging Face cache of `--cache-dir` and the detector weights once (unless
+      `--no-person-detection`); models skipped for a missing package are left out. Warning only;
+      a failing check says nothing. `search_space_needs` shares `_download_needs` with it.
+      Unit-tested.)
+- [x] **I25 – `framescout_eval.py` builds the cache paths itself (minor):** `engine_env`
+      derives the same four variables from `--cache-dir`; it takes a cache folder, not the
+      project folder, so it was left alone in E9/I10. It could share
+      `framescout_core.cache_paths`. Found in the PR of E9/I10.
+      (done 2026-11-04 in PR #73: new `framescout_core.cache_folder_paths(cache)` (the four
+      cache variables under a cache folder); `cache_paths(base)` and
+      `framescout_eval.engine_env` use it. No behavior change.)
