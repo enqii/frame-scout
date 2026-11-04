@@ -47,8 +47,8 @@ CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
 # profile (A34: a profile of that name may come back) and the damaged files set aside (A40: the
 # user may want to repair one) are not
 CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': False,
-                    'marks_unbound': False, 'marks_profiles': False, 'cache_old': True, 'cache_other': False, 'cache_models': False,
-                    'references': False, 'broken_files': False}
+                    'marks_unbound': False, 'marks_profiles': False, 'cache_old': True, 'cache_other': False,
+                    'cache_models': False, 'references': False, 'broken_files': False}
 # seconds the reachability probe of the drive and share roots may take (all roots together); a
 # stat on a disconnected network share can hang much longer
 ROOT_TIMEOUT = 5.0
