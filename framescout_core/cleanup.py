@@ -1008,11 +1008,14 @@ def project_temp_cleanup(folder, now=None):
     settings.json leaves <name>.<random>.tmp (_PROJECT_TEMP_FILE), which no other cleanup
     looks at (auto_cleanup only looks at the results folder). Only those at least
     STALE_TEMP_AGE seconds old by the folder's clock are removed (a younger one may be
-    written by an app session now, as in auto_cleanup; now: a time for tests). The summary
-    is auto_cleanup's.
+    written by an app session now, as in auto_cleanup; now: a time for tests). The folder's
+    clock is read (with a probe file) only if there is such a file, so a normal start writes
+    nothing into the project folder (review). The summary is auto_cleanup's.
     """
     folder = Path(folder)
     summary = _new_summary()
+    if not _files(folder, _PROJECT_TEMP_FILE):
+        return summary
     now = _file_system_now(folder, SETTINGS_FILE) if now is None else now
     for path in _stale_temp_files(folder, now, _PROJECT_TEMP_FILE):
         summary['temporary'] += _remove_file(path, summary)
