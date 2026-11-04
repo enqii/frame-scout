@@ -267,7 +267,7 @@ ARW, ORF, RW2, RAF, PEF, SRW).
   1024 pixels long, otherwise it decodes the RAW data at half size. Colors are the
   camera's, not your own RAW development.
 - If a JPEG or HEIC of the same name is next to a RAW file ("RAW+JPEG" mode), only the
-  JPEG/HEIC is searched. If that JPEG cannot be read, or its data ends early (a truncated file), the RAW file is analyzed instead.
+  JPEG/HEIC is searched. If that JPEG cannot be read, or its data ends early (a truncated file, or one that lacks only its end marker), the RAW file is analyzed instead.
 - The search log and the "Photo source" tab name skipped files and why.
 - Browsers cannot show HEIC or RAW files: in the HTML gallery the thumbnail works, but a
   click downloads the file. "Open" in the app uses the program Windows has for it.
@@ -348,7 +348,9 @@ unreadable cache, **Rename the damaged cache.sqlite3** renames it (and its
 an unreadable cache, check again first if the drive may just have been unreachable. The
 next search then analyzes all photos again. Delete the `.broken-` file yourself when you do
 not need it. A shown result disappears once the cache changes (e.g. after a cleanup or a
-search); check again then. A search on a damaged cache stops with a message that points here.
+search); check again then. A search on a cache that cannot be opened or written stops with a
+message that points here; if only some photos cannot be read from it, the search leaves them
+out, finishes, and the app shows a warning that names their number and points here.
 
 ### What the numbers mean
 

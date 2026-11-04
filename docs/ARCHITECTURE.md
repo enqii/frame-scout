@@ -268,13 +268,20 @@ the module of its area and to the re-exports in `__init__.py`.
   (the storage cleanup, E7/E11/E13/E23/A14/E8; the unbound-photo check is the private `_PathCheck`;
   E37: its folder pass runs in a daemon thread per root (`_FolderWorker`, `_pass`); a folder that
   does not answer within `FOLDER_TIMEOUT` (30 s) is not checked (its photos are kept, a note
-  names the folder), then the root is probed again and, if it is silent, its other folders
-  are not checked either; `_dead_link(folder)`: photos behind a junction, volume mount
+  names the folder), then the first junction, mount point or symbolic link above it
+  (`_link_above`: `lstat` from the root down, stopping at the first link or change of `st_dev`,
+  in a thread with `ROOT_TIMEOUT`), else its root, is probed again and, if it is silent, the
+  other folders behind it are not checked either; a folder an abandoned worker still hangs on
+  (`_HANGING`, like `_PROBES`) is given up at once by later passes, without a new thread;
+  `_dead_link(folder)`: photos behind a junction, volume mount
   point or symbolic link whose target cannot be reached count as not checked (note names the
-  link). Only ever fewer photos are offered as unbound. E44: `project_temp_cleanup(folder, now=None)`
+  link). `_unreachable` keeps the cause as `(kind, path)` (`root`, `folder`, `link`), and
+  `_unchecked_notes` words each kind (review). Only ever fewer photos are offered as unbound.
+  E44: `project_temp_cleanup(folder, now=None)`
   removes `profiles.json`, `profiles.json.bak` and `settings.json` temp files (`<name>.<8 chars>.tmp`,
   pattern `_PROJECT_TEMP_FILE`) at least `STALE_TEMP_AGE` old by the folder's clock
-  (`_file_system_now(folder, name)`, `_stale_temp_files(results, now, pattern)`); `app.py` calls it
+  (`_file_system_now(folder, name)`, read only if such a file exists, so a normal start writes
+  no probe file; `_stale_temp_files(results, now, pattern)`); `app.py` calls it
   once per app start (`clean_project_folder`, `st.cache_resource`) before `create_from_example`; errors
   never stop the app, lock files and `profiles.json.bak` itself are never touched;
   `_holding_run_lock` (the run lock shared with `cache_check`) and `_sqlite_uri` (F1)).
@@ -282,7 +289,9 @@ the module of its area and to the re-exports in `__init__.py`.
   (the cache health check and renaming a damaged cache, see "Storage cleanup").
   E50: `cache_error(exc)` is `'damaged'` for exactly `sqlite3.DatabaseError`, `'unreadable'` for a
   disk I/O error, else `None` (as `_quick_check` tells them apart); `cache_error_message(cache, exc)`
-  names the file and points to "Clean up storage" -> "Check cache" (for a disk I/O error to the drive first).
+  names the file and points to "Clean up storage" -> "Check cache" (for a disk I/O error to the drive first);
+  `cache_read_warning(cache, exc, count)` is the warning of a search that finished although
+  `count` photos could not be read from the cache (review).
   `_common._broken_names` builds the `<name>.broken-<YYYYMMDD-HHMMSS>[-n]` names.
 - `disk_space.py` (F3): the free disk space estimate. Sizes are 1024-based, the units
   `size_text` shows (1 GB = 1024³ bytes). `TORCH_INSTALL_SPACE` (download, installed bytes
@@ -874,12 +883,20 @@ reference image of such a format fails with the reason (`missing_decoder`).
   far as its data goes (log `The RAW file of … could not be analyzed either; analyzing the readable
   part of the photo instead.`), counted once for the shot. Photos without a RAW partner decode as
   before; a truncated partner analyzed by an earlier version stays in the cache. A truncated JPEG that
-  is not the shot's chosen partner counts as an error (E53).
-- **Damaged cache (E50):** the engine does not treat `sqlite3.DatabaseError` / a disk I/O error
-  as a per-photo error (cache scan, `analyzed`, storing and scoring re-raise it, `cache_error`);
-  `main()` prints `cache_error_message` to stderr (`run.log`), writes it as the status message
-  (phase `failed`, exit code 1) and returns 1 without a traceback. Other SQLite errors (locked, full)
-  keep their old handling. The cache is opened only after the model load (E56).
+  is not the shot's chosen partner counts as an error (E53). Pillow also sets `_ended` for a JPEG
+  whose image data is complete and that lacks only its EOI marker, so such a partner counts as
+  truncated too (error text `image file ends early (truncated, or only its end marker is missing)`, E57).
+- **Damaged cache (E50):** `sqlite3.DatabaseError` / a disk I/O error of the cache file itself
+  (`cache_error`) is handled by where it happens (review): opening the cache (`prepare_cache`) or
+  storing (`store_group(..., fatal=cache_error)` raises it at once, without storing the group's
+  photos one by one) stops the search: `main()` prints `cache_error_message` to stderr (`run.log`),
+  writes it as the status message (phase `failed`, exit code 1) and returns 1 without a traceback.
+  Reading a row (cache scan, `analyzed`, scoring) only leaves out that photo (`ERROR`/`CACHE ERROR`
+  line, as before E50), since a damaged page can hit only a few rows; the photos are collected and
+  the finished search prints `cache_read_warning` (count, file, "Check cache") before `Done.` and
+  passes it to `final_status(0, warnings)` as the message of the `finished` status, which the app
+  shows as a warning under the success note. Other SQLite errors (locked, full) keep their old
+  handling. The cache is opened only after the model load (E56).
 - **Skipped files:** the log names the RAW files skipped for a partner (count and one
   example), the files of a missing decoder with the reason (only if the folder has such
   files), and the files of other extensions by extension (`skipped_lines`); the app's
@@ -1312,10 +1329,13 @@ and only if one of them exists (e.g. another Unicode normalization) every missin
 gets its own `stat`; a folder with at most 4 photos gets one `stat` per photo; a folder
 that does not exist makes all its photos gone; a folder that cannot be listed (e.g. no
 permission) keeps them. E37: the folder pass of each root runs in a daemon thread (`_FolderWorker`); a folder
-that does not answer within `FOLDER_TIMEOUT` = 30 s is not checked (note with the folder, its photos kept),
-the root is probed again, and a silent root ends the pass for its other folders (note with the root);
-photos behind a junction, mount point or symbolic link whose target cannot be reached (`_dead_link`) count
-as not checked (note names the link). `FOLDER_TIMEOUT` is not measured: a legitimately slow folder is
+that does not answer within `FOLDER_TIMEOUT` = 30 s is not checked (note "<folder> did not answer within
+30 seconds ...", its photos kept), then the first junction, mount point or symbolic link above it
+(`_link_above`), else the root, is probed again, and if it is silent the folders behind it are given up
+together (note with the link or the root), so a share behind a junction that stops answering costs one
+timeout, not one per folder (review); a folder whose worker of an earlier pass still hangs (`_HANGING`) is
+given up at once, without another thread; photos behind a junction, mount point or symbolic link whose
+target cannot be reached (`_dead_link`) count as not checked (note "<link> cannot be reached now ..."). `FOLDER_TIMEOUT` is not measured: a legitimately slow folder is
 not checked, the safe side (E54). After the pass the gone photos are checked once more (a share
 that dropped during the pass and is back shows them again), then their roots are probed
 again, and a root that is still offline makes its photos count as not checked. Measured on Windows 11 with 30,000 files in 100 folders: stat
@@ -1358,7 +1378,7 @@ the folder list keeps the scan), with the note "The AI settings changed since th
 Scan again."; the scan runs only on the "Scan" click, never on a rerun or a search.
 No migration: a renamed or moved photo is analyzed again as a new photo, and its old
 cache row and mark stay until the user cleans them up (user decision 2026-10-28, E8).
-Open: E37 (a hanging folder listing or `stat` is not guarded by a timeout), A35 (a drive
+Open: E54 (Linux/macOS mount points, `FOLDER_TIMEOUT` not measured), A35 (a drive
 letter now used by another disk, or on POSIX the root `/` of an unmounted mount, counts as
 reachable; only mitigated by naming the folders).
 F1: below the cleanup, "Check cache" calls `check_cache(results, alive, lock_timeout)` under the
@@ -1375,7 +1395,9 @@ deletes. Starting a search drops a shown check result, a rename drops a shown cl
 and `cache_check_current(results, result)` (one `stat` per page run) drops a shown result
 once the cache's size or mtime differs from the checked file (a cleanup, a search of another
 tab, a rename; refused results stay).
-A search on a damaged cache stops with exit code 1 and a message pointing to "Check cache" (E50).
+A search on a cache that cannot be opened or written stops with exit code 1 and a message pointing to
+"Check cache" (E50); a row that cannot be read leaves out its photo, and the finished search ends with a
+warning pointing there.
 While `clean_up` holds the lock it registers the results folder in the process
 (`cleanup_running`; app sessions are threads of one process), so other tabs show "The
 storage is being cleaned up" instead of a running search and disable Stop (A23). The
@@ -1399,7 +1421,9 @@ search holds it, it exits with code 3 (`EXIT_BUSY`). Photo folders none of which
 are an error before the lock only if the output folder does not exist yet (no folder is
 created for a mistyped call); otherwise it is reported in the status file. A missing
 folder of several is left out with a log line (A25). The final phase comes from
-the exit code (`final_status`: 0 finished, 130 interrupted, others failed). The `message`
+the exit code (`final_status`: 0 finished, 130 interrupted, others failed; a finished run's
+message is its warnings, e.g. `cache_read_warning` of E50, which the app shows under the success
+note). The `message`
 is also set during a run: `LOADING_DETECTOR` ("Loading the person detector", F2) while the
 detector loads in the analysis phase, `NOTHING_NEW` ("Nothing new to analyze – ranking only",
 F2) when no photo needed an analysis; `status_text` appends the message of a running (non-final)
@@ -1631,7 +1655,7 @@ profile (A22, A33, `test_marks.py`, `test_copy.py`, the result list export in `t
 failing second file, nothing to export; not run: Excel import, a real browser), `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` and `open_clip_cache_dir` (E39) in `test_cache_dirs.py`, `cache_error`/`cache_error_message` with real damaged files (E50) in `test_cache_check.py`, the folder timeout, dead links and `project_temp_cleanup` (E37, E44) in `test_cleanup.py`, `RawFallback.strict/defer/retry` (E46) in `test_photos.py`, `open_image(complete=True)` with a truncated JPEG in `test_images.py` (needs Pillow, so skipped in CI), and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching
+`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` and `open_clip_cache_dir` (E39) in `test_cache_dirs.py`, `cache_error`/`cache_error_message` with real damaged files and `cache_read_warning` (E50) in `test_cache_check.py`, `store_group(..., fatal=)` in `test_pipeline.py` and `final_status(0, warnings)` in `test_run_status.py` (E50 review), the folder timeout, a share behind a junction that stops answering, a folder that still hangs (no second thread), `_link_above`, the notes per cause, dead links and `project_temp_cleanup` without a probe file (E37, E44) in `test_cleanup.py`, `RawFallback.strict/defer/retry` (E46) in `test_photos.py`, `open_image(complete=True)` with a truncated JPEG and one that lacks only its end marker (E57) in `test_images.py` (needs Pillow, so skipped in CI), and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the stale temporary files of
 `auto_cleanup` (E26, `test_cleanup.py`: removed; fresh ones, foreign ones and gallery names
