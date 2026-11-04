@@ -17,7 +17,7 @@ a folder of their own (default: .tmp/eval/ in the project folder, which git igno
   python framescout_eval.py metrics cosplay outdoor
 
 Steps 2-4 need numpy only (no torch); pool renders thumbnails with the engine's decoders
-when the engine can be loaded (E35). The labels stay in the collection's folder.
+(framescout_images, E49) when Pillow is installed (E35). The labels stay in the collection's folder.
 Everything runs locally; the labelling page is served on 127.0.0.1 only.
 """
 import argparse
@@ -346,15 +346,15 @@ def missing_thumbnails(collection, document):
 
 
 def load_renderer(import_module=importlib.import_module):
-    """(render, None) with the engine's thumbnail renderer and its decoders (HEIC/HEIF, RAW),
-    or (None, reason) if the engine cannot be loaded here, e.g. without torch or Pillow.
+    """(render, None) with the gallery's thumbnail renderer and its decoders (HEIC/HEIF, RAW),
+    or (None, reason) if they cannot be loaded here, e.g. without Pillow.
 
-    Loading the engine imports torch, which takes a few seconds; pool does it only when
-    thumbnails are missing.
+    They come from framescout_images, which the engine decodes with too, without torch
+    and the engine's cache variables (E49); pool loads them only when thumbnails are missing.
     """
     try:
-        return import_module('framescout_engine').render_thumbnail, None
-    except Exception as exc:  # ImportError, or e.g. an OSError of a torch DLL that does not load
+        return import_module('framescout_images').render_thumbnail, None
+    except Exception as exc:  # ImportError, or e.g. an OSError of a decoder library that does not load
         return None, f'{type(exc).__name__}: {exc}'
 
 
@@ -398,8 +398,8 @@ def pool_thumbnails(collection, document, log):
         return
     render, reason = load_renderer()
     if render is None:
-        log(f'Note: {len(missing)} photo(s) or reference image(s) have no thumbnail, and the engine that would '
-            f'render them cannot be loaded ({reason}); the labelling page shows their original files, which a '
+        log(f'Note: {len(missing)} photo(s) or reference image(s) have no thumbnail, and the image decoders that '
+            f'would render them cannot be loaded ({reason}); the labelling page shows their original files, which a '
             'browser cannot display for HEIC/HEIF or RAW.')
         return
     log(f'Rendering {len(missing)} thumbnail(s) for the labelling page ...')
