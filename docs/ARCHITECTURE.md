@@ -92,7 +92,19 @@ E7/E13/E26). The optional
 `--scores-file JSON` (E32, default off, never passed by the app) writes, after scoring and
 before the galleries, every crop's text and reference scores per profile for the
 evaluation tool (`framescout_core.evaluation.scores_document`; see "Model evaluation
-tool"); it changes no cache, profile, settings or `results.json`.
+tool"); it changes no cache, profile, settings or `results.json`. The image decoding
+(`open_image`, `open_raw`, `raw_preview`, `render_thumbnail`, `DECODERS`, `ORIENTATION`,
+`THUMBNAIL_SIZE`, the HEIF registration, Pillow's `MAX_IMAGE_PIXELS`/`LOAD_TRUNCATED_IMAGES`) lives in
+`framescout_images.py` (E49) and is imported by the engine.
+
+### `framescout_images.py`
+
+Torch-free root module (Pillow plus the optional pillow-heif/rawpy; no torch, no direct numpy
+import, sets no cache variables) with the image decoding and thumbnail rendering moved unchanged
+out of the engine (E49). Used by `framescout_engine.py` and by `framescout_eval.py pool`
+(`load_renderer`), so the evaluation tool no longer imports torch. `tests/test_images.py`: ast
+checks (no torch/numpy import, the engine defines no decoding functions of its own) and, with
+Pillow only, that rendering a thumbnail loads neither torch nor the cache variables.
 
 ### `framescout_core/`
 
@@ -194,7 +206,9 @@ the module of its area and to the re-exports in `__init__.py`.
   default's too. Since E16 each model also names `weights_repo` and `tokenizer_repo`
   (the Hugging Face Hub repositories open_clip loads the weights and a Hugging Face
   tokenizer from; `''` = built-in tokenizer; tested against open_clip's config).
-- `cache_dirs.py` (E9/I10): `CACHE_DIR`/`cache_paths`/`default_cache_env`/`yolo_weights`/`find_yolo_weights`
+- `cache_dirs.py` (E9/I10): `CACHE_DIR`/`cache_paths`/`cache_folder_paths` (I25: the four
+  cache variables under a cache folder itself; `cache_paths(base)` and the evaluation tool's
+  `engine_env` use it)/`default_cache_env`/`yolo_weights`/`find_yolo_weights`
   (the project's `.cache/` folders and the engine's defaults for them; `find_yolo_weights`
   is `yolo_weights`' lookup without moving anything, also used by the disk space check; see
   "Environment variables and caches").
@@ -266,7 +280,11 @@ the module of its area and to the re-exports in `__init__.py`.
   cache and the detector weights only if their root answers in time), `app_search_needs`
   (the needs of a search the app starts: the `cache_paths(base)` variables over the
   environment, as `cache_env` sets them, the hub cache from `hub_cache_dir`, the weights
-  from `find_yolo_weights`), `downloaded_models(base, environ, timeout, reachable)` (A39: model keys whose files are in the Hub cache the engine loads from, via `_engine_environ` shared with `app_search_needs`; a cache on a drive that does not answer is not read: empty set), `torch_install_needs(build, venv, temp, torch=True)`,
+  from `find_yolo_weights`), `eval_run_needs(runs, photos, top, profiles, hub_cache,
+  detector_weights)` (E51: the needs of `framescout_eval.py run`: each model's output folder
+  `engine/<model>` with every photo counted as new, the downloads of the models missing in the
+  Hub cache of `--cache-dir` added up, the detector weights once; shares `_download_needs`
+  with `search_space_needs`), `downloaded_models(base, environ, timeout, reachable)` (A39: model keys whose files are in the Hub cache the engine loads from, via `_engine_environ` shared with `app_search_needs`; a cache on a drive that does not answer is not read: empty set), `torch_install_needs(build, venv, temp, torch=True)`,
   `low_space` (probes the drive or share roots first with cleanup's threaded
   `_reachable_roots` and `SPACE_CHECK_TIMEOUT`, leaving out a root that does not answer;
   groups the needs by volume – device number, or the anchor if it is 0, plus the volume
@@ -341,7 +359,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `APPDATA` or the user profile defaults), never
   deleted: they are shared with other programs, I10).
 - `evaluation.py` (E32/E20):
-  `SCORES_FORMAT`/`LABELS_FORMAT`/`EVAL_K`/`SCORE_DIGITS`/`collection_name_problem`/`write_document`/`read_document`/`scores_document`/`write_scores`/`read_scores`/`read_labels`/`save_labels`/`set_label`/`average_precision`/`build_pool`
+  `SCORES_FORMAT`/`LABELS_FORMAT`/`EVAL_K`/`SCORE_DIGITS`/`collection_name_problem`/`write_document`/`read_document`/`scores_document`/`write_scores`/`read_scores`/`read_labels`/`save_labels(path, labels, motifs=None)`/`set_label`/`motif`/`read_motifs`/`record_motif`/`changed_motifs` (E36)/`average_precision`/`build_pool`
   (the formats of the model evaluation tool: scores file of the engine's `--scores-file`,
   labels file, AP@k = mean of the precision at each hit in the top k divided by
   min(labelled hits, k), a labelled hit outside the top k counts as a miss, no hits ->
@@ -616,7 +634,18 @@ without a folder list or profiles path is an error, exit code 2, and is left as 
 `engine/<model>/` (one engine output folder per model: cache, galleries, thumbnails; separate
 so one run's thumbnail cleanup never removes another model's), `scores/<model>.json`,
 `pool.json`, `labels.json` (`{"format": 1, "labels": {profile: {absolute photo path:
-true|false}}}`; an unreadable file is never saved over, the page refuses to start).
+true|false}}}`; an unreadable file is never saved over, the page refuses to start). Since
+E36 the file has an optional key `motifs`: `{profile: {"context", "features", "references"}}`
+(format still 1), recorded by the labelling page from the pool profile when the profile's
+first label is set (`record_motif`), kept while the profile has labels and removed when all
+are cleared. `pool` and `metrics` compare it with the current motif (`current_motifs`:
+context and features from the collection's profiles file, references from the latest model
+run; nothing is compared if the profiles file cannot be read) and print "The labels of
+<name> were made for another motif: its <context/features/reference images> changed since
+its first label" (`changed_motifs`, `motif_warnings`). Prompts are not part of the motif.
+A file without `motifs` (earlier version) gets the then-current motif with the next label
+set; an older tool version drops the key when it saves; unreadable motifs make the page
+refuse to start like unreadable labels.
 
 - Scores file (`{"format": 1, "model", "signature", "photos": [{"path", "mtime_ns", "crops"}],
   "profiles": [{"name", "prompts", "references", "text", "visual"}]}`): scores per photo and
@@ -640,19 +669,18 @@ true|false}}}`; an unreadable file is never saved over, the page refuses to star
   (100) per model and weight, prints pool size, labelled count and a time estimate (1.5 s
   per photo), and warns if a profile changed between model runs or the models scored
   different photos (path and `mtime_ns`). Re-running keeps all labels. Labels are keyed by
-  profile name and photo path only, so they survive prompt edits; a new motif needs a new
-  profile name (E36). Finally `pool_thumbnails` (E35) renders a thumbnail for every pool
+  profile name and photo path only, so they survive prompt edits; the motif recorded with
+  the first label is compared (E36, see `labels.json` below). Finally `pool_thumbnails` (E35) renders a thumbnail for every pool
   photo (named by its time of scoring) and every reference image that no model's gallery
   has, into `<collection>/thumbnails/`: `missing_thumbnails` finds them, `load_renderer`
-  imports `framescout_engine` and takes its module-level `render_thumbnail` (imports torch,
-  only when something is missing; on failure `pool` prints how many photos stay without a
-  thumbnail and works as before), `render_thumbnails` runs `ensure_thumbnail(path, thumbs,
+  takes `render_thumbnail` from `framescout_images` (E49: Pillow, no torch, no cache
+  variables set; on failure, e.g. without Pillow, `pool` prints how many photos stay
+  without a thumbnail and works as before), `render_thumbnails` runs `ensure_thumbnail(path, thumbs,
   None, render, log, mtime_ns=...)` in up to four threads. A photo whose modification time
   is no longer its time of scoring gets no thumbnail (logged; the page shows the original),
   so a thumbnail never shows pixels other than the scored ones under that name; a reference
   image that cannot be read is named in a note (review). Existing collections get the
-  missing thumbnails on their next `pool` run; labels are untouched. Loading the whole
-  engine for the renderer is a known cost (E49).
+  missing thumbnails on their next `pool` run; labels are untouched.
 - `label`: `LabelServer` (a `ThreadingHTTPServer` without `SO_REUSEADDR` on Windows, where
   it would let a second page bind the same port silently) on `127.0.0.1:8765` (`--port`
   0-65535, `--no-browser`; a port in use is an error, exit code 2), every route behind a
@@ -1396,6 +1424,10 @@ and working folder `BASE`, as the engine runs; none when person detection is off
 root that does not answer within `SPACE_CHECK_TIMEOUT` is left out, so a disconnected
 network share does not block the page runs (review). `OSError` and `ValueError` give no
 warning; other exceptions are not swallowed (review).
+
+The evaluation tool is covered too (E51): `framescout_eval.py run` prints the same kind of
+"Little free disk space" warning before the model runs (`eval_run_needs`, see
+`disk_space.py`), but only warns and says nothing if the check fails.
 
 Summary before the start (F12): in the same place, above the disk space warning, the run tab
 shows `st.info(start_summary(photos found, analyzed, known_throughput(run_status, cleanup_signature(), device)))`

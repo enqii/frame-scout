@@ -129,15 +129,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       missing. A key trimmed from the registry falls back to the default with
       a warning in a user's `settings.json` (`read_settings`); its cache rows then count as
       "older version" in the cleanup. Search quality is a hold point.
-- [ ] `minor` **E36 – Labels do not record the motif they were made for:** `labels.json` keys a
-      label by profile name and photo path only. Editing the prompts under the same name
-      keeps the labels (intended: prompt wordings can be compared on the same labels), but
-      a profile whose motif changes under the same name (context, features, reference
-      images) silently reuses labels made for the old motif, and the "profile has changed"
-      warning of `pool`/`metrics` disappears once every model has been run again. Today
-      `docs/DEVELOPMENT.md` asks for a new profile name instead. Fix idea: store each profile's
-      context, features and reference images in `labels.json` when a label is set and warn
-      in `pool`/`metrics` when they differ. Found in the review of PR #32 (E32).
 - [ ] `minor` **E37 – The unbound check guards only the root probe with a timeout:** a folder
       listing or `stat` on a share that hangs during the pass stalls the scan (the page
       run) until the OS gives up; a junction or mount point inside a reachable root that
@@ -201,21 +192,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       file, broken HEIC) fall back. Idea: for partners of a RAW file, detect truncation
       (Pillow's truncation warning, or a decode with `LOAD_TRUNCATED_IMAGES` off) and
       prefer the RAW file then. Found in PR #46.
-- [ ] `minor` **E49 – `framescout_eval.py pool` imports the whole engine to render thumbnails:**
-      `load_renderer` imports `framescout_engine` (torch, numpy, Pillow, a few seconds) for
-      `render_thumbnail` alone, and the import sets the cache variables of the process
-      (E42). Only when thumbnails are missing, once per pool run. Fix idea: move the image
-      decoding (`open_image`, `open_raw`, `raw_preview`, `render_thumbnail`, the decoder
-      registration) into a torch-free module that the engine and the evaluation tool both
-      import; that also drops the fallback for a missing engine and the ast-based test. An
-      engine refactor with its own smoke run. Review of PR #56, finding 2.
 - [ ] `minor` **E50 – A search on a damaged `cache.sqlite3` fails with SQLite's raw error:**
       `run.log` shows "file is not a database" or "database disk image is malformed". The
       engine could catch `sqlite3.DatabaseError` when opening or reading the cache and point
       to "Clean up storage" -> "Check cache". Found in F1 (PR #60).
-- [ ] `minor` **E51 – `framescout_eval.py` has no free disk space check:** it loads (and on
-      first use downloads) search models without the F3 check; only app searches and the
-      installer are covered. Found in F3 (PR #64).
 - [ ] `hardware` **E52 – The effect of `--low-priority` is not measured:** F4 lowers the engine's
       process priority and keeps one or two cores out of the PyTorch threads (`torch_threads`,
       also for the person detector), but neither the
@@ -422,10 +402,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       redistribution), codec libraries bundled in wheels such as x265 in `pillow-heif` (GPL)
       and LibRaw in `rawpy` (LGPL/CDDL); who builds and hosts the bundle. Needs a user
       decision. Found on 2026-10-27 in P5 part C.
-- [ ] `minor` **I25 – `framescout_eval.py` builds the cache paths itself (minor):** `engine_env`
-      derives the same four variables from `--cache-dir`; it takes a cache folder, not the
-      project folder, so it was left alone in E9/I10. It could share
-      `framescout_core.cache_paths`. Found in the PR of E9/I10.
 - [ ] `ready` **I30 – Repository layout, step 1: scoring module outside the package (low risk):**
       `framescout_scoring.py` (numpy only) lies loose in the root next to the standard-library-only
       package `framescout_core/`. Move it into a package of its own (e.g. `framescout_scoring/`,
