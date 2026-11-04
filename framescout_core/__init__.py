@@ -74,4 +74,4 @@ from .uninstall import (UNINSTALL_ITEMS, UNINSTALL_KEEP, UNINSTALL_FIRST, USER_D
     outside_leftovers, search_running, programs_in_use, remove_items)
 from .evaluation import (SCORES_FORMAT, LABELS_FORMAT, EVAL_K, SCORE_DIGITS, collection_name_problem,
     write_document, read_document, scores_document, write_scores, read_scores, read_labels, save_labels, set_label, average_precision, build_pool,
-    motif, read_motifs, record_motif, changed_motifs)
+    read_label_file, motif, record_motif, changed_motifs)

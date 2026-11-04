@@ -135,15 +135,33 @@ def read_labels(path):
     A missing file has no labels; any other unreadable content raises ValueError, so the
     labelling page never saves over labels it could not read.
     """
+    return read_label_file(path)[0]
+
+
+def read_label_file(path):
+    """Return (labels, motifs) of a labels file, read once: its labels as read_labels returns them
+    and {profile: motif}, the motif each profile's labels were made for (E36).
+
+    A missing file, or one of an earlier version, has no motifs ({}). Motifs that are not
+    readable give None and leave the labels usable (review): pool and metrics only cannot
+    compare them, and the labelling page refuses to save over them. Keys a later version
+    adds to a motif are kept and not compared.
+    """
     document = read_document(path, 'labels file', LABELS_FORMAT)
     if document is None:
-        return {}
+        return {}, {}
     labels = document.get('labels')
     if not isinstance(labels, dict) or not all(
             isinstance(photos, dict) and all(isinstance(value, bool) for value in photos.values())
             for photos in labels.values()):
         raise ValueError(f'{path} is not a labels file of format {LABELS_FORMAT}')
-    return labels
+    motifs = document.get('motifs', {})
+    if not isinstance(motifs, dict) or not all(
+            isinstance(entry, dict) and isinstance(entry.get('context'), str) and isinstance(entry.get('features'), str)
+            and isinstance(entry.get('references'), list) and all(isinstance(r, str) for r in entry['references'])
+            for entry in motifs.values()):
+        motifs = None
+    return labels, motifs
 
 
 def save_labels(path, labels, motifs=None):
@@ -170,32 +188,16 @@ def motif(context, features, references):
     return {'context': context or '', 'features': features or '', 'references': [str(r) for r in references]}
 
 
-def read_motifs(path):
-    """Return {profile: motif} of a labels file: the motif each profile's labels were made for (E36).
-
-    A missing file, or one of an earlier version without motifs, has none; motifs that are
-    not readable raise ValueError, like unreadable labels.
-    """
-    document = read_document(path, 'labels file', LABELS_FORMAT)
-    motifs = {} if document is None else document.get('motifs', {})
-    if not isinstance(motifs, dict) or not all(
-            isinstance(entry, dict) and set(entry) == {'context', 'features', 'references'}
-            and isinstance(entry['context'], str) and isinstance(entry['features'], str)
-            and isinstance(entry['references'], list) and all(isinstance(r, str) for r in entry['references'])
-            for entry in motifs.values()):
-        raise ValueError(f'{path} is not a labels file of format {LABELS_FORMAT}: unreadable motifs')
-    return motifs
-
-
 def record_motif(motifs, labels, profile, current):
     """Return a copy of motifs after a label of profile was set or cleared (labels: all labels after it).
 
-    A profile with labels and no motif yet gets current, the motif of the label just set; a
-    recorded one is kept, so labels of an earlier motif under the same name stay visible
-    (changed_motifs) until they are cleared. Profiles without labels lose their motif.
+    A profile with labels and no motif yet gets current, the motif of the label just set
+    (None: not known, nothing is recorded; review); a recorded one is kept, so labels of an
+    earlier motif under the same name stay visible (changed_motifs) until they are cleared.
+    Profiles without labels lose their motif.
     """
     result = {name: entry for name, entry in motifs.items() if name in labels}
-    if profile in labels:
+    if profile in labels and current is not None:
         result.setdefault(profile, current)
     return result
 
