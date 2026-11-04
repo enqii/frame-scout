@@ -529,6 +529,120 @@ def test_photos_behind_a_junction_to_a_missing_volume_are_not_checked(project):
     assert len(category['notes']) == 1 and str(link) in category['notes'][0] and '9 photos' in category['notes'][0]
 
 
+def test_notes_tell_a_folder_that_timed_out_from_a_root_that_is_not_reachable(project, monkeypatch):
+    # review: a slow folder on a connected drive is no "disconnected drive or offline share"
+    import threading
+    from framescout_core import cleanup
+    hanging = project.photos / 'hanging'
+    hanging.mkdir()
+    project.cache([(hanging / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
+    release = threading.Event()
+    listing_that_hangs(monkeypatch, hanging, release)
+    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
+    try:
+        [note] = project.scan()['cache_missing']['notes']
+    finally:
+        release.set()
+    assert note.startswith(str(hanging) + ' ') and 'did not answer within' in note and '6 photos' in note
+    assert 'disconnected' not in note
+
+
+def test_a_folder_that_still_hangs_gets_no_second_thread(project, monkeypatch):
+    # review: the worker that hangs on a folder is abandoned; the next scan must not start
+    # another thread blocked on the same folder, as for a root probe (_PROBES)
+    import threading
+    from framescout_core import cleanup
+    hanging = project.photos / 'hanging'
+    hanging.mkdir()
+    project.cache([(hanging / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
+    release, calls = threading.Event(), []
+    real = os.listdir
+
+    def listdir(path):
+        if os.path.normcase(str(path)) == os.path.normcase(str(hanging)):
+            calls.append(path)
+            release.wait(10)
+        return real(path)
+
+    monkeypatch.setattr(os, 'listdir', listdir)
+    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
+    try:
+        for _ in range(3):
+            [note] = project.scan()['cache_missing']['notes']
+            assert str(hanging) in note
+        assert len(calls) == 1
+    finally:
+        release.set()
+    for thread in [t for t in threading.enumerate() if t.name == 'FrameScout folder check']:
+        thread.join(5)
+    # the folder answered meanwhile: the next scan looks at it again (and finds the photos gone)
+    category = project.scan()['cache_missing']
+    assert category['notes'] == [] and len(category['items']) == 6 and len(calls) > 1
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
+def test_a_share_behind_a_junction_that_stops_answering_is_given_up_once(project, monkeypatch):
+    # review: after a folder behind a junction hangs, the junction (not only the drive root,
+    # which still answers) is probed again, so its other folders do not each wait
+    # FOLDER_TIMEOUT; folders outside the junction are still checked
+    import threading
+    from framescout_core import cleanup
+    _winapi = pytest.importorskip('_winapi')
+    volume = project.base / 'volume'
+    volume.mkdir()
+    link = project.photos / 'nas'
+    _winapi.CreateJunction(str(volume), str(link))
+    events = [link / f'event{n}' for n in range(4)]
+    for folder in events:
+        folder.mkdir()
+    local = project.photos / 'local'
+    project.cache([(folder / f'IMG_{n}.jpg', CURRENT) for folder in events for n in range(6)]
+                  + [(local / 'gone.jpg', CURRENT)])
+    behind = os.path.normcase(str(link))
+    release, listed = threading.Event(), []
+    real_listdir, real_probe = os.listdir, cleanup._probe_root
+
+    def listdir(path):
+        if os.path.normcase(str(path)).startswith(behind):
+            listed.append(path)
+            release.wait(10)
+        return real_listdir(path)
+
+    monkeypatch.setattr(os, 'listdir', listdir)
+    # the share behind the junction does not answer, the drive root does
+    monkeypatch.setattr(cleanup, '_probe_root', lambda path: (not os.path.normcase(str(path)).startswith(behind)
+                                                              and real_probe(path)))
+    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
+    try:
+        category = project.scan()['cache_missing']
+    finally:
+        release.set()
+    assert len(listed) == 1
+    assert category['items'] == [(str(local / 'gone.jpg'), CURRENT)]
+    [hung, rest] = sorted(category['notes'], key=lambda note: not note.startswith(str(events[0])))
+    assert hung.startswith(str(events[0]) + ' ') and '6 photos' in hung
+    assert rest.startswith(str(link) + ' ') and '18 photos' in rest and 'cannot be reached' in rest
+
+
+def test_the_first_link_or_mount_on_the_way_down_is_found(monkeypatch):
+    import stat
+    from types import SimpleNamespace
+    from framescout_core import cleanup
+    root = root_of(Path.cwd())
+    top, mount, deep = (os.path.join(root, *parts) for parts in (['a'], ['a', 'm'], ['a', 'm', 'x', 'y']))
+    seen = []
+
+    def lstat(path):
+        seen.append(path)
+        # a/m is another file system (a POSIX mount point); nothing below it is looked at
+        return SimpleNamespace(st_mode=stat.S_IFDIR, st_dev=2 if path == mount else 1)
+
+    monkeypatch.setattr(os, 'lstat', lstat)
+    assert cleanup._link_above(deep) == mount
+    assert seen == [root, top, mount]
+    assert cleanup._link_above(top) == root
+
+
 @pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
 def test_photos_behind_a_junction_whose_target_is_there_can_be_gone(project):
     _winapi = pytest.importorskip('_winapi')
