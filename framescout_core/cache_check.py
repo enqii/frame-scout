@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ._common import _broken_names
 from .cleanup import _BUSY, CLEANUP_LOCK_TIMEOUT, _holding_run_lock, _sqlite_uri
-from .signature import CACHE_FILE
+from .signature import CACHE_FILE, CACHE_SIDE_FILES
 
 
 # A damaged cache.sqlite3 (disk full, power loss, a bad sector) otherwise shows only as an
@@ -15,10 +15,6 @@ from .signature import CACHE_FILE
 # next search builds a new cache and analyzes every photo again.
 # at most this many problems quick_check reports
 CACHE_CHECK_LINES = 20
-# the files SQLite keeps next to a database (<name>-journal of the default rollback journal,
-# which the engine uses; -wal and -shm of WAL mode): renamed with it, since a hot journal
-# left behind would be rolled back into the new cache of the next search
-CACHE_SIDE_FILES = ('-journal', '-wal', '-shm')
 
 
 def _file_key(path):

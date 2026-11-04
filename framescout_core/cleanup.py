@@ -18,7 +18,7 @@ from .profiles import _read_entries, read_profiles
 from .results import RESULTS_FILE, _THUMBNAIL_NAME, read_results
 from .run_status import RUN_LOCK, RUN_STATUS, read_status, run_active
 from .settings import SETTINGS_FILE
-from .signature import CACHE_FILE, classify_signatures, engine_id
+from .signature import CACHE_FILE, CACHE_SIDE_FILES, classify_signatures, engine_id
 
 
 # Cleanup (E7, E11, E13, E23, A14; user decisions at the PR #18 hold point): the app's
@@ -38,15 +38,16 @@ LEGACY_THUMBNAILS_DIR = 'vorschaubilder'
 # every gallery the engine has written (also v1.1) has this title
 GALLERY_MARKER = '<title>FrameScout – '
 CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missing', 'marks_unbound', 'cache_old',
-                      'cache_other', 'cache_models', 'references')
+                      'cache_other', 'cache_models', 'references', 'broken_files')
 # the categories of cache rows (deleted by signature, except cache_missing: by path and signature)
 CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
 # selected when a scan is shown; cache rows and marks of unbound photos (any folder searched so
 # far; a drive letter another disk got makes photos look unbound, A35), reference images, rows
-# of other current settings and rows of other search models (E22) are not
+# of other current settings, rows of other search models (E22) and the damaged files set aside
+# (A40: the user may want to repair one) are not
 CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': False,
                     'marks_unbound': False, 'cache_old': True, 'cache_other': False, 'cache_models': False,
-                    'references': False}
+                    'references': False, 'broken_files': False}
 # seconds the reachability probe of the drive and share roots may take (all roots together); a
 # stat on a disconnected network share can hang much longer
 ROOT_TIMEOUT = 5.0
@@ -84,6 +85,12 @@ STALE_TEMP_AGE = 60
 _PROJECT_TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name) for name in ('profiles.json', 'profiles.json.bak',
                                                                              SETTINGS_FILE))
                                 + r')\.[a-z0-9_]{8}\.tmp')
+# the damaged files FrameScout set aside (F1): the copy of a damaged marks file restore_marks
+# keeps and a damaged cache set_cache_aside renamed, with its side files (_broken_names:
+# <name>.broken-<YYYYMMDD-HHMMSS>[-n]); never read again, offered by the cleanup (A40)
+_BROKEN_STAMP = r'\.broken-\d{8}-\d{6}(?:-\d+)?'
+_BROKEN_FILE = re.compile(re.escape(MARKS_FILE) + _BROKEN_STAMP + '|' + re.escape(CACHE_FILE) + _BROKEN_STAMP
+                          + '(?:' + '|'.join(re.escape(suffix) for suffix in CACHE_SIDE_FILES) + ')?')
 _GALLERY_LINK = re.compile(r'\b(' + THUMBNAILS_DIR + '|' + LEGACY_THUMBNAILS_DIR + r')/([0-9a-f]{24}\.jpg)')
 
 
@@ -792,6 +799,9 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
     else:
         found['references'] = _category('references', refs, sum(_file_size(p) for p in refs))
         found['references']['names'] = [str(p.relative_to(refs_root)) for p in refs]
+    broken = _files(results, _BROKEN_FILE)
+    found['broken_files'] = _category('broken_files', broken, sum(_file_size(p) for p in broken),
+                                      names=[p.name for p in broken])
     return {key: found[key] for key in CLEANUP_CATEGORIES}
 
 
@@ -1010,13 +1020,20 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                 if path in allowed and _remove_file(path, summary):
                     _remove_empty_folders(path.parent, refs_root)
 
+        def broken_files():
+            allowed = set(shown['broken_files']['items'])
+            for path in _files(results, _BROKEN_FILE):
+                if path in allowed:
+                    _remove_file(path, summary)
+
         steps = [('Temporary thumbnails', 'temp_thumbnails' in selected, temporary),
                  ('Galleries and thumbnails', bool({'galleries', 'thumbnails'} & selected),
                   lambda: _galleries_and_thumbnails(results, shown, selected, profiles_file, summary)),
                  ('Cache entries', True,
                   lambda: _delete_rows(results, shown, selected, current_signature, current_model, vacuum, summary)),
                  ('Marks', 'marks_unbound' in selected, lambda: _delete_marks(results, shown, summary)),
-                 ('Reference images', 'references' in selected, references)]
+                 ('Reference images', 'references' in selected, references),
+                 ('Damaged files set aside', 'broken_files' in selected, broken_files)]
         for name, wanted, step in steps:
             if not wanted:
                 continue
