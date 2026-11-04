@@ -993,9 +993,18 @@ def test_project_temp_cleanup_removes_temporary_files_of_the_app_in_the_project_
     assert sorted(p.name for p in tmp_path.glob('*.tmp')) == sorted(p.name for p in fresh + mine if p.suffix == '.tmp')
 
 
-def test_project_temp_cleanup_of_a_folder_without_such_files(tmp_path):
+def test_project_temp_cleanup_of_a_folder_without_such_files(tmp_path, monkeypatch):
+    # review: no probe file is written into the project folder (e.g. a synced folder) on
+    # every app start when there is nothing to remove
+    from framescout_core import cleanup
+
+    def no_probe(*args, **kwargs):
+        raise AssertionError('the folder clock was read')
+
+    monkeypatch.setattr(cleanup, '_file_system_now', no_probe)
+    (tmp_path / 'profiles.json').write_text('{}', encoding='utf-8')
     assert project_temp_cleanup(tmp_path)['files'] == 0
-    assert list(tmp_path.iterdir()) == []
+    assert [p.name for p in tmp_path.iterdir()] == ['profiles.json']
 
 
 def test_the_app_cleans_its_project_folder_once_per_start():
