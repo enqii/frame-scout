@@ -457,8 +457,6 @@ def search(args, parser, roots, dropped, output, status):
             raise
 
     def store_failed(item, exc):
-        if cache_error(exc):  # the cache itself is damaged: no photo can be stored (E50)
-            raise exc
         failed(item[0], exc)
 
     status.update('analyzing', total=len(paths))
@@ -480,8 +478,10 @@ def search(args, parser, roots, dropped, output, status):
             loaded = detector.get()
             for group in group_batches(prepared(todo, pool, ahead, loaded), args.batch_size,
                                        size=lambda item: len(item[2])):
-                # after a failure the photos are stored one by one, so only a broken one fails
-                finished(new=store_group(group, store, store_failed))
+                # after a failure the photos are stored one by one, so only a broken one fails;
+                # an error of the cache file itself stops the search at once: no photo could
+                # be stored (E50, review)
+                finished(new=store_group(group, store, store_failed, fatal=cache_error))
 
         try:
             analyze(todo)

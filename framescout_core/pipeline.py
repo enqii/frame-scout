@@ -69,19 +69,23 @@ def group_batches(items, batch_size, size):
         yield group
 
 
-def store_group(group, store, failed):
+def store_group(group, store, failed, fatal=lambda exc: False):
     """Store a group of items with store(group); return the number of items stored.
 
     store must store all items or none (one transaction). If it raises and the group has
     several items, each item is stored on its own, so a single broken photo or a failure
     that hits only one of them (review) does not fail the whole group, and failed(item,
-    exc) reports every item that still fails with its own error. KeyboardInterrupt and
-    other BaseExceptions are not caught.
+    exc) reports every item that still fails with its own error. An error for which
+    fatal(exc) is true (e.g. a damaged cache file, E50) is raised at once, without
+    storing the items one by one (review). KeyboardInterrupt and other BaseExceptions are
+    not caught.
     """
     try:
         store(group)
         return len(group)
     except Exception as exc:
+        if fatal(exc):
+            raise
         if len(group) == 1:
             failed(group[0], exc)
             return 0
@@ -91,6 +95,8 @@ def store_group(group, store, failed):
             store([item])
             stored += 1
         except Exception as exc:
+            if fatal(exc):
+                raise
             failed(item, exc)
     return stored
 
