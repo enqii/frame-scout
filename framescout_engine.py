@@ -26,7 +26,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              final_status, yolo_weights,
                              RawFallback, SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
-                             load_profiles, missing_folders_message, model_problem,
+                             load_profiles, missing_folders_message, model_problem, open_clip_cache_dir,
                              output_folder_problem, photo_name,
                              prefetch,
                              prepare_cache, profile_slugs, progress_due, publish_export,
@@ -269,8 +269,10 @@ def search(args, parser, roots, dropped, output, status):
     open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model, modules=sys.modules)
 
     def load_model():
-        model, _, preprocess = open_clip.create_model_and_transforms(search_model.name,
-                                                                     pretrained=search_model.pretrained, device=device)
+        # weights without a Hub repository go to .cache/clip, not ~/.cache/clip (E39)
+        model, _, preprocess = open_clip.create_model_and_transforms(
+            search_model.name, pretrained=search_model.pretrained, device=device,
+            cache_dir=open_clip_cache_dir(search_model, os.environ, Path(__file__).resolve().parent))
         return model, preprocess, open_clip.get_tokenizer(search_model.name)
 
     # an incomplete cache goes online again and downloads what is missing

@@ -42,6 +42,21 @@ def default_cache_env(environ, base):
     return added
 
 
+def open_clip_cache_dir(model, environ, base):
+    """The cache_dir the engine passes open_clip for the SearchModel model, or None (E39).
+
+    open_clip fetches weights that have no Hugging Face Hub repository from their URL into
+    ~/.cache/clip unless it gets a cache_dir, whatever TORCH_HOME or XDG_CACHE_HOME say. Such
+    a model therefore gets the folder clip in XDG_CACHE_HOME of environ (base/.cache if
+    unset). A model with weights_repo gets None: open_clip would hand cache_dir on to
+    huggingface_hub, so its weights would leave the Hub cache (HF_HOME) and be downloaded
+    again.
+    """
+    if model.weights_repo:
+        return None
+    return str(Path(environ.get('XDG_CACHE_HOME') or cache_paths(base)['XDG_CACHE_HOME']) / 'clip')
+
+
 def yolo_weights(name, base, cwd, environ, log=None, replace=os.replace):
     """The path the detector loads its weights from, and downloads them to on first use (E9).
 
