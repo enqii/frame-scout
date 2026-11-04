@@ -1,11 +1,12 @@
 """Shared logic of the search-model evaluation (framescout_core.evaluation, E32/E20)."""
 import json
+from pathlib import Path
 
 import pytest
 
-from framescout_core import (EVAL_K, LABELS_FORMAT, SCORES_FORMAT, average_precision, build_pool,
-                             collection_name_problem, read_document, read_labels, read_scores, save_labels,
-                             scores_document, set_label, write_document, write_scores)
+from framescout_core import (EVAL_K, LABELS_FORMAT, SCORES_FORMAT, average_precision, build_pool, changed_motifs,
+                             collection_name_problem, motif, read_document, read_labels, read_motifs, read_scores,
+                             record_motif, save_labels, scores_document, set_label, write_document, write_scores)
 
 
 def sample_document():
@@ -196,3 +197,58 @@ def test_an_unreadable_labels_file_raises_and_is_not_replaced(tmp_path, content)
     with pytest.raises(ValueError):
         read_labels(path)
     assert path.read_text(encoding='utf-8') == content
+
+
+# --- the motif a profile's labels were made for (E36) ---
+
+CAR = motif('Vehicles', 'red paint', [])
+
+
+def test_a_motif_holds_context_features_and_reference_images():
+    assert motif('Vehicles', 'red paint', [Path('C:/r/car.jpg')]) == {
+        'context': 'Vehicles', 'features': 'red paint', 'references': [str(Path('C:/r/car.jpg'))]}
+    assert motif(None, None, []) == {'context': '', 'features': '', 'references': []}
+
+
+def test_the_motif_of_the_first_label_of_a_profile_is_kept(tmp_path):
+    path = tmp_path / 'labels.json'
+    labels = set_label({}, 'Red car', 'a.jpg', True)
+    motifs = record_motif({}, labels, 'Red car', CAR)
+    assert motifs == {'Red car': CAR}
+    # a later label for another motif under the same name keeps the first one, so the
+    # change stays visible until the labels are cleared
+    labels = set_label(labels, 'Red car', 'b.jpg', False)
+    assert record_motif(motifs, labels, 'Red car', motif('Vehicles', 'blue paint', [])) == {'Red car': CAR}
+    save_labels(path, labels, motifs)
+    assert read_labels(path) == labels and read_motifs(path) == {'Red car': CAR}
+    # once every label of the profile is cleared, its motif goes too
+    labels = set_label(set_label(labels, 'Red car', 'a.jpg', None), 'Red car', 'b.jpg', None)
+    assert record_motif(motifs, labels, 'Red car', CAR) == {}
+
+
+def test_a_labels_file_without_motifs_has_none(tmp_path):
+    # files of an earlier version: the next label of a profile records its motif
+    path = tmp_path / 'labels.json'
+    save_labels(path, {'Red car': {'a.jpg': True}})
+    assert read_motifs(path) == {} and read_motifs(tmp_path / 'missing.json') == {}
+    assert 'motifs' not in json.loads(path.read_text(encoding='utf-8'))
+
+
+@pytest.mark.parametrize('motifs', ['[]', '{"Red car": []}',
+                                    '{"Red car": {"context": 1, "features": "", "references": []}}',
+                                    '{"Red car": {"context": "", "features": "", "references": [1]}}',
+                                    '{"Red car": {"context": "", "features": ""}}'])
+def test_unreadable_motifs_raise(tmp_path, motifs):
+    path = tmp_path / 'labels.json'
+    path.write_text(f'{{"format": 1, "labels": {{}}, "motifs": {motifs}}}', encoding='utf-8')
+    with pytest.raises(ValueError):
+        read_motifs(path)
+
+
+def test_changed_motifs_name_what_changed():
+    current = {'Red car': motif('Vehicles', 'red paint', ['C:/r/new.jpg']), 'Dog': motif('Dogs', '', [])}
+    recorded = {'Red car': CAR, 'Dog': motif('Dogs', '', []), 'Bike': motif('', '', [])}
+    # Bike has no current motif to compare with (no run scored it, or no profiles file)
+    assert changed_motifs(recorded, current) == {'Red car': ['reference images']}
+    recorded['Red car'] = motif('Cars', 'blue paint', ['C:/r/new.jpg'])
+    assert changed_motifs(recorded, current) == {'Red car': ['context', 'features']}
