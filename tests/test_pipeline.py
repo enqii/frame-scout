@@ -109,6 +109,44 @@ def test_a_single_photo_is_not_retried():
     assert calls == [['a']] and failures == ['a']
 
 
+@pytest.mark.parametrize('group', [['a', 'b', 'c'], ['a']])
+def test_a_fatal_error_stops_store_group_without_storing_one_by_one(group):
+    # review of E50: a damaged cache fails every write; storing the photos one by one would
+    # embed the first one again before the error stops the search
+    calls, failures = [], []
+
+    def store(items):
+        calls.append(list(items))
+        raise RuntimeError('database disk image is malformed')
+
+    with pytest.raises(RuntimeError, match='malformed'):
+        store_group(group, store, lambda item, exc: failures.append(item),
+                    fatal=lambda exc: 'malformed' in str(exc))
+    assert calls == [group] and failures == []
+
+
+def test_an_error_that_is_not_fatal_is_still_stored_one_by_one():
+    store, calls = recording_store(bad={'b'})
+    failures = []
+    assert store_group(['a', 'b'], store, lambda item, exc: failures.append(item), fatal=lambda exc: False) == 1
+    assert calls == [['a', 'b'], ['a'], ['b']] and failures == ['b']
+
+
+def test_a_fatal_error_of_one_photo_stored_alone_stops_too():
+    calls = []
+
+    def store(items):
+        calls.append(list(items))
+        if len(items) == 1 and items[0] == 'b':
+            raise RuntimeError('disk I/O error')
+        if len(items) > 1:
+            raise OSError('one broken photo')
+
+    with pytest.raises(RuntimeError):
+        store_group(['a', 'b', 'c'], store, lambda item, exc: None, fatal=lambda exc: isinstance(exc, RuntimeError))
+    assert calls == [['a', 'b', 'c'], ['a'], ['b']]
+
+
 def test_store_group_does_not_swallow_keyboard_interrupt():
     def store(group):
         raise KeyboardInterrupt
