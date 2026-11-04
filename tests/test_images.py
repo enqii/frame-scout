@@ -63,6 +63,7 @@ def test_a_truncated_jpeg_fails_only_where_it_must_decode_completely(tmp_path):
               'Image.frombytes("RGB", (900, 600), os.urandom(900 * 600 * 3)).save(photo, quality=90)\n'
               'data = open(photo, "rb").read()\n'
               'open(cut, "wb").write(data[:len(data) // 2])\n'
+              'open(cut + ".eoi.jpg", "wb").write(data[:-2])\n'
               'def outcome(path, **options):\n'
               '    try:\n'
               '        return framescout_images.open_image(path, **options).size\n'
@@ -71,11 +72,16 @@ def test_a_truncated_jpeg_fails_only_where_it_must_decode_completely(tmp_path):
               'print(outcome(photo, complete=True), outcome(photo, min_size=200, complete=True))\n'
               'print(outcome(cut))\n'
               'print(outcome(cut, complete=True))\n'
-              'print(outcome(cut, min_size=200, complete=True))\n')
+              'print(outcome(cut, min_size=200, complete=True))\n'
+              'print(outcome(cut + ".eoi.jpg", complete=True))\n')
     result = subprocess.run([sys.executable, '-c', script, str(tmp_path / 'photo.jpg'), str(tmp_path / 'cut.jpg')],
                             cwd=ROOT, capture_output=True, text=True, timeout=120)
     assert result.returncode == 0, result.stderr
-    complete, lenient, strict, drafted = result.stdout.strip().splitlines()[-4:]
+    complete, lenient, strict, drafted, no_end_marker = result.stdout.strip().splitlines()[-5:]
     assert complete == '(900, 600) (450, 300)'
     assert lenient == '(900, 600)'  # anywhere else it decodes as before, the missing part gray
     assert strict.startswith('truncated: ') and drafted.startswith('truncated: ')
+    assert 'end marker' in strict
+    # review, E57: Pillow cannot tell a JPEG that lacks only its end marker from a truncated
+    # one, so it counts as truncated too (pinned: a Pillow that tells them apart would show here)
+    assert no_end_marker.startswith('truncated: ')

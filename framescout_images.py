@@ -53,11 +53,13 @@ def open_image(path, min_size=None, complete=False):
         if min_size:
             image.draft(None, (min_size, min_size))
         upright = ImageOps.exif_transpose(image).convert('RGB')
-        # Pillow's JPEG reader sets _ended when the data ends before the image does (it then
-        # pretends the end marker): a global setting, so it cannot be turned off for one photo
-        # while the decoding threads read others; tests/test_images.py pins it
+        # Pillow's JPEG reader sets _ended when the file ends before its end marker (it then
+        # pretends the marker): a global setting, so it cannot be turned off for one photo
+        # while the decoding threads read others; tests/test_images.py pins it. It is also set
+        # for a JPEG whose image data is complete and that lacks only the end marker, which
+        # Pillow does not tell apart (review, E57): such a partner counts as truncated too
         if complete and getattr(image, '_ended', False):
-            raise TruncatedImageError('image file is truncated (its data ends early)')
+            raise TruncatedImageError('image file ends early (truncated, or only its end marker is missing)')
         return upright
 
 
