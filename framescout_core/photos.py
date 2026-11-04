@@ -257,6 +257,10 @@ def raw_fallbacks(scan):
     return fallbacks
 
 
+class TruncatedImageError(OSError):
+    """A photo whose data ends early, decoded with complete=True (framescout_images.open_image, E46)."""
+
+
 class RawFallback:
     """The RAW files a search analyzes instead of their partner that cannot be analyzed (E30).
 
@@ -267,18 +271,42 @@ class RawFallback:
     several failed partners. use(partner, raw) records a RAW file that was analyzed;
     photos(paths) names it in place of its partner, so the shot keeps its place and the
     number of photos stays the same. used: {partner: RAW file} of the analyzed ones.
+
+    A partner must decode completely (strict): a merely truncated JPEG, which decodes with
+    its missing part gray, fails (TruncatedImageError) so that the RAW file is analyzed
+    instead (E46). If that RAW file fails too, its failure is deferred as well, and retry()
+    returns the truncated partner, which is then analyzed as far as its data goes, so a RAW
+    file LibRaw cannot read does not cost the shot.
     """
 
     def __init__(self, scan):
         self.fallbacks = raw_fallbacks(scan)
         self.failed = []
         self.used = {}
+        self.truncated = set()  # deferred partners that failed only because their data ends early
+        self.lenient = set()  # truncated partners analyzed as far as their data goes (retry)
+        self._waiting = {}  # {RAW file: its truncated partner} of the RAW files choose picked
+        self._retry = []
 
-    def defer(self, path):
-        """Record a failed photo; True if it is a partner with a RAW file, decided later by choose."""
-        if path not in self.fallbacks or path in self.failed:
+    def strict(self, path):
+        """Whether path must decode completely: a partner with a RAW file not retried yet (E46)."""
+        return path in self.fallbacks and path not in self.lenient
+
+    def defer(self, path, truncated=False):
+        """Record a failed photo; True if it is decided later (by choose or retry), not counted now.
+
+        That is a partner with a RAW file that failed for the first time (truncated: only
+        because its data ends early, E46), or the RAW file choose picked for a truncated
+        partner (its partner is retried).
+        """
+        if path in self._waiting:
+            self._retry.append(self._waiting.pop(path))
+            return True
+        if path not in self.fallbacks or path in self.failed or path in self.lenient:
             return False
         self.failed.append(path)
+        if truncated:
+            self.truncated.add(path)
         return True
 
     def choose(self, analyzed):
@@ -299,7 +327,18 @@ class RawFallback:
                 lost.append(partner)
             else:
                 chosen[partner] = raw
+        self._waiting = {raw: partner for partner, raw in chosen.items() if partner in self.truncated}
         return chosen, lost
+
+    def retry(self):
+        """Return the truncated partners whose RAW file failed too, to analyze as far as their data goes (E46).
+
+        Called once the RAW files choose picked are done; from then on they are no longer
+        strict, and a failure of theirs counts (defer returns False).
+        """
+        partners, self._retry, self._waiting = self._retry, [], {}
+        self.lenient.update(partners)
+        return partners
 
     def use(self, partner, raw):
         self.used[partner] = raw

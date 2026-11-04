@@ -12,8 +12,8 @@ from pathlib import Path
 
 from PIL import Image, ImageFile, ImageOps
 
-from framescout_core import (DRAFT_REDUCING_GAP, RAW_EXT, available_decoders, missing_decoder, raw_preview_transpose,
-                             raw_preview_usable)
+from framescout_core import (DRAFT_REDUCING_GAP, RAW_EXT, TruncatedImageError, available_decoders, missing_decoder,
+                             raw_preview_transpose, raw_preview_usable)
 
 # pillow-heif and rawpy are in requirements.txt; an older installation without them still
 # runs and skips those photos with a note. The app checks the same way (available_decoders),
@@ -32,12 +32,14 @@ ORIENTATION = 0x0112
 THUMBNAIL_SIZE = 380
 
 
-def open_image(path, min_size=None):
+def open_image(path, min_size=None, complete=False):
     """Open path as an upright RGB image.
 
     With min_size, a JPEG is decoded at 1/2, 1/4 or 1/8 scale (Image.draft) as long as
     both edges stay at least min_size pixels long; other formats ignore it (E2). A camera
-    RAW file is read with open_raw (E25).
+    RAW file is read with open_raw (E25). A JPEG whose data ends early decodes with the
+    missing part gray (LOAD_TRUNCATED_IMAGES); with complete, it raises TruncatedImageError
+    instead, so that the engine analyzes the RAW file of its shot (E46).
     """
     suffix = Path(path).suffix.lower()
     # e.g. a HEIC reference image without pillow-heif: say why instead of a decoder error;
@@ -50,7 +52,13 @@ def open_image(path, min_size=None):
     with Image.open(path) as image:
         if min_size:
             image.draft(None, (min_size, min_size))
-        return ImageOps.exif_transpose(image).convert('RGB')
+        upright = ImageOps.exif_transpose(image).convert('RGB')
+        # Pillow's JPEG reader sets _ended when the data ends before the image does (it then
+        # pretends the end marker): a global setting, so it cannot be turned off for one photo
+        # while the decoding threads read others; tests/test_images.py pins it
+        if complete and getattr(image, '_ended', False):
+            raise TruncatedImageError('image file is truncated (its data ends early)')
+        return upright
 
 
 def open_raw(path, min_size=None):
