@@ -1,4 +1,5 @@
 """Model and config files stay under the project's .cache folder, also for manual runs (E9, I10)."""
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -161,5 +162,10 @@ def test_find_yolo_weights_looks_where_yolo_weights_does_without_moving(tmp_path
 
 
 def test_yolo_weights_paths_and_urls_are_used_as_given(tmp_path):
-    for name in (str(tmp_path / 'w.pt'), r'models\w.pt', 'models/w.pt', 'https://example.org/w.pt'):
+    names = [str(tmp_path / 'w.pt'), 'models/w.pt', 'https://example.org/w.pt']
+    if os.name == 'nt':
+        # a backslash separates folders on Windows only; elsewhere it is part of a bare file
+        # name, as Path and Ultralytics see it there (E40)
+        names.append(r'models\w.pt')
+    for name in names:
         assert yolo_weights(name, tmp_path, tmp_path, {}) == name
