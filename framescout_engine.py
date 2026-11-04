@@ -20,7 +20,8 @@ from urllib.parse import quote
 
 from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
                              DEVICES, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RUN_LOCK,
-                             RUN_STATUS, RunLock, StatusReporter, auto_cleanup, crop_label,
+                             RUN_STATUS, RunLock, StatusReporter, auto_cleanup, cache_error, cache_error_message,
+                             crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
                              AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, run_throughput,
                              final_status, yolo_weights,
@@ -191,6 +192,12 @@ def main():
         status.finish('interrupted', 130, 'Interrupted (Ctrl+C).')
         raise
     except BaseException as exc:
+        # a damaged cache file: what to do instead of SQLite's raw error and a traceback (E50)
+        damaged = cache_error_message(output / CACHE_FILE, exc)
+        if damaged:
+            print(damaged, file=sys.stderr, flush=True)
+            status.finish('failed', 1, damaged)
+            return 1
         # e.g. a model that cannot be loaded: the traceback goes to the log, the status names the error
         status.finish('failed', 1, f'{type(exc).__name__}: {exc}')
         raise
@@ -390,7 +397,9 @@ def search(args, parser, roots, dropped, output, status):
         """True if path has a current cache row; a file that cannot be read counts as not analyzed."""
         try:
             return cached(path)
-        except Exception:
+        except Exception as exc:
+            if cache_error(exc):  # the cache itself is damaged: the search stops (E50)
+                raise
             return False
 
     def failed(path, exc):
@@ -411,6 +420,8 @@ def search(args, parser, roots, dropped, output, status):
             try:
                 hit = cached(path)
             except Exception as exc:
+                if cache_error(exc):  # not an error of this photo (E50)
+                    raise
                 failed(path, exc)
                 continue
             if hit:
@@ -444,6 +455,8 @@ def search(args, parser, roots, dropped, output, status):
             raise
 
     def store_failed(item, exc):
+        if cache_error(exc):  # the cache itself is damaged: no photo can be stored (E50)
+            raise exc
         failed(item[0], exc)
 
     status.update('analyzing', total=len(paths))
@@ -515,6 +528,8 @@ def search(args, parser, roots, dropped, output, status):
             # a broken row (labels and vectors do not match, scores not finite) is skipped
             photo_text, photo_visual = photo_scores(features, labels, profile_vectors)
         except Exception as exc:
+            if cache_error(exc):  # the cache file itself, not this photo's row (E50)
+                raise
             print(f'CACHE ERROR {path}: {exc}', flush=True)
             continue
         scored.append(path); crop_labels.append(labels); mtimes.append(stat.st_mtime_ns)
