@@ -849,6 +849,47 @@ def test_references_are_not_offered_if_the_backup_cannot_be_read(project):
     assert scan['references']['items'] == [] and 'profiles.json.bak' in scan['references']['problem']
 
 
+# damaged files FrameScout set aside (A40)
+
+BROKEN = ('marks.json.broken-20261102-123045', 'marks.json.broken-20261102-123045-2',
+          'cache.sqlite3.broken-20261102-123045', 'cache.sqlite3.broken-20261102-123045-journal',
+          'cache.sqlite3.broken-20261102-123045-2-wal', 'cache.sqlite3.broken-20261102-123045-2-shm')
+
+
+def write_files(folder, names):
+    for name in names:
+        (folder / name).write_bytes(b'damaged')
+    return [folder / name for name in names]
+
+
+def test_damaged_files_set_aside_are_offered_unselected(project):
+    broken = write_files(project.results, BROKEN)
+    # not set aside by FrameScout, or a temporary file of a write (auto_cleanup's)
+    write_files(project.results, ('marks.json.broken', 'marks.json.broken-x', 'marks.json.broken-20261102-123045.bak',
+                                  'marks.json.broken-20261102-123045.abcdefgh.tmp', 'cache.sqlite3-journal',
+                                  'settings.json.broken-20261102-123045', 'marks.json.bak'))
+    (project.results / 'cache.sqlite3.broken-20261102-999999').mkdir()  # a folder, not a file
+    category = project.scan()['broken_files']
+    assert category['items'] == sorted(broken)
+    assert category['default'] is False and category['problem'] is None
+    assert category['size'] == 7 * len(BROKEN) and category['names'] == sorted(BROKEN)
+
+
+def test_deleting_damaged_files_removes_only_those_the_scan_showed(project):
+    shown = write_files(project.results, BROKEN[:2])
+    scan = project.scan()
+    late = write_files(project.results, BROKEN[2:3])
+    summary = project.clean(scan, {'broken_files'})
+    assert summary['files'] == 2 and not any(p.exists() for p in shown) and late[0].exists()
+
+
+def test_damaged_files_are_kept_unless_selected(project):
+    broken = write_files(project.results, BROKEN)
+    scan = project.scan()
+    project.clean(scan, set(scan) - {'broken_files'})
+    assert all(p.exists() for p in broken)
+
+
 # deleting
 
 def everything(scan):
@@ -876,6 +917,7 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
     # the only mark is unbound: the entry goes, the file stays
     project.marks({'Red car': {str(project.photos / 'gone.jpg'): 'match'}})
     (project.refs / 'old.jpg').write_bytes(b'image')
+    write_files(project.results, ['marks.json.broken-20261102-123045'])  # set aside by a restore (A40)
     scan = project.scan()
     summary = project.clean(scan, everything(scan), vacuum=True)
     assert summary['refused'] is None and summary['failed'] == []
@@ -896,7 +938,7 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
     assert not project.legacy.exists()  # emptied, and no kept gallery links it
     assert project.rows() == [(str(photo), CURRENT)]
     assert list(project.refs.iterdir()) == []
-    assert summary['files'] == 5 and summary['rows'] == 3
+    assert summary['files'] == 6 and summary['rows'] == 3
     assert summary['freed'] > 0
 
 

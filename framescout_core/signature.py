@@ -51,6 +51,10 @@ def feature_signature(person_detection, max_persons, person_confidence, yolo_mod
 
 # The feature cache in the output folder, and the engine's default person detector.
 CACHE_FILE = 'cache.sqlite3'
+# the files SQLite keeps next to a database (<name>-journal of the default rollback journal,
+# which the engine uses; -wal and -shm of WAL mode): renamed with it by set_cache_aside, since
+# a hot journal left behind would be rolled back into the new cache of the next search
+CACHE_SIDE_FILES = ('-journal', '-wal', '-shm')
 DEFAULT_YOLO_MODEL = 'yolo11n.pt'
 
 

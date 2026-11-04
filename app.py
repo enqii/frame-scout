@@ -113,6 +113,11 @@ CLEANUP_LABELS = {
     'references': ('Reference images no profile uses',
                    'Image files in the references folder that neither profiles.json nor its backup '
                    'profiles.json.bak names, e.g. removed from a profile or of a deleted profile.'),
+    'broken_files': ('Damaged files set aside',
+                     'The damaged copies FrameScout kept when you restored the marks from their backup '
+                     '(marks.json.broken-<date and time>) or set a damaged cache aside (cache.sqlite3.broken-<date '
+                     'and time>, with its journal files). FrameScout never reads them again; keep them only if you '
+                     'want to try to repair one.'),
 }
 CLEANUP_NAMES_SHOWN = 20
 
@@ -461,7 +466,8 @@ def restore_marks_backup():
         return
     text = f"Restored {count_text(restored, 'mark', 'marks')} from {MARKS_BACKUP}."
     if kept:
-        text += f' The damaged file is kept as {kept.name} in the results folder; delete it once you no longer need it.'
+        text += (f' The damaged file is kept as {kept.name} in the results folder; "Clean up storage" offers it as a '
+                 'damaged file set aside once you no longer need it.')
     st.session_state.marks_notice = ('success', text)
 
 def set_mark(profile, photo, key):
@@ -1058,7 +1064,7 @@ def set_damaged_cache_aside(expected):
     st.session_state.cache_notice = (
         'success', f'Renamed {CACHE_FILE} to {new}' + (f" (with {', '.join(sides)})" if sides else '') +
         '. The next search builds a new cache and analyzes all photos again, which takes about as long as the '
-        f'first search. Delete {new} yourself once you no longer need it.')
+        f'first search. Once you no longer need {new}, "Clean up storage" offers it as a damaged file set aside.')
 
 def show_cache_check():
     """"Check cache" in "Clean up storage": SQLite's quick check of the cache, a damaged one set aside (F1)."""
@@ -1090,7 +1096,8 @@ def show_cache_check():
         st.warning(f'{CACHE_FILE} could not be checked ({details}). Nothing was changed. Try again later, e.g. '
                    'after closing other programs that may have the file open.')
     else:
-        rename = plain(f'{CACHE_FILE}.broken-<date and time>: it stays in the results folder (nothing is deleted), '
+        rename = plain(f'{CACHE_FILE}.broken-<date and time>: it stays in the results folder until you delete it '
+                       'as a damaged file set aside in "Clean up storage", '
                        'and the next search builds a new cache and analyzes all photos again, which takes about as '
                        'long as the first search. Your marks, results, profiles and photos are not affected.')
         if result['state'] == 'unreadable':
