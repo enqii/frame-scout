@@ -98,7 +98,27 @@ After the user has agreed to the plan:
    explicit approval** (`gh pr merge <n> --rebase --delete-branch --match-head-commit
    <headRefOid>`; follow `/roadmap` → "Merge" for the cleanup).
 
-## 4. Rules
+## 4. Release (after the merge)
+
+A triage closes a round (the roadmap was worked off, then triaged), so each round gets a
+GitHub release. Only after the triage PR is merged and `main` is up to date:
+
+1. Find the last release: `gh release list --limit 1` (none yet: this is the first one).
+2. Propose the version to the user in German: SemVer `v<major>.<minor>.0`, the minor
+   number counts up once per round (first release: `v1.2.0`). While `CLAUDE.md` calls the
+   project a prototype, the release is a **pre-release** (`--prerelease`).
+3. Draft the release notes from the commits and merged PRs since the last release
+   (`gh release create … --generate-notes --notes-start-tag <last tag>` as a base, then
+   shorten): changes grouped by feat/fix/docs, followed by the verified status from
+   `CLAUDE.md` → "Status" (what is runtime-verified, what is not). Public text: no local
+   paths, user names or machine details.
+4. Show version and notes to the user. **Publish only after explicit approval:**
+   `gh release create <tag> --target <sha of origin/main> --title "…" --notes-file …
+   [--prerelease]`. This creates the tag on GitHub, so no `git push` of a tag is needed.
+   Never attach files; the automatic source ZIP is the download.
+5. Report the release URL. The user may say "no release this round"; then skip this step.
+
+## 5. Rules
 
 - The user's decision always wins; never re-litigate an earlier one.
 - Never edit `CLAUDE.md` hold points or the PR workflow from here; propose a separate PR.
