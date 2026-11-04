@@ -8,7 +8,7 @@ import pytest
 
 import framescout_core.exporting as exporting
 from framescout_core import (EXPORT_COLUMNS, EXPORTS_DIR, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, export_cards, export_csv, export_file_list, export_name, export_result_list,
-                             result_card)
+                             result_card, unlisted_paths)
 
 NOW = datetime(2026, 11, 3, 14, 5, 9)
 
@@ -68,6 +68,25 @@ def test_unreadable_marks_leave_the_mark_column_empty():
 def test_the_file_list_has_one_path_per_line():
     assert export_file_list(CARDS).splitlines() == [c['path'] for c in CARDS]
     assert export_file_list([]) == ''
+
+
+@pytest.mark.parametrize('brk', ['\n', '\r', '\r\n', '\x0b', '\x85', ' '])
+def test_a_path_with_a_line_break_is_left_out_of_the_file_list_only(brk):
+    # possible on Linux/macOS file systems; the CSV quotes it, one line of the list cannot hold it (A42)
+    odd = card(2, f'/photos/two{brk}lines.jpg')
+    cards = [CARDS[0], odd, CARDS[1]]
+    assert unlisted_paths(cards) == [odd['path']]
+    assert export_file_list(cards).splitlines() == [A, B]
+    assert export_file_list(cards).split('\n') == [A, B, '']
+    assert rows(export_csv(cards, {}))[2][1] == odd['path']
+    assert unlisted_paths(CARDS) == []
+
+
+def test_the_export_writes_a_path_with_a_line_break_only_to_the_csv(tmp_path):
+    odd = card(2, '/photos/two\nlines.jpg')
+    table, listing = export_result_list(tmp_path, 'x', [CARDS[0], odd], {}, now=NOW)
+    assert listing.read_text(encoding='utf-8') == A + '\n'
+    assert [r[1] for r in rows(table.read_text(encoding='utf-8-sig'))[1:]] == [A, odd['path']]
 
 
 # --- file names --------------------------------------------------------------------------

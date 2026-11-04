@@ -20,7 +20,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              clean_up, cleanup_running, cleanup_summary_text, marks_backup, restore_marks,
                              cache_check_current, set_cache_aside,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
-                             EXPORTS_DIR, export_cards, export_result_list,
+                             EXPORTS_DIR, export_cards, export_result_list, unlisted_paths,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              AI_SETTINGS, changed_from_defaults, setting_text,
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
@@ -557,9 +557,13 @@ def export_list(profile, gallery, cards, only_matches):
     except (OSError, ValueError) as exc:
         st.session_state.export_notice = ('warning', f'Nothing was exported: {exc}.')
         return
+    # a path with a line break (not possible on Windows) is only in the CSV table (A42)
+    unlisted = len(unlisted_paths(export_cards(cards, marks, only_matches)))
     st.session_state.export_notice = (
         'success', f'Exported to {table.name} and {listing.name} in {EXPORTS}.'
-                   + (f' The mark column is empty: {MARKS_FILE} cannot be read.' if marks is None else ''))
+                   + (f' The mark column is empty: {MARKS_FILE} cannot be read.' if marks is None else '')
+                   + (f" {count_text(unlisted, 'path contains', 'paths contain')} a line break, which one line of "
+                      f'{listing.name} cannot hold: only {table.name} lists it.' if unlisted else ''))
 
 def open_exports_folder():
     gallery_action(open_path, EXPORTS if EXPORTS.is_dir() else None, f'The folder {EXPORTS}')

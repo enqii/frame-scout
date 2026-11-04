@@ -62,9 +62,23 @@ def export_csv(cards, marks):
     return out.getvalue()
 
 
+def _has_line_break(path):
+    # every line break str.splitlines knows: a program reading the list may split at any of them
+    return path.splitlines() != [path]
+
+
+def unlisted_paths(cards):
+    """Return the paths of cards that export_file_list leaves out: those with a line break (A42).
+
+    Possible on Linux/macOS file systems, not on Windows; one line of the list cannot hold
+    such a path, so it is only in the CSV table, which quotes it.
+    """
+    return [card['path'] for card in cards if _has_line_break(card['path'])]
+
+
 def export_file_list(cards):
-    """Return the paths of cards, one per line ("\\n"), in rank order."""
-    return ''.join(card['path'] + '\n' for card in cards)
+    """Return the paths of cards, one per line ("\\n"), in rank order, without unlisted_paths (A42)."""
+    return ''.join(card['path'] + '\n' for card in cards if not _has_line_break(card['path']))
 
 
 def export_name(slug, now, only_matches=False):

@@ -55,7 +55,7 @@ from .marks import (MARKS_FILE, MARKS_BACKUP, MARKS_FORMAT, MARK_OPEN, MARK_MATC
 from .copying import (COPY_FOLDERS_KEY, COPY_MAX_NAMES, default_copy_folder, copy_target,
     copy_photos, copy_summary_text, read_copy_folders, save_copy_folder, rename_copy_folder, forget_copy_folder)
 from .exporting import (EXPORTS_DIR, EXPORT_COLUMNS, EXPORT_MARK_TEXT, EXPORT_MAX_NAMES, export_cards, export_csv,
-    export_file_list, export_name, export_result_list)
+    export_file_list, export_name, export_result_list, unlisted_paths)
 from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLEANUP_CATEGORIES,
     CACHE_CATEGORIES, CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, ROOT_TIMEOUT, FOLDER_TIMEOUT, STALE_TEMP_AGE, scan_cleanup, cleanup_running, clean_up,
     auto_cleanup, project_temp_cleanup, size_text, count_text, cleanup_summary_text)
