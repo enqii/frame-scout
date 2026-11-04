@@ -78,6 +78,12 @@ _TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name)
 # seconds after which such a temporary file counts as left over: the write of an app
 # session (marks.json, a stopped status) takes a fraction of a second
 STALE_TEMP_AGE = 60
+# the temporary files of the app's atomic writes into the project folder (E44): of
+# profiles.json, its backup and settings.json (also the probe file _file_system_now creates
+# there); a kill of the app during a save leaves one
+_PROJECT_TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name) for name in ('profiles.json', 'profiles.json.bak',
+                                                                             SETTINGS_FILE))
+                                + r')\.[a-z0-9_]{8}\.tmp')
 _GALLERY_LINK = re.compile(r'\b(' + THUMBNAILS_DIR + '|' + LEGACY_THUMBNAILS_DIR + r')/([0-9a-f]{24}\.jpg)')
 
 
@@ -929,10 +935,10 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     return summary
 
 
-def _stale_temp_files(results, now):
-    """The temporary files (_TEMP_FILE) directly in results last changed STALE_TEMP_AGE or more seconds before now."""
+def _stale_temp_files(results, now, pattern=_TEMP_FILE):
+    """The temporary files (pattern) directly in results last changed STALE_TEMP_AGE or more seconds before now."""
     stale = []
-    for path in _files(results, _TEMP_FILE):
+    for path in _files(results, pattern):
         try:
             if now - path.stat().st_mtime >= STALE_TEMP_AGE:
                 stale.append(path)
@@ -941,15 +947,16 @@ def _stale_temp_files(results, now):
     return stale
 
 
-def _file_system_now(folder):
+def _file_system_now(folder, name=RESULTS_FILE):
     """The current time by the clock that stamps files in folder: the mtime of a file created there now.
 
     A network share stamps files with its own clock, which may run minutes apart from this
     PC's. time.time() if no file can be created there. The probe file is removed (a process
-    killed meanwhile leaves it as a temporary file of RESULTS_FILE, see _TEMP_FILE).
+    killed meanwhile leaves it as a temporary file of name, see _TEMP_FILE and
+    _PROJECT_TEMP_FILE).
     """
     try:
-        probe = _temp_path(Path(folder) / RESULTS_FILE)
+        probe = _temp_path(Path(folder) / name)
     except OSError:
         return time.time()
     try:
@@ -991,6 +998,24 @@ def auto_cleanup(results, now=None):
         return summary
     _delete_unlinked(results, links, listed, [*_files(results / THUMBNAILS_DIR, _THUMBNAIL_NAME),
                                               *_files(results / LEGACY_THUMBNAILS_DIR, _THUMBNAIL_NAME)], summary)
+    return summary
+
+
+def project_temp_cleanup(folder, now=None):
+    """Remove the temporary files the app's saves left in the project folder folder; return a summary (E44).
+
+    For the app at its start: a kill during a save of profiles.json, its backup or
+    settings.json leaves <name>.<random>.tmp (_PROJECT_TEMP_FILE), which no other cleanup
+    looks at (auto_cleanup only looks at the results folder). Only those at least
+    STALE_TEMP_AGE seconds old by the folder's clock are removed (a younger one may be
+    written by an app session now, as in auto_cleanup; now: a time for tests). The summary
+    is auto_cleanup's.
+    """
+    folder = Path(folder)
+    summary = _new_summary()
+    now = _file_system_now(folder, SETTINGS_FILE) if now is None else now
+    for path in _stale_temp_files(folder, now, _PROJECT_TEMP_FILE):
+        summary['temporary'] += _remove_file(path, summary)
     return summary
 
 

@@ -29,7 +29,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              known_throughput, remaining_text, start_summary, check_installation,
                              hidden_text, hide_no_match, mark_style,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
-                             read_copy_folders,
+                             project_temp_cleanup, read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
                              reconcile_settings, reference_folder,
                              rename_copy_folder, rename_marks, reveal_command, run_active, save_copy_folder,
@@ -1153,9 +1153,18 @@ def models_downloaded():
     except (OSError, ValueError):
         return set()
 
+@st.cache_resource(show_spinner=False)
+def clean_project_folder():
+    """Once per app start: remove the temporary files a killed app left in the project folder (E44)."""
+    try:
+        return project_temp_cleanup(BASE)
+    except OSError:  # e.g. a read-only project folder: never stops the app
+        return None
+
 st.title('🔎 FrameScout')
 st.caption('Local AI search in large photo collections · your images stay on your computer')
 
+clean_project_folder()
 try:
     create_from_example(PROFILES, EXAMPLE_PROFILES)  # first start only; never overwrites
 except OSError as exc:  # e.g. a read-only project folder
