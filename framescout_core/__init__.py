@@ -28,7 +28,7 @@ from .signature import (ENGINE_TEMPLATE, engine_id, ENGINE, MODEL_ENGINES,
     DEFAULT_YOLO_MODEL, prepare_cache, SLIDER_NOISE_ULPS, known_signatures, classify_signatures)
 from .hub import (HUB_QUIET_ENV, WEIGHTS_FILES, TOKENIZER_FILES, OFFLINE_VARIABLES, hub_cache_dir,
     hub_file_cached, model_cached, import_open_clip, hub_go_online, hub_file_error, load_with_hub_fallback)
-from .cache_dirs import (CACHE_DIR, cache_folder_paths, cache_paths,default_cache_env, find_yolo_weights, yolo_weights)
+from .cache_dirs import (CACHE_DIR, cache_folder_paths, cache_paths, default_cache_env, find_yolo_weights, yolo_weights)
 from .torch_build import (TORCH_VERSION, TORCHVISION_VERSION, TORCH_INDEX, CUDA_BUILDS,
     parse_gpu_query, unsupported_gpus, cuda_build, driver_text, torch_requirements,
     installed_build_matches, installed_cuda_build, torch_index_url)
@@ -58,7 +58,7 @@ from .exporting import (EXPORTS_DIR, EXPORT_COLUMNS, EXPORT_MARK_TEXT, EXPORT_MA
 from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLEANUP_CATEGORIES,
     CACHE_CATEGORIES, CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, ROOT_TIMEOUT, STALE_TEMP_AGE, scan_cleanup, cleanup_running, clean_up,
     auto_cleanup, size_text, count_text, cleanup_summary_text)
-from .disk_space import (TORCH_INSTALL_SPACE, OTHER_PACKAGES_SPACE,CACHE_BYTES_PER_PHOTO, THUMBNAIL_BYTES, DETECTOR_DOWNLOAD, SPACE_RESERVE,
+from .disk_space import (TORCH_INSTALL_SPACE, OTHER_PACKAGES_SPACE, CACHE_BYTES_PER_PHOTO, THUMBNAIL_BYTES, DETECTOR_DOWNLOAD, SPACE_RESERVE,
     SPACE_CHECK_TIMEOUT, LowSpace, analyzed_photos, app_search_needs, download_bytes, downloaded_models, eval_run_needs, search_space_bytes, search_space_needs, torch_install_needs, low_space, low_space_lines)
 from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE, torch_threads,
     lower_priority)
