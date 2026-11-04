@@ -1485,3 +1485,60 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-04 in PR #73: new `framescout_core.cache_folder_paths(cache)` (the four
       cache variables under a cache folder); `cache_paths(base)` and
       `framescout_eval.engine_env` use it. No behavior change.)
+- [x] **E37 – The unbound check guards only the root probe with a timeout:** a folder
+      listing or `stat` on a share that hangs during the pass stalls the scan (the page
+      run) until the OS gives up; a junction or mount point inside a reachable root that
+      leads to a disconnected volume can make its photos look gone (the deletion
+      re-checks, but the volume would have to be back by then). Idea: run the pass in a
+      worker thread with a per-folder timeout, or treat folders on other volumes than
+      their root as their own root. Found in the PR of E8.
+      (done 2026-11-04 in PR #74: the folder pass of `_PathCheck` runs in a daemon thread per
+      root; a folder silent for `FOLDER_TIMEOUT` (30 s) is not checked, its photos are kept and a
+      note names it; a root that then does not answer ends the pass for its other folders;
+      photos behind a junction, mount point or symbolic link whose target cannot be reached
+      (`_dead_link`) count as not checked. Only ever fewer photos are offered. Unit-tested
+      with simulated hangs and links; not run against a real hanging share. Follow-up: E54.)
+- [x] **E39 – open_clip's URL download path ignores the cache variables (minor):** a model
+      without an `hf_hub` config would be fetched by `download_pretrained_from_url` into
+      `~/.cache/clip` regardless of `TORCH_HOME`/`XDG_CACHE_HOME`. Not hit today: every
+      `framescout_core.MODELS` entry downloads through the Hugging Face Hub. A future model
+      without `hf_hub` would need `cache_dir=` passed to open_clip. Found in the PR of E9/I10.
+      (done 2026-11-04 in PR #74: `framescout_core.open_clip_cache_dir(model, environ, base)`
+      is passed as `cache_dir=` to `open_clip.create_model_and_transforms`: `XDG_CACHE_HOME/clip`
+      for a model without `weights_repo`, `None` for Hub models. No change for today's models.
+      Follow-up: E55.)
+- [x] **E40 – A `yolo_weights` test only holds on Windows (minor):** `test_yolo_weights_paths_and_urls_are_used_as_given`
+      passes `r'models\w.pt'` and expects it back unchanged; on Linux/macOS `Path(name).name`
+      is the whole string, so `yolo_weights` treats it as a bare name and the test fails
+      (CI runs on Windows only). Fix: check the backslash case with `PureWindowsPath` or skip
+      it off Windows. Review of PR #42, finding 6.
+      (done 2026-11-04 in PR #74: the test checks the backslash path only on Windows.)
+- [x] **E44 – Temporary files of the app's atomic writes in the project folder stay after a
+      kill (minor):** `profiles.json.<random>.tmp`, `settings.json.<random>.tmp` (and the
+      write of `profiles.json.bak`) remain if the app process is killed during a write. No
+      cleanup removes them: `auto_cleanup` only looks at `results/`. Small and rare. Found
+      in PR #45.
+      (done 2026-11-04 in PR #74: `framescout_core.project_temp_cleanup(folder, now=None)`
+      removes `profiles.json`, `profiles.json.bak` and `settings.json` temp files at least
+      `STALE_TEMP_AGE` old by the folder's clock; `app.py` runs it once per app start before
+      the profiles are read. Lock files and `profiles.json.bak` itself are never touched.)
+- [x] **E46 – A merely truncated JPEG partner does not trigger the RAW fallback:** the
+      engine sets `ImageFile.LOAD_TRUNCATED_IMAGES = True`, so a JPEG with an intact header
+      but missing data decodes without an error (the missing part gray) and the E30
+      fallback never runs; only partners that fail to decode (corrupt header, unreadable
+      file, broken HEIC) fall back. Idea: for partners of a RAW file, detect truncation
+      (Pillow's truncation warning, or a decode with `LOAD_TRUNCATED_IMAGES` off) and
+      prefer the RAW file then. Found in PR #46.
+      (done 2026-11-04 in PR #74: `open_image(..., complete=True)` raises the new
+      `TruncatedImageError` for a JPEG whose data ends early (Pillow's private `_ended` flag);
+      `RawFallback.strict/defer/retry`: a partner with a RAW file decodes strictly, a truncated
+      one falls back to its RAW file, and if that fails too the partner is analyzed as far as
+      its data goes. Not detected: a JPEG damaged in the middle, a truncated HEIC (E53).)
+- [x] **E50 – A search on a damaged `cache.sqlite3` fails with SQLite's raw error:**
+      `run.log` shows "file is not a database" or "database disk image is malformed". The
+      engine could catch `sqlite3.DatabaseError` when opening or reading the cache and point
+      to "Clean up storage" -> "Check cache". Found in F1 (PR #60).
+      (done 2026-11-04 in PR #74: `cache_error`/`cache_error_message`; a damaged or unreadable
+      cache ends the search with exit code 1, a status message and a stderr line pointing to
+      "Clean up storage" -> "Check cache", without a traceback. Other SQLite errors keep their
+      old handling. Follow-up: E56.)
