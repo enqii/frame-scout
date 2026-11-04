@@ -49,3 +49,33 @@ def test_rendering_a_thumbnail_loads_neither_torch_nor_the_cache_variables(tmp_p
                             capture_output=True, text=True, timeout=120, env=env)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines()[-1] == '(380, 253) False None'
+
+
+def test_a_truncated_jpeg_fails_only_where_it_must_decode_completely(tmp_path):
+    # E46: needs Pillow, so it is skipped in CI; pins how Pillow tells a JPEG whose data ends
+    # early (its _ended flag), which a Pillow update could change
+    pytest.importorskip('PIL')
+    script = ('import os, sys\n'
+              'from PIL import Image\n'
+              'import framescout_images\n'
+              'from framescout_core import TruncatedImageError\n'
+              'photo, cut = sys.argv[1], sys.argv[2]\n'
+              'Image.frombytes("RGB", (900, 600), os.urandom(900 * 600 * 3)).save(photo, quality=90)\n'
+              'data = open(photo, "rb").read()\n'
+              'open(cut, "wb").write(data[:len(data) // 2])\n'
+              'def outcome(path, **options):\n'
+              '    try:\n'
+              '        return framescout_images.open_image(path, **options).size\n'
+              '    except TruncatedImageError as exc:\n'
+              '        return "truncated: " + str(exc)\n'
+              'print(outcome(photo, complete=True), outcome(photo, min_size=200, complete=True))\n'
+              'print(outcome(cut))\n'
+              'print(outcome(cut, complete=True))\n'
+              'print(outcome(cut, min_size=200, complete=True))\n')
+    result = subprocess.run([sys.executable, '-c', script, str(tmp_path / 'photo.jpg'), str(tmp_path / 'cut.jpg')],
+                            cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stderr
+    complete, lenient, strict, drafted = result.stdout.strip().splitlines()[-4:]
+    assert complete == '(900, 600) (450, 300)'
+    assert lenient == '(900, 600)'  # anywhere else it decodes as before, the missing part gray
+    assert strict.startswith('truncated: ') and drafted.startswith('truncated: ')

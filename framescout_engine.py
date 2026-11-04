@@ -25,7 +25,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
                              AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, run_throughput,
                              final_status, yolo_weights,
-                             RawFallback, SkippedPhotos, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
+                             RawFallback, SkippedPhotos, TruncatedImageError, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
                              load_profiles, missing_folders_message, model_problem, open_clip_cache_dir,
                              output_folder_problem, photo_name,
@@ -336,8 +336,10 @@ def search(args, parser, roots, dropped, output, status):
         long before), so the stored modification time and size belong to the analyzed content.
         """
         stat = path.stat()
-        crops = crops_for(open_image(path, min_size), detector, detect_options, detect_lock,
-                          cpu_threads if args.low_priority else None)
+        # a JPEG next to a RAW file of its shot that is merely truncated fails, so that the
+        # RAW file is analyzed instead (E46)
+        crops = crops_for(open_image(path, min_size, complete=raw_fallback.strict(path)), detector, detect_options,
+                          detect_lock, cpu_threads if args.low_priority else None)
         return stat, [label for label, _ in crops], torch.stack([preprocess(im) for _, im in crops])
 
     fresh = reused = errors = done = 0
@@ -410,7 +412,7 @@ def search(args, parser, roots, dropped, output, status):
         analyzed (E30, review).
         """
         print(f'ERROR {path}: {exc}', flush=True)
-        if not raw_fallback.defer(path):
+        if not raw_fallback.defer(path, truncated=isinstance(exc, TruncatedImageError)):
             finished(failed=1)
 
     def to_analyze(candidates):
@@ -495,6 +497,13 @@ def search(args, parser, roots, dropped, output, status):
             for partner, raw in chosen.items():
                 if analyzed(raw):
                     raw_fallback.use(partner, raw)
+            # a truncated JPEG whose RAW file failed too is analyzed as far as its data goes,
+            # as any truncated photo is; it counts for the shot (E46)
+            retry = raw_fallback.retry()
+            for partner in retry:
+                print(f'The RAW file of {partner} could not be analyzed either; analyzing the readable part of the '
+                      'photo instead.', flush=True)
+            analyze(to_analyze(retry))
             if not detector.created:
                 # no photo needed an analysis, e.g. all came from the cache (F2)
                 print(f'{NOTHING_NEW}.', flush=True)

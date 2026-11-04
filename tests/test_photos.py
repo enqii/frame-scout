@@ -282,6 +282,53 @@ def test_raw_fallback_photos_name_the_raw_file_in_place_of_its_partner(tmp_path)
     assert fallback.used == {b: raw}
 
 
+def test_partners_with_a_raw_file_must_decode_completely(tmp_path):
+    # E46: a merely truncated JPEG decodes (the missing part gray); next to a RAW file it
+    # fails instead, so the RAW file is analyzed
+    touch(tmp_path / 'IMG_0001.dng')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    other = touch(tmp_path / 'IMG_0002.jpg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    assert fallback.strict(jpeg) is True and fallback.strict(other) is False
+
+
+def test_a_truncated_partner_is_analyzed_as_far_as_it_goes_if_its_raw_file_fails(tmp_path):
+    # E46: a RAW file LibRaw cannot read (e.g. a camera it does not know) must not cost the
+    # shot whose truncated JPEG was readable in part
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    assert fallback.defer(jpeg, truncated=True)
+    assert fallback.choose(lambda path: False) == ({jpeg: raw}, [])
+    assert fallback.defer(raw) is True  # not counted: the shot is decided by the retry
+    assert fallback.retry() == [jpeg]
+    assert fallback.strict(jpeg) is False  # decoded as far as its data goes now
+    assert fallback.defer(jpeg) is False  # if that fails too, it counts as a failure
+    assert fallback.retry() == [] and fallback.photos([jpeg]) == [jpeg]
+
+
+def test_a_truncated_partner_is_not_retried_once_its_raw_file_was_analyzed(tmp_path):
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    fallback.defer(jpeg, truncated=True)
+    fallback.choose(lambda path: False)
+    fallback.use(jpeg, raw)
+    assert fallback.retry() == [] and fallback.strict(jpeg) is True
+    assert fallback.photos([jpeg]) == [raw]
+    assert fallback.defer(raw) is False  # decided: a later failure of it counts as before
+
+
+def test_a_partner_that_fails_otherwise_is_not_retried_after_its_raw_file(tmp_path):
+    # a corrupt header cannot be read in part: its RAW file failing ends the shot as in E30
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    heic = touch(tmp_path / 'IMG_0001.heic')
+    fallback = RawFallback(scan_photos(tmp_path))
+    fallback.defer(heic)
+    assert fallback.choose(lambda path: False) == ({heic: raw}, [])
+    assert fallback.defer(raw) is False and fallback.retry() == []
+
+
 # --- several photo folders (A25) ---
 
 def test_distinct_folders_keep_the_order_of_the_list(tmp_path):
