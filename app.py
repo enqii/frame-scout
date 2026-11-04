@@ -816,8 +816,6 @@ def show_results(results, photo_folders):
     shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
     if hidden:
         st.caption(hidden_text(hidden, len(shown), page < pages))
-    st.caption('"Open" and "Folder" use the programs of the computer FrameScout runs on. Mark each photo you have '
-               'checked as Match or No match; marks are kept for this profile across searches.')
     mark_keys = {}
     for card in shown:
         # the saved mark, set before the control is drawn (never as its default): the file
@@ -825,8 +823,12 @@ def show_results(results, photo_folders):
         mark_keys[card['rank']] = key = 'mark_' + widget_id(name, card['path'])
         st.session_state[key] = MARK_LABELS[marks.get(card['path'], MARK_OPEN)]
     colors = mark_style({mark_keys[card['rank']]: marks.get(card['path'], MARK_OPEN) for card in shown})
-    if colors:
-        st.markdown(colors, unsafe_allow_html=True)
+    # the style block rides in this caption, which is drawn anyway: an element of its own took
+    # a layout slot with the block gap above the cards (A38); replaced on every run like it
+    st.caption((colors + '\n\n' if colors else '') +
+               '"Open" and "Folder" use the programs of the computer FrameScout runs on. Mark each photo you have '
+               'checked as Match or No match; marks are kept for this profile across searches.',
+               unsafe_allow_html=bool(colors))
     # a new container for every profile, page and card count: in a fragment rerun with fewer
     # cards (the shorter last page) the rows of the previous page stayed in the browser
     # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
