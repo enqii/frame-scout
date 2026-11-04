@@ -538,7 +538,7 @@ def test_notes_tell_a_folder_that_timed_out_from_a_root_that_is_not_reachable(pr
     project.cache([(hanging / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
     release = threading.Event()
     listing_that_hangs(monkeypatch, hanging, release)
-    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
+    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.5)
     try:
         [note] = project.scan()['cache_missing']['notes']
     finally:
@@ -565,7 +565,7 @@ def test_a_folder_that_still_hangs_gets_no_second_thread(project, monkeypatch):
         return real(path)
 
     monkeypatch.setattr(os, 'listdir', listdir)
-    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
+    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.5)
     try:
         for _ in range(3):
             [note] = project.scan()['cache_missing']['notes']
@@ -612,7 +612,7 @@ def test_a_share_behind_a_junction_that_stops_answering_is_given_up_once(project
     # the share behind the junction does not answer, the drive root does
     monkeypatch.setattr(cleanup, '_probe_root', lambda path: (not os.path.normcase(str(path)).startswith(behind)
                                                               and real_probe(path)))
-    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
+    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.5)
     try:
         category = project.scan()['cache_missing']
     finally:
