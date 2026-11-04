@@ -177,7 +177,23 @@ def test_a_disk_space_check_that_fails_gives_no_warning(tmp_path, setup, monkeyp
     monkeypatch.setattr(ev, 'low_space', broken)
     assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
                     '--models', DEFAULT_MODEL, '--cache-dir', str(tmp_path / 'cache')]) == 0
-    assert 'disk space' not in capsys.readouterr().out and len(calls) == 1
+    out = capsys.readouterr().out
+    assert 'Little free disk space' not in out and 'Note' not in out and len(calls) == 1
+
+
+def test_an_unexpected_error_of_the_disk_space_check_does_not_stop_the_runs(tmp_path, setup, monkeypatch, capsys):
+    # review: an advisory check; the photos are counted with a line first, so a long scan is not silent
+    photos, profiles, calls = setup
+
+    def broken(needs):
+        raise KeyError('bug')
+
+    monkeypatch.setattr(ev, 'low_space', broken)
+    assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
+                    '--models', DEFAULT_MODEL, '--cache-dir', str(tmp_path / 'cache')]) == 0
+    out = capsys.readouterr().out
+    assert 'Counting the photos for the free disk space check' in out
+    assert "Note: the free disk space check failed (KeyError: 'bug')" in out and len(calls) == 1
 
 
 def test_the_engine_gets_the_cache_variables_of_the_shared_helper(tmp_path):
