@@ -848,7 +848,7 @@ def show_copy(name, entry, marks, photo_folders, profile_exists):
     rejected = sum(1 for state in marks.values() if state == MARK_NO_MATCH)
     in_results = {card['path'] for card in entry['cards']}
     elsewhere = sum(1 for photo in matches if photo not in in_results)
-    st.caption(f'Marked: {len(matches):,} photos of "{plain(name)}" as match · {rejected:,} as no match.'
+    st.caption(f'Marked: {count_text(len(matches), "photo", "photos")} of "{plain(name)}" as match · {rejected:,} as no match.'
                + (f' {elsewhere:,} of the matches are not among the results of this search (marked earlier); they '
                   'are copied too.' if elsewhere else ''))
     default = str(default_copy_folder(pictures_folder(), Path(entry['gallery']).stem))
@@ -865,7 +865,7 @@ def show_copy(name, entry, marks, photo_folders, profile_exists):
     if problem:
         st.warning(plain(problem))
     c1, c2 = st.columns(2)
-    copy = c1.button(f'Copy {len(matches):,} marked photos', disabled=not matches or target is None,
+    copy = c1.button(f"Copy {count_text(len(matches), 'marked photo', 'marked photos')}", disabled=not matches or target is None,
                      width='stretch')
     c2.button('Open target folder', on_click=open_target_folder, args=(key, photo_folders),
               disabled=target is None or not target.is_dir(), width='stretch')
