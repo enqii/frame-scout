@@ -191,6 +191,16 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       opens the cache after loading the model, so E50's message comes a few seconds (or a
       first download) later than it could; opening the cache before the model load would
       report it at once. Found in the PR of E50 (PR #74).
+- [ ] `minor` **E57 – E46 counts a JPEG that lacks only its end marker as truncated:** Pillow
+      sets `_ended` whenever the file ends before the EOI marker, also when the image data is
+      complete (checked with Pillow 13.0, baseline and progressive, full and draft decoding:
+      the pixels equal those of the intact file). Such a RAW partner fails with "image file
+      ends early (truncated, or only its end marker is missing)", the RAW file is analyzed
+      instead, and the error and the partner's decode repeat on every run. Pillow exposes no
+      decoder state that tells the two apart (e.g. whether all scanlines were decoded before
+      the data ended); a test that decodes again with filler bytes in place of the missing
+      end missed many truncations. Idea: count the MCUs of the scan, or a Pillow API if one
+      appears. Review of PR #74 (E46).
 
 ### App (`app.py`)
 
