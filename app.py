@@ -106,7 +106,7 @@ CLEANUP_LABELS = {
                        'profile of that name would get them. Deleting removes only these marks from marks.json, '
                        'never the file or other marks; the marks of a profile of that name created since the scan '
                        'are kept.'),
-    'cache_old':('Cache entries of older versions or unknown settings',
+    'cache_old': ('Cache entries of older versions or unknown settings',
                   'Analyses made by an earlier FrameScout version, which are never used again, or with settings '
                   'only the command line offers (e.g. another --yolo-model), which are analyzed again when such a '
                   'search runs.'),
@@ -866,8 +866,9 @@ def show_copy(name, entry, marks, photo_folders, profile_exists):
     rejected = sum(1 for state in marks.values() if state == MARK_NO_MATCH)
     in_results = {card['path'] for card in entry['cards']}
     elsewhere = sum(1 for photo in matches if photo not in in_results)
-    st.caption(f'Marked: {count_text(len(matches), "photo", "photos")} of "{plain(name)}" as match · {rejected:,} as no match.'
-               + (f' {elsewhere:,} of the matches are not among the results of this search (marked earlier); they '
+    st.caption(f'Marked: {count_text(len(matches), "photo", "photos")} of "{plain(name)}" as match · '
+               f'{rejected:,} as no match.'
+               +(f' {elsewhere:,} of the matches are not among the results of this search (marked earlier); they '
                   'are copied too.' if elsewhere else ''))
     default = str(default_copy_folder(pictures_folder(), Path(entry['gallery']).stem))
     key = 'copy_folder_' + widget_id(name)
@@ -883,8 +884,8 @@ def show_copy(name, entry, marks, photo_folders, profile_exists):
     if problem:
         st.warning(plain(problem))
     c1, c2 = st.columns(2)
-    copy = c1.button(f"Copy {count_text(len(matches), 'marked photo', 'marked photos')}", disabled=not matches or target is None,
-                     width='stretch')
+    copy = c1.button(f"Copy {count_text(len(matches), 'marked photo', 'marked photos')}",
+                     disabled=not matches or target is None, width='stretch')
     c2.button('Open target folder', on_click=open_target_folder, args=(key, photo_folders),
               disabled=target is None or not target.is_dir(), width='stretch')
     if copy:
