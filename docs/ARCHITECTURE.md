@@ -359,7 +359,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `APPDATA` or the user profile defaults), never
   deleted: they are shared with other programs, I10).
 - `evaluation.py` (E32/E20):
-  `SCORES_FORMAT`/`LABELS_FORMAT`/`EVAL_K`/`SCORE_DIGITS`/`collection_name_problem`/`write_document`/`read_document`/`scores_document`/`write_scores`/`read_scores`/`read_labels`/`save_labels(path, labels, motifs=None)`/`set_label`/`motif`/`read_motifs`/`record_motif`/`changed_motifs` (E36)/`average_precision`/`build_pool`
+  `SCORES_FORMAT`/`LABELS_FORMAT`/`EVAL_K`/`SCORE_DIGITS`/`collection_name_problem`/`write_document`/`read_document`/`scores_document`/`write_scores`/`read_scores`/`read_labels`/`read_label_file` (labels and motifs in one read)/`save_labels(path, labels, motifs=None)`/`set_label`/`motif`/`record_motif`/`changed_motifs` (E36)/`average_precision`/`build_pool`
   (the formats of the model evaluation tool: scores file of the engine's `--scores-file`,
   labels file, AP@k = mean of the precision at each hit in the top k divided by
   min(labelled hits, k), a labelled hit outside the top k counts as a miss, no hits ->
@@ -638,14 +638,20 @@ true|false}}}`; an unreadable file is never saved over, the page refuses to star
 E36 the file has an optional key `motifs`: `{profile: {"context", "features", "references"}}`
 (format still 1), recorded by the labelling page from the pool profile when the profile's
 first label is set (`record_motif`), kept while the profile has labels and removed when all
-are cleared. `pool` and `metrics` compare it with the current motif (`current_motifs`:
-context and features from the collection's profiles file, references from the latest model
-run; nothing is compared if the profiles file cannot be read) and print "The labels of
-<name> were made for another motif: its <context/features/reference images> changed since
-its first label" (`changed_motifs`, `motif_warnings`). Prompts are not part of the motif.
-A file without `motifs` (earlier version) gets the then-current motif with the next label
-set; an older tool version drops the key when it saves; unreadable motifs make the page
-refuse to start like unreadable labels.
+are cleared. `pool` and `metrics` read labels and motifs once (`read_label_file`) and compare
+the motifs with the current ones (`current_motifs`: context and features from the
+collection's profiles file, references from the latest model run; a profile the file does
+not have, or every profile if it cannot be read, has no known motif and is not compared)
+and print "The labels of <name> were made for another motif: the profile's
+<context/features/reference images> differ from those of its first label"
+(`changed_motifs`, `motif_warnings`). Prompts are not part of the motif. The labelling page
+records no motif for a profile without a known one, and `label` warns at its start when
+the pool shows a profile with another motif than `current_motifs` ("run pool again before
+labelling it", `pool_motif_warnings`; review). A file without `motifs` (earlier version)
+gets the then-current motif with the next label set; an older tool version drops the key
+when it saves; keys a later version adds to a motif are kept and not compared. Unreadable
+motifs leave the labels usable: `pool` and `metrics` print one warning and compare nothing,
+the labelling page refuses to start (it would save over them).
 
 - Scores file (`{"format": 1, "model", "signature", "photos": [{"path", "mtime_ns", "crops"}],
   "profiles": [{"name", "prompts", "references", "text", "visual"}]}`): scores per photo and
@@ -1427,7 +1433,9 @@ warning; other exceptions are not swallowed (review).
 
 The evaluation tool is covered too (E51): `framescout_eval.py run` prints the same kind of
 "Little free disk space" warning before the model runs (`eval_run_needs`, see
-`disk_space.py`), but only warns and says nothing if the check fails.
+`disk_space.py`), but only warns. It prints "Counting the photos ..." before its own scan of
+the photo folders (as long as the engine's scan; review). An `OSError`/`ValueError` gives
+no warning, any other error a note; the runs start in every case (review).
 
 Summary before the start (F12): in the same place, above the disk space warning, the run tab
 shows `st.info(start_summary(photos found, analyzed, known_throughput(run_status, cleanup_signature(), device)))`

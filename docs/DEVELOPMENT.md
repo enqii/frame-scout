@@ -95,12 +95,15 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
   `Space`/`→` and `←` move, `Enter` jumps to the next unlabelled photo and `O` opens the
   original. If port 8765 is taken, use `label --port`.
 - Labels belong to a profile **name**: editing the prompts keeps them. The labelling page
-  records the profile's context, features and reference images with its first label; if they
-  change later, `pool` and `metrics` warn that the labels were made for another motif (E36).
-  Give the profile a new name or clear its labels then. Labels made before E36 have no
-  recorded motif until the next label is set.
+  records the profile's context, features and reference images (as the pool shows them) with
+  its first label; if they change later, `pool` and `metrics` warn that the labels were made
+  for another motif (E36). Give the profile a new name or clear its labels then. `label` also
+  warns at its start when the profile changed after `pool`: run `pool` again before labelling.
+  Labels made before E36, and those of a profile the profiles file does not have, have no
+  recorded motif until the next label is set with a known one.
 - `run` warns ("Little free disk space") before the model runs when the model outputs, the
-  missing model downloads and the detector weights may not fit (E51); it only warns.
+  missing model downloads and the detector weights may not fit (E51); it only warns. It
+  counts the photos for that first (one more scan of the folders, as long as the engine's).
 - Files go to `.tmp/eval/<collection>/` (gitignored; `--dir` chooses another place).
 - `pool` also renders a thumbnail for every pool photo that no gallery has and for every
   reference image into `<collection>/thumbnails/`, so the page can show HEIC/HEIF and RAW

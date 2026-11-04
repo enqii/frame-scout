@@ -1443,11 +1443,14 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       for another motif: its <context/features/reference images> changed since its first
       label ..." (current context and features from the collection's profiles file, references
       from the latest model run; nothing compared if the profiles file cannot be read). Prompts
-      are not part of the motif. New core functions `motif`, `read_motifs`, `record_motif`,
+      are not part of the motif. New core functions `motif`, `read_label_file`, `record_motif`,
       `changed_motifs`; `save_labels(path, labels, motifs=None)`. Compatibility: a labels file
       of an earlier version has no motifs, the next label set on a profile records the
       then-current motif; an older tool version drops the key when it saves; unreadable motifs
-      make the labelling page refuse to start, like unreadable labels. Unit-tested.)
+      make the labelling page refuse to start, like unreadable labels. Unit-tested.
+      Review: a profile missing from the profiles file has no known motif (not compared, not
+      recorded); `label` warns when the pool shows an outdated motif; labels and motifs are read
+      once; extra motif keys are kept, and unreadable motifs only warn in `pool`/`metrics`.)
 - [x] **E49 – `framescout_eval.py pool` imports the whole engine to render thumbnails:**
       `load_renderer` imports `framescout_engine` (torch, numpy, Pillow, a few seconds) for
       `render_thumbnail` alone, and the import sets the cache variables of the process
@@ -1472,8 +1475,9 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       folder (cache rows and gallery thumbnails, every photo as new), the downloads of models
       missing in the Hugging Face cache of `--cache-dir` and the detector weights once (unless
       `--no-person-detection`); models skipped for a missing package are left out. Warning only;
-      a failing check says nothing. `search_space_needs` shares `_download_needs` with it.
-      Unit-tested.)
+      a failing check says nothing (review: an unexpected error gives a note, never stops the
+      runs, and the photo count is announced first). `search_space_needs` shares
+      `_download_needs` with it. Unit-tested.)
 - [x] **I25 – `framescout_eval.py` builds the cache paths itself (minor):** `engine_env`
       derives the same four variables from `--cache-dir`; it takes a cache folder, not the
       project folder, so it was left alone in E9/I10. It could share
