@@ -39,10 +39,11 @@ import numpy as np
 
 from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EVAL_K, MODEL_KEYS, MODELS,
                              SKIP_LOG_LIMIT, available_decoders, average_precision, build_pool, cache_folder_paths,
-                             collection_name_problem, distinct_folders, ensure_thumbnail, eval_run_needs,
-                             find_yolo_weights, hub_cache_dir, load_profiles, low_space, low_space_lines, model_problem,
-                             read_document, read_labels, read_profiles, read_scores, save_labels, scan_folders,
-                             set_label, supported_extensions, thumbnail_name, write_document)
+                             changed_motifs, collection_name_problem, distinct_folders, ensure_thumbnail,
+                             eval_run_needs, find_yolo_weights, hub_cache_dir, load_profiles, low_space,
+                             low_space_lines, model_problem, motif, read_document, read_labels, read_motifs,
+                             read_profiles, read_scores, record_motif, save_labels, scan_folders, set_label,
+                             supported_extensions, thumbnail_name, write_document)
 from framescout_scoring import rank_photos
 
 ROOT = Path(__file__).resolve().parent
@@ -188,6 +189,29 @@ def label_warnings(scores, labels):
             warnings.append(f'{len(lost)} label(s) of {name} name photos no model run scored (e.g. {lost[0]}); '
                             'a match among them counts as missed by every model.')
     return warnings
+
+
+def current_motifs(collection, scores):
+    """{profile name: motif} of the scored profiles as pool_document records them: context and
+    features from the collection's profiles file, the reference images of the latest model
+    run; {} if the profiles file cannot be read, so nothing is compared (E36)."""
+    details = profile_details(collection)
+    if not details:
+        return {}
+    return {name: motif(*details.get(name, ('', '')), next(reversed(models.values()))['references'])
+            for name, models in profile_entries(scores).items()}
+
+
+def motif_warnings(collection, scores):
+    """Warnings about labels made for another motif than the profile of that name describes now (E36).
+
+    Prompts may be reworded under the same name (the labels are kept for comparing the
+    wordings); another context, other features or reference images make a new motif.
+    """
+    changes = changed_motifs(read_motifs(collection.labels_file), current_motifs(collection, scores))
+    return [f'The labels of {name} were made for another motif: its {" and ".join(fields)} changed since its '
+            'first label. Use a new profile name for a new motif, or clear its labels on the labelling page.'
+            for name, fields in changes.items()]
 
 
 # --- run ---
@@ -466,7 +490,7 @@ def command_pool(args):
     if args.depth < EVAL_K:
         print(f'Note: with --depth below {EVAL_K}, the top {EVAL_K} of AP@{EVAL_K} holds unlabelled photos.', flush=True)
     weights = parse_weights(args.weights)
-    for warning in run_warnings(scores):
+    for warning in run_warnings(scores) + motif_warnings(collection, scores):
         print(f'Warning: {warning}', flush=True)
     document = pool_document(collection, scores, args.depth, weights)
     write_document(collection.pool_file, document, indent=1)
@@ -588,7 +612,7 @@ def command_metrics(args):
         if not scores:
             raise UsageError(f'No scores in {collection.root}.')
         labels = read_labels(collection.labels_file)
-        for warning in run_warnings(scores) + label_warnings(scores, labels):
+        for warning in run_warnings(scores) + label_warnings(scores, labels) + motif_warnings(collection, scores):
             print(f'Warning: {name}: {warning}', flush=True)
         results[name] = evaluate(scores, labels, args.k, args.weight, weights)
         models += [model for model in scores if model not in models]
@@ -623,6 +647,7 @@ class LabelSession:
         if self.pool is None:
             raise UsageError(f'No pool in {collection.root}: run "python framescout_eval.py pool {collection.name}" first.')
         self.labels = read_labels(collection.labels_file)  # ValueError: never saved over
+        self.motifs = read_motifs(collection.labels_file)
         self.token = secrets.token_urlsafe(16)
         self.lock = threading.Lock()
         self.thumb_folders = collection.thumbnail_folders(self.pool['models'])
@@ -678,8 +703,11 @@ class LabelSession:
         profile, photo = found
         with self.lock:
             labels = set_label(self.labels, profile['name'], photo['path'], value)
-            save_labels(self.collection.labels_file, labels)
-            self.labels = labels
+            # the motif of the pool the label is set in (E36): pool and metrics warn when it changes
+            motifs = record_motif(self.motifs, labels, profile['name'],
+                                  motif(profile['context'], profile['features'], profile['references']))
+            save_labels(self.collection.labels_file, labels, motifs)
+            self.labels, self.motifs = labels, motifs
         return 200, 'application/json', b'{"ok": true}'
 
     def handle(self, method, target, body):

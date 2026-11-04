@@ -73,4 +73,5 @@ from .uninstall import (UNINSTALL_ITEMS, UNINSTALL_KEEP, UNINSTALL_FIRST, USER_D
     PRIVATE_PYTHON_EXIT_CODE, UninstallItem, protected_folders, uninstall_plan, running_python, user_data,
     outside_leftovers, search_running, programs_in_use, remove_items)
 from .evaluation import (SCORES_FORMAT, LABELS_FORMAT, EVAL_K, SCORE_DIGITS, collection_name_problem,
-    write_document, read_document, scores_document, write_scores, read_scores, read_labels, save_labels, set_label, average_precision, build_pool)
+    write_document, read_document, scores_document, write_scores, read_scores, read_labels, save_labels, set_label, average_precision, build_pool,
+    motif, read_motifs, record_motif, changed_motifs)

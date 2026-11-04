@@ -9,7 +9,7 @@ import pytest
 
 import framescout_eval as ev
 from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, MODELS, LowSpace, cache_folder_paths, download_bytes,
-                             read_labels, search_space_bytes, save_labels, scores_document, thumbnail_name,
+                             motif, read_labels, read_motifs, search_space_bytes, save_labels, scores_document, thumbnail_name,
                              write_scores)
 from framescout_scoring import rank_photos
 
@@ -414,6 +414,27 @@ def test_labels_no_model_run_scored_are_warned_about(collection, capsys):
     assert 'photos/b.jpg' in capsys.readouterr().out
 
 
+def test_labels_made_for_another_motif_are_warned_about(collection, tmp_path, capsys):
+    # E36: the same profile name with another context, features or reference images
+    profiles = tmp_path / 'profiles.json'
+    profiles.write_text(json.dumps({'profiles': [{'name': 'Car', 'franchise': 'Vehicles', 'features': 'red'}]}),
+                        encoding='utf-8')
+    collection.save_config([str(tmp_path)], str(profiles))
+    write_model_scores(collection, DEFAULT_MODEL, [0.9, 0.8, 0.1, 0.2, 0.0])
+    labels = {'Car': {photo(collection, 'a.jpg'): True}}
+    save_labels(collection.labels_file, labels, {'Car': motif('Vehicles', 'red', [])})
+    assert ev.current_motifs(collection, collection.scores()) == {'Car': motif('Vehicles', 'red', [])}
+    assert ev.motif_warnings(collection, collection.scores()) == []
+    save_labels(collection.labels_file, labels, {'Car': motif('Vehicles', 'blue', [])})
+    [warning] = ev.motif_warnings(collection, collection.scores())
+    assert 'Car' in warning and 'features' in warning and 'new profile name' in warning
+    dir_option = ['--dir', str(collection.root.parent)]
+    assert ev.main(['metrics', 'cosplay', *dir_option]) == 0
+    assert f'Warning: cosplay: {warning}' in capsys.readouterr().out
+    assert ev.main(['pool', 'cosplay', *dir_option]) == 0
+    assert f'Warning: {warning}' in capsys.readouterr().out
+
+
 def test_a_profile_without_hits_has_no_ap(collection):
     write_model_scores(collection, DEFAULT_MODEL, [0.9, 0.8, 0.1, 0.2, 0.0])
     labelled(collection, 'Car', a=False)
@@ -492,8 +513,10 @@ def test_a_label_is_saved_right_away_and_can_be_cleared(session, collection):
     status, _, answer = session.handle('POST', f'/{session.token}/label', body)
     assert status == 200 and json.loads(answer) == {'ok': True}
     assert read_labels(collection.labels_file) == {'Dog': {target: False}}
+    # E36: with the motif the label was made for
+    assert read_motifs(collection.labels_file) == {'Dog': motif('', '', [str(collection.root / 'dog.jpg')])}
     session.handle('POST', f'/{session.token}/label', json.dumps({'profile': 1, 'photo': 2, 'value': None}).encode())
-    assert read_labels(collection.labels_file) == {}
+    assert read_labels(collection.labels_file) == {} and read_motifs(collection.labels_file) == {}
 
 
 @pytest.mark.parametrize('body', [b'not json', b'{"profile": 9, "photo": 0, "value": true}',
@@ -629,11 +652,12 @@ def test_only_pool_photos_and_references_are_served(session, route):
     assert get(session, route)[0] == 404
 
 
-def test_the_page_refuses_to_start_on_an_unreadable_labels_file(session, collection):
-    collection.labels_file.write_text('{broken', encoding='utf-8')
+@pytest.mark.parametrize('content', ['{broken', '{"format": 1, "labels": {}, "motifs": []}'])
+def test_the_page_refuses_to_start_on_an_unreadable_labels_file(session, collection, content):
+    collection.labels_file.write_text(content, encoding='utf-8')
     with pytest.raises(ValueError):
         ev.LabelSession(collection)
-    assert collection.labels_file.read_text(encoding='utf-8') == '{broken'
+    assert collection.labels_file.read_text(encoding='utf-8') == content
 
 
 @pytest.mark.parametrize('header, expected', [(None, 0), ('42', 42), (str(ev.MAX_BODY), ev.MAX_BODY),

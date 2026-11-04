@@ -146,9 +146,72 @@ def read_labels(path):
     return labels
 
 
-def save_labels(path, labels):
-    """Write labels ({profile: {photo path: bool}}) to path atomically (its folder is created)."""
-    write_document(path, {'format': LABELS_FORMAT, 'labels': labels}, indent=1)
+def save_labels(path, labels, motifs=None):
+    """Write labels ({profile: {photo path: bool}}) to path atomically (its folder is created).
+
+    motifs ({profile: motif}, record_motif) are saved with them if there are any (E36).
+    """
+    document = {'format': LABELS_FORMAT, 'labels': labels}
+    if motifs:
+        document['motifs'] = motifs
+    write_document(path, document, indent=1)
+
+
+# what a profile's motif is made of, in the order changed_motifs names them, with its label
+_MOTIF_FIELDS = (('context', 'context'), ('features', 'features'), ('references', 'reference images'))
+
+
+def motif(context, features, references):
+    """Return the motif a profile describes: its context, features and reference images (E36).
+
+    Its prompts are left out: they may be reworded under the same name to compare wordings
+    on the same labels.
+    """
+    return {'context': context or '', 'features': features or '', 'references': [str(r) for r in references]}
+
+
+def read_motifs(path):
+    """Return {profile: motif} of a labels file: the motif each profile's labels were made for (E36).
+
+    A missing file, or one of an earlier version without motifs, has none; motifs that are
+    not readable raise ValueError, like unreadable labels.
+    """
+    document = read_document(path, 'labels file', LABELS_FORMAT)
+    motifs = {} if document is None else document.get('motifs', {})
+    if not isinstance(motifs, dict) or not all(
+            isinstance(entry, dict) and set(entry) == {'context', 'features', 'references'}
+            and isinstance(entry['context'], str) and isinstance(entry['features'], str)
+            and isinstance(entry['references'], list) and all(isinstance(r, str) for r in entry['references'])
+            for entry in motifs.values()):
+        raise ValueError(f'{path} is not a labels file of format {LABELS_FORMAT}: unreadable motifs')
+    return motifs
+
+
+def record_motif(motifs, labels, profile, current):
+    """Return a copy of motifs after a label of profile was set or cleared (labels: all labels after it).
+
+    A profile with labels and no motif yet gets current, the motif of the label just set; a
+    recorded one is kept, so labels of an earlier motif under the same name stay visible
+    (changed_motifs) until they are cleared. Profiles without labels lose their motif.
+    """
+    result = {name: entry for name, entry in motifs.items() if name in labels}
+    if profile in labels:
+        result.setdefault(profile, current)
+    return result
+
+
+def changed_motifs(motifs, current):
+    """Return {profile: [what changed]} of the recorded motifs that differ from the current ones.
+
+    Profiles without a current motif (no model run scored them) are left out.
+    """
+    changes = {}
+    for name, recorded in motifs.items():
+        if name in current:
+            fields = [label for key, label in _MOTIF_FIELDS if recorded[key] != current[name][key]]
+            if fields:
+                changes[name] = fields
+    return changes
 
 
 def set_label(labels, profile, photo, value):
