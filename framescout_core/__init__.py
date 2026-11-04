@@ -70,7 +70,7 @@ from .install_check import (VENV_DIR, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTAL
     venv_site_packages, requirement_names, installed_versions, check_environment, check_packages, check_torch,
     check_writable, check_models, check_disk_space, check_installation, check_lines)
 from .cache_check import (CACHE_CHECK_LINES, CACHE_SIDE_FILES, cache_check_current, cache_error, cache_error_message,
-    check_cache, set_cache_aside)
+    cache_read_warning, check_cache, set_cache_aside)
 from .uninstall import (UNINSTALL_ITEMS, UNINSTALL_KEEP, UNINSTALL_FIRST, USER_DATA, ENVIRONMENT_PROGRAMS,
     PRIVATE_PYTHON_EXIT_CODE, UninstallItem, protected_folders, uninstall_plan, running_python, user_data,
     outside_leftovers, search_running, programs_in_use, remove_items)

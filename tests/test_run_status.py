@@ -431,6 +431,13 @@ def test_exit_codes_map_to_final_phases():
     assert all(final_status(code)[0] in FINAL_PHASES for code in (0, 1, 2, 3, 130))
 
 
+def test_a_finished_run_carries_its_warnings():
+    # review of E50: a search that finished despite unreadable cache rows says so in the app
+    assert final_status(0, ['Rows left out.', 'Check cache.']) == ('finished', 'Rows left out. Check cache.')
+    assert final_status(0, []) == ('finished', None)
+    assert final_status(130, ['x']) == ('interrupted', 'Interrupted (Ctrl+C).')
+
+
 # --- lock_held when the lock file cannot be opened (review) ---
 
 def test_a_lock_file_that_cannot_be_opened_counts_as_held(tmp_path, monkeypatch):
