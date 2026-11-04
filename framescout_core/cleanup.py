@@ -1,7 +1,9 @@
 """The app's "Clean up storage": what FrameScout no longer needs, listed and deleted (E7, E11)."""
 import os
+import queue
 import re
 import sqlite3
+import stat
 import threading
 import time
 from contextlib import contextmanager
@@ -48,6 +50,10 @@ CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': Tr
 # seconds the reachability probe of the drive and share roots may take (all roots together); a
 # stat on a disconnected network share can hang much longer
 ROOT_TIMEOUT = 5.0
+# seconds the look at one folder of the pass may take (a listing, a few stats, E37); a share
+# that stops answering during the pass would otherwise stall it until the OS gives up. A
+# folder that takes longer is not checked (its photos stay), which is the safe side.
+FOLDER_TIMEOUT = 30.0
 # a folder with at most this many photos to check gets one stat per photo, a fuller one is
 # listed once (see _PathCheck)
 _STAT_UP_TO = 4
@@ -269,6 +275,66 @@ def _gone_in(folder, members):
     return {p for p in absent if _missing(p)}
 
 
+def _is_link(info):
+    """Whether the lstat result info is a symbolic link, a junction or a volume mount point."""
+    return stat.S_ISLNK(info.st_mode) or getattr(info, 'st_reparse_tag', 0) == stat.IO_REPARSE_TAG_MOUNT_POINT
+
+
+def _dead_link(folder):
+    """The link above the photos of folder that leads nowhere now, or None (E37).
+
+    A junction, volume mount point or symbolic link inside a reachable root can lead to a
+    volume or share that is disconnected: the folders behind it then look missing, although
+    the photos may only be offline. The nearest part of folder that exists (folder itself or
+    a parent folder) is looked at: if it is such a link and its target cannot be reached, it
+    is returned, so the photos behind it count as not checked, as on a root that is not
+    reachable. A part that cannot be looked at (an error other than "not found") is returned
+    too. None if the nearest existing part is a folder or a link whose target is there.
+    """
+    path = folder
+    while True:
+        try:
+            info = os.lstat(path)
+        except (FileNotFoundError, NotADirectoryError):
+            parent = os.path.dirname(path)
+            if parent == path:
+                return None
+            path = parent
+            continue
+        except (OSError, ValueError):
+            return path
+        return path if _is_link(info) and not os.path.exists(path) else None
+
+
+def _look_at(folder, members):
+    """Return (gone, dead link) of one folder of the pass: _gone_in, and _dead_link if any member looks gone."""
+    gone = _gone_in(folder, members)
+    return gone, (_dead_link(folder) if gone else None)
+
+
+class _FolderWorker:
+    """Looks at folders one after another in a daemon thread (_look_at), so a hanging one can be waited for with a timeout (E37).
+
+    results gets (answer, error) per folder in order. Once cancelled, it stops before the next
+    folder; a folder that hangs ends on its own later, like a root probe.
+    """
+
+    def __init__(self, folders):
+        self.results = queue.Queue()
+        self.cancelled = False
+        self.thread = threading.Thread(target=self._run, args=(folders,), daemon=True, name='FrameScout folder check')
+        self.thread.start()
+
+    def _run(self, folders):
+        for folder, members in folders:
+            if self.cancelled:
+                return
+            try:
+                self.results.put((_look_at(folder, members), None))
+            except Exception as exc:  # passed on to the scan, as before the worker
+                self.results.put((None, exc))
+
+
 def _by_folder(paths):
     folders = {}
     for path in paths:
@@ -290,13 +356,77 @@ class _PathCheck:
     absolute is never gone. After the pass, the gone paths are checked once more and then
     their roots are probed again, so a share that dropped during the pass (and is back, or
     still offline) does not make its photos look deleted.
+
+    The pass itself is guarded too (E37, _pass): a folder that does not answer within
+    folder_timeout seconds (FOLDER_TIMEOUT if None) is not checked, and the photos behind a
+    junction, mount point or link that leads nowhere now (_dead_link) are not checked either.
     """
 
-    def __init__(self, root_timeout=ROOT_TIMEOUT):
+    def __init__(self, root_timeout=ROOT_TIMEOUT, folder_timeout=None):
         self._timeout = root_timeout
+        self._folder_timeout = FOLDER_TIMEOUT if folder_timeout is None else folder_timeout
         self._gone = set()
         self._checked = set()  # paths with an answer: gone, there or never gone
-        self._unreachable = {}  # path -> its root that was not reachable
+        # path -> what it waits for: its root that was not reachable, a folder that did not
+        # answer or a link that leads nowhere (E37)
+        self._unreachable = {}
+
+    def _not_checked(self, paths, reason):
+        self._unreachable.update(dict.fromkeys(paths, reason))
+
+    def _pass(self, folders, progress=None):
+        """Return the paths of folders ({folder: members}) that are gone; progress(done, total) per folder.
+
+        The folders of each root are looked at one after another in a _FolderWorker (E37). A
+        folder that has not answered within the folder timeout is not checked; its root is
+        then probed again, and if it does not answer either, its other folders are not
+        checked either (no timeout per folder of a dead share). Paths not checked, also those
+        behind a link that leads nowhere (_look_at), go to _unreachable with the folder, root
+        or link they wait for.
+        """
+        gone, done, total = set(), 0, len(folders)
+        step = max(1, total // 100)
+
+        def tick(count):
+            nonlocal done
+            before, done = done, done + count
+            if progress and count and (before // step != done // step or done == total):
+                progress(done, total)
+
+        by_root = {}
+        for folder, members in sorted(folders.items()):
+            by_root.setdefault(_root_of(folder), []).append((folder, members))
+        for root, items in by_root.items():
+            while items:
+                worker, answered = _FolderWorker(items), 0
+                for folder, members in items:
+                    try:
+                        answer, error = worker.results.get(timeout=self._folder_timeout)
+                    except queue.Empty:
+                        worker.cancelled = True
+                        break
+                    if error is not None:
+                        worker.cancelled = True
+                        raise error
+                    found, link = answer
+                    if link is None:
+                        gone |= found
+                    else:
+                        self._not_checked(found, link)
+                    answered += 1
+                    tick(1)
+                else:
+                    break
+                hung, rest = items[answered], items[answered + 1:]
+                self._not_checked(hung[1], hung[0])
+                tick(1)
+                if rest and not _reachable_roots([root], self._timeout)[root]:
+                    for _, members in rest:
+                        self._not_checked(members, root)
+                    tick(len(rest))
+                    rest = []
+                items = rest
+        return gone
 
     def check(self, paths, progress=None):
         """Check the paths not checked yet; progress(done, total) is called per folder."""
@@ -312,19 +442,12 @@ class _PathCheck:
             if reachable[root]:
                 checked += members
             else:
-                self._unreachable.update(dict.fromkeys(members, root))
-        folders = _by_folder(checked)
-        gone = set()
-        total = len(folders)
-        step = max(1, total // 100)
-        for done, (folder, members) in enumerate(sorted(folders.items()), 1):
-            gone |= _gone_in(folder, members)
-            if progress and (done % step == 0 or done == total):
-                progress(done, total)
+                self._not_checked(members, root)
+        gone = self._pass(_by_folder(checked), progress)
         # a share that went offline during the pass makes its folders look missing: the gone
         # paths are looked at once more (a share back by now shows them again, review), then
         # their roots are probed again (a share still offline is not checked)
-        gone = set().union(*(_gone_in(folder, members) for folder, members in _by_folder(gone).items()))
+        gone = self._pass(_by_folder(gone))
         suspects = {_root_of(p) for p in gone}
         lost = {root for root, up in _reachable_roots(sorted(suspects), self._timeout).items() if not up}
         for path in [p for p in gone if _root_of(p) in lost]:

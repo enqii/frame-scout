@@ -448,6 +448,100 @@ def test_rows_of_a_folder_that_cannot_be_listed_are_kept(project, monkeypatch):
     assert project.scan()['cache_missing']['items'] == []
 
 
+def listing_that_hangs(monkeypatch, folder, release):
+    """Make os.listdir of folder hang until release is set, as on a share that stops answering."""
+    real = os.listdir
+
+    def listdir(path):
+        if os.path.normcase(str(path)) == os.path.normcase(str(folder)):
+            release.wait(10)
+        return real(path)
+
+    monkeypatch.setattr(os, 'listdir', listdir)
+
+
+def test_a_folder_whose_listing_hangs_is_not_checked(project, monkeypatch):
+    # E37: a listing on a share that hangs during the pass stalled the scan until the OS
+    # gave up; now the folder's photos count as not checked after FOLDER_TIMEOUT, and the
+    # other folders of its root are still checked while the root answers
+    import threading
+    from framescout_core import cleanup
+    hanging, other = project.photos / 'hanging', project.photos / 'other'
+    rows = [(hanging / f'IMG_{n}.jpg', CURRENT) for n in range(6)] + [(other / 'gone.jpg', CURRENT)]
+    hanging.mkdir()
+    project.cache(rows)
+    release = threading.Event()
+    listing_that_hangs(monkeypatch, hanging, release)
+    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
+    start = time.monotonic()
+    try:
+        scan = project.scan()
+    finally:
+        release.set()
+    assert time.monotonic() - start < 5
+    category = scan['cache_missing']
+    assert category['items'] == [(str(other / 'gone.jpg'), CURRENT)]
+    assert len(category['notes']) == 1 and str(hanging) in category['notes'][0] and '6 photos' in category['notes'][0]
+
+
+def test_a_root_that_stops_answering_during_the_pass_is_given_up(project, monkeypatch):
+    # after a folder hangs, the root is probed again: a share that does not answer is not
+    # waited for once per folder
+    import threading
+    from framescout_core import cleanup
+    folders = [project.photos / name for name in ('a', 'b', 'c')]
+    project.cache([(folder / f'IMG_{n}.jpg', CURRENT) for folder in folders for n in range(6)])
+    folders[0].mkdir()
+    release = threading.Event()
+    listing_that_hangs(monkeypatch, folders[0], release)
+    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
+    probes = iter([True, False])  # reachable before the pass, not after the hang
+    monkeypatch.setattr(cleanup, '_probe_root', lambda root: next(probes, False))
+    try:
+        scan = project.scan()
+    finally:
+        release.set()
+    category = scan['cache_missing']
+    assert category['items'] == []
+    # the folder that hung and the rest of its root
+    [hung, rest] = sorted(category['notes'], key=lambda note: not note.startswith(str(folders[0])))
+    assert hung.startswith(str(folders[0]) + ' ') and '6 photos' in hung
+    assert rest.startswith(root_of(project.photos) + ' ') and '12 photos' in rest
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
+def test_photos_behind_a_junction_to_a_missing_volume_are_not_checked(project):
+    # E37: a junction or mount point inside a reachable root that leads to a disconnected
+    # volume made its photos look gone; the link counts as a root of its own
+    _winapi = pytest.importorskip('_winapi')
+    volume = project.base / 'volume'
+    (volume / 'event').mkdir(parents=True)
+    link = project.photos / 'nas'
+    _winapi.CreateJunction(str(volume), str(link))
+    few = [(link / 'event' / f'IMG_{n}.jpg', CURRENT) for n in range(2)]
+    many = [(link / 'other' / f'IMG_{n}.jpg', CURRENT) for n in range(6)]
+    direct = [(link / 'top.jpg', CURRENT)]
+    project.cache(few + many + direct)
+    (volume / 'event').rmdir()
+    volume.rmdir()  # the volume is gone, the junction stays
+    category = project.scan()['cache_missing']
+    assert category['items'] == []
+    assert len(category['notes']) == 1 and str(link) in category['notes'][0] and '9 photos' in category['notes'][0]
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
+def test_photos_behind_a_junction_whose_target_is_there_can_be_gone(project):
+    _winapi = pytest.importorskip('_winapi')
+    volume = project.base / 'volume'
+    volume.mkdir()
+    link = project.photos / 'nas'
+    _winapi.CreateJunction(str(volume), str(link))
+    gone = [(link / 'event' / f'IMG_{n}.jpg', CURRENT) for n in range(6)] + [(link / 'a.jpg', CURRENT)]
+    project.cache(gone)
+    category = project.scan()['cache_missing']
+    assert sorted(category['items']) == sorted((str(p), s) for p, s in gone) and category['notes'] == []
+
+
 def test_a_relative_path_is_never_unbound(project):
     project.cache([('relative\\a.jpg' if os.name == 'nt' else 'relative/a.jpg', CURRENT), ('', CURRENT)])
     assert project.scan()['cache_missing']['items'] == []
