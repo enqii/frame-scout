@@ -58,7 +58,7 @@ from .exporting import (EXPORTS_DIR, EXPORT_COLUMNS, EXPORT_MARK_TEXT, EXPORT_MA
     export_file_list, export_name, export_result_list)
 from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLEANUP_CATEGORIES,
     CACHE_CATEGORIES, CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, ROOT_TIMEOUT, FOLDER_TIMEOUT, STALE_TEMP_AGE, scan_cleanup, cleanup_running, clean_up,
-    auto_cleanup, size_text, count_text, cleanup_summary_text)
+    auto_cleanup, project_temp_cleanup, size_text, count_text, cleanup_summary_text)
 from .disk_space import (TORCH_INSTALL_SPACE, OTHER_PACKAGES_SPACE, CACHE_BYTES_PER_PHOTO, THUMBNAIL_BYTES, DETECTOR_DOWNLOAD, SPACE_RESERVE,
     SPACE_CHECK_TIMEOUT, LowSpace, analyzed_photos, app_search_needs, download_bytes, downloaded_models, eval_run_needs, search_space_bytes, search_space_needs, torch_install_needs, low_space, low_space_lines)
 from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE, torch_threads,

@@ -10,7 +10,7 @@ import pytest
 
 from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_YOLO_MODEL, ENGINE, EXPORTS_DIR, MARKS_FILE, RESULTS_FILE,
                              RUN_LOCK, RUN_STATUS, RunLock, auto_cleanup, clean_up, cleanup_summary_text, engine_id,
-                             export_result_list, feature_signature, prepare_cache,
+                             export_result_list, feature_signature, prepare_cache, project_temp_cleanup,
                              publish_export, result_card, results_document, save_profiles, scan_cleanup, size_text)
 
 CURRENT = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL)
@@ -968,6 +968,51 @@ def test_auto_cleanup_removes_temporary_files_also_if_results_json_cannot_be_rea
     stale = temp_file(project.results, RESULTS_FILE, 120)
     removed = auto_cleanup(project.results)
     assert not stale.exists() and removed['temporary'] == 1 and removed['skipped']
+
+
+def test_project_temp_cleanup_removes_temporary_files_of_the_app_in_the_project_folder(tmp_path):
+    # E44: a kill of the app during a save of profiles.json, its backup or settings.json left them
+    for name, data in (('profiles.json', '{}'), ('profiles.json.bak', '{}'), ('settings.json', '{}')):
+        (tmp_path / name).write_text(data, encoding='utf-8')
+    stale = [temp_file(tmp_path, name, 120) for name in ('profiles.json', 'profiles.json.bak', 'settings.json')]
+    # less than a minute old: possibly being written now by an app session
+    fresh = [temp_file(tmp_path, name, 5) for name in ('profiles.json', 'settings.json')]
+    # not the app's temporary files of the project folder: kept
+    mine = [tmp_path / name for name in ('notes.tmp', 'profiles.json.mine.tmp', 'profiles.example.json.abcdefgh.tmp',
+                                         'run.log.abcdefgh.tmp', 'profiles.json.abcdefgh.bak', 'settings.json.lock')]
+    for path in mine:
+        path.write_text('mine', encoding='utf-8')
+        os.utime(path, (time.time() - 120,) * 2)
+    removed = project_temp_cleanup(tmp_path)
+    assert not any(p.exists() for p in stale)
+    assert all(p.exists() for p in fresh + mine)
+    for name in ('profiles.json', 'profiles.json.bak', 'settings.json'):
+        assert (tmp_path / name).read_text(encoding='utf-8') == '{}'
+    assert removed['files'] == removed['temporary'] == len(stale) and removed['failed'] == []
+    # the probe file that reads the folder's clock is gone again
+    assert sorted(p.name for p in tmp_path.glob('*.tmp')) == sorted(p.name for p in fresh + mine if p.suffix == '.tmp')
+
+
+def test_project_temp_cleanup_of_a_folder_without_such_files(tmp_path):
+    assert project_temp_cleanup(tmp_path)['files'] == 0
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_the_app_cleans_its_project_folder_once_per_start():
+    # E44: in a function Streamlit runs once per server process, called before the page
+    # reads profiles.json
+    import ast
+    source = (Path(__file__).resolve().parent.parent / 'app.py').read_text(encoding='utf-8')
+    tree = ast.parse(source)
+    [function] = [node for node in tree.body if isinstance(node, ast.FunctionDef)
+                  and any(isinstance(call, ast.Call) and getattr(call.func, 'id', None) == 'project_temp_cleanup'
+                          for call in ast.walk(node))]
+    assert any('cache_resource' in ast.unparse(decorator) for decorator in function.decorator_list)
+    calls = [node.lineno for node in tree.body if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+             and getattr(node.value.func, 'id', None) == function.name]
+    reads = [node.lineno for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and getattr(node.func, 'id', None) == 'read_profiles_versioned']
+    assert len(calls) == 1 and calls[0] < min(reads)
 
 
 # texts
