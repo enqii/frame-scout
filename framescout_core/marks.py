@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ._common import (_backup_path, _broken_names, _file_lock, _previous_content, _publish_new, _publish_via_temp,
                       _replace_with_retry, _update_locked)
-from .profiles import require_profile
+from .profiles import read_profiles, require_profile
 
 
 # Marks (A17, P4 (B)): FrameScout ranks candidates, not certain hits; a mark records what the
@@ -180,14 +180,18 @@ def delete_marks(path, profile, attempts=5, retry_delay=0.05, lock_timeout=MARKS
     return removed
 
 
-def remove_marks(path, entries, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
+def remove_marks(path, entries, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT,
+                 unless_profile_of=None):
     """Remove the marks entries ((profile name, photo path) pairs) names; return how many were removed.
 
-    For the cleanup of marks of photos that no longer exist (unbound, E8/A21): only these
-    entries go, never the file or other marks; a profile left without marks is removed from
-    the file, as by save_marks. Merged into the file as it is now, under the lock of
-    save_marks; nothing happens without a marks file or without one of the entries. Raises
-    like save_marks.
+    For the cleanup of marks of photos that no longer exist (unbound, E8/A21) and of names
+    that are no profile (A34): only these entries go, never the file or other marks; a
+    profile left without marks is removed from the file, as by save_marks. With
+    unless_profile_of (the app's profiles JSON file), the entries of a name that is a profile
+    of that file at the time of the write are kept (read under the lock, like
+    require_profile; ValueError naming the file if it is missing or cannot be read). Merged into the file
+    as it is now, under the lock of save_marks; nothing happens without a marks file or
+    without one of the entries. Raises like save_marks.
     """
     path = Path(path)
     entries = set(entries)
@@ -198,7 +202,17 @@ def remove_marks(path, entries, attempts=5, retry_delay=0.05, lock_timeout=MARKS
     def update(document):
         nonlocal removed
         profiles = document['profiles']
+        current = set()
+        if unless_profile_of is not None:
+            if not Path(unless_profile_of).is_file():  # read_profiles would give no profile
+                raise ValueError(f'{Path(unless_profile_of).name} does not exist')
+            try:
+                current = {p.get('name') for p in read_profiles(unless_profile_of)}
+            except ValueError as exc:
+                raise ValueError(f'{Path(unless_profile_of).name} cannot be read: {exc}') from exc
         for profile, photo in entries:
+            if profile in current:
+                continue
             marks = profiles.get(profile)
             if marks is not None and photo in marks:
                 del marks[photo]

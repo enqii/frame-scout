@@ -755,6 +755,65 @@ def test_unbound_marks_are_kept_unless_selected(project):
         'Red car': {str(gone): 'match'}}
 
 
+# marks of profile names that are no search profile (A34)
+
+def test_marks_of_names_that_are_no_profile_are_offered_unselected(project):
+    photo = project.photo('a.jpg')
+    gone = project.photos / 'b.jpg'
+    # e.g. of a profile deleted before deleting a profile deleted its marks (A22)
+    project.marks({'Red car': {str(photo): 'match'}, 'Dog': {str(photo): 'no-match', str(gone): 'match'},
+                   'Cat': {str(photo): 'match'}, 'red car': {str(photo): 'match'}})
+    category = project.scan()['marks_profiles']
+    assert category['items'] == [('Cat', str(photo)), ('Dog', str(photo)), ('Dog', str(gone)),
+                                 ('red car', str(photo))]
+    assert category['default'] is False and category['problem'] is None
+    assert category['names'] == ['Cat: 1 mark', 'Dog: 2 marks', 'red car: 1 mark']
+
+
+def test_marks_of_deleted_profiles_are_not_offered_without_readable_profiles(project):
+    project.marks({'Dog': {'x.jpg': 'match'}})
+    project.profiles.write_text('{broken', encoding='utf-8')
+    category = project.scan()['marks_profiles']
+    assert category['items'] == [] and 'profiles.json' in category['problem']
+    (project.results / MARKS_FILE).write_text('{broken', encoding='utf-8')
+    project.set_profiles([])
+    category = project.scan()['marks_profiles']
+    assert category['items'] == [] and MARKS_FILE in category['problem']
+
+
+def test_deleting_marks_of_deleted_profiles_keeps_a_profile_created_since(project):
+    project.marks({'Red car': {'a.jpg': 'match'}, 'Dog': {'a.jpg': 'match', 'b.jpg': 'no-match'},
+                   'Cat': {'a.jpg': 'match'}})
+    scan = project.scan()
+    assert len(scan['marks_profiles']['items']) == 3
+    project.set_profiles([{'name': 'Red car', 'reference_images': []}, {'name': 'Cat', 'reference_images': []}])
+    from framescout_core import save_marks
+    save_marks(project.results / MARKS_FILE, 'Dog', {'c.jpg': 'match'})  # not shown by the scan
+    summary = project.clean(scan, {'marks_profiles'})
+    assert summary['marks'] == 2 and summary['files'] == 0
+    assert json.loads((project.results / MARKS_FILE).read_text(encoding='utf-8'))['profiles'] == {
+        'Red car': {'a.jpg': 'match'}, 'Dog': {'c.jpg': 'match'}, 'Cat': {'a.jpg': 'match'}}
+
+
+def test_marks_of_deleted_profiles_are_kept_if_the_profiles_cannot_be_read_when_deleting(project):
+    project.marks({'Dog': {'a.jpg': 'match'}})
+    scan = project.scan()
+    project.profiles.write_text('{broken', encoding='utf-8')
+    summary = project.clean(scan, {'marks_profiles'})
+    assert summary['marks'] == 0 and 'profiles.json' in ' '.join(summary['skipped'])
+    assert json.loads((project.results / MARKS_FILE).read_text(encoding='utf-8'))['profiles'] == {
+        'Dog': {'a.jpg': 'match'}}
+
+
+def test_unbound_marks_and_marks_of_deleted_profiles_together(project):
+    gone = str(project.photos / 'b.jpg')
+    project.marks({'Dog': {gone: 'match'}, 'Red car': {gone: 'match'}})
+    scan = project.scan()
+    summary = project.clean(scan, {'marks_unbound', 'marks_profiles'})
+    assert summary['marks'] == 2
+    assert json.loads((project.results / MARKS_FILE).read_text(encoding='utf-8'))['profiles'] == {}
+
+
 def test_rows_of_old_engines_and_other_settings(project):
     photo = project.photo('a.jpg')
     cli = 'c' * 64  # e.g. another --yolo-model, recorded by the engine of this version
