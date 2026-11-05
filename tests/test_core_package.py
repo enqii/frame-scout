@@ -1,15 +1,21 @@
-"""The package framescout_core re-exports the public names of its area modules (I15)."""
+"""The packages framescout_core (I15) and framescout_scoring (I30) re-export the public names of their modules."""
 import ast
 import importlib
 import inspect
 import pkgutil
 
+import pytest
+
 import framescout_core
+import framescout_scoring
+
+# the re-export list of framescout_scoring is short and kept by hand too (review of I30)
+packages = pytest.mark.parametrize('package', [framescout_core, framescout_scoring], ids=lambda p: p.__name__)
 
 
-def area_modules():
-    return [importlib.import_module(f'framescout_core.{info.name}')
-            for info in pkgutil.iter_modules(framescout_core.__path__) if not info.name.startswith('_')]
+def area_modules(package=framescout_core):
+    return [importlib.import_module(f'{package.__name__}.{info.name}')
+            for info in pkgutil.iter_modules(package.__path__) if not info.name.startswith('_')]
 
 
 def defined_names(module):
@@ -28,25 +34,28 @@ def test_there_are_area_modules():
     assert len(area_modules()) >= 10
 
 
-def test_every_public_name_of_an_area_module_is_re_exported():
+@packages
+def test_every_public_name_of_an_area_module_is_re_exported(package):
     # app.py and the engine import from the package, but the tests never import them and CI
     # only compiles them, so a name missing in __init__.py would only fail at the app start
-    missing = sorted(f'{module.__name__}.{name}' for module in area_modules() for name in defined_names(module)
-                     if getattr(framescout_core, name, None) is not getattr(module, name))
+    missing = sorted(f'{module.__name__}.{name}' for module in area_modules(package) for name in defined_names(module)
+                     if getattr(package, name, None) is not getattr(module, name))
     assert missing == []
 
 
-def test_private_helpers_are_not_re_exported():
+@packages
+def test_private_helpers_are_not_re_exported(package):
     # a monkeypatch of a private helper on the package would not reach the calling module
     # (the submodule _common itself is bound on the package by the import system)
-    leaked = sorted(name for name, value in vars(framescout_core).items()
+    leaked = sorted(name for name, value in vars(package).items()
                     if name.startswith('_') and not name.startswith('__') and not inspect.ismodule(value))
     assert leaked == []
 
 
-def test_no_module_alias_of_another_package_is_left_in_the_package():
+@packages
+def test_no_module_alias_of_another_package_is_left_in_the_package(package):
     # e.g. "import os as _os" in __init__.py (review): only the package's own submodules are bound
-    aliases = sorted(name for name, value in vars(framescout_core).items()
+    aliases = sorted(name for name, value in vars(package).items()
                      if not name.startswith('__') and inspect.ismodule(value)
-                     and not value.__name__.startswith('framescout_core.'))
+                     and not value.__name__.startswith(f'{package.__name__}.'))
     assert aliases == []
