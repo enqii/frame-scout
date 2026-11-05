@@ -781,6 +781,22 @@ def test_marks_of_deleted_profiles_are_not_offered_without_readable_profiles(pro
     assert category['items'] == [] and MARKS_FILE in category['problem']
 
 
+def test_the_scan_reads_unreadable_profiles_only_once(project, monkeypatch):
+    # the first failure is the reason of every category that needs the profiles (review)
+    from framescout_core import cleanup
+    project.marks({'Dog': {'x.jpg': 'match'}})
+    calls = []
+
+    def broken(filename):
+        calls.append(filename)
+        raise ValueError('broken')
+    monkeypatch.setattr(cleanup, 'read_profiles', broken)
+    found = project.scan()
+    assert len(calls) == 1
+    for key in ('galleries', 'thumbnails', 'marks_profiles', 'references'):
+        assert found[key]['items'] == [] and 'broken' in found[key]['problem']
+
+
 def test_deleting_marks_of_deleted_profiles_keeps_a_profile_created_since(project):
     project.marks({'Red car': {'a.jpg': 'match'}, 'Dog': {'a.jpg': 'match', 'b.jpg': 'no-match'},
                    'Cat': {'a.jpg': 'match'}})
