@@ -1301,8 +1301,11 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       standard library only, `framescout_scoring` numpy only. `UNINSTALL_ITEMS` also lists
       `framescout_scoring/__pycache__`. No user-visible change. A ZIP extracted over an older
       folder leaves the old `framescout_scoring.py` next to the package; Python imports the
-      package (checked), so the leftover is unused and harmless. The reverse case (rollback) is
-      I36. Tests: full pytest 1292 passed, 2 skipped; no engine smoke run.)
+      package (`tests/test_layout.py`), so the leftover is unused; unlike `framescout_core.py`
+      (I16) the `.bat` files do not delete it. The reverse case (rollback) is I36. Review:
+      tests now check the re-exports of `framescout_scoring` (`tests/test_core_package.py`)
+      and that every program folder's `__pycache__` is in `UNINSTALL_ITEMS`; the code stays in
+      `ranking.py` (same layout as `framescout_core`). Tests: full pytest 1297 passed, 2 skipped; no engine smoke run.)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 

@@ -372,7 +372,8 @@ the module of its area and to the re-exports in `__init__.py`.
   `UNINSTALL_ITEMS`/`UNINSTALL_KEEP`/`UNINSTALL_FIRST`/`USER_DATA`/`ENVIRONMENT_PROGRAMS`/`UninstallItem`/`PRIVATE_PYTHON_EXIT_CODE`/`running_python`/`protected_folders`/`uninstall_plan`/`user_data`/`outside_leftovers`/`search_running`/`programs_in_use`/`remove_items`
   (what the uninstall script deletes, keeps and only reports; standard library only. The
   items include the `__pycache__` folders of the root, `framescout_core/`,
-  `framescout_scoring/` (I30) and `tests/`.
+  `framescout_scoring/` (I30) and `tests/`: a fixed list, so a new program folder adds its
+  own (`tests/test_uninstall.py` fails for a folder with `.py` files that is missing).
   `uninstall_plan(root, protected)` returns the existing items to delete and the skipped
   ones: an item that contains a photo or copy folder of `settings.json` (except inside a
   kept entry, `.tmp/eval`), that lies inside one (a photo folder that is the project
@@ -433,8 +434,11 @@ own module (`monkeypatch.setattr(os, 'replace', …)`), which reaches every area
 
 `framescout_scoring/` (I30): package with the engine's scoring, **numpy only** (no torch).
 The code lives in `ranking.py`; `__init__.py` re-exports its public names, so
-`from framescout_scoring import ...` works as before. It is a package of its own so that
-`framescout_core/` stays standard library only. Functions: `text_queries`
+`from framescout_scoring import ...` works as before (`tests/test_core_package.py` checks
+the re-exports as for `framescout_core`). It is a package of its own so that
+`framescout_core/` stays standard library only. A leftover `framescout_scoring.py` of an
+older version next to it is never imported (the package wins, `tests/test_layout.py`); the
+`.bat` files do not delete it. The reverse case, a rollback, is I36. Functions: `text_queries`
 (the generated templates averaged into one query, custom prompts kept apart, E4),
 `best_scores`, `spread`/`MIN_SCORES`/`MIN_SPREAD`, `rank_photos`/`Match` (per-profile
 z-scores and their combination, E5) and `score_caption` (the numbers on a gallery card).
