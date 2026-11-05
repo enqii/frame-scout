@@ -42,3 +42,11 @@ def test_private_helpers_are_not_re_exported():
     leaked = sorted(name for name, value in vars(framescout_core).items()
                     if name.startswith('_') and not name.startswith('__') and not inspect.ismodule(value))
     assert leaked == []
+
+
+def test_no_module_alias_of_another_package_is_left_in_the_package():
+    # e.g. "import os as _os" in __init__.py (review): only the package's own submodules are bound
+    aliases = sorted(name for name, value in vars(framescout_core).items()
+                     if not name.startswith('__') and inspect.ismodule(value)
+                     and not value.__name__.startswith('framescout_core.'))
+    assert aliases == []

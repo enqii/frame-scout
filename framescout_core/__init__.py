@@ -9,16 +9,12 @@ underscore) are not re-exported: import or monkeypatch them on their defining mo
 The same holds for a public name that another module imports, e.g. read_profiles as
 used by the cleanup: patch framescout_core.cleanup.read_profiles.
 """
-import os as _os
-
-from .layout import (OBSOLETE_CORE_FILE, mixed_versions_message)
+from .layout import (OBSOLETE_CORE_FILE, PACKAGE_ONLY_SCRIPTS, mixed_versions_message, refused_import,
+    refuse_mixed_versions)
 
 # First of all (I16): next to framescout_core.py of an older version, the importing app.py
 # may be that older version's, which must not run against this core.
-_problem = mixed_versions_message(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-if _problem:
-    raise ImportError(_problem)
-del _problem
+refuse_mixed_versions(__file__)
 
 from .names import (AVIF_EXT, HEIF_EXT, RAW_EXT, EXT, SLUG_MAX_LENGTH, slugify, profile_slugs)
 from .photos import (RAW_PARTNER_EXT, RAW_PREVIEW_MIN_EDGE, RAW_FLIP_TRANSPOSE, SKIPPED_EXTENSIONS_SHOWN,
