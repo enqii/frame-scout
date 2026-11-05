@@ -23,11 +23,20 @@ if /i "%TORCH_VARIANT%"=="cuda" set "TORCH_VARIANT=cuda"
 rem I16: a ZIP of this version extracted over an older folder leaves the older single file
 rem framescout_core.py next to the folder framescout_core, which refuses to load next to it.
 rem This .bat is of the newer version, so the single file is the leftover. Start-FrameScout.bat
-rem has the same lines.
+rem has the same lines (a test compares them).
+rem A folder of that name is no leftover ("\*" exists only for a folder): del would ask and
+rem delete the files in it. /f deletes a read-only file; a file that stays (open in another
+rem program) stops here, as the app would not start next to it (review).
 if not exist "framescout_core.py" goto obsolete_done
+if exist "framescout_core.py\*" goto obsolete_done
 if not exist "framescout_core\__init__.py" goto obsolete_done
 echo Deleting framescout_core.py, a leftover of an older FrameScout version.
-del "framescout_core.py"
+del /f "framescout_core.py"
+if not exist "framescout_core.py" goto obsolete_done
+echo framescout_core.py could not be deleted. Close the programs that use it or delete it
+echo yourself, then run this file again.
+pause
+exit /b 1
 :obsolete_done
 set "PIP_CACHE_DIR=%CD%\.cache\pip"
 set "TORCH_HOME=%CD%\.cache\torch"
