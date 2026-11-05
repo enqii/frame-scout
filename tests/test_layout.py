@@ -80,6 +80,20 @@ def test_the_package_loads_without_the_single_file(tmp_path):
     assert result.returncode == 0, result.stderr
 
 
+def test_the_scoring_package_wins_over_its_leftover_single_file(tmp_path):
+    # I30: a newer ZIP over a version with framescout_scoring.py leaves that file unused, since
+    # Python imports the package of the same folder (the reverse case, a rollback, is I36)
+    shutil.copytree(ROOT / 'framescout_scoring', tmp_path / 'framescout_scoring',
+                    ignore=shutil.ignore_patterns('__pycache__'))
+    (tmp_path / 'framescout_scoring.py').write_text("raise SystemExit('the single file was imported')\n",
+                                                    encoding='utf-8')
+    code = 'import framescout_scoring; print(framescout_scoring.__file__)'
+    result = subprocess.run([sys.executable, '-B', '-c', code], cwd=tmp_path, capture_output=True, text=True,
+                            encoding='utf-8', errors='replace')
+    assert result.returncode == 0, result.stderr
+    assert Path(result.stdout.strip()).resolve() == (tmp_path / 'framescout_scoring' / '__init__.py').resolve()
+
+
 def run_script(folder, name):
     (folder / name).write_text('import framescout_core\nprint("LOADED")\n', encoding='utf-8')
     return subprocess.run([sys.executable, '-B', name], cwd=folder, capture_output=True, text=True,
