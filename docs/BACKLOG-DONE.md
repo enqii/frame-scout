@@ -840,7 +840,7 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (light and dark theme) and switch if `st.html` is clean. One selector per card stays:
       the state of a mark is not in the DOM, and a page holds at most 48 cards. Review of
       PR #55, finding 6.
-      (done 2026-11-04 in PR #77: the `<style>` block of `mark_style` is prepended to the existing caption above the cards instead of an own `st.markdown` element, so it takes no layout slot; `st.html` was not used, its fragment-rerun behavior stays unchecked. Not verified in a browser (mark colors, light/dark theme, gap); only Streamlit `AppTest`.)
+      (done 2026-11-04 in PR #77: the `<style>` block of `mark_style` is prepended to the existing caption above the cards instead of an own `st.markdown` element, so it takes no layout slot; `st.html` was not used, its fragment-rerun behavior stays unchecked. Not verified in a browser (mark colors, light/dark theme, gap); only Streamlit `AppTest`; the browser check is A45.)
 - [x] **A40 – `*.broken-*` files are not offered by "Clean up storage"; no restore for a missing `marks.json`:**
       `marks.json.broken-*` and `cache.sqlite3.broken-*` are never deleted by FrameScout, so
       the user deletes them by hand in the results folder (the notices say so); a cleanup

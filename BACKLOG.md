@@ -271,6 +271,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       summary may undercount the photos to analyze (and the duration). Fix idea: compare size and
       modification time like the engine does, reusing the scan cache (A6/A27) so that a rerun
       does not stat every photo again. Found in F12 (PR #71).
+- [ ] `minor` **A45 – The mark colors in the gallery caption are not checked in a browser:** since
+      A38 (PR #77) the `<style>` block of `mark_style` is prepended to the caption above the
+      cards (`st.caption(..., unsafe_allow_html=True)`) instead of an own `st.markdown`
+      element. Only Streamlit's `AppTest` checked it, which cannot see layout or CSS. Check in
+      a real browser, light and dark theme: the mark colors still apply after mark clicks and
+      page changes (fragment reruns), the caption shows no stray text, and no gap is left above
+      the cards. If not, try `st.html` (A38). Review of PR #77, finding 1.
 
 ### Installation / project
 
