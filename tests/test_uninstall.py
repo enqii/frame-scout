@@ -97,6 +97,17 @@ def test_the_plan_never_lists_user_data(project):
         assert relative not in listed
 
 
+def test_every_program_folder_has_its_compiled_files_listed():
+    # the list stays fixed (the uninstall deletes only known paths), so a new package of the
+    # repository must add its __pycache__ by hand; this catches a forgotten one (review)
+    listed = {path for path, _ in uninstall_module.UNINSTALL_ITEMS}
+    folders = [entry.name for entry in os.scandir(ROOT)
+               if entry.is_dir() and not entry.name.startswith('.') and any(Path(entry.path).glob('*.py'))]
+    assert 'framescout_scoring' in folders
+    assert '__pycache__' in listed
+    assert sorted(name for name in folders if f'{name}/__pycache__' not in listed) == []
+
+
 def test_missing_items_are_not_listed(tmp_path):
     write(tmp_path / 'app.py')
     assert plan(tmp_path) == ([], [])
