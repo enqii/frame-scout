@@ -27,7 +27,7 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
 - [x] (A) Evaluation tool: E36, E49, E51, I25 (done 2026-11-04 in PR #73)
 - [x] (B) Engine and cache: E37, E39, E40, E44, E46, E50 (done 2026-11-04 in PR #74)
 - [x] (C) App: A34, A38, A40, A41, A42, A43 (done 2026-11-04 in PR #77; A38 not verified in a browser, follow-up A45)
-- [ ] (D) Installer: I4, I16
+- [x] (D) Installer: I4, I16 (done 2026-11-05 in PR #78)
 
 ### P17 – Repository layout (added 2026-11-03)
 - [ ] Scoring module outside the package (I30)

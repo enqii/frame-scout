@@ -115,6 +115,7 @@ so callers write `import framescout_core` or `from framescout_core import <name>
 logic here when both sides need it or it should be unit-tested without models; add it to
 the module of its area and to the re-exports in `__init__.py`.
 
+- `layout.py` (I16): `OBSOLETE_CORE_FILE` (`framescout_core.py`, the single file of FrameScout before I15) and `mixed_versions_message(folder)` (the error text if that file lies next to the package, else `None`). `__init__.py` calls it **before any other import** and raises an `ImportError` with that text, so every entry point (app, engine, evaluation tool, check, uninstall) stops in a folder with files of two versions: Python would import the package either way, and after going back to an older version the older `app.py` would run silently against the newer core (another `ENGINE` and cache signature). The message names both fixes (updated: delete `framescout_core.py`; went back: delete the folder `framescout_core`; best: extract a ZIP into a new, empty folder).
 - `names.py`: `EXT` (supported image extensions, including `HEIF_EXT` and `RAW_EXT`,
   E25), `slugify`, `profile_slugs` (unique gallery file names, used by the engine).
 - `photos.py` (E25): `available_decoders` (`Decoders`: whether AVIF, HEIC/HEIF and RAW
@@ -524,7 +525,11 @@ says to delete `.python`. `.venv` refers to `.python` by absolute path, so the f
 cannot be moved afterwards without running the installer again, which then re-creates
 `.venv` and downloads all packages again (prebuilt movable bundle: I23). The script uses no delayed expansion (a `!` in
 the folder path would be dropped from `cd` and `%CD%`), `goto` instead of parenthesized
-blocks and never the folder path inside parentheses (I21). Then it sets `PIP_CONSTRAINT=constraints.txt` (I18),
+blocks and never the folder path inside parentheses (I21). Right after the argument check it
+deletes `framescout_core.py` if `framescout_core\__init__.py` exists (I16: the leftover of an
+older version after a ZIP update; prints "Deleting framescout_core.py, a leftover of an older
+FrameScout version."; the same lines as in `Start-FrameScout.bat`, kept identical by
+`tests/test_layout.py`; the jump to `:obsolete_done` avoids a block). Then it sets `PIP_CONSTRAINT=constraints.txt` (I18),
 installs PyTorch with `install_torch.py` (passing the argument on; torch's dependencies
 come in their pinned versions), then `pip install --no-cache-dir -r requirements.txt -c
 constraints.txt` (on a re-run this moves installed packages to the pinned versions and may
@@ -570,9 +575,12 @@ if that fails too, it says to run `Install-FrameScout.bat`. It never writes, dow
 
 `Uninstall-FrameScout.bat [--dry-run]` (P5 part B, I20 in part C) runs
 `framescout_uninstall.py` with `.python\python.exe` if it exists, otherwise (installations
-of older installers) with the first of Python 3.14/3.13/3.12 found through the `py`
-launcher (neither: it prints the manual steps, which name `.venv`, `.python`, `.cache` and
-`.tmp`), with `-B -E -s` and **not** with `.venv`'s Python, which
+of older installers, I4) with the `python.exe` in the `home` of `.venv\pyvenv.cfg` (read with
+`for /f "usebackq tokens=1,* delims== "`; used only if it reports Python 3.12 or newer), otherwise
+with the first of Python 3.14/3.13/3.12 found through the `py` launcher (none: it prints
+"No Python 3.12 or newer found to run the uninstall: there is no private Python in .python, the
+Python that created .venv is gone, and the py launcher finds none." and the manual steps, which
+name `.venv`, `.python`, `.cache` and `.tmp`), with `-B -E -s` and **not** with `.venv`'s Python, which
 cannot delete itself while it runs. It sets no cache or `TMP` variables (`.tmp` is
 deleted) and uses no delayed expansion, which would drop a `!` from the folder path and
 the arguments (review: the `cd` then failed and the script of the current directory
@@ -599,7 +607,10 @@ I19.
 
 ### `Start-FrameScout.bat`
 
-`Start-FrameScout.bat`: launches app via that venv on `127.0.0.1:8501`.
+`Start-FrameScout.bat`: launches app via that venv on `127.0.0.1:8501`. Right after the `cd` it
+deletes `framescout_core.py` when `framescout_core\__init__.py` exists (I16, same lines and
+message as in the installer). `Check-FrameScout.bat` stays read-only: in such a folder it shows
+the `ImportError` of the guard (see I34) and then its advice to run the installer.
 
 ### `README.md`
 
@@ -1737,15 +1748,16 @@ never inside a block; the real download, extraction and `venv` creation and the 
 `Fo!to (old)\fs` were run by hand under `.tmp`, as were the repair paths of the review
 (`python.exe` of `.python` deleted, pip removed from `.venv`, a failed `venv`, `Lib\venv`
 removed from `.python`, the folder renamed, the move blocked by an open file for 7 s and
-for 25 s); a full install with PyTorch on the private Python was not), and the uninstall script (P5, `test_uninstall.py`, tests on `tmp_path` trees: plan, kept
+for 25 s); a full install with PyTorch on the private Python was not), and the files of two versions (I16, `tests/test_layout.py`: the message, the package guard through a subprocess import of a package copy, the `.bat` cleanup lines of Install and Start identical and before any Python run, Start run on a copy in `Fo!to (old) & co`; `Install-FrameScout.bat cpu` was run by hand on a scratch copy and deleted the leftover), and the uninstall script (P5, `test_uninstall.py`, I4: order and version check of the `pyvenv.cfg` fallback, tests on `tmp_path` trees: plan, kept
 entries (also in another case, Windows only), protected folders from settings (invalid
 values, read once, photo folder around the project), links and junctions, read-only
 files and folders, unlistable items, failures reported once, user-data and outside
 listings, the run lock, read-only vs. running `python.exe` (Windows only), the dialog of
 `framescout_uninstall.py`, no delayed expansion in the `.bat`; the real `.bat` was run by
 hand on scratch copies, once with `!` and `)` in the folder path as a dry run, not
-against a real installation, not while Streamlit was running and not on a PC without the
-`py` launcher; the private Python's deletion (`running_python`, exit code 3, the `.bat`
+against a real installation, not while Streamlit was running and on a PC without the
+`py` launcher only through a `.bat` run with `PATH` limited to System32 (I4: `pyvenv.cfg` whose `home`
+is a junction `Py thon (x86) & !`, and without any Python); the private Python's deletion (`running_python`, exit code 3, the `.bat`
 removing `.python`) was run by hand under `.tmp` with the real private Python, not against a
 full installation; the running check was tried by hand with a running read-only executable);
 still missing: cache

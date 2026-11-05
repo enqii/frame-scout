@@ -20,7 +20,10 @@ downloads all packages again, several GB with CUDA). If the installation fails t
 delete `.python` and run it once more.
 
 When you update from a ZIP, extract it into a fresh folder instead of over an old one,
-so no files of earlier versions stay behind.
+so no files of earlier versions stay behind. If you extracted over an old folder anyway,
+`Install-FrameScout.bat` and `Start-FrameScout.bat` delete the leftover `framescout_core.py`
+of the older version. If you went back to an older version this way, FrameScout stops with an
+error that names the file and the folder `framescout_core` to delete.
 
 ### Checking the installation
 
@@ -387,7 +390,9 @@ Person detection helps with people in group photos; turn it off for other motifs
 
 `Uninstall-FrameScout.bat` (`--dry-run` only shows the lists) lists what it deletes and
 keeps, and deletes only after you type `yes`. Close FrameScout first; the script refuses
-while a search or the app runs, or when `settings.json` cannot be read.
+while a search or the app runs, or when `settings.json` cannot be read. It runs with the
+private Python in `.python`; for an installation of an older installer it uses the Python
+that created `.venv` or the `py` launcher, and says so if it finds none.
 
 - **Deleted:** `.venv`, `.python`, `.cache` (model weights and pip cache), `.tmp` (except
   `.tmp\eval`), `.pytest_cache` and the `__pycache__` folders.
