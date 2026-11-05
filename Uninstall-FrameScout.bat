@@ -50,9 +50,11 @@ for %%V in (3.14 3.13 3.12) do (
 )
 if defined PYTHON_VERSION goto installed
 echo No Python 3.12 or newer found to run the uninstall: there is no private Python in
-echo .python, the Python that created .venv is gone, and the py launcher finds none.
+echo .python, .venv\pyvenv.cfg names no usable Python 3.12 or newer, and the py launcher
+echo finds none.
 echo To delete the environment by hand, close FrameScout and delete the folders .venv,
-echo .python, .cache and .tmp in %CD%
+rem quoted: an "&" in the folder path would end the echo and run the rest as a command
+echo .python, .cache and .tmp in "%CD%"
 echo (keep .tmp\eval if you labelled photos with the evaluation tool).
 pause
 exit /b 1
