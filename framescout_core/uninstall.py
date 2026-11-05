@@ -33,6 +33,7 @@ UNINSTALL_ITEMS = (
     (DEFAULT_YOLO_MODEL, 'person detection model'),
     ('__pycache__', 'compiled Python files'),
     ('framescout_core/__pycache__', 'compiled Python files'),
+    ('framescout_scoring/__pycache__', 'compiled Python files'),
     ('tests/__pycache__', 'compiled Python files'),
     ('.pytest_cache', 'test cache'),
 )
