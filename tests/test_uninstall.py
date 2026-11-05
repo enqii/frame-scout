@@ -180,8 +180,9 @@ def test_nothing_inside_a_photo_folder_is_deleted(project, folder):
     (project / 'settings.json').write_text(json.dumps({'photo_folders': [folder]}), encoding='utf-8')
     items, skipped = plan(project)
     assert items == []
-    assert sorted(path.name for path, _ in skipped) == sorted(
-        ['.cache', '.python', '.tmp', '.venv', '__pycache__', '__pycache__', '__pycache__', 'yolo11n.pt'])
+    assert sorted(path.relative_to(project).as_posix() for path, _ in skipped) == [
+        '.cache', '.python', '.tmp', '.venv', '__pycache__', 'framescout_core/__pycache__',
+        'framescout_scoring/__pycache__', 'yolo11n.pt']
     assert all('inside' in reason for _, reason in skipped)
 
 
