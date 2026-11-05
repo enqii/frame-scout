@@ -561,6 +561,20 @@ def test_the_restore_is_offered_for_a_missing_file_whose_backup_holds_marks(tmp_
     assert marks_restore_offer(path, None) is None
 
 
+def test_the_restore_offer_reads_the_backup_with_the_given_reader(tmp_path):
+    # the app passes a cached read_marks: the offer runs on every gallery rerun (review)
+    path = damaged(tmp_path)
+    path.unlink()
+    read = []
+    offer = marks_restore_offer(path, None, read=lambda backup: read.append(backup) or {'Red car': {'a.jpg': MARK_MATCH}})
+    assert offer == (1, marks_backup(path).stat().st_mtime)
+    assert read == [marks_backup(path)]
+
+    def missing(backup):
+        raise FileNotFoundError(backup)
+    assert marks_restore_offer(path, None, read=missing) is None
+
+
 def test_restoring_waits_for_the_lock_and_gives_up(tmp_path):
     path = damaged(tmp_path)
     lock = RunLock(tmp_path / (MARKS_FILE + '.lock'))
