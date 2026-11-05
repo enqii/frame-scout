@@ -82,6 +82,12 @@ def test_a_path_with_a_line_break_is_left_out_of_the_file_list_only(brk):
     assert unlisted_paths(CARDS) == []
 
 
+def test_an_empty_path_has_no_line_break():
+    # ''.splitlines() is [], which is not [''] (review)
+    assert unlisted_paths([{'path': ''}]) == []
+    assert export_file_list([{'path': ''}]) == '\n'
+
+
 def test_the_export_writes_a_path_with_a_line_break_only_to_the_csv(tmp_path):
     odd = card(2, '/photos/two\nlines.jpg')
     table, listing = export_result_list(tmp_path, 'x', [CARDS[0], odd], {}, now=NOW)

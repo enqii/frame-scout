@@ -64,7 +64,8 @@ def export_csv(cards, marks):
 
 def _has_line_break(path):
     # every line break str.splitlines knows: a program reading the list may split at any of them
-    return path.splitlines() != [path]
+    # ''.splitlines() is [], so an empty path needs its own case (review)
+    return path.splitlines() not in ([path], [])
 
 
 def unlisted_paths(cards):
