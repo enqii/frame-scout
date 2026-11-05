@@ -679,13 +679,19 @@ def base_python_folder():
     return Path(getattr(sys, '_base_executable', sys.executable)).parent
 
 
-def run_uninstaller(folder, *args, path=None):
-    """Run a copy of the .bat with a stand-in framescout_uninstall.py that reports how it ran."""
+def run_uninstaller(folder, *args, path=None, code_page=None):
+    """Run a copy of the .bat with a stand-in framescout_uninstall.py that reports how it ran.
+
+    With `code_page`, it runs in a console of its own (no window) switched to that code page,
+    and the console's code page afterwards is printed (chcp).
+    """
     import shutil
     import subprocess
     shutil.copy(ROOT / 'Uninstall-FrameScout.bat', folder)
+    # UTF-8 output: -E ignores PYTHONIOENCODING, and the path may be outside the ANSI code page
     (folder / 'framescout_uninstall.py').write_text(
         'import sys\n'
+        'sys.stdout.reconfigure(encoding="utf-8")\n'
         'print("STAND-IN", sys.executable, sys.argv[1:], sys.flags.dont_write_bytecode,'
         ' sys.flags.ignore_environment, sys.flags.no_user_site)\n'
         'sys.exit(5)\n', encoding='utf-8')
@@ -693,8 +699,14 @@ def run_uninstaller(folder, *args, path=None):
     if path is not None:
         env['PATH'] = path
     # relative to the current directory (cmd may not search it), so no quoting of the folder path
-    return subprocess.run(['cmd.exe', '/d', '/c', '.\\Uninstall-FrameScout.bat', *args], cwd=folder,
-                          input='\n\n', capture_output=True, text=True, errors='replace', env=env)
+    command = ['cmd.exe', '/d', '/c', '.\\Uninstall-FrameScout.bat', *args]
+    flags = 0
+    if code_page is not None:
+        command = ['cmd.exe', '/d', '/c', ' '.join([f'chcp {code_page} >nul &', *command[3:], '& chcp'])]
+        # its own console: the code page of the console pytest runs in stays as it is
+        flags = subprocess.CREATE_NO_WINDOW
+    return subprocess.run(command, cwd=folder, input='\n\n', capture_output=True, text=True, encoding='utf-8',
+                          errors='replace', env=env, creationflags=flags)
 
 
 def environment_of(folder, home):
@@ -724,6 +736,29 @@ def test_the_uninstaller_runs_with_the_python_that_created_the_environment(tmp_p
     result = run_uninstaller(folder, '--dry-run', path=os.path.join(os.environ['SystemRoot'], 'System32'))
     assert f"STAND-IN {home}\\python.exe ['--dry-run'] 1 1 1" in result.stdout, result.stdout + result.stderr
     assert result.returncode == 5  # the script's exit code is passed on
+
+
+def test_the_utf_8_code_page_is_used_for_reading_pyvenv_cfg_only():
+    commands = batch_commands(uninstaller())
+    switch = commands.index('if defined OLD_CP chcp 65001 >nul')
+    restore = commands.index('if defined OLD_CP chcp %OLD_CP% >nul')
+    # nothing between them can leave the console in UTF-8
+    assert restore == switch + 2 and 'pyvenv.cfg' in commands[switch + 1]
+    assert not any(word in commands[switch + 1].lower() for word in ('goto', 'exit'))
+
+
+@windows_only
+def test_the_uninstaller_reads_a_home_with_non_ascii_characters(tmp_path):
+    # venv writes pyvenv.cfg as UTF-8, but for /f reads in the console's code page, e.g. 850, so a
+    # per-user Python of "Jürgen" was not found (review); the code page is restored afterwards
+    folder = tmp_path / 'Fo!to (old) & co'
+    folder.mkdir()
+    home = junction_to(tmp_path / 'Jürgen 写真 (x86) & !', base_python_folder())
+    environment_of(folder, home)
+    result = run_uninstaller(folder, '--dry-run', path=os.path.join(os.environ['SystemRoot'], 'System32'),
+                             code_page=850)
+    assert f"STAND-IN {home}\\python.exe ['--dry-run'] 1 1 1" in result.stdout, result.stdout + result.stderr
+    assert result.stdout.rstrip().splitlines()[-1].rstrip('.').endswith(' 850')
 
 
 @windows_only
