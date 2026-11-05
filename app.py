@@ -452,9 +452,10 @@ def marks_backup_offer(error):
     """The text offering to restore marks.json.bak, or None if there is nothing to offer (F1, A40).
 
     error: the error of load_marks, or None. For a damaged marks.json and for a missing one
-    whose backup holds marks (marks_restore_offer).
+    whose backup holds marks (marks_restore_offer). This runs on every gallery rerun, so the
+    backup is read through cached_marks: again only when it changes (review).
     """
-    offer = marks_restore_offer(MARKS, error)
+    offer = marks_restore_offer(MARKS, error, read=lambda backup: cached_marks(*version_key(backup)))
     if offer is None:
         return None
     count, saved = offer
