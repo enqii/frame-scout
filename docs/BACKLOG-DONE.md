@@ -1292,6 +1292,17 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (2026-10-27, P5 part B: the README now advises extracting a ZIP into a fresh folder,
       and the uninstall script removes `__pycache__`; the stale file itself is still not
       detected or removed, so this stays open.) (Done 2026-11-05 in PR #78: new `framescout_core/layout.py`; `framescout_core/__init__.py` raises an `ImportError` naming both fixes when `framescout_core.py` lies next to the package, so the rollback case no longer runs silently; `Install-FrameScout.bat` and `Start-FrameScout.bat` delete the leftover when the package exists. Review: a folder named `framescout_core.py` is skipped (`del` would have asked and deleted its files), `del /f` removes a read-only leftover and a leftover that stays (open in another program) stops the `.bat` with a message; the guard lets `framescout_uninstall.py` of the same folder load (it came after the package and imports no other FrameScout module), so the uninstall works in such a folder, while `Uninstall-FrameScout.bat` deletes nothing of it (after going back to a version before I15 the single file is that version's core). Tests: `tests/test_layout.py`. Not runtime-tested: no real ZIP update; `Install-FrameScout.bat cpu` was run on a scratch copy only up to the missing `install_torch.py`. Open: I34, I35.)
+- [x] **I30 – Repository layout, step 1: scoring module outside the package (low risk):**
+      `framescout_scoring.py` (numpy only) lay loose in the root next to the standard-library-only
+      package `framescout_core/`. Found on 2026-10-30 in a review of the folder structure.
+      (Done 2026-11-05 in PR #79: now the package `framescout_scoring/`, the code unchanged in
+      `framescout_scoring/ranking.py`, `__init__.py` re-exports the public names, so the imports
+      in the engine, `framescout_eval.py` and the tests did not change; `framescout_core` stays
+      standard library only, `framescout_scoring` numpy only. `UNINSTALL_ITEMS` also lists
+      `framescout_scoring/__pycache__`. No user-visible change. A ZIP extracted over an older
+      folder leaves the old `framescout_scoring.py` next to the package; Python imports the
+      package (checked), so the leftover is unused and harmless. The reverse case (rollback) is
+      I36. Tests: full pytest 1292 passed, 2 skipped; no engine smoke run.)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 

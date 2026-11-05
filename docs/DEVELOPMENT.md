@@ -127,7 +127,7 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `app.py` | Streamlit user interface |
 | `framescout_engine.py` | Search engine as a standalone CLI |
 | `framescout_core/` | Shared helpers of app and engine, one module per area; standard library only |
-| `framescout_scoring.py` | Scoring (prompt ensemble, scaling, weighting); numpy only |
+| `framescout_scoring/` | Scoring package (`ranking.py`, re-exported by `__init__.py`): prompt ensemble, scaling, weighting; numpy only |
 | `framescout_images.py` | Image decoding and thumbnails (Pillow, optional HEIF/RAW); no torch; used by the engine and the evaluation tool |
 | `framescout_eval.py`, `framescout_eval_page.html` | Model evaluation tool (see above); not used by the app |
 | `framescout_uninstall.py`, `Uninstall-FrameScout.bat` | Uninstaller |

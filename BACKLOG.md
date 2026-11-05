@@ -323,6 +323,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       points set in `__main__` before importing `framescout_core` and that
       `layout.refuse_mixed_versions` accepts, checked with Streamlit's `__main__` for `app.py`.
       Found in the review of PR #78 (I16).
+- [ ] `minor` **I36 – A rollback ZIP over a newer folder leaves `framescout_scoring/`, which shadows the old `framescout_scoring.py`:**
+      after going back to an older version by extracting its ZIP over a newer folder, the
+      leftover package `framescout_scoring/` wins over that version's `framescout_scoring.py`
+      (a package beats a module of the same name), so the older engine silently scores with the
+      newer code. Today harmless (the code is identical), it matters once the scoring changes.
+      Like I16 for `framescout_core.py`. Fix ideas: a guard in `framescout_scoring/__init__.py`
+      similar to `framescout_core.layout`, or only the existing advice to extract a ZIP into a
+      new, empty folder. Found in PR #79 (I30).
 - [ ] `decision` **I9 – CI action pins are updated by hand only:** `.github/workflows/tests.yml`
       pins `actions/checkout` and `actions/setup-python` to commit SHAs (with a version
       comment). That avoids moved tags, but security and runtime updates
@@ -371,12 +379,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       redistribution), codec libraries bundled in wheels such as x265 in `pillow-heif` (GPL)
       and LibRaw in `rawpy` (LGPL/CDDL); who builds and hosts the bundle. Needs a user
       decision. Found on 2026-10-27 in P5 part C.
-- [ ] `ready` **I30 – Repository layout, step 1: scoring module outside the package (low risk):**
-      `framescout_scoring.py` (numpy only) lies loose in the root next to the standard-library-only
-      package `framescout_core/`. Move it into a package of its own (e.g. `framescout_scoring/`,
-      or a sub-package that keeps the "core is standard library only" rule intact) and adjust the
-      imports in the engine, the evaluation tool and the tests. No user-visible change. Found on
-      2026-10-30 in a review of the folder structure.
 - [ ] `decision` **I31 – Repository layout, step 2: group the loose root files (medium risk):** move
       `requirements*.txt`, `constraints.txt` and `pytest.ini` into `requirements/` (check
       whether `pytest.ini` may move), `profiles.example.json` and `framescout_eval_page.html`
