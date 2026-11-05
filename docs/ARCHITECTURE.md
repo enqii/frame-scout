@@ -242,7 +242,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `remove_marks(path, entries)` removes single `(profile, photo path)` marks for the cleanup, E8; with
   `unless_profile_of=profiles_file` it reads `profiles.json` again under the marks lock and keeps the marks of a name that is a profile now
   (`ValueError` if the file is missing or unreadable; the cleanup category `marks_profiles`, A34);
-  `marks_restore_offer(path, error)` returns `(marks in the backup, its mtime)` if restoring the backup can be offered: for a
+  `marks_restore_offer(path, error, read=read_marks)` (the app passes its cached `read_marks`, as it runs on every gallery rerun) returns `(marks in the backup, its mtime)` if restoring the backup can be offered: for a
   `ValueError` read (damaged file) or for a missing `marks.json` whose readable backup holds at least one mark, else `None` (A40);
   `save_marks(..., profiles_file=...)` saves only for a name that is a profile now;
   `hide_no_match(cards, marks)` returns the cards not marked as no match and how many it
@@ -1237,7 +1237,7 @@ page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[kind
 with `!important`; this relies on Streamlit internals (the key class and the button kind,
 read from the 1.66.1 frontend bundle), so `test_marks.py` fails once `constraints.txt` pins
 another Streamlit than `MARK_STYLE_STREAMLIT`: check the selectors against the new version,
-then raise that constant (not verified in a real browser or the dark theme). A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The result is **not verified in a browser** (light/dark theme, mark colors, gap). A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
+then raise that constant (not verified in a real browser or the dark theme). A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The result is **not verified in a browser** (light/dark theme, mark colors, gap; follow-up A45). A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
 that are no longer search profiles cannot be marked and their "Copy to folder" field is
 disabled. A gallery drawn before its profile was renamed or deleted (another tab) still
@@ -1369,7 +1369,7 @@ missing one counts as empty) or `profiles.json` (also missing) cannot be read,
 `references` if `profiles.json` or the `.bak` cannot be read; an unreadable cache blocks
 the cache categories. The cache is read with a read-only URI with an empty authority
 (`_read_only_uri`; never created; `Path.as_uri()` would fail for a UNC path). A scan reads
-`profiles.json` once and every gallery once (its marker and links). "Delete selected" asks
+`profiles.json` once (also when it fails: that error is the reason for every category that needs it) and every gallery once (its marker and links). "Delete selected" asks
 for a confirmation; `clean_up` takes `results/run.lock` (1 s; refused if held, or if a
 `starting` status names a live engine, `engine_alive`), scans again under the lock and
 deletes only items that the shown scan lists and the fresh scan still has: galleries first
