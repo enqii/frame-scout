@@ -764,13 +764,19 @@ def test_the_uninstaller_reads_a_home_with_non_ascii_characters(tmp_path):
 @windows_only
 def test_the_uninstaller_names_the_manual_steps_without_any_python(tmp_path):
     # the Python that created .venv is gone and the py launcher is not on PATH
-    environment_of(tmp_path, tmp_path / 'gone')
-    result = run_uninstaller(tmp_path, path=os.path.join(os.environ['SystemRoot'], 'System32'))
+    folder = tmp_path / 'Fo!to (old) & co'
+    folder.mkdir()
+    environment_of(folder, tmp_path / 'gone')
+    result = run_uninstaller(folder, path=os.path.join(os.environ['SystemRoot'], 'System32'))
     assert 'STAND-IN' not in result.stdout and result.returncode == 1
     assert 'No Python 3.12 or newer found' in result.stdout
     assert 'delete the folders .venv' in result.stdout
-    # the misleading message of I4 is gone
+    # the whole folder path, and its "& co" is not run as a command (review)
+    assert f'.tmp in "{folder}"' in result.stdout and result.stderr == ''
+    # the misleading messages of I4 and of its first fix are gone: a Python older than 3.12 or a
+    # missing .venv is no Python that "is gone" (review)
     assert 'Python 3.12 to 3.14 not found' not in result.stdout
+    assert ' is gone' not in result.stdout and 'pyvenv.cfg names no usable Python' in result.stdout
 
 
 def test_the_uninstaller_deletes_the_private_python_only_after_the_script_asked_for_it():
