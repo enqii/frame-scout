@@ -22,9 +22,18 @@ if exist ".python\python.exe" goto private
 rem The line "home = <folder>" of pyvenv.cfg: tokens split at "=" and blanks, the rest of the
 rem line (with its blanks) is the folder. A for variable is not parsed again, so a ")" or "&"
 rem in it does no harm; %BASE_PYTHON% is used outside of blocks only.
+rem venv writes the file as UTF-8, but for /f reads it in the console's code page (e.g. 850),
+rem which garbles a home with a non-ASCII user name (review): the console is switched to UTF-8
+rem for the read only and then back. OLD_CP is the number of "Active code page: 850." (in
+rem the language of Windows); without a number nothing is switched.
 set "BASE_PYTHON="
 if not exist ".venv\pyvenv.cfg" goto launcher
+set "OLD_CP="
+for /f "tokens=2 delims=:." %%C in ('chcp') do set "OLD_CP=%%C"
+if defined OLD_CP for /f "delims=0123456789 " %%D in ("%OLD_CP%") do set "OLD_CP="
+if defined OLD_CP chcp 65001 >nul
 for /f "usebackq tokens=1,* delims== " %%A in (".venv\pyvenv.cfg") do if /i "%%A"=="home" set "BASE_PYTHON=%%B\python.exe"
+if defined OLD_CP chcp %OLD_CP% >nul
 if not defined BASE_PYTHON goto launcher
 "%BASE_PYTHON%" -I -c "import sys; sys.exit(sys.version_info < (3, 12))" >nul 2>&1
 if errorlevel 1 goto launcher
