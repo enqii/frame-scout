@@ -307,7 +307,22 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       its `ImportError` before `framescout_check.py` can print a check line, so the user sees a
       traceback with the message instead of a check line. Running `Install-FrameScout.bat` fixes
       it and the message names the fix, so this is cosmetic. Fix idea: catch the `ImportError`
-      in `framescout_check.py` and print it as a failed check. Found in PR #78 (I16).
+      in `framescout_check.py` and print it as a failed check. Found in PR #78 (I16). (The
+      uninstall had the same problem; the review of PR #78 fixed it there: the guard lets
+      `framescout_uninstall.py` load.)
+- [ ] `minor` **I35 – Entry points stop next to the update leftover until Install or Start ran:**
+      after a ZIP of a version with the package was extracted over a folder of a version
+      before I15, the I16 guard also stops the newer `framescout_engine.py` (CLI),
+      `framescout_eval.py` and `install_torch.py` run directly, until `Install-FrameScout.bat`
+      or `Start-FrameScout.bat` deleted `framescout_core.py`; before I16 they ran, because the
+      package wins. Only going back to an older version needs the stop, but the engine and
+      `install_torch.py` existed before I15 too, and the (newer) evaluation tool imports
+      `framescout_scoring`, which may then be the older version's, so the guard cannot tell
+      them apart by name as it does for the uninstall. The message
+      names the fix (delete `framescout_core.py`). Fix idea: a marker that only newer entry
+      points set in `__main__` before importing `framescout_core` and that
+      `layout.refuse_mixed_versions` accepts, checked with Streamlit's `__main__` for `app.py`.
+      Found in the review of PR #78 (I16).
 - [ ] `decision` **I9 – CI action pins are updated by hand only:** `.github/workflows/tests.yml`
       pins `actions/checkout` and `actions/setup-python` to commit SHAs (with a version
       comment). That avoids moved tags, but security and runtime updates

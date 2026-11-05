@@ -22,7 +22,8 @@ delete `.python` and run it once more.
 When you update from a ZIP, extract it into a fresh folder instead of over an old one,
 so no files of earlier versions stay behind. If you extracted over an old folder anyway,
 `Install-FrameScout.bat` and `Start-FrameScout.bat` delete the leftover `framescout_core.py`
-of the older version. If you went back to an older version this way, FrameScout stops with an
+of the older version (if another program holds it open, they stop and ask you to close it).
+`Uninstall-FrameScout.bat` works in such a folder too. If you went back to an older version this way, FrameScout stops with an
 error that names the file and the folder `framescout_core` to delete.
 
 ### Checking the installation

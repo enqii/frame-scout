@@ -115,7 +115,7 @@ so callers write `import framescout_core` or `from framescout_core import <name>
 logic here when both sides need it or it should be unit-tested without models; add it to
 the module of its area and to the re-exports in `__init__.py`.
 
-- `layout.py` (I16): `OBSOLETE_CORE_FILE` (`framescout_core.py`, the single file of FrameScout before I15) and `mixed_versions_message(folder)` (the error text if that file lies next to the package, else `None`). `__init__.py` calls it **before any other import** and raises an `ImportError` with that text, so every entry point (app, engine, evaluation tool, check, uninstall) stops in a folder with files of two versions: Python would import the package either way, and after going back to an older version the older `app.py` would run silently against the newer core (another `ENGINE` and cache signature). The message names both fixes (updated: delete `framescout_core.py`; went back: delete the folder `framescout_core`; best: extract a ZIP into a new, empty folder).
+- `layout.py` (I16): `OBSOLETE_CORE_FILE` (`framescout_core.py`, the single file of FrameScout before I15) and `mixed_versions_message(folder)` (the error text if that file lies next to the package, else `None`). `__init__.py` calls `refuse_mixed_versions(__file__)` **before any other import**, which raises an `ImportError` with that text unless `refused_import(folder, main_file)` lets the running script (`__main__.__file__`) load: so every entry point (app, engine, evaluation tool, check) stops in a folder with files of two versions: Python would import the package either way, and after going back to an older version the older `app.py` would run silently against the newer core (another `ENGINE` and cache signature). The exception are the `PACKAGE_ONLY_SCRIPTS` (`framescout_uninstall.py`) in the same folder: they came after the package and import no other FrameScout module (a test checks that), so they are never an older version's and the uninstall works in such a folder too (review). The newer engine, evaluation tool and `install_torch.py` stop until Install or Start removed the leftover (I35). The message names both fixes (updated: delete `framescout_core.py`; went back: delete the folder `framescout_core`; best: extract a ZIP into a new, empty folder).
 - `names.py`: `EXT` (supported image extensions, including `HEIF_EXT` and `RAW_EXT`,
   E25), `slugify`, `profile_slugs` (unique gallery file names, used by the engine).
 - `photos.py` (E25): `available_decoders` (`Decoders`: whether AVIF, HEIC/HEIF and RAW
@@ -528,8 +528,11 @@ the folder path would be dropped from `cd` and `%CD%`), `goto` instead of parent
 blocks and never the folder path inside parentheses (I21). Right after the argument check it
 deletes `framescout_core.py` if `framescout_core\__init__.py` exists (I16: the leftover of an
 older version after a ZIP update; prints "Deleting framescout_core.py, a leftover of an older
-FrameScout version."; the same lines as in `Start-FrameScout.bat`, kept identical by
-`tests/test_layout.py`; the jump to `:obsolete_done` avoids a block). Then it sets `PIP_CONSTRAINT=constraints.txt` (I18),
+FrameScout version."; a folder of that name is skipped (`if exist "framescout_core.py\*"`),
+since `del` would ask and delete its files; `del /f` also removes a read-only file, and a file
+that stays (open in another program) stops the script with "framescout_core.py could not be
+deleted. ..." and exit code 1; the same lines as in `Start-FrameScout.bat`, kept identical by
+`tests/test_layout.py`; the jumps to `:obsolete_done` avoid a block). Then it sets `PIP_CONSTRAINT=constraints.txt` (I18),
 installs PyTorch with `install_torch.py` (passing the argument on; torch's dependencies
 come in their pinned versions), then `pip install --no-cache-dir -r requirements.txt -c
 constraints.txt` (on a re-run this moves installed packages to the pinned versions and may
@@ -576,11 +579,15 @@ if that fails too, it says to run `Install-FrameScout.bat`. It never writes, dow
 `Uninstall-FrameScout.bat [--dry-run]` (P5 part B, I20 in part C) runs
 `framescout_uninstall.py` with `.python\python.exe` if it exists, otherwise (installations
 of older installers, I4) with the `python.exe` in the `home` of `.venv\pyvenv.cfg` (read with
-`for /f "usebackq tokens=1,* delims== "`; used only if it reports Python 3.12 or newer), otherwise
+`for /f "usebackq tokens=1,* delims== "` with the console switched to code page 65001 for that
+one line and back right after, since venv writes the file as UTF-8 and a `home` with a non-ASCII
+user name was misread in e.g. code page 850 (review; the old code page is taken from `chcp` and
+nothing is switched if it is no number); used only if it reports Python 3.12 or newer), otherwise
 with the first of Python 3.14/3.13/3.12 found through the `py` launcher (none: it prints
-"No Python 3.12 or newer found to run the uninstall: there is no private Python in .python, the
-Python that created .venv is gone, and the py launcher finds none." and the manual steps, which
-name `.venv`, `.python`, `.cache` and `.tmp`), with `-B -E -s` and **not** with `.venv`'s Python, which
+"No Python 3.12 or newer found to run the uninstall: there is no private Python in .python,
+.venv\pyvenv.cfg names no usable Python 3.12 or newer, and the py launcher finds none." and the
+manual steps, which name `.venv`, `.python`, `.cache` and `.tmp` and the quoted folder path),
+with `-B -E -s` and **not** with `.venv`'s Python, which
 cannot delete itself while it runs. It sets no cache or `TMP` variables (`.tmp` is
 deleted) and uses no delayed expansion, which would drop a `!` from the folder path and
 the arguments (review: the `cd` then failed and the script of the current directory
@@ -602,15 +609,18 @@ after failures or when `.python` was skipped. The `.bat` then deletes `python.ex
 `pythonw.exe` and `.python` (`rmdir /s /q`) and reports a leftover with exit code 1,
 otherwise exit code 0. The "FrameScout is running" check still looks at the `.venv`
 programs. "Python itself was installed separately and stays" is printed only when there is
-no `.python`. Not deleted: the program files themselves. Opt-in deletion of user data is
-I19.
+no `.python`. Not deleted: the program files themselves, also not a leftover
+`framescout_core.py` of I16 (after going back to a version before I15, which had no
+uninstaller, it is that version's core); the import guard lets `framescout_uninstall.py` run
+next to it. Opt-in deletion of user data is I19.
 
 ### `Start-FrameScout.bat`
 
 `Start-FrameScout.bat`: launches app via that venv on `127.0.0.1:8501`. Right after the `cd` it
 deletes `framescout_core.py` when `framescout_core\__init__.py` exists (I16, same lines and
-message as in the installer). `Check-FrameScout.bat` stays read-only: in such a folder it shows
-the `ImportError` of the guard (see I34) and then its advice to run the installer.
+message as in the installer, including the skipped folder and the stop when the file stays).
+`Check-FrameScout.bat` stays read-only: in such a folder it shows the `ImportError` of the guard
+(see I34) and then its advice to run the installer.
 
 ### `README.md`
 
@@ -1748,7 +1758,7 @@ never inside a block; the real download, extraction and `venv` creation and the 
 `Fo!to (old)\fs` were run by hand under `.tmp`, as were the repair paths of the review
 (`python.exe` of `.python` deleted, pip removed from `.venv`, a failed `venv`, `Lib\venv`
 removed from `.python`, the folder renamed, the move blocked by an open file for 7 s and
-for 25 s); a full install with PyTorch on the private Python was not), and the files of two versions (I16, `tests/test_layout.py`: the message, the package guard through a subprocess import of a package copy, the `.bat` cleanup lines of Install and Start identical and before any Python run, Start run on a copy in `Fo!to (old) & co`; `Install-FrameScout.bat cpu` was run by hand on a scratch copy and deleted the leftover), and the uninstall script (P5, `test_uninstall.py`, I4: order and version check of the `pyvenv.cfg` fallback, tests on `tmp_path` trees: plan, kept
+for 25 s); a full install with PyTorch on the private Python was not), and the files of two versions (I16, `tests/test_layout.py`: the message, the package guard through a subprocess import of a package copy, the uninstall exception (a stand-in `framescout_uninstall.py` loads, an `app.py` does not; only from the same folder; the real script imports no other FrameScout module), the `.bat` cleanup lines of Install and Start identical (with their messages) and before any Python run, the uninstaller without them, Start run on a copy in `Fo!to (old) & co`, with a folder named `framescout_core.py` (kept with its file), a read-only leftover (deleted) and a leftover held open (stop, exit code 1); `Install-FrameScout.bat cpu` was run by hand on a scratch copy and deleted the leftover), and the uninstall script (P5, `test_uninstall.py`, I4: order and version check of the `pyvenv.cfg` fallback, tests on `tmp_path` trees: plan, kept
 entries (also in another case, Windows only), protected folders from settings (invalid
 values, read once, photo folder around the project), links and junctions, read-only
 files and folders, unlistable items, failures reported once, user-data and outside
@@ -1757,7 +1767,8 @@ listings, the run lock, read-only vs. running `python.exe` (Windows only), the d
 hand on scratch copies, once with `!` and `)` in the folder path as a dry run, not
 against a real installation, not while Streamlit was running and on a PC without the
 `py` launcher only through a `.bat` run with `PATH` limited to System32 (I4: `pyvenv.cfg` whose `home`
-is a junction `Py thon (x86) & !`, and without any Python); the private Python's deletion (`running_python`, exit code 3, the `.bat`
+is a junction `Py thon (x86) & !`, one named `Jürgen 写真 (x86) & !` read in a console of its own
+with code page 850, which is restored afterwards, and without any Python, in a folder with `&`); the private Python's deletion (`running_python`, exit code 3, the `.bat`
 removing `.python`) was run by hand under `.tmp` with the real private Python, not against a
 full installation; the running check was tried by hand with a running read-only executable);
 still missing: cache
