@@ -82,10 +82,13 @@ def test_the_package_loads_without_the_single_file(tmp_path):
 # --- the .bat files of this version delete the leftover of an update ---
 
 def cleanup_commands(name):
-    commands = batch_commands((ROOT / name).read_text(encoding='utf-8'))
+    """All commands, the index of the first cleanup command and the cleanup lines with echo."""
+    text = (ROOT / name).read_text(encoding='utf-8')
+    commands = batch_commands(text)
     first = next(i for i, line in enumerate(commands) if OBSOLETE_CORE_FILE in line)
-    last = max(i for i, line in enumerate(commands) if OBSOLETE_CORE_FILE in line)
-    return commands, first, commands[first:last + 1]
+    lines = [line.strip() for line in text.splitlines() if line.strip() and not line.strip().startswith('rem ')]
+    start = next(i for i, line in enumerate(lines) if OBSOLETE_CORE_FILE in line)
+    return commands, first, lines[start:lines.index(':obsolete_done', start)]
 
 
 def test_install_and_start_delete_the_single_file_the_same_way():
@@ -95,6 +98,20 @@ def test_install_and_start_delete_the_single_file_the_same_way():
     # only next to the package: the folder of an older version keeps its core
     assert any('framescout_core\\__init__.py' in line for line in start)
     assert sum(line.startswith('del ') for line in start) == 1
+    # a directory of that name is no leftover: del would ask and delete the files in it (review)
+    directory = start.index(f'if exist "{OBSOLETE_CORE_FILE}\\*" goto obsolete_done')
+    assert directory < next(i for i, line in enumerate(start) if line.startswith('del '))
+    # a read-only file is deleted too, and a file that stays stops the .bat (review)
+    deletion = start.index(f'del /f "{OBSOLETE_CORE_FILE}"')
+    assert start[deletion + 1] == f'if not exist "{OBSOLETE_CORE_FILE}" goto obsolete_done'
+    assert start[-2:] == ['pause', 'exit /b 1']
+
+
+def test_the_uninstaller_does_not_delete_the_single_file():
+    # after going back to a version before I15 (which had no uninstaller), this version's
+    # Uninstall-FrameScout.bat stays in the folder, and the single file is that version's core
+    text = (ROOT / 'Uninstall-FrameScout.bat').read_text(encoding='utf-8')
+    assert not any(OBSOLETE_CORE_FILE in line for line in batch_commands(text))
 
 
 def test_the_single_file_is_deleted_before_python_runs():
@@ -139,3 +156,46 @@ def test_start_keeps_the_single_file_without_the_package(tmp_path):
     result = run_start(tmp_path)
     assert (tmp_path / OBSOLETE_CORE_FILE).exists()
     assert OBSOLETE_CORE_FILE not in result.stdout
+
+
+def folder_with_the_package(folder):
+    (folder / 'framescout_core').mkdir(parents=True)
+    (folder / 'framescout_core' / '__init__.py').write_text('', encoding='utf-8')
+    return folder
+
+
+@windows_only
+@pytest.mark.parametrize('content', [None, 'kept.txt'])
+def test_start_keeps_a_folder_named_like_the_single_file(tmp_path, content):
+    # del "framescout_core.py" would ask and then delete the files in such a folder (review)
+    folder = folder_with_the_package(tmp_path)
+    (folder / OBSOLETE_CORE_FILE).mkdir()
+    if content:
+        (folder / OBSOLETE_CORE_FILE / content).write_text('x', encoding='utf-8')
+    result = run_start(folder)
+    assert (folder / OBSOLETE_CORE_FILE).is_dir()
+    assert content is None or (folder / OBSOLETE_CORE_FILE / content).exists()
+    assert 'Deleting' not in result.stdout and 'run Install-FrameScout.bat first' in result.stdout
+
+
+@windows_only
+def test_start_deletes_a_read_only_single_file(tmp_path):
+    import stat
+    folder = folder_with_the_package(tmp_path)
+    (folder / OBSOLETE_CORE_FILE).write_text('', encoding='utf-8')
+    (folder / OBSOLETE_CORE_FILE).chmod(stat.S_IREAD)
+    result = run_start(folder)
+    assert not (folder / OBSOLETE_CORE_FILE).exists(), result.stdout + result.stderr
+    assert 'run Install-FrameScout.bat first' in result.stdout
+
+
+@windows_only
+def test_start_stops_when_the_single_file_cannot_be_deleted(tmp_path):
+    folder = folder_with_the_package(tmp_path)
+    # Python opens files without delete sharing on Windows: like a file open in an editor
+    with open(folder / OBSOLETE_CORE_FILE, 'w', encoding='utf-8'):
+        result = run_start(folder)
+    assert (folder / OBSOLETE_CORE_FILE).exists()
+    assert 'could not be deleted' in result.stdout and result.returncode == 1
+    # it stops before it looks for the environment
+    assert 'run Install-FrameScout.bat first' not in result.stdout
