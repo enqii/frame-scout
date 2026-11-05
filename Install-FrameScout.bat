@@ -20,6 +20,15 @@ if not "%TORCH_VARIANT%"=="" if /i not "%TORCH_VARIANT%"=="cpu" if /i not "%TORC
 rem lower case for install_torch.py
 if /i "%TORCH_VARIANT%"=="cpu" set "TORCH_VARIANT=cpu"
 if /i "%TORCH_VARIANT%"=="cuda" set "TORCH_VARIANT=cuda"
+rem I16: a ZIP of this version extracted over an older folder leaves the older single file
+rem framescout_core.py next to the folder framescout_core, which refuses to load next to it.
+rem This .bat is of the newer version, so the single file is the leftover. Start-FrameScout.bat
+rem has the same lines.
+if not exist "framescout_core.py" goto obsolete_done
+if not exist "framescout_core\__init__.py" goto obsolete_done
+echo Deleting framescout_core.py, a leftover of an older FrameScout version.
+del "framescout_core.py"
+:obsolete_done
 set "PIP_CACHE_DIR=%CD%\.cache\pip"
 set "TORCH_HOME=%CD%\.cache\torch"
 set "HF_HOME=%CD%\.cache\huggingface"
