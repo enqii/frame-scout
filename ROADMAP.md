@@ -30,7 +30,7 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
 - [x] (D) Installer: I4, I16 (done 2026-11-05 in PR #78)
 
 ### P17 – Repository layout (added 2026-11-03)
-- [ ] Scoring module outside the package (I30)
+- [x] Scoring module outside the package (I30) (done 2026-11-05 in PR #79)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
