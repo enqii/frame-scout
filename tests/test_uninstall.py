@@ -43,6 +43,7 @@ def project(tmp_path):
     write(root / 'yolo11n.pt', b'y' * 50)
     write(root / '__pycache__' / 'app.cpython-314.pyc')
     write(root / 'framescout_core' / '__pycache__' / 'names.cpython-314.pyc')
+    write(root / 'framescout_scoring' / '__pycache__' / 'ranking.cpython-314.pyc')
     # the user's data
     write(root / 'photos' / 'IMG_0001.jpg', b'photo')
     write(root / 'references' / 'hero' / 'ref.jpg', b'ref')
@@ -78,7 +79,7 @@ def names(items, root):
 def test_the_plan_lists_the_environment_caches_and_temporary_files(project):
     items, skipped = plan(project)
     assert names(items, project) == ['.cache', '.python', '.tmp', '.venv', '__pycache__',
-                                     'framescout_core/__pycache__', 'yolo11n.pt']
+                                     'framescout_core/__pycache__', 'framescout_scoring/__pycache__', 'yolo11n.pt']
     assert skipped == []
     sizes = {item.path.name: item.size for item in items}
     assert sizes['.venv'] == 100 + len(b'home = C:\\Python') + 1000
@@ -180,7 +181,7 @@ def test_nothing_inside_a_photo_folder_is_deleted(project, folder):
     items, skipped = plan(project)
     assert items == []
     assert sorted(path.name for path, _ in skipped) == sorted(
-        ['.cache', '.python', '.tmp', '.venv', '__pycache__', '__pycache__', 'yolo11n.pt'])
+        ['.cache', '.python', '.tmp', '.venv', '__pycache__', '__pycache__', '__pycache__', 'yolo11n.pt'])
     assert all('inside' in reason for _, reason in skipped)
 
 
