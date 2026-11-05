@@ -6,6 +6,7 @@ and Python always imports the package: after a rollback the older app would sile
 against the newer core. The package refuses to load next to the single file, and the
 .bat files of the newer version delete the leftover single file of an update.
 """
+import ast
 import re
 import shutil
 import subprocess
@@ -14,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import OBSOLETE_CORE_FILE, mixed_versions_message
+from framescout_core import OBSOLETE_CORE_FILE, PACKAGE_ONLY_SCRIPTS, mixed_versions_message, refused_import
 
 ROOT = Path(__file__).resolve().parent.parent
 windows_only = pytest.mark.skipif(sys.platform != 'win32', reason='runs a .bat file')
@@ -77,6 +78,46 @@ def test_the_package_loads_without_the_single_file(tmp_path):
     copy_of_the_package(tmp_path)
     result = import_core(tmp_path)
     assert result.returncode == 0, result.stderr
+
+
+def run_script(folder, name):
+    (folder / name).write_text('import framescout_core\nprint("LOADED")\n', encoding='utf-8')
+    return subprocess.run([sys.executable, '-B', name], cwd=folder, capture_output=True, text=True,
+                          encoding='utf-8', errors='replace')
+
+
+def test_the_uninstall_runs_next_to_the_single_file(tmp_path):
+    # the uninstall came after the package, so it is never the older version's: it must work
+    # in such a folder too, also after going back to a version before I15 (review)
+    folder = tmp_path / 'Fo!to (old) & co'
+    folder.mkdir()
+    copy_of_the_package(folder)
+    (folder / OBSOLETE_CORE_FILE).write_text('', encoding='utf-8')
+    assert 'LOADED' in run_script(folder, 'framescout_uninstall.py').stdout
+    # an app.py may be the older version's
+    result = run_script(folder, 'app.py')
+    assert 'LOADED' not in result.stdout and 'ImportError' in result.stderr
+
+
+def test_only_the_uninstall_of_the_same_folder_may_load_next_to_the_single_file(tmp_path):
+    (tmp_path / OBSOLETE_CORE_FILE).write_text('', encoding='utf-8')
+    assert refused_import(tmp_path, str(tmp_path / 'framescout_uninstall.py')) is None
+    for main_file in (str(tmp_path / 'app.py'), str(tmp_path / 'framescout_engine.py'),
+                      str(tmp_path / 'framescout_check.py'), str(tmp_path / 'other' / 'framescout_uninstall.py'),
+                      None):
+        assert refused_import(tmp_path, main_file) == mixed_versions_message(tmp_path), main_file
+
+
+def test_the_scripts_allowed_next_to_the_single_file_import_no_other_framescout_module():
+    # otherwise the uninstall could load an older version's module next to this core
+    for name in PACKAGE_ONLY_SCRIPTS:
+        tree = ast.parse((ROOT / name).read_text(encoding='utf-8'))
+        modules = {alias.name.split('.')[0] for node in ast.walk(tree) if isinstance(node, ast.Import)
+                   for alias in node.names}
+        modules |= {node.module.split('.')[0] for node in ast.walk(tree)
+                    if isinstance(node, ast.ImportFrom) and node.module and not node.level}
+        assert {module for module in modules if module.startswith('framescout')} == {'framescout_core'}, name
+        assert 'import_module' not in (ROOT / name).read_text(encoding='utf-8'), name
 
 
 # --- the .bat files of this version delete the leftover of an update ---
