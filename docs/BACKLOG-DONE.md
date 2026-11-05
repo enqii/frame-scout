@@ -1273,6 +1273,25 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       <noreply@anthropic.com>`, which conflicted with the attribution the session gives a
       subagent. Found in the PR of I26. (Done 2026-11-03 in PR #68: the literal line is
       gone; the agent uses the trailer its session prescribes. Markdown only.)
+- [x] **I4 – Installer requires the `py` launcher;** without it, the misleading message
+      "Python 3.12 to 3.14 not found." is shown. (Done 2026-11-05 in PR #78: the installer has needed no `py` launcher since P5 part C; what remained was `Uninstall-FrameScout.bat` for installations of older installers (no `.python`). It now runs the script with the `python.exe` in the `home` of `.venv\pyvenv.cfg` if that is Python 3.12 or newer, then falls back to the `py` launcher (3.14/3.13/3.12) as before; the message without any Python is now "No Python 3.12 or newer found to run the uninstall: ...". Tests: `tests/test_uninstall.py` (order, version check, real `.bat` runs with PATH limited to System32). Not runtime-tested against a real old installation. The `py` fallback still tries only 3.14/3.13/3.12, which covers what the older installers used.)
+- [x] **I16 – A ZIP update leaves the old `framescout_core.py` behind:** since I15 the
+      shared code is the package `framescout_core/`. A user who extracts a new ZIP over an
+      older folder (instead of a fresh folder or `git pull`) keeps the old single file next
+      to the package. Python imports the package, which takes precedence over a module of
+      the same name in the same folder (checked locally), so the new app runs correctly, but
+      the stale file may be edited by mistake. The reverse case is not harmless: extracting
+      an *older* ZIP over a newer folder (a rollback) restores `framescout_core.py` and the
+      old `app.py`/`framescout_engine.py`, but the leftover package still wins, so the old
+      frontend silently runs against the newer core (e.g. another `ENGINE` and cache
+      signature). Bytecode in `__pycache__/` is not a problem: Python ignores a cached
+      `.pyc` whose source is gone. Fix with the update/uninstall story of P5 (e.g. the
+      installer removes known obsolete files, `Start-FrameScout.bat` warns when both
+      `framescout_core.py` and `framescout_core/` exist, or the README says to extract into
+      a fresh folder). Found on 2026-10-26 in I15 (rollback case: PR #25 review).
+      (2026-10-27, P5 part B: the README now advises extracting a ZIP into a fresh folder,
+      and the uninstall script removes `__pycache__`; the stale file itself is still not
+      detected or removed, so this stays open.) (Done 2026-11-05 in PR #78: new `framescout_core/layout.py`; `framescout_core/__init__.py` raises an `ImportError` naming both fixes when `framescout_core.py` lies next to the package, so the rollback case no longer runs silently; `Install-FrameScout.bat` and `Start-FrameScout.bat` delete the leftover when the package exists. Tests: `tests/test_layout.py`. Not runtime-tested: no real ZIP update; `Install-FrameScout.bat cpu` was run on a scratch copy only up to the missing `install_torch.py`. Open: I34.)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 

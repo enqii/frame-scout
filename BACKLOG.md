@@ -302,8 +302,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (kept outside the repo; not in CI).
       Open: tests for cache signature/reuse and scoring; tests of `app.py` itself (e.g.
       Streamlit's `AppTest`, which needs Streamlit in CI); a smoke test with real models.)
-- [ ] `minor` **I4 – Installer requires the `py` launcher;** without it, the misleading message
-      "Python 3.12 to 3.14 not found." is shown.
+- [ ] `minor` **I34 – `Check-FrameScout.bat` shows a Python traceback in a folder with files of two versions:**
+      when both `framescout_core.py` and `framescout_core/` exist, the import guard of I16 raises
+      its `ImportError` before `framescout_check.py` can print a check line, so the user sees a
+      traceback with the message instead of a check line. Running `Install-FrameScout.bat` fixes
+      it and the message names the fix, so this is cosmetic. Fix idea: catch the `ImportError`
+      in `framescout_check.py` and print it as a failed check. Found in PR #78 (I16).
 - [ ] `decision` **I9 – CI action pins are updated by hand only:** `.github/workflows/tests.yml`
       pins `actions/checkout` and `actions/setup-python` to commit SHAs (with a version
       comment). That avoids moved tags, but security and runtime updates
@@ -332,23 +336,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       recognises the RTX 4070 with compute capability 8.9, `cpu` would replace it); all four
       search models and the evaluation tool ran on CUDA with real models. The speed numbers
       feed E18 and P10 (B).)
-- [ ] `minor` **I16 – A ZIP update leaves the old `framescout_core.py` behind:** since I15 the
-      shared code is the package `framescout_core/`. A user who extracts a new ZIP over an
-      older folder (instead of a fresh folder or `git pull`) keeps the old single file next
-      to the package. Python imports the package, which takes precedence over a module of
-      the same name in the same folder (checked locally), so the new app runs correctly, but
-      the stale file may be edited by mistake. The reverse case is not harmless: extracting
-      an *older* ZIP over a newer folder (a rollback) restores `framescout_core.py` and the
-      old `app.py`/`framescout_engine.py`, but the leftover package still wins, so the old
-      frontend silently runs against the newer core (e.g. another `ENGINE` and cache
-      signature). Bytecode in `__pycache__/` is not a problem: Python ignores a cached
-      `.pyc` whose source is gone. Fix with the update/uninstall story of P5 (e.g. the
-      installer removes known obsolete files, `Start-FrameScout.bat` warns when both
-      `framescout_core.py` and `framescout_core/` exist, or the README says to extract into
-      a fresh folder). Found on 2026-10-26 in I15 (rollback case: PR #25 review).
-      (2026-10-27, P5 part B: the README now advises extracting a ZIP into a fresh folder,
-      and the uninstall script removes `__pycache__`; the stale file itself is still not
-      detected or removed, so this stays open.)
 - [ ] `decision` **I19 – The uninstall script never deletes user data:** `Uninstall-FrameScout.bat`
       keeps photos, references, results (with `marks.json`), `profiles.json`,
       `settings.json`, `run.log` and the evaluation labels in `.tmp/eval`, and tells the
