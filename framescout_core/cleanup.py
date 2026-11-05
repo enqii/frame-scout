@@ -786,10 +786,12 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
     results, refs_root = Path(results), Path(refs_root)
     temps = _temp_thumbnails(results)
     found = {'temp_thumbnails': _category('temp_thumbnails', temps, sum(_file_size(p) for p in temps))}
-    profiles = None
+    # read once for galleries, references and the marks of deleted profiles; a failure is
+    # the reason all three are not offered, never read again (review)
+    profiles = _attempt(lambda: _load_profile_file(profiles_file))
     try:
-        # read once for galleries, references and the marks of deleted profiles (review)
-        profiles = _load_profile_file(profiles_file)
+        if isinstance(profiles, ValueError):
+            raise profiles
         orphaned, kept, listed = _gallery_state(results, profiles)
     except ValueError as exc:
         problem = f'Not offered: {exc}.'
@@ -814,9 +816,10 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
                 {photo for _, photo in ([] if isinstance(entries, ValueError) else entries)}, progress)
     found.update(_cache_categories(cache, current_signature, current_model, check))
     found['marks_unbound'] = _unbound_marks(entries, check)
-    found['marks_profiles'] = _profile_marks(entries, _attempt(lambda: profiles if profiles is not None
-                                                               else _load_profile_file(profiles_file)))
+    found['marks_profiles'] = _profile_marks(entries, profiles)
     try:
+        if isinstance(profiles, ValueError):
+            raise profiles
         refs = _unreferenced_references(refs_root, profiles_file, profiles)
     except ValueError as exc:
         found['references'] = _category('references', problem=f'Not offered: {exc}.')
