@@ -139,19 +139,19 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       downloading what is missing) and the first download into an empty cache were covered
       by unit tests only, since a real run downloads at least 605 MB. Verify on the home PC
       (P10 A, next to E34) and fix what shows up. Found in the PR of E16.
-- [ ] `decision` **E41 – A user's own `yolo11n.pt` in the working folder is ignored once a cached copy
+- [ ] `ready` **E41 – A user's own `yolo11n.pt` in the working folder is ignored once a cached copy
       exists:** `yolo_weights` looks in the cache folder first and in the working folder only
       afterwards, so the "used as before" file of the working folder loses against any copy in
       `.cache/ultralytics/`. Decide which one should win (a copy the user put next to the run
-      is arguably more deliberate) and document it. Review of PR #42, finding 7.
-- [ ] `decision` **E42 – The engine sets the cache variables when it is imported:** `default_cache_env`
+      is arguably more deliberate) and document it. Review of PR #42, finding 7. **Decided 2026-11-06 (triage):** the file in the working folder wins (a deliberate copy); one PR with E42 and A36 (ROADMAP P20), kind `code-risky`.
+- [ ] `ready` **E42 – The engine sets the cache variables when it is imported:** `default_cache_env`
       runs at module level in `framescout_engine.py` (so it precedes the torch import), which
       changes `HF_HOME`, `TORCH_HOME` and `XDG_CACHE_HOME` for every importer of the module and
       means models cached in the user profile are no longer found by a manual run (documented
       consequence of E9/I10). Decide whether to move it into `main()` (the heavy imports are
       lazy or must be reordered; `tests/test_engine_defaults.py` pins the module-level call)
       and whether a note or an opt-out is needed for users who keep models elsewhere. Review of
-      PR #42, findings 8 and 9.
+      PR #42, findings 8 and 9. **Decided 2026-11-06 (triage):** a variable the user set wins; move the call out of the import (ROADMAP P20 with E41, A36).
 - [ ] `hardware` **E43 – `yolo_weights` returns a path in `.cache/ultralytics/` without creating the folder
       (not verified):** Ultralytics should create the parent folder when it downloads to that
       path, but this was not run; if it does not, the first download fails. Check on the first
@@ -259,12 +259,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       them, and (user decision) neither category is selected by default any more. Idea:
       record the volume serial number (or mount) per root, which changes the cache or a
       side file (hold point). Found in the PR of E8.
-- [ ] `decision` **A36 – The app overwrites cache variables a user set, the engine keeps them:**
+- [ ] `ready` **A36 – The app overwrites cache variables a user set, the engine keeps them:**
       `cache_env()` in `app.py` assigns all of `cache_paths(BASE)` to the engine's environment,
       while `default_cache_env` keeps a value that is set. A search from the app therefore
       ignores e.g. a `HF_HOME` the user exported, a manual run honours it. Probably intended
       (the app keeps the install self-contained), but undecided and undocumented; decide and
-      document, or use `default_cache_env` in the app too. Review of PR #42, finding 12.
+      document, or use `default_cache_env` in the app too. Review of PR #42, finding 12. **Decided 2026-11-06 (triage):** the app behaves like the CLI, a variable the user set wins (ROADMAP P20 with E41, E42).
 - [ ] `minor` **A44 – "Already analyzed" ignores modification time and size:** the count of F3 and
       the summary before the start (F12) use `analyzed_photos`, which counts cache rows of the
       signature without a `stat`. A photo edited since its analysis counts as analyzed, so the
@@ -449,7 +449,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (`export_csv`), `app.py` (`show_export`), user guide, `tests/test_export.py`.
       **Question:** whether a second format is wanted at all, and which. Found in the review of
       F5 (PR #67). Size S.
-- [ ] `decision` **F10 – Quick search over the analyzed photos, without a profile:** trying a
+- [ ] `ready` **F10 – Quick search over the analyzed photos, without a profile:** trying a
       search text means creating a profile and starting a full run that also analyzes every
       uncached photo. Sketch: a "Quick search" field in "Search & results"; the engine gets an
       option (e.g. `--quick-query "<text>"`) that skips the analysis phase, scores only photos with
@@ -459,8 +459,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (result paths, cleanup must know `results/quick/`), `app.py`, user guide,
       `docs/ARCHITECTURE.md`. Risks: z-scoring over fewer photos makes scores differ from a full
       run (label it); the text model still loads; cleanup of the second results folder. **Question:**
-      the new `results/` folder (UX/product decision); the CLI option is additive. Size M.
-- [ ] `decision` **F11 – "Find similar" from a result card:** no way to ask for "more like this
+      the new `results/` folder (UX/product decision); the CLI option is additive. Size M. **Decided 2026-11-06 (triage):** the new folder `results/quick/` is accepted; ROADMAP P21, kind `code`.
+- [ ] `ready` **F11 – "Find similar" from a result card:** no way to ask for "more like this
       one" short of copying the photo into a profile's references. Sketch: a button per card; the
       engine ranks all cached photos by cosine similarity to that photo's cached embedding (full
       image or the shown crop), no text, no new analysis, result like F10 (size S if F10 exists).
@@ -468,7 +468,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `framescout_engine.py` (`--like <path>`), `framescout_scoring.py` (rank by one vector),
       `app.py`, user guide, `docs/ARCHITECTURE.md`. Risks: a photo with a cache row of another
       signature has no usable vector (say so, never analyze silently); burst shots dominate the
-      top (see F7). **Question:** gallery UX; the CLI option is additive. Size M.
+      top (see F7). **Question:** gallery UX; the CLI option is additive. Size M. **Decided 2026-11-06 (triage):** after F10, ROADMAP P22, kind `code`.
 - [ ] `decision` **F13 – Keep the previous search results:** every search replaces `results.json`
       and the galleries, so a worse result cannot be compared with the earlier ranking. Sketch:
       before `publish_export` replaces them, move the previous `results.json` and galleries to
