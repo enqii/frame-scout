@@ -135,7 +135,7 @@ def test_requirements_pin_the_same_versions(path):
     # requirements.txt is installed after the build from the PyTorch index; the same pins
     # (without a local label) keep pip from replacing that build with another version, and
     # match the +cpu and CUDA builds (constraints.txt applies to both pip calls, I12/I18)
-    lines = (ROOT / path).read_text(encoding='utf-8').splitlines()
+    lines = (ROOT / 'requirements' / path).read_text(encoding='utf-8').splitlines()
     assert f'torch=={TORCH_VERSION}' in lines
     assert f'torchvision=={TORCHVISION_VERSION}' in lines
 
@@ -438,7 +438,9 @@ def test_installed_build_still_checks_space_for_the_other_packages(monkeypatch, 
 
 
 def test_requirement_names_of_requirements_txt():
-    names = install_torch.requirement_names((ROOT / 'requirements.txt').read_text(encoding='utf-8'))
+    # in the folder requirements/ since I31
+    assert install_torch.REQUIREMENTS == ROOT / 'requirements' / 'requirements.txt'
+    names = install_torch.requirement_names(install_torch.REQUIREMENTS.read_text(encoding='utf-8'))
     assert {'torch', 'torchvision', 'streamlit', 'open_clip_torch', 'pillow-heif', 'transformers'} <= set(names)
     assert install_torch.requirement_names('# comment\n\nnumpy>=2 ; python_version>"3"\nfoo[bar]==1\n') == [
         'numpy', 'foo']

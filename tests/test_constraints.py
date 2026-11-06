@@ -1,6 +1,7 @@
 """constraints.txt pins every installed package to the version of the verified runs (I12).
 
-Install-FrameScout.bat runs pip install -r requirements.txt -c constraints.txt: requirements.txt
+Install-FrameScout.bat runs pip install -r requirements.txt -c constraints.txt (both in the
+folder requirements/ since I31): requirements.txt
 names the direct dependencies with ranges, constraints.txt pins them and all their dependencies
 exactly. Standard library only, like the rest of the suite in CI. Whether constraints.txt lists
 every transitive dependency needs the packages' metadata and is checked when the lock is
@@ -13,6 +14,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
+# the requirement files are in requirements/ since I31
+REQUIREMENTS_DIR = ROOT / 'requirements'
 PIN = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)==(\d+(?:\.\d+)*(?:\.post\d+)?)$')
 REQUIREMENT = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)\s*((?:[<>=!]=?\s*[\w.]+\s*,?\s*)*)$')
 SPECIFIER = re.compile(r'^(==|!=|>=|<=|<|>)\s*(\d+(?:\.\d+)*)$')
@@ -42,9 +45,9 @@ def satisfies(version, specifiers):
 
 
 def lines(path):
-    """The non-empty lines of path without comments."""
+    """The non-empty lines of the requirement file path (in requirements/) without comments."""
     result = []
-    for line in (ROOT / path).read_text(encoding='utf-8').splitlines():
+    for line in (REQUIREMENTS_DIR / path).read_text(encoding='utf-8').splitlines():
         line = line.split('#', 1)[0].strip()
         if line:
             result.append(line)
@@ -133,7 +136,8 @@ def test_batch_commands_skip_comments_and_messages():
 
 def test_installer_uses_the_constraints():
     # the pip command itself, not a comment or a message that mentions it (review)
-    assert any('-m pip install' in line and '-r requirements.txt -c constraints.txt' in line
+    assert any('-m pip install' in line
+               and r'-r requirements\requirements.txt -c requirements\constraints.txt' in line
                for line in installer_commands())
 
 
@@ -142,10 +146,23 @@ def test_installer_constrains_the_torch_install_too():
     # installed in their pinned versions right away (I18); relative, because pip splits the
     # value at spaces and the installer folder may contain one
     commands = installer_commands()
-    setting = commands.index('set "PIP_CONSTRAINT=constraints.txt"')
+    setting = commands.index(r'set "PIP_CONSTRAINT=requirements\constraints.txt"')
     torch_install = next(i for i, line in enumerate(commands) if 'install_torch.py' in line)
     venv = next(i for i, line in enumerate(commands) if '-m venv' in line)
     assert venv < setting < torch_install
+
+
+def test_the_requirement_files_the_installer_and_ci_name_exist():
+    # I31 moved them into requirements/: a path the installer or CI still names in the root
+    # would only fail on a real install or in CI's pip step
+    named = [match for line in installer_commands()
+             for match in re.findall(r'(?:-[rc] |PIP_CONSTRAINT=)([\w\\/.-]+\.txt)', line)]
+    workflow = (ROOT / '.github' / 'workflows' / 'tests.yml').read_text(encoding='utf-8')
+    ci = re.findall(r'(?:-r |cache-dependency-path: )([\w\\/.-]+\.txt)', workflow)
+    assert len(named) == 3 and len(ci) == 2
+    for path in named + ci:
+        assert (ROOT / path.replace('\\', '/')).is_file(), path
+        assert path.replace('\\', '/').startswith('requirements/'), path
 
 
 def test_streamlit_floor_allows_the_width_parameter():

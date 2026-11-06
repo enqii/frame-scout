@@ -1,6 +1,6 @@
 """Install PyTorch for FrameScout: the CPU build or a CUDA build for an NVIDIA GPU (A7, I3).
 
-Install-FrameScout.bat runs it with the project venv before requirements.txt:
+Install-FrameScout.bat runs it with the project venv before requirements/requirements.txt:
 
     python install_torch.py [cpu|cuda] [--dry-run]
 
@@ -27,8 +27,8 @@ import tempfile
 from importlib import metadata
 from pathlib import Path
 
-from framescout_core import (CUDA_BUILDS, cuda_build, driver_text, installed_build_matches, installed_cuda_build,
-                             low_space, low_space_lines, parse_gpu_query, requirement_names, torch_index_url,
+from framescout_core import (CUDA_BUILDS, REQUIREMENTS_FILE, cuda_build, driver_text, installed_build_matches,
+                             installed_cuda_build, low_space, low_space_lines, parse_gpu_query, requirement_names, torch_index_url,
                              torch_install_needs,
                              torch_requirements, unsupported_gpus)
 
@@ -37,7 +37,7 @@ PYPI_INDEX = 'https://pypi.org/simple'
 # the user stopped on low disk space: Install-FrameScout.bat says so instead of "failed"
 # (review); not 1 (failure, also an uncaught exception) or 2 (argparse's usage error)
 STOPPED_EXIT_CODE = 3
-REQUIREMENTS = Path(__file__).resolve().parent / 'requirements.txt'
+REQUIREMENTS = Path(__file__).resolve().parent / REQUIREMENTS_FILE
 
 
 def other_packages_missing():

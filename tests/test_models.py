@@ -83,7 +83,7 @@ def test_missing_packages_and_problem():
     problem = model_problem('vit-b-16-siglip', none_installed)
     assert 'transformers' in problem and 'Install-FrameScout.bat' in problem
     # a manual install keeps the pinned versions (I12 review)
-    assert 'pip install -r requirements.txt -c constraints.txt' in problem
+    assert r'pip install -r requirements\requirements.txt -c requirements\constraints.txt' in problem
     assert model_problem('vit-b-16-siglip', all_installed) is None
     assert model_problem(DEFAULT_MODEL, none_installed) is None
 
