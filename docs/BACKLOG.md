@@ -382,24 +382,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       redistribution), codec libraries bundled in wheels such as x265 in `pillow-heif` (GPL)
       and LibRaw in `rawpy` (LGPL/CDDL); who builds and hosts the bundle. Needs a user
       decision. Found on 2026-10-27 in P5 part C.
-- [ ] `ready` **I31 – Repository layout, step 2: group the loose root files (medium risk):** move
-      `requirements*.txt`, `constraints.txt` and `pytest.ini` into `requirements/` (check
-      whether `pytest.ini` may move; if not, it stays in the root), `profiles.example.json` and
-      `framescout_eval_page.html` into `assets/`, and `ROADMAP.md`/`BACKLOG.md` into `docs/`
-      (`SECURITY.md` stays where GitHub finds it). Update `install_torch.py`, the `.bat` files,
-      CI, the test that compares the torch pins, `framescout_core.create_from_example`, the
-      skills and briefs in `.claude/` and every link in the docs and `CLAUDE.md`. `Install-`,
-      `Start-` and `Uninstall-FrameScout.bat` stay in the root (double-click). **Decided
-      2026-11-06 (triage):** the target names above, including `ROADMAP.md`/`BACKLOG.md` into
-      `docs/` (the large variant); kind `code-risky` (installer). Found on 2026-10-30 in a
-      review of the folder structure.
 - [ ] `decision` **I32 – Repository layout, step 3: entry points in a package (breaking):** move `app.py`,
       `framescout_engine.py`, `framescout_eval.py`, `framescout_uninstall.py` and
       `install_torch.py` into a package (e.g. `src/framescout/`, started with
       `python -m framescout.engine`). This changes the documented CLI call
       `python framescout_engine.py`, the Streamlit start command and the `.bat` files, so it is
       a hold point (breaking change, folder rename): decide first whether thin wrappers stay in
-      the root for a transition period. Best done after I30 and I31. Found on 2026-10-30 in a
+      the root for a transition period. Best done after I30 and I31 (both done). Found on 2026-10-30 in a
       review of the folder structure.
 - [ ] `hardware` **I33 – Measure the CUDA install size for the disk space check:** the
       unpacked size of the CUDA build of PyTorch and pip's peak space use are not measured;

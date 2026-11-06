@@ -304,7 +304,7 @@ the module of its area and to the re-exports in `__init__.py`.
 - `disk_space.py` (F3): the free disk space estimate. Sizes are 1024-based, the units
   `size_text` shows (1 GB = 1024³ bytes). `TORCH_INSTALL_SPACE` (download, installed bytes
   per build: `cpu` 0.3 + 1.2 GB, `cuda` 3 + 6 GB; the CPU numbers are measured, the CUDA
-  ones an estimate, I33), `OTHER_PACKAGES_SPACE` (0.2 + 0.4 GB: the `requirements.txt` part
+  ones an estimate, I33), `OTHER_PACKAGES_SPACE` (0.2 + 0.4 GB: the `requirements/requirements.txt` part
   of it, for a rerun with PyTorch installed), `CACHE_BYTES_PER_PHOTO` (10 KB),
   `THUMBNAIL_BYTES` (50 KB), `DETECTOR_DOWNLOAD` (6 MB), `SPACE_RESERVE` (1 GB),
   `SPACE_CHECK_TIMEOUT` (1 s), `LowSpace(folder, needed, free)`, `download_bytes("605 MB")`
@@ -344,17 +344,21 @@ the module of its area and to the re-exports in `__init__.py`.
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
   the installer downloads into `.python`; constants only, checked against the `.bat` by
   `tests/test_installer.py`).
-- `install_check.py` (F15): the read-only installation self-test. `CheckResult(name, ok, text,
+- `install_check.py` (F15): the read-only installation self-test. `REQUIREMENTS_FILE` and
+  `CONSTRAINTS_FILE` (I31: `Path('requirements/requirements.txt')` and
+  `Path('requirements/constraints.txt')`, relative, re-exported; used by `install_torch.REQUIREMENTS`
+  and by `check_installation`, which reads `base / CONSTRAINTS_FILE` and `base / REQUIREMENTS_FILE`).
+  `CheckResult(name, ok, text,
   fix)` (`ok` True, False or None = information); `check_environment(base)` (`.venv/pyvenv.cfg`
   `home` is this folder's `.python` (compared with `os.path.samefile`, so a link, junction or
   8.3 name counts) or an installed Python of an older installer; a problem if
   that Python is missing (moved folder or deleted Python: the installer repairs it) or is the
   `.python` of another folder (copied or moved folder: delete `.venv`, run the installer, which
   keeps a working `.venv`)); `check_packages` (installed metadata of `.venv`'s site-packages via
-  `importlib.metadata.distributions(path=...)`: every package of `requirements.txt` installed,
-  every installed package that `constraints.txt` pins in the pinned version, torch/torchvision
+  `importlib.metadata.distributions(path=...)`: every package of `requirements/requirements.txt` installed,
+  every installed package that `requirements/constraints.txt` pins in the pinned version, torch/torchvision
   with any build label; a pin of a package that is not installed is no problem unless
-  `requirements.txt` names it without an environment marker, which the standard library cannot
+  `requirements/requirements.txt` names it without an environment marker, which the standard library cannot
   evaluate); `check_torch` (imports torch in a subprocess of `.venv`'s Python
   with `-B`, `TORCH_CHECK_TIMEOUT` 180 s, the engine's cache variables and the FrameScout folder
   as working folder, so its `sys.path` is the engine's; no `-I`, since a `PYTHONPATH` that breaks
@@ -443,24 +447,30 @@ older version next to it is never imported (the package wins, `tests/test_layout
 `best_scores`, `spread`/`MIN_SCORES`/`MIN_SPREAD`, `rank_photos`/`Match` (per-profile
 z-scores and their combination, E5) and `score_caption` (the numbers on a gallery card).
 
-### `framescout_eval.py` and `framescout_eval_page.html`
+### `framescout_eval.py` and `assets/framescout_eval_page.html`
 
 Development tool (E32/E20, not part of the app, not on the install path): numpy,
 `framescout_scoring` and `framescout_core`, no torch; `run` starts the engine as a
 subprocess. See "Model evaluation tool" below.
 
-### `tests/`, `pytest.ini`, `requirements-dev.txt`
+### `tests/`, `pytest.ini`, `requirements/requirements-dev.txt`
 
-`tests/`, `pytest.ini`, `requirements-dev.txt`: pytest suite for `framescout_core/`,
+`tests/`, `pytest.ini`, `requirements/requirements-dev.txt`: pytest suite for `framescout_core/`,
 `framescout_scoring` and `install_torch.py` (no torch, no model download); dev
 dependencies `pytest` and `numpy` (for `framescout_scoring`, user decision in PR #11).
+`pytest.ini` stays in the root (I31): pytest finds its configuration only in the folder of the call
+or above it, and a copy under `requirements/` would need `-c` on every call and move the rootdir.
+`test_doc_links.py` checks that every relative Markdown link in the repository's documents resolves;
+`test_example_profiles.py` that the app creates `profiles.json` from `assets/profiles.example.json`;
+`test_eval_tool.py` that the labelling page is shipped in `assets/`; `test_constraints.py` that the
+requirement files named by the installer and CI exist.
 `test_models.py` (E22) tests the registry, and its checks of every model's open_clip
 config (weights known, image size, QuickGELU of the weights, E1; Hugging Face tokenizer)
 read open_clip's config tables only where open_clip is installed and are skipped in CI.
 
-### `profiles.example.json` and `profiles.json`
+### `assets/profiles.example.json` and `profiles.json`
 
-`profiles.example.json`: shipped, general-purpose English example profiles (I5).
+`assets/profiles.example.json`: shipped, general-purpose English example profiles (I5).
 `profiles.json`: the user's working profile list, **gitignored**; `app.py` creates it from
 the example on the first start with `framescout_core.create_from_example`, which never
 replaces an existing file. Every app save keeps the previous file as `profiles.json.bak`
@@ -469,30 +479,30 @@ saved over (A2). Back it up before overwriting user changes. A save is refused i
 file changed since the page showed it (A13); the lock file `profiles.json.lock` is
 gitignored and in `NEVER_DELETED`. More generations: A30.
 
-### `requirements.txt`
+### `requirements/requirements.txt`
 
-`requirements.txt`: `torch==2.14.1` and `torchvision==0.29.1` pinned (same values as
+`requirements/requirements.txt`: `torch==2.14.1` and `torchvision==0.29.1` pinned (same values as
 `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, checked by a test; change them
 together); Streamlit `>=1.66.1` (A10; the version of the verified runs, like the other packages;
 `app.py` needs at least 1.48 for `width='stretch'` on buttons); `transformers>=5.21.0` (the SigLIP tokenizer, E22;
 torch and huggingface-hub unchanged, `pip check` clean); numpy, Pillow, open_clip_torch, ultralytics and
 psutil with the versions of the verified runs as minimum, no upper bounds (user decision);
-the installer pins the versions of the verified runs with `constraints.txt` (I12). `pillow-heif` and `rawpy` (E25, required by user decision;
+the installer pins the versions of the verified runs with `requirements/constraints.txt` (I12). `pillow-heif` and `rawpy` (E25, required by user decision;
 optional extras: E29) have the versions of the venv's smoke runs (PR #26) as minimum.
 
-### `constraints.txt`
+### `requirements/constraints.txt`
 
-`constraints.txt` (I12): exact pins (`name==version`) of all 84 packages in the dependency
-closure of `requirements.txt`, direct and transitive, taken from the project venv (Python
+`requirements/constraints.txt` (I12): exact pins (`name==version`) of all 84 packages in the dependency
+closure of `requirements/requirements.txt`, direct and transitive, taken from the project venv (Python
 3.14, Windows); no hashes. torch and torchvision are pinned without a local label
 (`torch==2.14.1`), so the `+cpu`, `+cu126` and `+cu130` builds all satisfy the pin. It is a
 pip constraints file: it limits versions but installs nothing by itself, and
-`requirements.txt` keeps its ranges (no upper bounds, I3). Only `Install-FrameScout.bat`
-uses it: it sets `PIP_CONSTRAINT=constraints.txt` (after creating the venv, so `ensurepip`
+`requirements/requirements.txt` keeps its ranges (no upper bounds, I3). Only `Install-FrameScout.bat`
+uses it: it sets `PIP_CONSTRAINT=requirements\constraints.txt` (after creating the venv, so `ensurepip`
 is not affected) for the pip call of `install_torch.py` (I18) and passes `-c
-constraints.txt` to the requirements install. The value is relative because pip splits
+requirements\constraints.txt` to the requirements install. The value is relative because pip splits
 `PIP_CONSTRAINT` at whitespace and the install folder may contain a space; both pip calls
-run in the install folder. A plain `pip install -r requirements.txt` or a manual
+run in the install folder. A plain `pip install -r requirements/requirements.txt` or a manual
 `install_torch.py` takes the newest releases. The file is sorted by package name.
 Evidence: the pins are the venv of the verified runs (a CPU engine run on Python 3.14);
 3.12 and 3.13 are only checked by the dry-run below; the CUDA wheels only by their
@@ -500,7 +510,7 @@ metadata (their Windows Requires-Dist is the same as that of the `+cpu` wheels a
 every pin; PR #33 review). Refreshing is manual, in a PR of its own: update and test the
 venv, write the closure into the file, then check with `pip install --dry-run
 --ignore-installed --report r.json --python-version 3.12|3.13|3.14 --platform win_amd64
---only-binary=:all: -r requirements.txt -c constraints.txt` that every resolved package is
+--only-binary=:all: -r requirements\requirements.txt -c requirements\constraints.txt` that every resolved package is
 pinned and has a wheel, and compare the Requires-Dist lines of the CUDA wheels' metadata
 on the PyTorch index (`<wheel>.metadata`, PEP 658) with the pins; a pip dry-run against
 that index downloads the wheels (pip 25.2 downloads them even with `--dry-run`). The
@@ -541,17 +551,17 @@ FrameScout version."; a folder of that name is skipped (`if exist "framescout_co
 since `del` would ask and delete its files; `del /f` also removes a read-only file, and a file
 that stays (open in another program) stops the script with "framescout_core.py could not be
 deleted. ..." and exit code 1; the same lines as in `Start-FrameScout.bat`, kept identical by
-`tests/test_layout.py`; the jumps to `:obsolete_done` avoid a block). Then it sets `PIP_CONSTRAINT=constraints.txt` (I18),
+`tests/test_layout.py`; the jumps to `:obsolete_done` avoid a block). Then it sets `PIP_CONSTRAINT=requirements\constraints.txt` (I18),
 installs PyTorch with `install_torch.py` (passing the argument on; torch's dependencies
-come in their pinned versions), then `pip install --no-cache-dir -r requirements.txt -c
-constraints.txt` (on a re-run this moves installed packages to the pinned versions and may
+come in their pinned versions), then `pip install --no-cache-dir -r requirements\requirements.txt -c
+requirements\constraints.txt` (on a re-run this moves installed packages to the pinned versions and may
 downgrade newer ones; an installed CUDA build is kept), performs imports and prints the
 PyTorch build and whether CUDA is available.
 
 ### `install_torch.py`
 
 `install_torch.py [cpu|cuda] [--dry-run]`: installs the pinned PyTorch from the PyTorch
-index (dependencies also from PyPI; in the versions of `constraints.txt` when run by
+index (dependencies also from PyPI; in the versions of `requirements/constraints.txt` when run by
 `Install-FrameScout.bat`, which sets `PIP_CONSTRAINT`) – the CPU build or the CUDA build that
 `framescout_core.cuda_build` picks from `nvidia-smi` (`cu130`, otherwise `cu126`; a build
 for every GPU, else for the most capable one). Without an argument an installed CUDA build
@@ -562,7 +572,7 @@ matching installed build is not downloaded again. Before the pip call (F3) it ch
 free space of the drives of `sys.prefix` (the venv) and `tempfile.gettempdir()` (`.tmp`
 under `Install-FrameScout.bat`) with `framescout_core.torch_install_needs`/`low_space`;
 with the build installed already it still checks the space of the other packages
-(`torch=False`, `OTHER_PACKAGES_SPACE`) unless every name of `requirements.txt`
+(`torch=False`, `OTHER_PACKAGES_SPACE`) unless every name of `requirements/requirements.txt`
 (`requirement_names`) is installed, since the `.bat` installs them next (review). On low
 space it prints the drives and asks `Install anyway? [Y/N]` (no console: continues;
 `--dry-run` only warns). N prints "PyTorch was not installed." (or "The other packages were
@@ -639,14 +649,14 @@ installation, quick start, reliability of the matches, license. Details live in
 uninstalling) and `docs/DEVELOPMENT.md` (manual commands, CLI, tests, evaluation tool,
 project structure).
 
-### `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`, `docs/ROADMAP-DONE.md`
+### `docs/ROADMAP.md`, `docs/BACKLOG.md`, `docs/BACKLOG-DONE.md`, `docs/ROADMAP-DONE.md`
 
-`ROADMAP.md`: the prioritized roadmap that drives the PR workflow (open items first, the
+`docs/ROADMAP.md`: the prioritized roadmap that drives the PR workflow (open items first, the
 next item is the first `- [ ]` line; checked-off lines stay in their package until every
 line of it is done).
 `docs/ROADMAP-DONE.md`: the packages whose lines are all done; `/triage` moves them there
 unchanged.
-`BACKLOG.md`: open items (IDs E/A/I/F, each with a status tag once triaged).
+`docs/BACKLOG.md`: open items (IDs E/A/I/F, each with a status tag once triaged).
 `docs/BACKLOG-DONE.md`: finished items with their
 reports; an item moves there unchanged when its PR is merged (I22).
 `docs/IDEAS.md` (raw ideas) feeds the backlog and the roadmap only through the `/triage`
@@ -670,7 +680,7 @@ permission rules for the workflow.
 
 `.github/workflows/tests.yml`: CI – runs `pytest` (plus a `compileall` syntax check of all
 Python files outside dot-directories) on `windows-latest` for Python 3.12/3.13/3.14 on
-every pull request and push to `main`. It installs only `requirements-dev.txt` and fails
+every pull request and push to `main`. It installs only `requirements/requirements-dev.txt` and fails
 if torch is installed, so tests must not need torch or model downloads. Green CI is
 unit-test and syntax evidence only, not a model run.
 
@@ -1265,7 +1275,7 @@ page only, so ranks and pages stay stable (A24; a page of only rejects says so).
 selected option is colored by state (green match, red no match) by one `<style>` block per
 page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]`
 with `!important`; this relies on Streamlit internals (the key class and the button kind,
-read from the 1.66.1 frontend bundle), so `test_marks.py` fails once `constraints.txt` pins
+read from the 1.66.1 frontend bundle), so `test_marks.py` fails once `requirements/constraints.txt` pins
 another Streamlit than `MARK_STYLE_STREAMLIT`: check the selectors against the new version,
 then raise that constant (not verified in a real browser or the dark theme). A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The result is **not verified in a browser** (light/dark theme, mark colors, gap; follow-up A45). A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
@@ -1747,11 +1757,11 @@ skipped without torch and Pillow; no first download, no fallback with real files
 and the pool; `test_eval_tool.py` for the tool's commands, metrics and labelling server
 with fake scores; the engine's `--scores-file` only from its syntax tree in
 `test_engine_defaults.py`; no real-model run, no browser test), and the pinned
-dependencies (I12, `test_constraints.py`: every line of `constraints.txt` is an exact pin
+dependencies (I12, `test_constraints.py`: every line of `requirements/constraints.txt` is an exact pin
 without local label, hash or duplicate, sorted by name; every requirement of
-`requirements.txt` and the pinned numpy of `requirements-dev.txt` has an allowed pin; a
-non-comment pip line of the installer passes `-r requirements.txt -c constraints.txt`, and
-it sets `PIP_CONSTRAINT=constraints.txt` between the venv and `install_torch.py` (I18);
+`requirements/requirements.txt` and the pinned numpy of `requirements/requirements-dev.txt` has an allowed pin; a
+non-comment pip line of the installer passes `-r requirements\requirements.txt -c requirements\constraints.txt`, and
+it sets `PIP_CONSTRAINT=requirements\constraints.txt` between the venv and `install_torch.py` (I18);
 the Streamlit floor is at least 1.48 and `app.py` no longer uses `use_container_width`,
 A10);
 the torch pins of both files equal `TORCH_VERSION`/`TORCHVISION_VERSION` in
@@ -1794,7 +1804,7 @@ and rawpy, which CI does not install). Add a small integration smoke test for re
   the device on purpose, so a cache built on one device is reused as is on the other. Not a bug.
 
 Potential current quirks to investigate rather than assume solved (most are tracked in
-`BACKLOG.md`): "Clean up storage" was checked with `AppTest` only (not in a browser), and
+`docs/BACKLOG.md`): "Clean up storage" was checked with `AppTest` only (not in a browser), and
 `auto_cleanup` in one CPU smoke run with synthetic photos under `.tmp/`; marks follow the
 absolute photo path, a renamed or moved photo counts as new (A21 closed as won't do, E8); the app saves its whole profile list, so a save based on a
 file that another session changed in between is refused and has to be made again (A13);

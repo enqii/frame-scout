@@ -20,7 +20,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
 ### P18 – Repository layout, step 2 (added 2026-11-06)
-- [ ] Group the loose root files into `requirements/`, `assets/` and `docs/`, update every
+- [x] Group the loose root files into `requirements/`, `assets/` and `docs/`, update every
       path in installer, CI, tests, skills and docs (I31; kind `code-risky`)
 
 ### P19 – Hygiene (`minor` items bundled per area, added 2026-11-06)
