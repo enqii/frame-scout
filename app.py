@@ -42,7 +42,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
 SETTINGS = BASE / SETTINGS_FILE  # the user's settings (A8), not in the repository
-EXAMPLE_PROFILES = BASE / 'profiles.example.json'
+EXAMPLE_PROFILES = BASE / 'assets' / 'profiles.example.json'
 REFS = BASE / 'references'
 RESULTS = BASE / 'results'
 LOG = BASE / 'run.log'

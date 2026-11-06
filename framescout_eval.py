@@ -48,7 +48,7 @@ from framescout_scoring import rank_photos
 
 ROOT = Path(__file__).resolve().parent
 ENGINE = ROOT / 'framescout_engine.py'
-PAGE = ROOT / 'framescout_eval_page.html'
+PAGE = ROOT / 'assets' / 'framescout_eval_page.html'
 DEFAULT_DIR = ROOT / '.tmp' / 'eval'
 COLLECTION_FORMAT = 1
 POOL_FORMAT = 1

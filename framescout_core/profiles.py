@@ -11,7 +11,7 @@ def create_from_example(target, example):
     """Create target as a copy of example if target does not exist; return True if created.
 
     Used for profiles.json, the user's working file, which is not in the repository:
-    the app creates it from the shipped profiles.example.json on the first start. An
+    the app creates it from the shipped assets/profiles.example.json on the first start. An
     existing file (even an empty one) is never replaced, and nothing is created if the
     example is missing. The copy is written to a temporary file next to target first and
     only then published under the final name, so a crash or a parallel session never

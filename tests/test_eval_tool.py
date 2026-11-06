@@ -69,6 +69,12 @@ def test_the_default_folder_is_ignored_by_git():
     assert ev.DEFAULT_DIR == Path(ev.__file__).resolve().parent / '.tmp' / 'eval'
 
 
+def test_the_labelling_page_is_shipped_in_assets():
+    # moved out of the root folder in I31
+    assert ev.PAGE == Path(ev.__file__).resolve().parent / 'assets' / 'framescout_eval_page.html'
+    assert ev.PAGE.is_file()
+
+
 def test_the_scores_are_read_in_registry_order(collection):
     for model in reversed(MODEL_KEYS[:2]):
         write_model_scores(collection, model, [0.1] * 5)
