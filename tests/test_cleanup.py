@@ -551,10 +551,64 @@ def test_photos_of_a_drive_that_is_not_mounted_are_not_checked(project, monkeypa
     [note] = category['notes']
     assert note.startswith(str(drive) + ' ') and 'not mounted' in note and '7 photos' in note
     # the mount points udisks makes (/media/<user>/<label>) disappear on unmount: the
-    # empty folder above them counts too
+    # missing mount point counts too
     drive.rmdir()
     [note] = project.scan()['cache_missing']['notes']
-    assert note.startswith(str(media / 'user') + ' ') and '7 photos' in note
+    assert note.startswith(str(drive) + ' does not exist') and 'not mounted' in note and '7 photos' in note
+
+
+@pytest.mark.parametrize('parent', ['user-folder', 'mount-root'])
+def test_photos_of_a_drive_whose_mount_point_went_away_are_not_checked_next_to_another_drive(
+        project, monkeypatch, parent):
+    # E54 review: /media/<user>/A (udisks) or /Volumes/A (macOS) goes away on unmount while
+    # /media/<user>/B or /Volumes/Macintosh HD stays, so the folder above is not empty
+    media = project.base / 'media'
+    above = media / 'user' if parent == 'user-folder' else media
+    (above / 'B').mkdir(parents=True)
+    (above / 'B' / 'photo.jpg').write_bytes(b'photo')
+    gone_drive = above / 'A'
+    project.cache([(gone_drive / 'trip' / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
+    posix_mounts(monkeypatch, roots=[media])
+    category = project.scan()['cache_missing']
+    assert category['items'] == []
+    [note] = category['notes']
+    assert note.startswith(str(gone_drive) + ' does not exist') and '6 photos' in note
+
+
+def test_a_folder_deleted_on_a_mounted_drive_is_gone(project, monkeypatch):
+    # E54 review: /media/<user>/B is mounted; a folder deleted on it is no mount point
+    from framescout_core import cleanup
+    media = project.base / 'media'
+    drive = media / 'user' / 'B'
+    drive.mkdir(parents=True)
+    (drive / 'photo.jpg').write_bytes(b'photo')
+    project.cache([(drive / 'deleted' / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
+    posix_mounts(monkeypatch, roots=[media])
+    monkeypatch.setattr(cleanup, '_mounted', lambda path: os.path.normcase(str(path)) == os.path.normcase(str(drive)))
+    category = project.scan()['cache_missing']
+    assert category['notes'] == [] and len(category['items']) == 6
+    # deeper below a mount root, a missing folder is no mount point either (sub is neither a
+    # mount root nor right inside one)
+    deep = drive / 'sub'
+    deep.mkdir()
+    (deep / 'photo.jpg').write_bytes(b'photo')
+    monkeypatch.setattr(cleanup, '_mounted', lambda path: False)
+    project.cache([(deep / 'deleted' / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
+    category = project.scan()['cache_missing']
+    assert category['notes'] == [] and len(category['items']) == 12
+
+
+def test_a_missing_mount_point_of_the_fstab_counts_wherever_it_is(project, monkeypatch):
+    home = project.base / 'home'
+    home.mkdir()
+    (home / 'other.txt').write_bytes(b'x')
+    nas = home / 'nas'
+    project.cache([(nas / f'IMG_{n}.jpg', CURRENT) for n in range(3)])
+    fstab = project.base / 'fstab'
+    fstab.write_text(f'//server/photos {nas} cifs noauto 0 0\n', encoding='utf-8')
+    posix_mounts(monkeypatch, fstab=fstab)
+    [note] = project.scan()['cache_missing']['notes']
+    assert note.startswith(str(nas) + ' does not exist') and '3 photos' in note
 
 
 def test_an_empty_mount_point_of_the_fstab_counts_wherever_it_is(project, monkeypatch):
