@@ -529,6 +529,76 @@ def test_photos_behind_a_junction_to_a_missing_volume_are_not_checked(project):
     assert len(category['notes']) == 1 and str(link) in category['notes'][0] and '9 photos' in category['notes'][0]
 
 
+def posix_mounts(monkeypatch, roots=(), fstab=''):
+    """Look at empty mount points as on Linux/macOS, with roots as the usual mount folders and an fstab text."""
+    from framescout_core import cleanup
+    monkeypatch.setattr(cleanup, '_EMPTY_MOUNT_POINTS', True)
+    monkeypatch.setattr(cleanup, '_MOUNT_ROOTS', tuple(str(root) for root in roots))
+    monkeypatch.setattr(cleanup, '_FSTAB', str(fstab) if fstab else os.devnull)
+
+
+@pytest.mark.parametrize('layout', ['photos-in-the-mount-point', 'photos-in-subfolders'])
+def test_photos_of_a_drive_that_is_not_mounted_are_not_checked(project, monkeypatch, layout):
+    # E54: on Linux/macOS a mount point stays as an empty folder when its drive is unmounted
+    media = project.base / 'media'
+    drive = media / 'user' / 'DRIVE'
+    folder = drive if layout == 'photos-in-the-mount-point' else drive / 'trip'
+    project.cache([(folder / f'IMG_{n}.jpg', CURRENT) for n in range(6)] + [(drive / 'a' / 'b.jpg', CURRENT)])
+    drive.mkdir(parents=True)  # unmounted: only the empty mount point is left
+    posix_mounts(monkeypatch, roots=[media])
+    category = project.scan()['cache_missing']
+    assert category['items'] == []
+    [note] = category['notes']
+    assert note.startswith(str(drive) + ' ') and 'not mounted' in note and '7 photos' in note
+    # the mount points udisks makes (/media/<user>/<label>) disappear on unmount: the
+    # empty folder above them counts too
+    drive.rmdir()
+    [note] = project.scan()['cache_missing']['notes']
+    assert note.startswith(str(media / 'user') + ' ') and '7 photos' in note
+
+
+def test_an_empty_mount_point_of_the_fstab_counts_wherever_it_is(project, monkeypatch):
+    # E54: a mount point the system mounts at start (/etc/fstab) can be anywhere
+    nas = project.base / 'home' / 'nas'
+    nas.mkdir(parents=True)
+    project.cache([(nas / f'IMG_{n}.jpg', CURRENT) for n in range(3)])
+    fstab = project.base / 'fstab'
+    fstab.write_text('# comment\nUUID=1 / ext4 defaults 0 1\n//server/photos ' + str(nas).replace(' ', '\\040')
+                     + ' cifs noauto 0 0\n', encoding='utf-8')
+    posix_mounts(monkeypatch, fstab=fstab)
+    [note] = project.scan()['cache_missing']['notes']
+    assert note.startswith(str(nas) + ' ') and '3 photos' in note
+
+
+def test_photos_of_an_emptied_folder_elsewhere_are_gone(project, monkeypatch):
+    # E54: a folder whose photos were deleted is no mount point; outside the usual mount
+    # folders and the fstab its photos are unbound as before
+    media = project.base / 'media'
+    (media / 'DRIVE').mkdir(parents=True)
+    (media / 'DRIVE' / 'photo.jpg').write_bytes(b'photo')
+    emptied = project.photos / 'emptied'
+    emptied.mkdir()
+    project.cache([(emptied / f'IMG_{n}.jpg', CURRENT) for n in range(6)]
+                  + [(media / 'DRIVE' / f'IMG_{n}.jpg', CURRENT) for n in range(2)])
+    posix_mounts(monkeypatch, roots=[media])
+    category = project.scan()['cache_missing']
+    # a mount point that is not empty is mounted: its photos that are missing are gone too
+    assert category['notes'] == [] and len(category['items']) == 8
+
+
+def test_an_empty_mount_point_counts_only_on_linux_and_macos(project, monkeypatch):
+    # E54: on Windows, junctions and mount points are handled by E37
+    from framescout_core import cleanup
+    assert cleanup._EMPTY_MOUNT_POINTS is (os.name != 'nt')
+    media = project.base / 'media'
+    (media / 'DRIVE').mkdir(parents=True)
+    project.cache([(media / 'DRIVE' / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
+    posix_mounts(monkeypatch, roots=[media])
+    monkeypatch.setattr(cleanup, '_EMPTY_MOUNT_POINTS', False)
+    category = project.scan()['cache_missing']
+    assert category['notes'] == [] and len(category['items']) == 6
+
+
 def test_notes_tell_a_folder_that_timed_out_from_a_root_that_is_not_reachable(project, monkeypatch):
     # review: a slow folder on a connected drive is no "disconnected drive or offline share"
     import threading
