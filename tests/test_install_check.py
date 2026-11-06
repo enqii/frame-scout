@@ -9,7 +9,8 @@ import pytest
 
 import framescout_core
 from framescout_core import install_check
-from framescout_core.install_check import (CONSTRAINTS_FILE, REQUIREMENTS_FILE, CheckResult, check_disk_space,
+from framescout_core import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
+from framescout_core.install_check import (CheckResult, check_disk_space,
                                            check_environment, check_installation, check_lines, check_models,
                                            check_packages, check_torch, check_writable, installed_versions,
                                            requirement_names, venv_python, venv_site_packages)
@@ -140,6 +141,8 @@ def test_packages_matching_the_constraints_are_fine(tmp_path):
     # a pin of a package that is not needed here ("not-needed") is no problem
     [result] = check_packages(tmp_path, CONSTRAINTS, REQUIREMENTS)
     assert result.ok is True
+    # the file in its folder, as the user finds it (I31, review)
+    assert result.text.endswith(r'in the versions of requirements\constraints.txt.')
 
 
 def test_plain_torch_version_of_pypi_counts_as_the_pin(tmp_path):
@@ -158,6 +161,7 @@ def test_other_versions_and_missing_packages_are_named(tmp_path):
     assert 'torch 2.13.0+cpu instead of 2.14.1' in result.text
     assert 'pillow' in result.text and 'missing' in result.text
     assert 'Install-FrameScout.bat' in result.fix
+    assert result.fix.endswith(r'It installs the versions of requirements\constraints.txt.')
 
 
 def test_missing_requirement_with_an_environment_marker_is_no_problem(tmp_path):
@@ -176,6 +180,12 @@ def test_missing_requirement_with_an_environment_marker_is_no_problem(tmp_path):
 
 def test_requirement_names_skip_comments_markers_and_extras():
     assert requirement_names('# comment\n\nnumpy>=2 ; python_version>"3"\nfoo[bar]==1\n') == ['numpy', 'foo']
+
+
+def test_messages_name_the_requirement_files_as_windows_shows_them():
+    # on any system, since the messages are for Windows users (review)
+    assert windows_path(CONSTRAINTS_FILE) == r'requirements\constraints.txt'
+    assert windows_path(REQUIREMENTS_FILE) == r'requirements\requirements.txt'
 
 
 def test_the_real_constraints_and_requirements_can_be_read(tmp_path):

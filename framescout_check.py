@@ -4,7 +4,7 @@
 
 Read-only: it writes, downloads and repairs nothing (a temporary file shows whether .cache
 and results can be written and is deleted right away). It checks that the Python
-environment (.venv) belongs to this folder, the package versions equal constraints.txt,
+environment (.venv) belongs to this folder, the package versions equal requirements/constraints.txt,
 PyTorch imports (in a subprocess) and finds the GPU for a CUDA build, .cache and results can
 be written, which model files are downloaded and the free disk space, and names one fix per
 problem. Standard library only, so it also runs with the private Python (.python) when .venv
