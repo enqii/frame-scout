@@ -19,7 +19,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
-                             DEVICES, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RUN_LOCK,
+                             DEVICES, EXAMPLE_PROFILES_FILE, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, cache_error, cache_error_message,
                              cache_read_warning, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
@@ -129,7 +129,7 @@ def main():
     parser = Parser(description='FrameScout: local image search by name, reference images and optional features.')
     parser.add_argument('folder', type=Path, nargs='+',
                         help='one or more photo folders (subfolders are searched recursively)')
-    parser.add_argument('--profiles', type=Path, help='JSON file with search profiles, texts in English (see assets/profiles.example.json)')
+    parser.add_argument('--profiles', type=Path, help=f'JSON file with search profiles, texts in English (see {EXAMPLE_PROFILES_FILE.as_posix()})')
     parser.add_argument('--character', action='append', default=[], metavar='NAME|CONTEXT|FEATURES',
                         help='inline search profile in English, can be repeated; e.g. "Red car|Vehicles|red paint, black roof"')
     parser.add_argument('--output', type=Path, default=Path('results'))

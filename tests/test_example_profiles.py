@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 
 import framescout_core
-from framescout_core import create_from_example, load_profiles
+from framescout_core import EXAMPLE_PROFILES_FILE, create_from_example, load_profiles
 
 REPO = Path(__file__).resolve().parent.parent
-EXAMPLE = REPO / 'assets' / 'profiles.example.json'
+EXAMPLE = REPO / EXAMPLE_PROFILES_FILE
 
 
 def test_missing_profiles_file_is_created_from_the_example(tmp_path):
@@ -117,12 +117,11 @@ def test_the_shipped_example_loads_and_is_general_purpose():
 
 
 def test_the_app_creates_profiles_json_from_the_shipped_example():
-    # app.py imports streamlit, so its path constant is read from the source: the parts of
-    # BASE / '...' / '...' must name the shipped example (in assets/ since I31)
+    # app.py imports streamlit, so its path constant is read from the source; compared as a
+    # syntax tree, so line breaks and spacing do not matter (review)
     tree = ast.parse((REPO / 'app.py').read_text(encoding='utf-8'))
     [value] = [node.value for node in tree.body if isinstance(node, ast.Assign)
                and any(isinstance(t, ast.Name) and t.id == 'EXAMPLE_PROFILES' for t in node.targets)]
-    constants = sorted((node for node in ast.walk(value) if isinstance(node, ast.Constant)),
-                       key=lambda node: node.col_offset)  # in source order
-    parts = [node.value for node in constants]
-    assert REPO.joinpath(*parts) == EXAMPLE and EXAMPLE.is_file()
+    assert ast.dump(value) == ast.dump(ast.parse('BASE / EXAMPLE_PROFILES_FILE', mode='eval').body)
+    # in assets/ since I31
+    assert EXAMPLE == REPO / 'assets' / 'profiles.example.json' and EXAMPLE.is_file()

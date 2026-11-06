@@ -37,8 +37,8 @@ from urllib.parse import unquote, urlsplit
 
 import numpy as np
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EVAL_K, LABELS_FORMAT, MODEL_KEYS,
-                             MODELS, SKIP_LOG_LIMIT, available_decoders, average_precision, build_pool,
+from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EVAL_K, EVAL_PAGE_FILE,
+                             LABELS_FORMAT, MODEL_KEYS, MODELS, SKIP_LOG_LIMIT, available_decoders, average_precision, build_pool,
                              cache_folder_paths, changed_motifs, collection_name_problem, distinct_folders,
                              ensure_thumbnail, eval_run_needs, find_yolo_weights, hub_cache_dir, load_profiles,
                              low_space, low_space_lines, model_problem, motif, read_document, read_label_file,
@@ -48,7 +48,7 @@ from framescout_scoring import rank_photos
 
 ROOT = Path(__file__).resolve().parent
 ENGINE = ROOT / 'framescout_engine.py'
-PAGE = ROOT / 'assets' / 'framescout_eval_page.html'
+PAGE = ROOT / EVAL_PAGE_FILE
 DEFAULT_DIR = ROOT / '.tmp' / 'eval'
 COLLECTION_FORMAT = 1
 POOL_FORMAT = 1

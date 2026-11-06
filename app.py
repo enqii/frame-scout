@@ -19,7 +19,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              SETTING_STEPS, SETTINGS_FILE, RunLock, StatusReporter, cache_paths, check_cache,
                              clean_up, cleanup_running, cleanup_summary_text, marks_restore_offer, restore_marks,
                              cache_check_current, set_cache_aside,
-                             copy_photos, copy_summary_text, copy_target, count_text, create_from_example,
+                             copy_photos, copy_summary_text, copy_target, count_text, create_from_example, EXAMPLE_PROFILES_FILE,
                              EXPORTS_DIR, export_cards, export_result_list, unlisted_paths,
                              DEFAULT_MODEL, MODEL_KEYS, MODELS, model_label, model_problem, results_model,
                              AI_SETTINGS, changed_from_defaults, setting_text,
@@ -27,7 +27,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
                              analyzed_photos, app_search_needs, downloaded_models, low_space, low_space_lines,
                              known_throughput, remaining_text, start_summary, check_installation,
-                             hidden_text, hide_no_match, mark_style,
+                             hidden_text, hide_no_match, mark_style, windows_path,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
                              project_temp_cleanup, read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
@@ -42,7 +42,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
 SETTINGS = BASE / SETTINGS_FILE  # the user's settings (A8), not in the repository
-EXAMPLE_PROFILES = BASE / 'assets' / 'profiles.example.json'
+EXAMPLE_PROFILES = BASE / EXAMPLE_PROFILES_FILE
 REFS = BASE / 'references'
 RESULTS = BASE / 'results'
 LOG = BASE / 'run.log'
@@ -1193,7 +1193,7 @@ clean_project_folder()
 try:
     create_from_example(PROFILES, EXAMPLE_PROFILES)  # first start only; never overwrites
 except OSError as exc:  # e.g. a read-only project folder
-    st.error(f'Could not create profiles.json from profiles.example.json: {exc}. '
+    st.error(f'Could not create profiles.json from {windows_path(EXAMPLE_PROFILES_FILE)}: {exc}. '
              'Check that the project folder is writable.')
     st.stop()
 try:
