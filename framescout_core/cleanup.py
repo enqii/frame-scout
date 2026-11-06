@@ -56,8 +56,9 @@ ROOT_TIMEOUT = 5.0
 # that stops answering during the pass would otherwise stall it until the OS gives up. A
 # folder that takes longer is not checked (its photos stay), which is the safe side.
 FOLDER_TIMEOUT = 30.0
-# Linux and macOS leave the mount point of an unmounted drive or share as an empty folder,
-# whose photos then look gone (E54; on Windows, E37's junction check covers mount points);
+# Linux and macOS leave the mount point of an unmounted drive or share as an empty folder or
+# take it away, so its photos look gone (E54; on Windows, E37's junction check covers mount
+# points);
 # the folders drives and shares are usually mounted in, and the file of the mount points
 # the system mounts at start
 _EMPTY_MOUNT_POINTS = os.name != 'nt'
@@ -343,40 +344,64 @@ def _fstab_mount_points():
     return points
 
 
-def _empty_mount_point(folder):
-    """The empty mount point above the photos of folder whose drive or share is not mounted now, or None (E54).
+def _holds_mount_points(path):
+    """Whether path is one of _MOUNT_ROOTS or a folder right inside one (such as /media/<user>)."""
+    path = os.path.normcase(os.path.normpath(path))
+    roots = {os.path.normcase(os.path.normpath(root)) for root in _MOUNT_ROOTS}
+    return path in roots or os.path.dirname(path) in roots
+
+
+def _mounted(path):
+    """Whether path is a mount point with a drive or share mounted on it now (False if that cannot be told)."""
+    try:
+        return os.path.ismount(path)
+    except (OSError, ValueError):
+        return False
+
+
+def _unmounted(folder):
+    """The mount point above the photos of folder whose drive or share is not mounted now, as (kind, path), or None (E54).
 
     On Linux and macOS (_EMPTY_MOUNT_POINTS) an unmounted drive or share leaves its mount
-    point as an empty folder (or, for the ones udisks makes in /media/<user>, takes it
-    away), so the photos behind it look gone. The nearest part of folder that exists
-    (folder itself or a parent folder) is returned if it is an empty folder inside one of
-    the folders drives and shares are usually mounted in (_MOUNT_ROOTS) or a mount point
-    of the fstab: its photos count as not checked. A folder emptied by hand elsewhere is
-    no mount point; its photos are gone as before.
+    point as an empty folder, or takes it away (the ones udisks makes in /media/<user> or
+    /run/media/<user>, and macOS in /Volumes), so the photos behind it look gone. Returned:
+    - ('vanished', the first part of folder that is missing) if it is a mount point of the
+      fstab, or if the part above it is one of _MOUNT_ROOTS or a folder right inside one
+      (such as /media/<user>) with no drive mounted on it, also when other drives are
+      mounted next to it (review); a folder deleted on a drive mounted there is gone;
+    - else ('unmounted', the nearest part of folder that exists: folder itself or a parent
+      folder) if it is an empty folder inside one of the folders drives and shares are
+      usually mounted in (_MOUNT_ROOTS) or a mount point of the fstab.
+    Its photos count as not checked. A folder emptied or deleted by hand elsewhere is no
+    mount point; its photos are gone as before.
     """
     if not _EMPTY_MOUNT_POINTS:
         return None
-    path = folder
+    path, below = folder, None
     while _missing(path):
         parent = os.path.dirname(path)
         if parent == path:
             return None
-        path = parent
+        path, below = parent, path
+    fstab = _fstab_mount_points()
+    if below is not None and (os.path.normcase(os.path.normpath(below)) in fstab
+                              or (_holds_mount_points(path) and not _mounted(path))):
+        return 'vanished', below
     try:
         if os.listdir(path):
             return None
     except (OSError, ValueError):
         return None
-    if any(_inside(path, root) for root in _MOUNT_ROOTS):
-        return path
-    return path if os.path.normcase(os.path.normpath(path)) in _fstab_mount_points() else None
+    if any(_inside(path, root) for root in _MOUNT_ROOTS) or os.path.normcase(os.path.normpath(path)) in fstab:
+        return 'unmounted', path
+    return None
 
 
 def _look_at(folder, members):
     """Return (gone, why not checked) of one folder of the pass.
 
     gone: _gone_in. If any member looks gone, the photos may only be offline: ('link',
-    _dead_link) or ('unmounted', _empty_mount_point), else None.
+    _dead_link) or _unmounted's ('unmounted' or 'vanished', mount point), else None.
     """
     gone = _gone_in(folder, members)
     if not gone:
@@ -384,8 +409,7 @@ def _look_at(folder, members):
     link = _dead_link(folder)
     if link is not None:
         return gone, ('link', link)
-    mount_point = _empty_mount_point(folder)
-    return gone, (('unmounted', mount_point) if mount_point is not None else None)
+    return gone, _unmounted(folder)
 
 
 def _link_above(folder):
@@ -502,8 +526,8 @@ class _PathCheck:
 
     The pass itself is guarded too (E37, _pass): a folder that does not answer within
     folder_timeout seconds (FOLDER_TIMEOUT if None) is not checked, and the photos behind a
-    junction, mount point or link that leads nowhere now (_dead_link) or behind an empty
-    mount point on Linux/macOS (_empty_mount_point, E54) are not checked either.
+    junction, mount point or link that leads nowhere now (_dead_link) or behind an empty or
+    missing mount point on Linux/macOS (_unmounted, E54) are not checked either.
     """
 
     def __init__(self, root_timeout=ROOT_TIMEOUT, folder_timeout=None):
@@ -513,8 +537,8 @@ class _PathCheck:
         self._checked = set()  # paths with an answer: gone, there or never gone
         # path -> what it waits for, (kind, path) as _unchecked_notes words it: ('root', its
         # root that was not reachable), ('folder', a folder that did not answer), ('link', a
-        # link that leads nowhere or does not answer) (E37, review) or ('unmounted', an empty
-        # mount point, E54)
+        # link that leads nowhere or does not answer) (E37, review), ('unmounted', an empty
+        # mount point) or ('vanished', a missing one) (E54)
         self._unreachable = {}
 
     def _not_checked(self, paths, reason):
@@ -529,9 +553,9 @@ class _PathCheck:
         (_link_above, review), else its root, is probed again, and if that does not answer
         either, the other folders behind it are not checked either (no timeout per folder of
         a dead share). Paths not checked, also those behind a link that leads nowhere or an
-        empty mount point (_look_at), go to _unreachable with what they wait for: ('root',
-        root), ('folder', folder) for a folder that did not answer, ('link', link),
-        ('unmounted', mount point).
+        empty or missing mount point (_look_at), go to _unreachable with what they wait for:
+        ('root', root), ('folder', folder) for a folder that did not answer, ('link', link),
+        ('unmounted' or 'vanished', mount point).
         """
         gone, done, total = set(), 0, len(folders)
         step = max(1, total // 100)
@@ -632,7 +656,7 @@ def _unchecked_notes(unchecked):
 
     Worded by what they wait for (review): a root that is not reachable, a folder that did not
     answer within FOLDER_TIMEOUT, a junction, mount point or link that cannot be reached, or
-    an empty mount point (E54).
+    an empty or missing mount point (E54).
     """
     notes = []
     for (kind, path), count in sorted(unchecked.items(), key=lambda item: (item[0][1], item[0][0])):
@@ -647,6 +671,9 @@ def _unchecked_notes(unchecked):
             notes.append(f'{path} is empty: a drive or network share mounted there is probably not mounted now, so '
                          f'{photos} behind it. Mount it and scan again; if the photos are gone for good, delete the '
                          'empty folder first.')
+        elif kind == 'vanished':
+            notes.append(f'{path} does not exist: a drive or network share mounted there is probably not mounted now '
+                         f'(its mount point goes away with it), so {photos} behind it. Mount it and scan again.')
         else:
             notes.append(f'{path} is not reachable now (e.g. a disconnected drive or an offline network share), so '
                          f'{photos} there.')
