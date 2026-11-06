@@ -301,10 +301,10 @@ def test_a_truncated_partner_is_analyzed_as_far_as_it_goes_if_its_raw_file_fails
     assert fallback.defer(jpeg, truncated=True)
     assert fallback.choose(lambda path: False) == ({jpeg: raw}, [])
     assert fallback.defer(raw) is True  # not counted: the shot is decided by the retry
-    assert fallback.retry() == [jpeg]
+    assert fallback.retry() == ([jpeg], [])
     assert fallback.strict(jpeg) is False  # decoded as far as its data goes now
     assert fallback.defer(jpeg) is False  # if that fails too, it counts as a failure
-    assert fallback.retry() == [] and fallback.photos([jpeg]) == [jpeg]
+    assert fallback.retry() == ([], []) and fallback.photos([jpeg]) == [jpeg]
 
 
 def test_a_truncated_partner_is_not_retried_once_its_raw_file_was_analyzed(tmp_path):
@@ -314,7 +314,7 @@ def test_a_truncated_partner_is_not_retried_once_its_raw_file_was_analyzed(tmp_p
     fallback.defer(jpeg, truncated=True)
     fallback.choose(lambda path: False)
     fallback.use(jpeg, raw)
-    assert fallback.retry() == [] and fallback.strict(jpeg) is True
+    assert fallback.retry() == ([], []) and fallback.strict(jpeg) is True
     assert fallback.photos([jpeg]) == [raw]
     assert fallback.defer(raw) is False  # decided: a later failure of it counts as before
 
@@ -326,7 +326,7 @@ def test_a_partner_that_fails_otherwise_is_not_retried_after_its_raw_file(tmp_pa
     fallback = RawFallback(scan_photos(tmp_path))
     fallback.defer(heic)
     assert fallback.choose(lambda path: False) == ({heic: raw}, [])
-    assert fallback.defer(raw) is False and fallback.retry() == []
+    assert fallback.defer(raw) is False and fallback.retry() == ([], [])
 
 
 # --- several photo folders (A25) ---
@@ -884,3 +884,35 @@ def test_remembered_scans_counts_again_after_a_folder_was_gone(tmp_path):
     _, counted_at = remembered_scans(memory, [tmp_path], EXT, None, scan=scan, clock=lambda: 2.0)
     assert len(scan.calls) == 2
     assert counted_at == 2.0
+
+
+def test_a_truncated_partner_that_did_not_get_the_raw_file_is_retried_if_it_fails(tmp_path):
+    # E53: a broken HEIC failed first and got the RAW file; the truncated JPEG of the shot
+    # waits instead of being lost, and is analyzed as far as its data goes if the RAW file
+    # fails too
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    heic = touch(tmp_path / 'IMG_0001.heic')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    assert fallback.defer(heic) and fallback.defer(jpeg, truncated=True)
+    assert fallback.choose(lambda path: False) == ({heic: raw}, [])
+    # the RAW file counts for the HEIC it was analyzed for: its failure is the HEIC's
+    assert fallback.defer(raw) is False
+    assert fallback.retry() == ([jpeg], [])
+    assert fallback.strict(jpeg) is False and fallback.defer(jpeg) is False
+
+
+def test_a_waiting_truncated_partner_stays_a_failure_once_the_raw_file_was_analyzed(tmp_path):
+    # E53: the shot is analyzed as its RAW file; the truncated JPEG that waited is counted
+    # as a failure now, as it was before
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    heic = touch(tmp_path / 'IMG_0001.heic')
+    jpeg = touch(tmp_path / 'IMG_0001.jpg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    fallback.defer(heic)
+    fallback.defer(jpeg, truncated=True)
+    fallback.choose(lambda path: False)
+    fallback.use(heic, raw)
+    assert fallback.retry() == ([], [jpeg])
+    assert fallback.retry() == ([], [])
+    assert fallback.photos([heic, jpeg]) == [raw, jpeg]
