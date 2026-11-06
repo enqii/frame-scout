@@ -272,59 +272,65 @@ def search(args, parser, roots, dropped, output, status, warnings):
     # opened before the model load, so that a damaged cache is reported at once (E50, E56),
     # not after the seconds (or the first download) of loading the model
     con = sqlite3.connect(output / CACHE_FILE)
-    # also records which engine version and settings the signature stands for (E11)
-    signature = prepare_cache(con, person_detection, args.max_persons, args.person_confidence,
-                              args.yolo_model, model=args.model)
-    status.update('loading')
-    print(f'{len(paths)} photos; {len(profiles)} search profiles; search model: {search_model.label} '
-          f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
-          f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
-    print('Model weights are downloaded the first time a model is used.', flush=True)
-    # imported here, offline once the model is cached: no Hugging Face Hub request per search
-    # and no symlink warning (E16, E31, E33); huggingface_hub reads the variables on import,
-    # and its constants are set too if anything imported it earlier
-    open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model, modules=sys.modules)
+    try:
+        # also records which engine version and settings the signature stands for (E11)
+        signature = prepare_cache(con, person_detection, args.max_persons, args.person_confidence,
+                                  args.yolo_model, model=args.model)
+        status.update('loading')
+        print(f'{len(paths)} photos; {len(profiles)} search profiles; search model: {search_model.label} '
+              f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
+              f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
+        print('Model weights are downloaded the first time a model is used.', flush=True)
+        # imported here, offline once the model is cached: no Hugging Face Hub request per search
+        # and no symlink warning (E16, E31, E33); huggingface_hub reads the variables on import,
+        # and its constants are set too if anything imported it earlier
+        open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model, modules=sys.modules)
 
-    def load_model():
-        # weights without a Hub repository go to .cache/clip, not ~/.cache/clip (E39)
-        model, _, preprocess = open_clip.create_model_and_transforms(
-            search_model.name, pretrained=search_model.pretrained, device=device,
-            cache_dir=open_clip_cache_dir(search_model, os.environ, Path(__file__).resolve().parent))
-        return model, preprocess, open_clip.get_tokenizer(search_model.name)
+        def load_model():
+            # weights without a Hub repository go to .cache/clip, not ~/.cache/clip (E39)
+            model, _, preprocess = open_clip.create_model_and_transforms(
+                search_model.name, pretrained=search_model.pretrained, device=device,
+                cache_dir=open_clip_cache_dir(search_model, os.environ, Path(__file__).resolve().parent))
+            return model, preprocess, open_clip.get_tokenizer(search_model.name)
 
-    # an incomplete cache goes online again and downloads what is missing
-    model, preprocess, tokenizer = load_with_hub_fallback(load_model, offline,
-                                                          lambda: hub_go_online(os.environ, sys.modules),
-                                                          lambda text: print(text, flush=True))
-    model.eval()
+        # an incomplete cache goes online again and downloads what is missing
+        model, preprocess, tokenizer = load_with_hub_fallback(load_model, offline,
+                                                              lambda: hub_go_online(os.environ, sys.modules),
+                                                              lambda text: print(text, flush=True))
+        model.eval()
 
-    def embed_pixels(pixels):
-        """Embed preprocessed images (one tensor, first dimension = images), batch_size at a time."""
-        vectors = []
+        def embed_pixels(pixels):
+            """Embed preprocessed images (one tensor, first dimension = images), batch_size at a time."""
+            vectors = []
+            with torch.inference_mode():
+                for start in range(0, len(pixels), args.batch_size):
+                    emb = model.encode_image(pixels[start:start+args.batch_size].to(device)).float()
+                    emb /= emb.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+                    vectors.append(emb.cpu().numpy())
+            return np.concatenate(vectors, axis=0)
+
+        def embed_images(images):
+            return embed_pixels(torch.stack([preprocess(im) for im in images]))
+
+        profile_vectors = {}
         with torch.inference_mode():
-            for start in range(0, len(pixels), args.batch_size):
-                emb = model.encode_image(pixels[start:start+args.batch_size].to(device)).float()
-                emb /= emb.norm(dim=-1, keepdim=True).clamp_min(1e-8)
-                vectors.append(emb.cpu().numpy())
-        return np.concatenate(vectors, axis=0)
-
-    def embed_images(images):
-        return embed_pixels(torch.stack([preprocess(im) for im in images]))
-
-    profile_vectors = {}
-    with torch.inference_mode():
-        for p in profiles:
-            t = model.encode_text(tokenizer(p['prompts']).to(device)).float()
-            t /= t.norm(dim=-1, keepdim=True).clamp_min(1e-8)
-            ref_vectors = []
-            for ref in p['refs']:
-                try:
-                    ref_vectors.append(embed_images([open_image(ref)])[0])
-                except Exception as exc:
-                    parser.error(f'Reference image cannot be read ({ref}): {exc}')
-            # the generated templates are averaged into one query, custom prompts stay apart (E4)
-            profile_vectors[p['name']] = (text_queries(t.cpu().numpy(), p['generated']),
-                                          np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
+            for p in profiles:
+                t = model.encode_text(tokenizer(p['prompts']).to(device)).float()
+                t /= t.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+                ref_vectors = []
+                for ref in p['refs']:
+                    try:
+                        ref_vectors.append(embed_images([open_image(ref)])[0])
+                    except Exception as exc:
+                        parser.error(f'Reference image cannot be read ({ref}): {exc}')
+                # the generated templates are averaged into one query, custom prompts stay apart (E4)
+                profile_vectors[p['name']] = (text_queries(t.cpu().numpy(), p['generated']),
+                                              np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
+    except BaseException:
+        # a damaged cache, a model or a reference image that cannot be loaded: the cache
+        # file is not left open (and locked on Windows) until the process ends (review)
+        con.close()
+        raise
 
     # the registry's input size (tested against the OpenCLIP config) if the model does not name it
     image_size = getattr(model.visual, 'image_size', search_model.image_size)

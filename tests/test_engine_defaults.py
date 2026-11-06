@@ -205,3 +205,22 @@ def test_the_engine_opens_the_cache_before_it_loads_the_model():
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             lines.setdefault(node.func.id, node.lineno)
     assert lines['prepare_cache'] < lines['import_open_clip'] < lines['load_with_hub_fallback']
+
+
+def test_the_engine_closes_the_cache_if_the_model_or_a_reference_fails_to_load():
+    # E56 review: the cache opened before the model load is closed again if the cache check,
+    # the model load or a reference image fails, so the file is not left open (locked on
+    # Windows)
+    search = next(node for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
+                  if isinstance(node, ast.FunctionDef) and node.name == 'search')
+    guarded = []
+    for node in ast.walk(search):
+        if not isinstance(node, ast.Try):
+            continue
+        closes = any(isinstance(handler.type, ast.Name) and handler.type.id == 'BaseException'
+                     and 'con.close()' in ast.unparse(handler) and isinstance(handler.body[-1], ast.Raise)
+                     for handler in node.handlers)
+        if closes:
+            guarded.append({call.func.id for part in node.body for call in ast.walk(part)
+                            if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)})
+    assert any({'prepare_cache', 'load_with_hub_fallback', 'open_image'} <= calls for calls in guarded)
