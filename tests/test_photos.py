@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
+from framescout_core import (jpeg_scans_missing, ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
                              RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, RawFallback, available_decoders, distinct_folders,
                              folder_labels, join_scans, missing_decoder, missing_folders_message,
                              output_folder_problem, photo_name, raw_fallbacks, remembered_scans, raw_preview_transpose, raw_preview_usable, scan_each_folder, scan_folders, scan_photos,
@@ -916,3 +916,64 @@ def test_a_waiting_truncated_partner_stays_a_failure_once_the_raw_file_was_analy
     assert fallback.retry() == ([], [jpeg])
     assert fallback.retry() == ([], [])
     assert fallback.photos([heic, jpeg]) == [raw, jpeg]
+
+
+# E57: the marker segments of a JPEG that ends before its end marker; built by hand, so
+# that the tests need no Pillow
+def segment(marker, payload=b''):
+    return bytes((0xFF, marker)) + (len(payload) + 2).to_bytes(2, 'big') + payload
+
+
+def frame(marker, components):
+    """A start of frame segment (SOF0 baseline, SOF2 progressive) of 8x8 pixels."""
+    return segment(marker, bytes((8, 0, 8, 0, 8, len(components)))
+                   + b''.join(bytes((c, 0x11, 0)) for c in components))
+
+
+def scan(components, start=0, end=63, low=0, data=b'\x12\x34\xff\x00\x56'):
+    """A start of scan segment and its image data (with a stuffed 0xFF byte and a restart marker)."""
+    header = bytes((len(components),)) + b''.join(bytes((c, 0)) for c in components) + bytes((start, end, low))
+    return segment(0xDA, header) + data + b'\xff\xd0' + data
+
+
+SOI = b'\xff\xd8'
+TABLE = segment(0xC4, b'\x00' * 17)
+
+
+def test_a_baseline_jpeg_that_ends_in_its_scan_lacks_no_scan():
+    data = SOI + segment(0xE1, b'Exif\x00\x00\xff\xd8\xff\xd9') + frame(0xC0, [1, 2, 3]) + TABLE + scan([1, 2, 3])
+    assert jpeg_scans_missing(data) is False
+    # the decoder tells whether the image data of that scan is complete
+    assert jpeg_scans_missing(data[:-3]) is False
+
+
+def test_a_jpeg_that_ends_outside_the_image_data_of_a_scan_lacks_scans():
+    data = SOI + frame(0xC0, [1, 2, 3]) + TABLE
+    assert jpeg_scans_missing(data) is True  # right after a marker segment
+    assert jpeg_scans_missing(data[:-5]) is True  # inside one
+    assert jpeg_scans_missing(data + b'\xff') is True  # inside a marker
+
+
+def test_a_baseline_jpeg_whose_scans_do_not_cover_every_component_lacks_scans():
+    # non-interleaved: one scan per component
+    data = SOI + frame(0xC0, [1, 2, 3]) + TABLE + scan([1]) + scan([2])
+    assert jpeg_scans_missing(data) is True
+    assert jpeg_scans_missing(data + scan([3])) is False
+
+
+def test_a_progressive_jpeg_lacks_scans_until_every_coefficient_is_at_full_precision():
+    data = SOI + frame(0xC2, [1, 2]) + TABLE + scan([1, 2], 0, 0, low=1)
+    for part in (scan([1], 1, 63), scan([2], 1, 5), scan([2], 6, 63, low=1)):
+        data += part
+        assert jpeg_scans_missing(data) is True
+    data += scan([2], 6, 63) + TABLE
+    assert jpeg_scans_missing(data) is True  # the DC refinement is still missing
+    data += scan([1, 2], 0, 0)
+    assert jpeg_scans_missing(data) is False
+
+
+def test_data_that_cannot_be_followed_does_not_count_as_lacking_scans():
+    assert jpeg_scans_missing(b'not a jpeg') is False
+    assert jpeg_scans_missing(SOI + b'\x00\x01' + frame(0xC0, [1])) is False
+    # no frame header before the scan: nothing to compare its scans with
+    assert jpeg_scans_missing(SOI + TABLE + scan([1])) is False
