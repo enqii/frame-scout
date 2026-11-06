@@ -2,7 +2,7 @@
 
 Items of [docs/BACKLOG.md](BACKLOG.md) that are done, with their reports (what was decided,
 measured and left open). Moved here unchanged when their pull request was merged. Open
-follow-ups that a report names have their own IDs in `BACKLOG.md`. The roadmap lines of
+follow-ups that a report names have their own IDs in `docs/BACKLOG.md`. The roadmap lines of
 finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
 
 ### Engine (`framescout_engine.py`)
