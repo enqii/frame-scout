@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
+from framescout_core import (CONSTRAINTS_FILE, MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
                              MARKS_BACKUP, MARKS_FILE, NEVER_DELETED, RunLock, UnknownProfileError, delete_marks,
                              hidden_text, hide_no_match, lock_held, mark_style, marks_backup, marks_restore_offer, page_cards,
                              read_marks,
@@ -396,8 +396,7 @@ def test_mark_style_names_a_key_as_streamlit_turns_it_into_a_class():
 def test_mark_style_was_checked_with_the_pinned_streamlit():
     # the selectors rely on Streamlit internals: raising the pin fails here until the
     # selectors were checked against the new version and MARK_STYLE_STREAMLIT updated
-    constraints = (Path(__file__).resolve().parent.parent / 'requirements' / 'constraints.txt').read_text(
-        encoding='utf-8')
+    constraints = (Path(__file__).resolve().parent.parent / CONSTRAINTS_FILE).read_text(encoding='utf-8')
     pinned = re.search(r'^streamlit==(\S+)$', constraints, re.MULTILINE)
     assert pinned and pinned.group(1) == MARK_STYLE_STREAMLIT
 

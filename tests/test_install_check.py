@@ -335,9 +335,9 @@ def test_check_installation_runs_every_check_and_writes_nothing(tmp_path, monkey
     site = venv_site_packages(tmp_path)
     site.mkdir(parents=True)
     dist(site, 'torch', '2.14.1+cpu')
-    (tmp_path / 'requirements').mkdir()
-    (tmp_path / 'requirements' / 'constraints.txt').write_text('torch==2.14.1\n', encoding='utf-8')
-    (tmp_path / 'requirements' / 'requirements.txt').write_text('torch==2.14.1\n', encoding='utf-8')
+    (tmp_path / CONSTRAINTS_FILE).parent.mkdir()
+    (tmp_path / CONSTRAINTS_FILE).write_text('torch==2.14.1\n', encoding='utf-8')
+    (tmp_path / REQUIREMENTS_FILE).write_text('torch==2.14.1\n', encoding='utf-8')
     before = sorted(p for p in tmp_path.rglob('*'))
     calls = []
     results = check_installation(tmp_path, {'PATH': 'x'}, run=fake_run(probe(False, None, torch='2.14.1+cpu'),
