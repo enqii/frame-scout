@@ -56,6 +56,13 @@ ROOT_TIMEOUT = 5.0
 # that stops answering during the pass would otherwise stall it until the OS gives up. A
 # folder that takes longer is not checked (its photos stay), which is the safe side.
 FOLDER_TIMEOUT = 30.0
+# Linux and macOS leave the mount point of an unmounted drive or share as an empty folder,
+# whose photos then look gone (E54; on Windows, E37's junction check covers mount points);
+# the folders drives and shares are usually mounted in, and the file of the mount points
+# the system mounts at start
+_EMPTY_MOUNT_POINTS = os.name != 'nt'
+_MOUNT_ROOTS = ('/media', '/mnt', '/run/media', '/Volumes')
+_FSTAB = '/etc/fstab'
 # a folder with at most this many photos to check gets one stat per photo, a fuller one is
 # listed once (see _PathCheck)
 _STAT_UP_TO = 4
@@ -320,10 +327,65 @@ def _dead_link(folder):
         return path if _is_link(info) and not os.path.exists(path) else None
 
 
+def _fstab_mount_points():
+    """The mount points listed in _FSTAB (normalized paths; none if it cannot be read)."""
+    try:
+        with open(_FSTAB, encoding='utf-8', errors='replace') as file:
+            lines = file.read().splitlines()
+    except OSError:
+        return set()
+    points = set()
+    for line in lines:
+        fields = line.split()
+        if len(fields) >= 2 and not fields[0].startswith('#'):
+            # fstab writes a space in a path as \040
+            points.add(os.path.normcase(os.path.normpath(fields[1].replace('\\040', ' '))))
+    return points
+
+
+def _empty_mount_point(folder):
+    """The empty mount point above the photos of folder whose drive or share is not mounted now, or None (E54).
+
+    On Linux and macOS (_EMPTY_MOUNT_POINTS) an unmounted drive or share leaves its mount
+    point as an empty folder (or, for the ones udisks makes in /media/<user>, takes it
+    away), so the photos behind it look gone. The nearest part of folder that exists
+    (folder itself or a parent folder) is returned if it is an empty folder inside one of
+    the folders drives and shares are usually mounted in (_MOUNT_ROOTS) or a mount point
+    of the fstab: its photos count as not checked. A folder emptied by hand elsewhere is
+    no mount point; its photos are gone as before.
+    """
+    if not _EMPTY_MOUNT_POINTS:
+        return None
+    path = folder
+    while _missing(path):
+        parent = os.path.dirname(path)
+        if parent == path:
+            return None
+        path = parent
+    try:
+        if os.listdir(path):
+            return None
+    except (OSError, ValueError):
+        return None
+    if any(_inside(path, root) for root in _MOUNT_ROOTS):
+        return path
+    return path if os.path.normcase(os.path.normpath(path)) in _fstab_mount_points() else None
+
+
 def _look_at(folder, members):
-    """Return (gone, dead link) of one folder of the pass: _gone_in, and _dead_link if any member looks gone."""
+    """Return (gone, why not checked) of one folder of the pass.
+
+    gone: _gone_in. If any member looks gone, the photos may only be offline: ('link',
+    _dead_link) or ('unmounted', _empty_mount_point), else None.
+    """
     gone = _gone_in(folder, members)
-    return gone, (_dead_link(folder) if gone else None)
+    if not gone:
+        return gone, None
+    link = _dead_link(folder)
+    if link is not None:
+        return gone, ('link', link)
+    mount_point = _empty_mount_point(folder)
+    return gone, (('unmounted', mount_point) if mount_point is not None else None)
 
 
 def _link_above(folder):
@@ -440,7 +502,8 @@ class _PathCheck:
 
     The pass itself is guarded too (E37, _pass): a folder that does not answer within
     folder_timeout seconds (FOLDER_TIMEOUT if None) is not checked, and the photos behind a
-    junction, mount point or link that leads nowhere now (_dead_link) are not checked either.
+    junction, mount point or link that leads nowhere now (_dead_link) or behind an empty
+    mount point on Linux/macOS (_empty_mount_point, E54) are not checked either.
     """
 
     def __init__(self, root_timeout=ROOT_TIMEOUT, folder_timeout=None):
@@ -449,8 +512,9 @@ class _PathCheck:
         self._gone = set()
         self._checked = set()  # paths with an answer: gone, there or never gone
         # path -> what it waits for, (kind, path) as _unchecked_notes words it: ('root', its
-        # root that was not reachable), ('folder', a folder that did not answer) or ('link', a
-        # link that leads nowhere or does not answer) (E37, review)
+        # root that was not reachable), ('folder', a folder that did not answer), ('link', a
+        # link that leads nowhere or does not answer) (E37, review) or ('unmounted', an empty
+        # mount point, E54)
         self._unreachable = {}
 
     def _not_checked(self, paths, reason):
@@ -464,9 +528,10 @@ class _PathCheck:
         hangs on) is not checked; then the first junction, mount point or link above it
         (_link_above, review), else its root, is probed again, and if that does not answer
         either, the other folders behind it are not checked either (no timeout per folder of
-        a dead share). Paths not checked, also those behind a link that leads nowhere
-        (_look_at), go to _unreachable with what they wait for: ('root', root), ('folder',
-        folder) for a folder that did not answer, ('link', link).
+        a dead share). Paths not checked, also those behind a link that leads nowhere or an
+        empty mount point (_look_at), go to _unreachable with what they wait for: ('root',
+        root), ('folder', folder) for a folder that did not answer, ('link', link),
+        ('unmounted', mount point).
         """
         gone, done, total = set(), 0, len(folders)
         step = max(1, total // 100)
@@ -495,11 +560,11 @@ class _PathCheck:
                     if error is not None:
                         worker.cancelled = True
                         raise error
-                    found, link = answer
-                    if link is None:
+                    found, reason = answer
+                    if reason is None:
                         gone |= found
                     else:
-                        self._not_checked(found, ('link', link))
+                        self._not_checked(found, reason)
                     answered += 1
                     tick(1)
                 else:
@@ -566,7 +631,8 @@ def _unchecked_notes(unchecked):
     """The notes of the photos not checked ({(kind, path): number of photos}, _PathCheck.result), by path.
 
     Worded by what they wait for (review): a root that is not reachable, a folder that did not
-    answer within FOLDER_TIMEOUT, or a junction, mount point or link that cannot be reached.
+    answer within FOLDER_TIMEOUT, a junction, mount point or link that cannot be reached, or
+    an empty mount point (E54).
     """
     notes = []
     for (kind, path), count in sorted(unchecked.items(), key=lambda item: (item[0][1], item[0][0])):
@@ -577,6 +643,10 @@ def _unchecked_notes(unchecked):
         elif kind == 'link':
             notes.append(f'{path} cannot be reached now (a junction, mount point or link to e.g. a disconnected drive '
                          f'or an offline network share), so {photos} behind it.')
+        elif kind == 'unmounted':
+            notes.append(f'{path} is empty: a drive or network share mounted there is probably not mounted now, so '
+                         f'{photos} behind it. Mount it and scan again; if the photos are gone for good, delete the '
+                         'empty folder first.')
         else:
             notes.append(f'{path} is not reachable now (e.g. a disconnected drive or an offline network share), so '
                          f'{photos} there.')
