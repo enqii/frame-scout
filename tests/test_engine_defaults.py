@@ -193,3 +193,15 @@ def test_importing_the_engine_does_not_import_a_hugging_face_library():
                             timeout=300)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines()[-1] == '[]'
+
+
+def test_the_engine_opens_the_cache_before_it_loads_the_model():
+    # E56: a damaged cache is reported at once (E50), not after the seconds (or the first
+    # download) of the model load
+    search = next(node for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
+                  if isinstance(node, ast.FunctionDef) and node.name == 'search')
+    lines = {}
+    for node in ast.walk(search):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            lines.setdefault(node.func.id, node.lineno)
+    assert lines['prepare_cache'] < lines['import_open_clip'] < lines['load_with_hub_fallback']

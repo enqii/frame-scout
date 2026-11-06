@@ -268,6 +268,13 @@ def search(args, parser, roots, dropped, output, status, warnings):
     # fewer with --low-priority, so other programs keep a core (F4)
     cpu_threads = torch_threads(torch.get_num_threads(), args.low_priority)
     torch.set_num_threads(cpu_threads)
+    person_detection = not args.no_person_detection
+    # opened before the model load, so that a damaged cache is reported at once (E50, E56),
+    # not after the seconds (or the first download) of loading the model
+    con = sqlite3.connect(output / CACHE_FILE)
+    # also records which engine version and settings the signature stands for (E11)
+    signature = prepare_cache(con, person_detection, args.max_persons, args.person_confidence,
+                              args.yolo_model, model=args.model)
     status.update('loading')
     print(f'{len(paths)} photos; {len(profiles)} search profiles; search model: {search_model.label} '
           f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
@@ -319,11 +326,6 @@ def search(args, parser, roots, dropped, output, status, warnings):
             profile_vectors[p['name']] = (text_queries(t.cpu().numpy(), p['generated']),
                                           np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
 
-    person_detection = not args.no_person_detection
-    con = sqlite3.connect(output / CACHE_FILE)
-    # also records which engine version and settings the signature stands for (E11)
-    signature = prepare_cache(con, person_detection, args.max_persons, args.person_confidence,
-                              args.yolo_model, model=args.model)
     # the registry's input size (tested against the OpenCLIP config) if the model does not name it
     image_size = getattr(model.visual, 'image_size', search_model.image_size)
     min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
