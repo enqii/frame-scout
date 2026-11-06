@@ -17,7 +17,7 @@ suite: the CUDA path has been run on one machine only (the installer option and 
 exist since PR #8): an RTX 4070 with torch 2.14.1+cu130, Python 3.14 (I11, PR #56). CLIP and
 YOLO on CUDA, `--device auto`, the app's device choice (seen in headless Edge), 400
 synthetic photos and 4997 real full-size JPEGs on CUDA and CPU, all four search models
-and the evaluation tool with real models. A fresh `Install-FrameScout.bat cuda`, `cu126`
+and the evaluation tool with real models. The empty mount point check of the unbound photos on Linux/macOS (E54) is **not runtime-tested** (simulated in tests). A fresh `Install-FrameScout.bat cuda`, `cu126`
 and other or several GPUs are untested (I11), as are other Python versions, a fresh install on
 another machine and the edge cases in the backlog are **not** verified. Treat syntax
 checks, unit tests and a real model run as distinct kinds of evidence, and do not call the
@@ -926,21 +926,31 @@ reference image of such a format fails with the reason (`missing_decoder`).
   which names it in its partner's place, so cache row, card, thumbnail, link and
   `--scores-file` use the RAW path. The partner has no cache row, so every run retries it
   first (one failed decode and its `ERROR` per run) and a repaired JPEG wins again.
-  Truncated JPEG partners (E46): the engine sets `ImageFile.LOAD_TRUNCATED_IMAGES = True`, which
-  cannot be switched per photo while the decoding threads run, so
-  `open_image(path, min_size=None, complete=False)` with `complete=True` detects a JPEG whose data
-  ends early itself (Pillow's private `_ended` flag of `JpegImageFile.load_read`; pinned by
-  `tests/test_images.py`, which runs only where Pillow is installed, not in CI) and raises
-  `framescout_core.TruncatedImageError(OSError)`. `RawFallback.strict(path)` is true for a partner
-  with a RAW file: it decodes with `complete=True`, a truncated one fails and its RAW file is
-  analyzed (E30 path). If that RAW file fails too, `defer(path, truncated=True)` keeps the failure,
-  `retry()` returns the partner (attributes `truncated`/`lenient`) and the engine analyzes it as
-  far as its data goes (log `The RAW file of … could not be analyzed either; analyzing the readable
-  part of the photo instead.`), counted once for the shot. Photos without a RAW partner decode as
-  before; a truncated partner analyzed by an earlier version stays in the cache. A truncated JPEG that
-  is not the shot's chosen partner counts as an error (E53). Pillow also sets `_ended` for a JPEG
-  whose image data is complete and that lacks only its EOI marker, so such a partner counts as
-  truncated too (error text `image file ends early (truncated, or only its end marker is missing)`, E57).
+  Truncated partners (E46, E53, E57): `framescout_images` sets `ImageFile.LOAD_TRUNCATED_IMAGES` to
+  `_LenientUnlessStrict`, true except in a thread inside `_strict()` (thread-local, so the decoding threads
+  can mix both). `open_image(path, min_size=None, complete=False)` with `complete=True` goes to
+  `_open_complete`: a strict decode first (this also detects mid-data damage, `err_code < 0`); if it fails
+  and the file decodes leniently, a JPEG raises `framescout_core.TruncatedImageError(OSError)` with `image
+  data ends early or is damaged (decodes only in part)`; any other file (e.g. a truncated HEIC: pillow-heif
+  raises `ValueError` strictly, leniently it decodes all black) raises the strict error and is not retried.
+  A JPEG that lacks only its EOI marker (E57) is not an error: `_ends_only_its_marker` uses
+  `framescout_core.jpeg_scans_missing(data)` (`photos.py`, stdlib only: follows the marker segments; true if
+  the data ends inside or right after a marker segment or the scans do not cover all components (baseline) /
+  all coefficients at Al=0 (progressive)), then decodes `data + filler + EOI` for `0xAA`/`0x55` fillers and
+  RST0-7 + filler (a trailing `0xFF` gets a `0x00`; the data as is must decode the same) and compares with
+  `data + EOI`; such a partner is analyzed itself. The check relies on libjpeg skipping bytes after the last
+  scan's complete data (measured: 1,500 random cuts on 5 JPEG kinds, no miss, no false alarm; the decode uses
+  Pillow internals and is pinned by `tests/test_images.py`, which runs only where Pillow is installed, not in CI).
+  `RawFallback.strict(path)` is true for a partner with a RAW file: it decodes with `complete=True`, a
+  truncated one fails and its RAW file is analyzed (E30 path). If that RAW file fails too,
+  `defer(path, truncated=True)` keeps the failure, `retry()` returns `(retry, lost)`: `retry` are the partners
+  (attributes `truncated`/`lenient`) the engine analyzes as far as their data goes (log `The RAW file of ...
+  could not be analyzed either; analyzing the readable part of the photo instead.`), counted once for the
+  shot. A truncated partner of a shot whose RAW file another failed partner got stays waiting in `choose`
+  (not in `lost`); `defer(raw)` then counts the RAW failure for the partner the RAW file was picked for and
+  queues the waiting one; `lost` are waiting partners whose RAW file was analyzed, which the engine counts as
+  failures. Photos without a RAW partner decode as before; a truncated partner analyzed by an earlier version
+  stays in the cache. Open: E59 (a truncated HEIC/AVIF that is not a RAW partner is analyzed as an all-black image).
 - **Damaged cache (E50):** `sqlite3.DatabaseError` / a disk I/O error of the cache file itself
   (`cache_error`) is handled by where it happens (review): opening the cache (`prepare_cache`) or
   storing (`store_group(..., fatal=cache_error)` raises it at once, without storing the group's
@@ -953,7 +963,8 @@ reference image of such a format fails with the reason (`missing_decoder`).
   shows as a warning under the success note. If no photo could be scored and some rows could not
   be read (e.g. the table's root page is damaged), the first such error is raised after the scoring,
   so the search stops as above and the previous galleries stay. Other SQLite errors (locked, full) keep their old
-  handling. The cache is opened only after the model load (E56).
+  handling. The cache is opened (`prepare_cache`) right after the device/thread setup, before the `loading`
+  status and the model load, so a damaged cache is reported at once (E56).
 - **Skipped files:** the log names the RAW files skipped for a partner (count and one
   example), the files of a missing decoder with the reason (only if the folder has such
   files), and the files of other extensions by extension (`skipped_lines`); the app's
@@ -1437,7 +1448,7 @@ the folder list keeps the scan), with the note "The AI settings changed since th
 Scan again."; the scan runs only on the "Scan" click, never on a rerun or a search.
 No migration: a renamed or moved photo is analyzed again as a new photo, and its old
 cache row and mark stay until the user cleans them up (user decision 2026-10-28, E8).
-Open: E54 (Linux/macOS mount points, `FOLDER_TIMEOUT` not measured), A35 (a drive
+Open: E58 (`FOLDER_TIMEOUT` not measured), A35 (a drive
 letter now used by another disk, or on POSIX the root `/` of an unmounted mount, counts as
 reachable; only mitigated by naming the folders).
 F1: below the cleanup, "Check cache" calls `check_cache(results, alive, lock_timeout)` under the
@@ -1714,7 +1725,7 @@ profile (A22, A33, `test_marks.py`, `test_copy.py`, the result list export in `t
 failing second file, nothing to export; not run: Excel import, a real browser), `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` and `open_clip_cache_dir` (E39) in `test_cache_dirs.py`, `cache_error`/`cache_error_message` with real damaged files and `cache_read_warning` (E50) in `test_cache_check.py`, `store_group(..., fatal=)` in `test_pipeline.py` and `final_status(0, warnings)` in `test_run_status.py` (E50 review), the folder timeout, a share behind a junction that stops answering, a folder that still hangs (no second thread), `_link_above`, the notes per cause, dead links and `project_temp_cleanup` without a probe file (E37, E44) in `test_cleanup.py`, `RawFallback.strict/defer/retry` (E46) in `test_photos.py`, `open_image(complete=True)` with a truncated JPEG and one that lacks only its end marker (E57) in `test_images.py` (needs Pillow, so skipped in CI), and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching
+`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` and `open_clip_cache_dir` (E39) in `test_cache_dirs.py`, `cache_error`/`cache_error_message` with real damaged files and `cache_read_warning` (E50) in `test_cache_check.py`, `store_group(..., fatal=)` in `test_pipeline.py` and `final_status(0, warnings)` in `test_run_status.py` (E50 review), the folder timeout, a share behind a junction that stops answering, a folder that still hangs (no second thread), `_link_above`, the notes per cause, dead links and `project_temp_cleanup` without a probe file (E37, E44) in `test_cleanup.py`, `RawFallback.strict/defer/retry` (E46) and the waiting partner, `retry()` with `lost` and `jpeg_scans_missing` (E53, E57) in `test_photos.py`, `open_image(complete=True)` with a truncated JPEG, mid-data damage, a truncated HEIC and a JPEG that lacks only its end marker (E53, E57) in `test_images.py` (needs Pillow, so skipped in CI), the unmounted mount point notes (E54, simulated) in `test_cleanup.py`, the cache opened before the model load (E56) in `test_engine_defaults.py`, and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the stale temporary files of
 `auto_cleanup` (E26, `test_cleanup.py`: removed; fresh ones, foreign ones and gallery names

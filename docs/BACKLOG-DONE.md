@@ -1634,6 +1634,48 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       before (the previous galleries stay). Smoke runs: one overwritten table leaf page: 2 of 8
       photos left out, galleries written, exit code 0, the warning in the log and the status;
       the table's root page overwritten: exit code 1 with the message.)
+- [x] **E53 – E46 detects only a JPEG whose data ends early:** a partner whose JPEG
+      data is damaged in the middle so that libjpeg gives up (`err_code < 0`) still decodes
+      with a gray part, since `LOAD_TRUNCATED_IMAGES` also suppresses that error; a truncated
+      HEIC partner was not tested. A truncated JPEG that is not the chosen partner of its shot
+      (another partner failed first and got the RAW file) is not retried if the RAW file
+      fails, so that shot is lost. Found in the PR of E46 (PR #74).
+      (done 2026-11-06 in PR #84, roadmap P19 (A): `LOAD_TRUNCATED_IMAGES` is a thread-local
+      `_LenientUnlessStrict`; `open_image(..., complete=True)` decodes strictly first, so mid-data
+      damage is detected; a JPEG that then decodes only leniently raises `TruncatedImageError`
+      ("image data ends early or is damaged (decodes only in part)"), any other file (a truncated
+      HEIC: pillow-heif raises `ValueError`, leniently it decodes all black) raises the strict
+      error and is not retried. `RawFallback.choose` keeps a truncated partner of a shot whose RAW
+      file another failed partner got waiting; `defer(raw)` queues it when that RAW file fails, and
+      `retry()` returns `(retry, lost)` (waiting partners whose RAW file was analyzed, counted as
+      failures). Follow-up: E59.)
+- [x] **E54 – The unbound check on Linux/macOS and the folder timeout:** E37 handles
+      junctions, mount points and links on Windows; on Linux/macOS an unmounted mount point
+      that stays as an empty folder makes its photos look gone. `FOLDER_TIMEOUT` (30 s) is
+      not measured: a legitimately slow folder (e.g. many absent names each confirmed by a
+      `stat` on a slow share) is not checked (the safe side). Found in the PR of E37 (PR #74).
+      (done 2026-11-06 in PR #84, roadmap P19 (A), the Linux/macOS part: an empty folder below
+      `/media`, `/mnt`, `/run/media`, `/Volumes` or at an `/etc/fstab` mount point counts as an
+      unmounted mount point and its photos as not checked, with a note (kind `unmounted`) saying
+      to mount it and scan again, or to delete the empty folder first. Windows unchanged. Not
+      runtime-tested on Linux/macOS (simulated in tests). Limitation: a folder emptied by hand
+      inside such a place is treated the same (safe side). The timeout measurement is E58.)
+- [x] **E56 – A damaged cache is reported only after the model load:** the engine
+      opens the cache after loading the model, so E50's message comes a few seconds (or a
+      first download) later than it could; opening the cache before the model load would
+      report it at once. Found in the PR of E50 (PR #74).
+      (done 2026-11-06 in PR #84, roadmap P19 (A): `search` calls `prepare_cache` right after the
+      device/thread setup, before the `loading` status and the model load.)
+- [x] **E57 – E46 counts a JPEG that lacks only its end marker as truncated:** Pillow
+      sets `_ended` whenever the file ends before the EOI marker, also when the image data is
+      complete. Such a RAW partner failed, the RAW file was analyzed instead, and the error and
+      the partner's decode repeated on every run. Review of PR #74 (E46).
+      (done 2026-11-06 in PR #84, roadmap P19 (A): `framescout_core.jpeg_scans_missing(data)`
+      follows the marker segments and tells whether the scans cover all components/coefficients;
+      `_ends_only_its_marker` then decodes `data + filler + EOI` for the `0xAA`/`0x55` fillers and
+      RST0-7 + filler and compares with `data + EOI`. Such a partner is analyzed itself. Measured:
+      1,500 random cuts on 5 JPEG kinds, 0 misses, no false alarm. Limitation: the check relies on
+      libjpeg skipping bytes after the last scan's complete data.)
 - [x] **I31 – Repository layout, step 2: group the loose root files (medium risk):** move
       `requirements*.txt`, `constraints.txt` and `pytest.ini` into `requirements/` (check
       whether `pytest.ini` may move; if not, it stays in the root), `profiles.example.json` and
