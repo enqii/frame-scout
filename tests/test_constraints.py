@@ -13,9 +13,11 @@ from pathlib import Path
 
 import pytest
 
+from framescout_core import CONSTRAINTS_FILE, REQUIREMENTS_DIR, REQUIREMENTS_FILE, windows_path
+
 ROOT = Path(__file__).resolve().parent.parent
-# the requirement files are in requirements/ since I31
-REQUIREMENTS_DIR = ROOT / 'requirements'
+# the requirement files are in requirements/ since I31: the folder the code names (review)
+FOLDER = ROOT / REQUIREMENTS_DIR
 PIN = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)==(\d+(?:\.\d+)*(?:\.post\d+)?)$')
 REQUIREMENT = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)\s*((?:[<>=!]=?\s*[\w.]+\s*,?\s*)*)$')
 SPECIFIER = re.compile(r'^(==|!=|>=|<=|<|>)\s*(\d+(?:\.\d+)*)$')
@@ -47,7 +49,7 @@ def satisfies(version, specifiers):
 def lines(path):
     """The non-empty lines of the requirement file path (in requirements/) without comments."""
     result = []
-    for line in (REQUIREMENTS_DIR / path).read_text(encoding='utf-8').splitlines():
+    for line in (FOLDER / path).read_text(encoding='utf-8').splitlines():
         line = line.split('#', 1)[0].strip()
         if line:
             result.append(line)
@@ -137,7 +139,7 @@ def test_batch_commands_skip_comments_and_messages():
 def test_installer_uses_the_constraints():
     # the pip command itself, not a comment or a message that mentions it (review)
     assert any('-m pip install' in line
-               and r'-r requirements\requirements.txt -c requirements\constraints.txt' in line
+               and f'-r {windows_path(REQUIREMENTS_FILE)} -c {windows_path(CONSTRAINTS_FILE)}' in line
                for line in installer_commands())
 
 
@@ -146,7 +148,7 @@ def test_installer_constrains_the_torch_install_too():
     # installed in their pinned versions right away (I18); relative, because pip splits the
     # value at spaces and the installer folder may contain one
     commands = installer_commands()
-    setting = commands.index(r'set "PIP_CONSTRAINT=requirements\constraints.txt"')
+    setting = commands.index(f'set "PIP_CONSTRAINT={windows_path(CONSTRAINTS_FILE)}"')
     torch_install = next(i for i, line in enumerate(commands) if 'install_torch.py' in line)
     venv = next(i for i, line in enumerate(commands) if '-m venv' in line)
     assert venv < setting < torch_install
@@ -162,7 +164,7 @@ def test_the_requirement_files_the_installer_and_ci_name_exist():
     assert len(named) == 3 and len(ci) == 2
     for path in named + ci:
         assert (ROOT / path.replace('\\', '/')).is_file(), path
-        assert path.replace('\\', '/').startswith('requirements/'), path
+        assert path.replace('\\', '/').startswith(f'{REQUIREMENTS_DIR.as_posix()}/'), path
 
 
 def test_streamlit_floor_allows_the_width_parameter():

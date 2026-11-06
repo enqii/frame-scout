@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import install_torch
-from framescout_core import (TORCH_VERSION, TORCHVISION_VERSION, LowSpace, cuda_build, driver_text,
+from framescout_core import (CONSTRAINTS_FILE, REQUIREMENTS_FILE, TORCH_VERSION, TORCHVISION_VERSION, LowSpace, cuda_build, driver_text,
                              installed_build_matches, installed_cuda_build, parse_gpu_query, torch_index_url,
                              torch_install_needs, torch_requirements, unsupported_gpus)
 
@@ -130,12 +130,12 @@ def test_torch_index_url():
         torch_index_url('cu999')
 
 
-@pytest.mark.parametrize('path', ['requirements.txt', 'constraints.txt'])
+@pytest.mark.parametrize('path', [REQUIREMENTS_FILE, CONSTRAINTS_FILE], ids=lambda path: path.name)
 def test_requirements_pin_the_same_versions(path):
     # requirements.txt is installed after the build from the PyTorch index; the same pins
     # (without a local label) keep pip from replacing that build with another version, and
     # match the +cpu and CUDA builds (constraints.txt applies to both pip calls, I12/I18)
-    lines = (ROOT / 'requirements' / path).read_text(encoding='utf-8').splitlines()
+    lines = (ROOT / path).read_text(encoding='utf-8').splitlines()
     assert f'torch=={TORCH_VERSION}' in lines
     assert f'torchvision=={TORCHVISION_VERSION}' in lines
 
@@ -439,7 +439,7 @@ def test_installed_build_still_checks_space_for_the_other_packages(monkeypatch, 
 
 def test_requirement_names_of_requirements_txt():
     # in the folder requirements/ since I31
-    assert install_torch.REQUIREMENTS == ROOT / 'requirements' / 'requirements.txt'
+    assert install_torch.REQUIREMENTS == ROOT / REQUIREMENTS_FILE
     names = install_torch.requirement_names(install_torch.REQUIREMENTS.read_text(encoding='utf-8'))
     assert {'torch', 'torchvision', 'streamlit', 'open_clip_torch', 'pillow-heif', 'transformers'} <= set(names)
     assert install_torch.requirement_names('# comment\n\nnumpy>=2 ; python_version>"3"\nfoo[bar]==1\n') == [

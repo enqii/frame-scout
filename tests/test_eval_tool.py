@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 import framescout_eval as ev
-from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, MODELS, LowSpace, cache_folder_paths, download_bytes,
+from framescout_core import (DEFAULT_MODEL, EVAL_PAGE_FILE, MODEL_KEYS, MODELS, LowSpace, cache_folder_paths, download_bytes,
                              motif, read_label_file, read_labels, search_space_bytes, save_labels, scores_document, thumbnail_name,
                              write_scores)
 from framescout_scoring import rank_photos
@@ -71,7 +71,8 @@ def test_the_default_folder_is_ignored_by_git():
 
 def test_the_labelling_page_is_shipped_in_assets():
     # moved out of the root folder in I31
-    assert ev.PAGE == Path(ev.__file__).resolve().parent / 'assets' / 'framescout_eval_page.html'
+    assert EVAL_PAGE_FILE.as_posix() == 'assets/framescout_eval_page.html'
+    assert ev.PAGE == Path(ev.__file__).resolve().parent / EVAL_PAGE_FILE
     assert ev.PAGE.is_file()
 
 
