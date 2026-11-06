@@ -271,7 +271,7 @@ _JPEG_STANDALONE = frozenset(range(0xD0, 0xD8)) | {0xD8, 0x01}
 
 
 def _scan_data_end(data, start):
-    """The position of the marker after the image data of a scan that starts at start, or None if the data ends first."""
+    """The position of the marker after the image data of a scan from start on; None if the data ends first."""
     position = data.find(b'\xff', start)
     while 0 <= position < len(data) - 1:
         follower = data[position + 1]
@@ -283,7 +283,7 @@ def _scan_data_end(data, start):
 
 
 def _scans_cover(components, scans, progressive):
-    """Whether the scans [(component ids, first coefficient, last coefficient, precision shift)] complete every component."""
+    """Whether the scans [(component ids, first and last coefficient, precision shift)] complete every component."""
     if not progressive:
         return components <= set().union(*(ids for ids, *_ in scans))
     for component in components:
