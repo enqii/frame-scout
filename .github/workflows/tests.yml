@@ -34,20 +34,20 @@ jobs:
         python-version: ['3.12', '3.13', '3.14']
     steps:
       # Actions are pinned to commit SHAs because tags can be moved. When updating,
-      # change the SHA and its version comment together (see BACKLOG.md I9).
+      # change the SHA and its version comment together (see docs/BACKLOG.md I9).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: requirements-dev.txt
+          cache-dependency-path: requirements/requirements-dev.txt
 
       - name: Install development requirements (no torch, no models)
-        run: python -m pip install -r requirements-dev.txt
+        run: python -m pip install -r requirements/requirements-dev.txt
 
       - name: Check that torch is not installed
-        # Keeps the "no torch" promise: if requirements-dev.txt ever pulls in torch,
+        # Keeps the "no torch" promise: if requirements/requirements-dev.txt ever pulls in torch,
         # this step fails; a test that imports the engine (and thereby torch) fails
         # in the pytest step with an ImportError instead of downloading anything.
         run: python -c "import importlib.util, sys; sys.exit('torch is installed' if importlib.util.find_spec('torch') else 0)"

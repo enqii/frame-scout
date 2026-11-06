@@ -396,7 +396,8 @@ def test_mark_style_names_a_key_as_streamlit_turns_it_into_a_class():
 def test_mark_style_was_checked_with_the_pinned_streamlit():
     # the selectors rely on Streamlit internals: raising the pin fails here until the
     # selectors were checked against the new version and MARK_STYLE_STREAMLIT updated
-    constraints = (Path(__file__).resolve().parent.parent / 'constraints.txt').read_text(encoding='utf-8')
+    constraints = (Path(__file__).resolve().parent.parent / 'requirements' / 'constraints.txt').read_text(
+        encoding='utf-8')
     pinned = re.search(r'^streamlit==(\S+)$', constraints, re.MULTILINE)
     assert pinned and pinned.group(1) == MARK_STYLE_STREAMLIT
 

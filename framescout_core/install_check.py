@@ -4,7 +4,7 @@ After a Windows update, a moved folder or an interrupted installation, a search 
 traceback in run.log, and nothing says whether to reinstall. Check-FrameScout.bat
 (framescout_check.py) and the app's AI settings tab run these checks and name one fix per
 problem: the Python environment belongs to this folder, the installed package versions are
-those of constraints.txt, PyTorch imports (and finds the GPU for a CUDA build), .cache and
+those of requirements/constraints.txt, PyTorch imports (and finds the GPU for a CUDA build), .cache and
 results can be written, which model files are downloaded, and the free disk space.
 
 Read-only: nothing is written, downloaded or repaired. The only file operation is a temporary
@@ -33,6 +33,9 @@ from .portable_python import PRIVATE_PYTHON
 from .signature import DEFAULT_YOLO_MODEL
 
 VENV_DIR = '.venv'
+# the installer's requirement files, relative to the FrameScout folder (in requirements/ since I31)
+REQUIREMENTS_FILE = Path('requirements', 'requirements.txt')
+CONSTRAINTS_FILE = Path('requirements', 'constraints.txt')
 # seconds the PyTorch import may take: the first import after an installation can be slow
 # while a virus scanner checks the files
 TORCH_CHECK_TIMEOUT = 180
@@ -285,7 +288,7 @@ def check_installation(base, environ, run=subprocess.run):
     results = check_environment(base)
     site = venv_site_packages(base)
     if venv_python(base).is_file():
-        results += check_packages(site, _read_text(base / 'constraints.txt'), _read_text(base / 'requirements.txt'))
+        results += check_packages(site, _read_text(base / CONSTRAINTS_FILE), _read_text(base / REQUIREMENTS_FILE))
     else:
         results.append(CheckResult('Packages', None, 'Not checked, since there is no Python environment.', ''))
     if results[0].ok:

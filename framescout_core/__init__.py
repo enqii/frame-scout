@@ -73,8 +73,8 @@ from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIO
 from .estimate import (RATE_WINDOW, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS,
     AnalysisRate, duration_text, known_throughput, remaining_text, remember_throughput, run_throughput, start_summary,
     stored_throughput)
-from .install_check import (VENV_DIR, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTALL, CheckResult, venv_python,
-    venv_site_packages, requirement_names, installed_versions, check_environment, check_packages, check_torch,
+from .install_check import (VENV_DIR, REQUIREMENTS_FILE, CONSTRAINTS_FILE, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTALL,
+    CheckResult, venv_python, venv_site_packages, requirement_names, installed_versions, check_environment, check_packages, check_torch,
     check_writable, check_models, check_disk_space, check_installation, check_lines)
 from .cache_check import (CACHE_CHECK_LINES, CACHE_SIDE_FILES, cache_check_current, cache_error, cache_error_message,
     cache_read_warning, check_cache, set_cache_aside)

@@ -9,9 +9,10 @@ import pytest
 
 import framescout_core
 from framescout_core import install_check
-from framescout_core.install_check import (CheckResult, check_disk_space, check_environment, check_installation,
-                                           check_lines, check_models, check_packages, check_torch, check_writable,
-                                           installed_versions, requirement_names, venv_python, venv_site_packages)
+from framescout_core.install_check import (CONSTRAINTS_FILE, REQUIREMENTS_FILE, CheckResult, check_disk_space,
+                                           check_environment, check_installation, check_lines, check_models,
+                                           check_packages, check_torch, check_writable, installed_versions,
+                                           requirement_names, venv_python, venv_site_packages)
 
 ROOT = Path(__file__).resolve().parent.parent
 Usage = namedtuple('Usage', 'total used free')
@@ -178,8 +179,11 @@ def test_requirement_names_skip_comments_markers_and_extras():
 
 
 def test_the_real_constraints_and_requirements_can_be_read(tmp_path):
-    constraints = (ROOT / 'constraints.txt').read_text(encoding='utf-8')
-    requirements = (ROOT / 'requirements.txt').read_text(encoding='utf-8')
+    # in the folder requirements/ since I31
+    assert CONSTRAINTS_FILE.as_posix() == 'requirements/constraints.txt'
+    assert REQUIREMENTS_FILE.as_posix() == 'requirements/requirements.txt'
+    constraints = (ROOT / CONSTRAINTS_FILE).read_text(encoding='utf-8')
+    requirements = (ROOT / REQUIREMENTS_FILE).read_text(encoding='utf-8')
     [result] = check_packages(tmp_path, constraints, requirements)
     # nothing installed in tmp_path: every requirement is missing
     assert result.ok is False
@@ -321,8 +325,9 @@ def test_check_installation_runs_every_check_and_writes_nothing(tmp_path, monkey
     site = venv_site_packages(tmp_path)
     site.mkdir(parents=True)
     dist(site, 'torch', '2.14.1+cpu')
-    (tmp_path / 'constraints.txt').write_text('torch==2.14.1\n', encoding='utf-8')
-    (tmp_path / 'requirements.txt').write_text('torch==2.14.1\n', encoding='utf-8')
+    (tmp_path / 'requirements').mkdir()
+    (tmp_path / 'requirements' / 'constraints.txt').write_text('torch==2.14.1\n', encoding='utf-8')
+    (tmp_path / 'requirements' / 'requirements.txt').write_text('torch==2.14.1\n', encoding='utf-8')
     before = sorted(p for p in tmp_path.rglob('*'))
     calls = []
     results = check_installation(tmp_path, {'PATH': 'x'}, run=fake_run(probe(False, None, torch='2.14.1+cpu'),
