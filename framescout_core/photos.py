@@ -261,6 +261,90 @@ class TruncatedImageError(OSError):
     """A photo whose data ends early, decoded with complete=True (framescout_images.open_image, E46)."""
 
 
+# JPEG markers (jpeg_scans_missing): the start of frame markers (SOF0-SOF15 without DHT, JPG
+# and DAC), the progressive ones among them, start of scan, and the markers without a length
+# (restart markers RST0-RST7, start of image, TEM)
+_JPEG_FRAMES = frozenset(range(0xC0, 0xD0)) - {0xC4, 0xC8, 0xCC}
+_JPEG_PROGRESSIVE = frozenset({0xC2, 0xC6, 0xCA, 0xCE})
+_JPEG_SCAN = 0xDA
+_JPEG_STANDALONE = frozenset(range(0xD0, 0xD8)) | {0xD8, 0x01}
+
+
+def _scan_data_end(data, start):
+    """The position of the marker after the image data of a scan that starts at start, or None if the data ends first."""
+    position = data.find(b'\xff', start)
+    while 0 <= position < len(data) - 1:
+        follower = data[position + 1]
+        # 0x00: a stuffed 0xFF byte; a restart marker belongs to the image data
+        if follower != 0x00 and follower not in _JPEG_STANDALONE:
+            return position
+        position = data.find(b'\xff', position + 2)
+    return None
+
+
+def _scans_cover(components, scans, progressive):
+    """Whether the scans [(component ids, first coefficient, last coefficient, precision shift)] complete every component."""
+    if not progressive:
+        return components <= set().union(*(ids for ids, *_ in scans))
+    for component in components:
+        # at full precision (no bits left for a later refinement scan): the DC coefficient
+        # and the AC coefficients 1-63
+        if not any(component in ids and first == 0 and low == 0 for ids, first, _, low in scans):
+            return False
+        ac = set()
+        for ids, first, last, low in scans:
+            if component in ids and first > 0 and low == 0:
+                ac.update(range(first, last + 1))
+        if not ac >= set(range(1, 64)):
+            return False
+    return True
+
+
+def jpeg_scans_missing(data):
+    """Whether the JPEG data, which ends before its end marker, certainly lacks scans (E57).
+
+    Its marker segments are followed from the start: data that ends inside or right after a
+    marker segment (not inside the image data of a scan) lacks scans, and so does data
+    whose scans so far do not cover every component of the frame (baseline) or every
+    coefficient of every component at full precision (progressive). False if it ends inside
+    the image data of a scan that completes the image: whether that data is complete is
+    left to the decoder (framescout_images); False too if the data cannot be followed.
+    """
+    if not data.startswith(b'\xff\xd8'):
+        return False
+    components, progressive, scans = None, False, []
+    position, size = 2, len(data)
+    while True:
+        if position + 1 >= size:
+            return True  # right after a marker segment, or inside a marker
+        if data[position] != 0xFF:
+            return False
+        marker = data[position + 1]
+        if marker == 0xFF:  # fill byte before a marker
+            position += 1
+            continue
+        if marker in _JPEG_STANDALONE:
+            position += 2
+            continue
+        end = position + 2 + int.from_bytes(data[position + 2:position + 4], 'big')
+        if position + 4 > size or end > size:
+            return True  # inside a marker segment
+        payload = data[position + 4:end]
+        if marker in _JPEG_FRAMES and len(payload) >= 6:
+            progressive = marker in _JPEG_PROGRESSIVE
+            components = {payload[6 + 3 * i] for i in range(payload[5]) if 6 + 3 * i < len(payload)}
+        elif marker == _JPEG_SCAN:
+            count = payload[0] if payload else 0
+            if components is None or len(payload) < 4 + 2 * count:
+                return False
+            scans.append(({payload[1 + 2 * i] for i in range(count)}, payload[1 + 2 * count],
+                          payload[2 + 2 * count], payload[3 + 2 * count] & 0x0F))
+            end = _scan_data_end(data, end)
+            if end is None:
+                return not _scans_cover(components, scans, progressive)
+        position = end
+
+
 class RawFallback:
     """The RAW files a search analyzes instead of their partner that cannot be analyzed (E30).
 
