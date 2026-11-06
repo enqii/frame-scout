@@ -2,6 +2,8 @@
 import importlib.util
 from dataclasses import dataclass
 
+from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
+
 
 @dataclass(frozen=True)
 class SearchModel:
@@ -98,5 +100,5 @@ def model_problem(key, find_spec=importlib.util.find_spec):
     names = ', '.join(missing)
     return (f'The search model {_model(key).label} needs the Python package{"s" if len(missing) > 1 else ""} '
             f'{names}, which {"are" if len(missing) > 1 else "is"} not installed. Run Install-FrameScout.bat again '
-            r'(or pip install -r requirements\requirements.txt -c requirements\constraints.txt), or choose '
+            f'(or pip install -r {windows_path(REQUIREMENTS_FILE)} -c {windows_path(CONSTRAINTS_FILE)}), or choose '
             'another search model.')

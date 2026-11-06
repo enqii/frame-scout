@@ -16,6 +16,8 @@ from .layout import (OBSOLETE_CORE_FILE, PACKAGE_ONLY_SCRIPTS, mixed_versions_me
 # may be that older version's, which must not run against this core.
 refuse_mixed_versions(__file__)
 
+from .paths import (REQUIREMENTS_DIR, REQUIREMENTS_FILE, CONSTRAINTS_FILE, ASSETS_DIR, EXAMPLE_PROFILES_FILE,
+    EVAL_PAGE_FILE, windows_path)
 from .names import (AVIF_EXT, HEIF_EXT, RAW_EXT, EXT, SLUG_MAX_LENGTH, slugify, profile_slugs)
 from .photos import (RAW_PARTNER_EXT, RAW_PREVIEW_MIN_EDGE, RAW_FLIP_TRANSPOSE, SKIPPED_EXTENSIONS_SHOWN,
     PhotoScan, Decoders, ALL_DECODERS, available_decoders, supported_extensions, missing_decoder, scan_photos,
@@ -73,7 +75,7 @@ from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIO
 from .estimate import (RATE_WINDOW, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS,
     AnalysisRate, duration_text, known_throughput, remaining_text, remember_throughput, run_throughput, start_summary,
     stored_throughput)
-from .install_check import (VENV_DIR, REQUIREMENTS_FILE, CONSTRAINTS_FILE, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTALL,
+from .install_check import (VENV_DIR, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTALL,
     CheckResult, venv_python, venv_site_packages, requirement_names, installed_versions, check_environment, check_packages, check_torch,
     check_writable, check_models, check_disk_space, check_installation, check_lines)
 from .cache_check import (CACHE_CHECK_LINES, CACHE_SIDE_FILES, cache_check_current, cache_error, cache_error_message,

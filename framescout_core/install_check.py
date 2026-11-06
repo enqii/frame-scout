@@ -29,13 +29,11 @@ from .disk_space import (SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _engine_environ, _e
                          downloaded_models)
 from .hub import hub_cache_dir
 from .models import MODELS
+from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
 from .portable_python import PRIVATE_PYTHON
 from .signature import DEFAULT_YOLO_MODEL
 
 VENV_DIR = '.venv'
-# the installer's requirement files, relative to the FrameScout folder (in requirements/ since I31)
-REQUIREMENTS_FILE = Path('requirements', 'requirements.txt')
-CONSTRAINTS_FILE = Path('requirements', 'constraints.txt')
 # seconds the PyTorch import may take: the first import after an installation can be slow
 # while a virus scanner checks the files
 TORCH_CHECK_TIMEOUT = 180
@@ -145,10 +143,10 @@ def check_environment(base):
 
 
 def check_packages(site_packages, constraints_text, requirements_text):
-    """Check that the packages of requirements.txt are installed and every installed pinned package has its pin.
+    """Check that the packages of requirements/requirements.txt are installed and every installed pinned package has its pin.
 
     A pin of a package that is not installed is no problem unless requirements.txt names it
-    (constraints.txt may pin packages another Python version needs), and a requirement with an
+    (requirements/constraints.txt may pin packages another Python version needs), and a requirement with an
     environment marker is not required either. torch and torchvision count with any build
     label (+cpu, +cu130).
     """
@@ -166,12 +164,12 @@ def check_packages(site_packages, constraints_text, requirements_text):
     other = [f'{package} {installed[package]} instead of {version}' for package, version in sorted(pins.items())
              if package in installed and installed[package].partition('+')[0] != version]
     if not missing and not other:
-        return [CheckResult(name, True, f'{len(installed)} packages installed, in the versions of constraints.txt.',
-                            '')]
+        return [CheckResult(name, True, f'{len(installed)} packages installed, in the versions of '
+                            f'{windows_path(CONSTRAINTS_FILE)}.', '')]
     parts = ([f'missing: {", ".join(missing)}'] if missing else []) + (
         [f'other versions: {", ".join(other)}'] if other else [])
     return [CheckResult(name, False, 'Not as the installer installs them: ' + '; '.join(parts) + '.',
-                        f'{REINSTALL} It installs the versions of constraints.txt.')]
+                        f'{REINSTALL} It installs the versions of {windows_path(CONSTRAINTS_FILE)}.')]
 
 
 def check_torch(python, environ, torch_version, run=subprocess.run, timeout=TORCH_CHECK_TIMEOUT, cwd=None):
