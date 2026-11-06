@@ -297,7 +297,7 @@ the results do not show which case you are in. In one local test with about 5,00
 photos, an English profile "Sword" put 29 photos with a sword among its first 40 results;
 the same profile in German found almost completely different photos. For 16 motifs, the
 first 50 results of the German and the English word agreed by 0 % to 58 %. A multilingual
-model may become an option later (E21 in [BACKLOG.md](../BACKLOG.md)).
+model may become an option later (E21 in [docs/BACKLOG.md](BACKLOG.md)).
 
 ## Results
 

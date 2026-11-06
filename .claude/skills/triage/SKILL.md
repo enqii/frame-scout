@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Triage FrameScout's open work with the user - sort the feature ideas of docs/IDEAS.md and the open items of BACKLOG.md into the roadmap, tag the rest, and record the decisions in one docs-only pull request. Started only by the user typing /triage.
+description: Triage FrameScout's open work with the user - sort the feature ideas of docs/IDEAS.md and the open items of docs/BACKLOG.md into the roadmap, tag the rest, and record the decisions in one docs-only pull request. Started only by the user typing /triage.
 # User-invoked only: the user decides every line, and the skill edits the planning files.
 disable-model-invocation: true
 model: sonnet
@@ -14,16 +14,16 @@ you never move an item on your own. The result is one docs-only pull request.
 The pipeline (rules: `CLAUDE.md` → "Triage"):
 
 1. **Idea** (`docs/IDEAS.md`) → *take over* (becomes a backlog item), *discard* or *park*.
-2. **Backlog** (`BACKLOG.md`) → every open item carries one status tag.
-3. **Roadmap** (`ROADMAP.md`) → themed packages, one PR each. A rolling window of
+2. **Backlog** (`docs/BACKLOG.md`) → every open item carries one status tag.
+3. **Roadmap** (`docs/ROADMAP.md`) → themed packages, one PR each. A rolling window of
    **about 10 open PRs at most**; it is not a second backlog.
 
 ## 1. Read the state
 
 From the main checkout (`git fetch origin --prune`; fast-forward `main` if clean):
 
-1. `ROADMAP.md` – count the open `- [ ]` PRs (the window has room for 10 minus that).
-2. `BACKLOG.md` – every open item with its tag (untagged = not yet triaged).
+1. `docs/ROADMAP.md` – count the open `- [ ]` PRs (the window has room for 10 minus that).
+2. `docs/BACKLOG.md` – every open item with its tag (untagged = not yet triaged).
 3. `docs/IDEAS.md` – ideas without a `Disposition:` line.
 4. Search `docs/BACKLOG-DONE.md` for the keywords of each idea (an idea may already be
    done or a duplicate; name the closest existing item).
@@ -85,7 +85,7 @@ them without the text). Therefore:
 - Never ask a bundled multi-select over many items. One question per decision; the option
   descriptions must be understandable on their own (no bare IDs, no jargon), because the
   user may see only the question dialog.
-- Name where the user can read more (the item's entry in `BACKLOG.md`, the idea in
+- Name where the user can read more (the item's entry in `docs/BACKLOG.md`, the idea in
   `docs/IDEAS.md`) and offer to explain any item on request ("explain X"). If the user says
   the context is not enough, give the missing context in chat instead of repeating the
   question.
@@ -102,18 +102,18 @@ PRs and what is missing from the window, and wait for the user's explicit yes. T
 2. `docs/IDEAS.md`: add one line `Disposition: <take over → F<n> | discarded: <reason> |
    parked: <reason>> (<date>)` under the idea's heading. Nothing else of earlier sections
    is edited.
-3. `BACKLOG.md`: new items for taken-over ideas in group **F** (next free number: search
+3. `docs/BACKLOG.md`: new items for taken-over ideas in group **F** (next free number: search
    both backlog files), with the text of the idea reduced to problem, sketch, affected
    files, risks and hold point; the status tag on every triaged item; closed duplicates
    are removed and mentioned in the PR.
-4. `ROADMAP.md`: new themed packages under "Open (priority order)" in the agreed order,
+4. `docs/ROADMAP.md`: new themed packages under "Open (priority order)" in the agreed order,
    each line naming its backlog IDs and the date (`added <date>`); keep the numbering
    scheme (`P<n>`).
-5. `ROADMAP.md` tidy-up: move every package in which no `- [ ]` or `- [~]` line is left,
+5. `docs/ROADMAP.md` tidy-up: move every package in which no `- [ ]` or `- [~]` line is left,
    with its heading and lines unchanged, from "Open" to the end of
    `docs/ROADMAP-DONE.md`. The next item must still be the first `- [ ]` line.
-6. Check the links and IDs: every ID named in `ROADMAP.md` or `docs/ROADMAP-DONE.md`
-   exists in `BACKLOG.md` or `docs/BACKLOG-DONE.md`.
+6. Check the links and IDs: every ID named in `docs/ROADMAP.md` or `docs/ROADMAP-DONE.md`
+   exists in `docs/BACKLOG.md` or `docs/BACKLOG-DONE.md`.
 7. Commits: Conventional Commits, e.g. `docs(backlog): triage … (F1–F4)`, pushed after
    each commit (`git push -u origin chore/triage-<date>`). Stage files by name.
 8. Open a **non-draft PR** with the template `.github/pull_request_template.md`
@@ -148,6 +148,6 @@ GitHub release. Only after the triage PR is merged and `main` is up to date:
 
 - The user's decision always wins; never re-litigate an earlier one.
 - Never edit `CLAUDE.md` hold points or the PR workflow from here; propose a separate PR.
-- Never create GitHub issues; `BACKLOG.md` is the single source of open work.
-- Keep your context lean: this skill needs `ROADMAP.md`, `BACKLOG.md` and `docs/IDEAS.md`
+- Never create GitHub issues; `docs/BACKLOG.md` is the single source of open work.
+- Keep your context lean: this skill needs `docs/ROADMAP.md`, `docs/BACKLOG.md` and `docs/IDEAS.md`
   and nothing else. After the merge suggest `/clear`, then `/roadmap`.

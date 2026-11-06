@@ -1,6 +1,6 @@
 # FrameScout – Finished roadmap packages
 
-Packages of [ROADMAP.md](../ROADMAP.md) in which every line is done, with their check-off
+Packages of [docs/ROADMAP.md](ROADMAP.md) in which every line is done, with their check-off
 lines (date, pull request, open follow-up IDs). A package moves here unchanged when its
 last line is checked off, at the next `/triage` run (rule: `CLAUDE.md` → "Triage"). The
 items' reports are in [BACKLOG-DONE.md](BACKLOG-DONE.md).
