@@ -103,7 +103,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `multilingual` flag exist, but all offered models are English-only and the "in
       English" hint does not depend on the model yet.
 - [ ] `decision` **E29 – HEIC/RAW support as optional extras:** E25 made `pillow-heif` and `rawpy`
-      required in `requirements.txt` (user decision at the PR #26 hold point; the user may
+      required in `requirements/requirements.txt` (user decision at the PR #26 hold point; the user may
       want them optional later). Idea: a separate requirements file, a question in
       `Install-FrameScout.bat`, and the engine's existing fallback (formats without their
       package are skipped with a note). Roadmap candidate, not scheduled.
@@ -403,7 +403,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `framescout_scoring` a crop's score drops by a weighted z-scored similarity to the best
       exclude text (`z_text - λ·max(0, z_exclude)`); the engine encodes them like custom
       prompts, no cache change. Affected: `app.py`, profile validation and `search_fingerprint`,
-      `framescout_scoring.py`, `framescout_engine.py`, `profiles.example.json`, tests, user
+      `framescout_scoring.py`, `framescout_engine.py`, `assets/profiles.example.json`, tests, user
       guide. Risks: CLIP handles negation poorly, so it must be a separate query; a too strong λ
       buries real matches. **Question:** additive optional `profiles.json` field (schema change)
       and search quality (λ tuned on a local evaluation set, E32/E20). Size M.
