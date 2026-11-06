@@ -90,7 +90,7 @@ repository and keep their own licenses:
 - **Ultralytics** and the YOLO11 person detector `yolo11n.pt` (AGPL-3.0), the main
   reason FrameScout itself uses the AGPL.
 - **OpenCLIP** (MIT), **PyTorch** (BSD-3-Clause), **Streamlit** (Apache-2.0) and the
-  other packages in `requirements.txt` and `constraints.txt`.
+  other packages in `requirements/requirements.txt` and `requirements/constraints.txt`.
 - **Model weights** of the search models, downloaded from the Hugging Face Hub on first
   use (`timm/vit_base_patch32_clip_224.openai`,
   `laion/CLIP-ViT-B-16-DataComp.XL-s13B-b90K`,

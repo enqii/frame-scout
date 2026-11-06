@@ -1634,3 +1634,27 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       before (the previous galleries stay). Smoke runs: one overwritten table leaf page: 2 of 8
       photos left out, galleries written, exit code 0, the warning in the log and the status;
       the table's root page overwritten: exit code 1 with the message.)
+- [x] **I31 – Repository layout, step 2: group the loose root files (medium risk):** move
+      `requirements*.txt`, `constraints.txt` and `pytest.ini` into `requirements/` (check
+      whether `pytest.ini` may move; if not, it stays in the root), `profiles.example.json` and
+      `framescout_eval_page.html` into `assets/`, and `ROADMAP.md`/`BACKLOG.md` into `docs/`
+      (`SECURITY.md` stays where GitHub finds it). Update `install_torch.py`, the `.bat` files,
+      CI, the test that compares the torch pins, `framescout_core.create_from_example`, the
+      skills and briefs in `.claude/` and every link in the docs and `CLAUDE.md`. `Install-`,
+      `Start-` and `Uninstall-FrameScout.bat` stay in the root (double-click). **Decided
+      2026-11-06 (triage):** the target names above, including `ROADMAP.md`/`BACKLOG.md` into
+      `docs/` (the large variant); kind `code-risky` (installer). Found on 2026-10-30 in a
+      review of the folder structure.
+      (done 2026-11-06 in PR #82: `requirements.txt`, `requirements-dev.txt` and
+      `constraints.txt` moved to `requirements/`, `profiles.example.json` and
+      `framescout_eval_page.html` to `assets/`, `ROADMAP.md` and `BACKLOG.md` to `docs/`.
+      `pytest.ini` stays in the root: pytest finds its configuration only in the folder of
+      the call or above it, and moving it would need `-c` on every call and change the
+      rootdir; `SECURITY.md` and the `.bat` files stay too. New `REQUIREMENTS_FILE` and
+      `CONSTRAINTS_FILE` in `framescout_core.install_check`; installer, `install_torch.py`,
+      installation check, CI, skills, briefs, PR template, `CLAUDE.md` and every link
+      follow. New tests: `test_doc_links.py` (every relative Markdown link resolves) and
+      checks that the installer and CI name existing requirement files, that the app creates
+      `profiles.json` from `assets/profiles.example.json` and that the labelling page is
+      shipped in `assets/`. A newer ZIP extracted over an older folder leaves the old root
+      files behind; nothing reads them.)

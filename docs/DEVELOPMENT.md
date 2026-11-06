@@ -28,7 +28,7 @@ exception) or any other: the check itself could not run. It is standard library 
 also runs with the private Python (`.python\python.exe`).
 
 `profiles.json` exists once the app has been started; on a fresh clone use
-`--profiles .\profiles.example.json`.
+`--profiles .\assets\profiles.example.json`.
 
 - A manual run needs no environment variables: unless set, the engine puts model weights,
   the Ultralytics settings and `yolo11n.pt` under the project's `.cache\`, like the `.bat`
@@ -45,15 +45,15 @@ also runs with the private Python (`.python\python.exe`).
   and writes its progress to `<output>\run-status.json`. A second engine on the same folder
   waits five seconds and exits with code 3. The app shows a command-line search into
   `results` too, and its Stop button ends it.
-- To install packages by hand, use `pip install -r requirements.txt -c constraints.txt`;
-  without `-c constraints.txt` pip takes the newest releases.
+- To install packages by hand, use `pip install -r requirements\requirements.txt -c requirements\constraints.txt`;
+  without `-c requirements\constraints.txt` pip takes the newest releases.
 
 ## Tests
 
 The tests need neither torch nor a model download:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements\requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest
 ```
 
@@ -129,15 +129,15 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `framescout_core/` | Shared helpers of app and engine, one module per area; standard library only |
 | `framescout_scoring/` | Scoring package (`ranking.py`, re-exported by `__init__.py`): prompt ensemble, scaling, weighting; numpy only |
 | `framescout_images.py` | Image decoding and thumbnails (Pillow, optional HEIF/RAW); no torch; used by the engine and the evaluation tool |
-| `framescout_eval.py`, `framescout_eval_page.html` | Model evaluation tool (see above); not used by the app |
+| `framescout_eval.py`, `assets/framescout_eval_page.html` | Model evaluation tool (see above); not used by the app |
 | `framescout_uninstall.py`, `Uninstall-FrameScout.bat` | Uninstaller |
 | `framescout_check.py`, `Check-FrameScout.bat` | Read-only installation self-test (`framescout_core/install_check.py`) |
 | `install_torch.py`, `Install-FrameScout.bat`, `Start-FrameScout.bat` | Installation (CPU or CUDA build of PyTorch) and start on Windows |
-| `profiles.example.json` | Example search profiles; copied to `profiles.json` on the first start |
-| `requirements.txt`, `constraints.txt` | Dependencies (ranges, PyTorch pinned) and the exact versions of the verified runs |
-| `requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite |
+| `assets/profiles.example.json` | Example search profiles; copied to `profiles.json` on the first start |
+| `requirements/requirements.txt`, `requirements/constraints.txt` | Dependencies (ranges, PyTorch pinned) and the exact versions of the verified runs |
+| `requirements/requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite (`pytest.ini` stays in the root: pytest finds its configuration only there) |
 | `.github/` | CI workflow and pull request template |
-| `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md`, `docs/ROADMAP-DONE.md` | Order of work, open items, finished items, finished roadmap packages |
+| `docs/ROADMAP.md`, `docs/BACKLOG.md`, `docs/BACKLOG-DONE.md`, `docs/ROADMAP-DONE.md` | Order of work, open items, finished items, finished roadmap packages |
 | `docs/` | User guide, this file, architecture, feature ideas (`IDEAS.md`) |
 | `CLAUDE.md`, `.claude/` | Rules for Claude Code and the `/roadmap` workflow skill |
 | `profiles.json`, `settings.json`, `photos/`, `references/`, `results/`, `run.log` | User data and output (not in the repo) |

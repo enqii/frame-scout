@@ -8,7 +8,7 @@ are in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 `Install-FrameScout.bat` downloads python.org's Python 3.14.9 (about 33 MB, checked
 against a fixed SHA-256) into the folder `.python`, creates an isolated `.venv` with it
-and installs the dependencies in the fixed versions of `constraints.txt`. An installed
+and installs the dependencies in the fixed versions of `requirements/constraints.txt`. An installed
 Python is not needed and not used. A working `.venv` is kept, also one from an earlier
 installer (Python 3.12 to 3.14 installed on the PC). Running the installer again repairs
 an environment that no longer starts or lacks pip, and downloads the private Python again
@@ -38,8 +38,8 @@ of what to do for each problem:
 - **Python environment:** `.venv` belongs to this folder and its Python still exists. After
   a moved or copied folder, delete `.venv` and run `Install-FrameScout.bat`; if the Python is
   missing, run the installer, which repairs it.
-- **Packages:** all packages of `requirements.txt` are installed, in the versions of
-  `constraints.txt` (PyTorch in any build).
+- **Packages:** all packages of `requirements/requirements.txt` are installed, in the versions of
+  `requirements/constraints.txt` (PyTorch in any build).
 - **PyTorch:** it imports (this can take several seconds); an installation with GPU support
   that finds no usable GPU is reported with the hint to update the driver or to run
   `Install-FrameScout.bat cpu`.
@@ -53,7 +53,7 @@ of what to do for each problem:
 or the check cannot run with either, it tells you to run `Install-FrameScout.bat`. In the app,
 the results stay until you click the button again; a line above them says when they were
 found. A package version that differs from
-`constraints.txt` is a problem only because the verified versions are the tested ones; the
+`requirements/constraints.txt` is a problem only because the verified versions are the tested ones; the
 app may still work.
 
 ### GPU support (NVIDIA, CUDA)
@@ -110,7 +110,7 @@ few example profiles that you can edit or delete.
   [Clean up storage](#cleaning-up-storage) can. "Delete profile" asks first and also
   deletes the profile's marks and its saved copy folder setting.
 - Profiles are stored in `profiles.json`, which is not part of the repository: the app
-  creates it from `profiles.example.json` on the first start and never overwrites it.
+  creates it from `assets/profiles.example.json` on the first start and never overwrites it.
   Each save keeps the previous version as `profiles.json.bak` (one step only, so restore
   it right after a mistake). An unreadable `profiles.json` is shown as an error and left
   unchanged. If the file was changed elsewhere (by hand or in another tab) since the page
