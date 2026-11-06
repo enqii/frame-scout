@@ -13,8 +13,8 @@ shows them as a gallery.
   person detection for group photos. Search terms must be **English**.
 
 > **Status:** prototype (v1.1) for Windows. Only one full search and one GPU run have been
-> tested end to end; expect rough edges. Open issues: [BACKLOG.md](BACKLOG.md), plans:
-> [ROADMAP.md](ROADMAP.md).
+> tested end to end; expect rough edges. Open issues: [docs/BACKLOG.md](docs/BACKLOG.md), plans:
+> [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 

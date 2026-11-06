@@ -3,14 +3,14 @@
 Open work: known weaknesses and ideas, nothing is checked off here. Result of the code
 analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 (E = engine, A = app, I = installation/project, F = feature, taken over from
-[docs/IDEAS.md](docs/IDEAS.md)) are referenced in commits, pull requests and discussions.
+[docs/IDEAS.md](IDEAS.md)) are referenced in commits, pull requests and discussions.
 
-- **Finished items** move to [docs/BACKLOG-DONE.md](docs/BACKLOG-DONE.md) with their
+- **Finished items** move to [docs/BACKLOG-DONE.md](BACKLOG-DONE.md) with their
   reports when their PR is merged; the ID stays valid (search both files for it).
-- **The order of work** is in [ROADMAP.md](ROADMAP.md). An item in this file that the
+- **The order of work** is in [docs/ROADMAP.md](ROADMAP.md). An item in this file that the
   roadmap does not name is not scheduled.
 - **A new ID** is the next free number of its group: search both files, e.g.
-  `rg -o "\*\*E\d+ " BACKLOG.md docs/BACKLOG-DONE.md`, and take the highest plus one.
+  `rg -o "\*\*E\d+ " docs/BACKLOG.md docs/BACKLOG-DONE.md`, and take the highest plus one.
 - **Status tags** are set by `/triage` (untagged = not triaged yet) and written in
   backticks before the ID, e.g. ``- [ ] `minor` **E39 – …**``:
   `ready` (clear scope, can be implemented now), `decision` (needs a user decision first;
@@ -406,7 +406,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `TORCH_INSTALL_SPACE['cuda']` (3 GB download, 6 GB installed) is an estimate. Measure on
       the home PC and correct it; could go into the rest of I11. Found in F3 (PR #64).
 
-### Features (from [docs/IDEAS.md](docs/IDEAS.md))
+### Features (from [docs/IDEAS.md](IDEAS.md))
 
 - [ ] `decision` **F6 – "Not this" search texts per profile:** a profile "red car" also ranks
       toy cars or posters high; A20 covers rejected marks, but there is no way to say up front

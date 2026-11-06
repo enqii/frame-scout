@@ -64,8 +64,8 @@ every push to `main` (`.github/workflows/tests.yml`).
 
 Changes go through pull requests with [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/);
 roadmap items follow the workflow in [CLAUDE.md](../CLAUDE.md) (one pull request per
-item). Open work is tracked in [BACKLOG.md](../BACKLOG.md), the order of work in
-[ROADMAP.md](../ROADMAP.md). Report security issues privately (see
+item). Open work is tracked in [docs/BACKLOG.md](BACKLOG.md), the order of work in
+[docs/ROADMAP.md](ROADMAP.md). Report security issues privately (see
 [SECURITY.md](../SECURITY.md)).
 
 ## Evaluating the search models

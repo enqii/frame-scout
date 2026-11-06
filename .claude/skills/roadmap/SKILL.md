@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: Orchestrate the FrameScout roadmap in ROADMAP.md as one pull request per item - reconstruct the current state from git and GitHub, then spawn the implementer or reviewer subagent, relay hold-point questions, and merge only after explicit user approval. Started only by the user typing /roadmap.
+description: Orchestrate the FrameScout roadmap in docs/ROADMAP.md as one pull request per item - reconstruct the current state from git and GitHub, then spawn the implementer or reviewer subagent, relay hold-point questions, and merge only after explicit user approval. Started only by the user typing /roadmap.
 # Deliberately user-invoked only: subagents share this .claude/skills folder in their
 # worktrees, and the orchestrator spawns agents and merges, so the model must never
 # start it on its own (no nested orchestrators).
@@ -37,9 +37,9 @@ Run these as separate, plain commands from the main checkout:
 1. `git fetch origin --prune`
 2. If the main checkout is on `main` and clean: `git merge --ff-only origin/main`.
    Otherwise do not touch it; mention it to the user.
-3. Roadmap: read `ROADMAP.md` (about 50 lines; not `BACKLOG.md`, which holds the items'
+3. Roadmap: read `docs/ROADMAP.md` (about 50 lines; not `docs/BACKLOG.md`, which holds the items'
    details). If step 2 could not fast-forward `main`, read
-   `git show origin/main:ROADMAP.md` instead. The **next item** is the first unchecked
+   `git show origin/main:docs/ROADMAP.md` instead. The **next item** is the first unchecked
    `- [ ]` line of the section "Open (priority order)", top to bottom. Lines marked `- [~]` are deferred by
    user decision and are skipped.
 4. Open PRs: `gh pr list --state open --json number,title,headRefName,isDraft,labels,url`.
@@ -240,9 +240,9 @@ short and evidence-based; the checklist of areas and the signals to read are in
 - Otherwise at most 5 bullets, each: observation → evidence (PR number, comment, step) →
   proposed change → effort (S/M/L). Mark guesses (performance, context size) as guesses.
 - **Propose only, change nothing:** do not edit this skill, the briefs, `CLAUDE.md` or
-  `BACKLOG.md`, and open no PR or issue. The user decides each bullet in chat; accepted
-  ones become a group-I item in `BACKLOG.md` with the next docs PR or `/triage`.
-- Do not repeat a proposal the user already declined or that is already in `BACKLOG.md`
+  `docs/BACKLOG.md`, and open no PR or issue. The user decides each bullet in chat; accepted
+  ones become a group-I item in `docs/BACKLOG.md` with the next docs PR or `/triage`.
+- Do not repeat a proposal the user already declined or that is already in `docs/BACKLOG.md`
   (search it for the keyword first).
 
 **Context hygiene:** keep your own context lean: delegate reading code, diffs and review

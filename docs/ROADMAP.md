@@ -5,9 +5,9 @@ after another (see the PR workflow in `CLAUDE.md` and the `/roadmap` skill). The
 items come first, in priority order; the next item is the first `- [ ]` line.
 The list is a rolling window of about 10 open PRs at most, filled by `/triage` (see
 `CLAUDE.md` → "Triage"); everything else stays in the backlog.
-The items' IDs (E/A/I/F) are described in [BACKLOG.md](BACKLOG.md) (open) and
-[docs/BACKLOG-DONE.md](docs/BACKLOG-DONE.md) (finished). Packages whose lines are all
-done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
+The items' IDs (E/A/I/F) are described in [docs/BACKLOG.md](BACKLOG.md) (open) and
+[docs/BACKLOG-DONE.md](BACKLOG-DONE.md) (finished). Packages whose lines are all
+done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 
 ## Open (priority order)
 
