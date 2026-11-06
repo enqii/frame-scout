@@ -918,6 +918,42 @@ def test_a_waiting_truncated_partner_stays_a_failure_once_the_raw_file_was_analy
     assert fallback.photos([heic, jpeg]) == [raw, jpeg]
 
 
+@pytest.mark.parametrize('first', ['heic', 'jpg'])
+def test_every_truncated_partner_of_the_shot_waits_for_the_raw_file(tmp_path, first):
+    # E53 review: a second truncated partner is not lost either, whether the partner that got
+    # the RAW file failed otherwise (heic) or is truncated itself (jpg)
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    photos = {ext: touch(tmp_path / f'IMG_0001.{ext}') for ext in ('heic', 'jpg', 'jpeg')}
+    assert set(raw_fallbacks(scan_photos(tmp_path))) == set(photos.values())
+    fallback = RawFallback(scan_photos(tmp_path))
+    order = [first] + [ext for ext in photos if ext != first]
+    for ext in order:
+        assert fallback.defer(photos[ext], truncated=ext != 'heic')
+    # a HEIC that failed otherwise and did not get the RAW file stays a failure (E30)
+    lost = [photos['heic']] if first != 'heic' else []
+    assert fallback.choose(lambda path: False) == ({photos[first]: raw}, lost)
+    # the RAW file fails: every truncated partner is analyzed as far as its data goes, and
+    # the RAW failure counts only for a picked partner that failed otherwise
+    assert fallback.defer(raw) is (first != 'heic')
+    retry, lost = fallback.retry()
+    assert sorted(retry) == sorted([photos['jpg'], photos['jpeg']]) and lost == []
+
+
+def test_every_waiting_truncated_partner_stays_a_failure_once_the_raw_file_was_analyzed(tmp_path):
+    raw = touch(tmp_path / 'IMG_0001.dng')
+    heic = touch(tmp_path / 'IMG_0001.heic')
+    jpg = touch(tmp_path / 'IMG_0001.jpg')
+    jpeg = touch(tmp_path / 'IMG_0001.jpeg')
+    fallback = RawFallback(scan_photos(tmp_path))
+    fallback.defer(jpg, truncated=True)
+    fallback.defer(heic)
+    fallback.defer(jpeg, truncated=True)
+    # the picked truncated partner stands for the shot; the others wait for its RAW file
+    assert fallback.choose(lambda path: False) == ({jpg: raw}, [heic])
+    fallback.use(jpg, raw)
+    assert fallback.retry() == ([], [jpeg])
+
+
 # E57: the marker segments of a JPEG that ends before its end marker; built by hand, so
 # that the tests need no Pillow
 def segment(marker, payload=b''):
