@@ -23,6 +23,22 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
 - [ ] Group the loose root files into `requirements/`, `assets/` and `docs/`, update every
       path in installer, CI, tests, skills and docs (I31; kind `code-risky`)
 
+### P19 – Hygiene (`minor` items bundled per area, added 2026-11-06)
+- [ ] (A) Engine: E53, E54, E56, E57
+- [ ] (B) App: A44, F16
+- [ ] (C) Installer: I34, I35, I36 (kind `code-risky`)
+
+### P20 – Cache variables (added 2026-11-06)
+- [ ] The app and the CLI honour cache variables the user set; the engine sets its defaults
+      in `main()`, not on import; a `yolo11n.pt` in the working folder wins (E41, E42, A36;
+      kind `code-risky`)
+
+### P21 – Quick search (added 2026-11-06)
+- [ ] Quick search over the analyzed photos without a profile, result in `results/quick/` (F10)
+
+### P22 – Find similar (added 2026-11-06)
+- [ ] "Find similar" from a result card, builds on P21 (F11)
+
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
       pool at home, search quality is a hold point) (tooling done 2026-10-26 in PR #32;
