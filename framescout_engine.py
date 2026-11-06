@@ -510,8 +510,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 if analyzed(raw):
                     raw_fallback.use(partner, raw)
             # a truncated JPEG whose RAW file failed too is analyzed as far as its data goes,
-            # as any truncated photo is; it counts for the shot (E46)
-            retry = raw_fallback.retry()
+            # as any truncated photo is; it counts for the shot (E46). One that waited for the
+            # RAW file another partner of its shot got stays a failure if that was analyzed (E53)
+            retry, lost = raw_fallback.retry()
+            for _ in lost:
+                finished(failed=1)
             for partner in retry:
                 print(f'The RAW file of {partner} could not be analyzed either; analyzing the readable part of the '
                       'photo instead.', flush=True)

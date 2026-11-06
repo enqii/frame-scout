@@ -274,9 +274,11 @@ class RawFallback:
 
     A partner must decode completely (strict): a merely truncated JPEG, which decodes with
     its missing part gray, fails (TruncatedImageError) so that the RAW file is analyzed
-    instead (E46). If that RAW file fails too, its failure is deferred as well, and retry()
-    returns the truncated partner, which is then analyzed as far as its data goes, so a RAW
-    file LibRaw cannot read does not cost the shot.
+    instead (E46). If that RAW file fails too, retry() returns the truncated partner, which
+    is then analyzed as far as its data goes, so a RAW file LibRaw cannot read does not cost
+    the shot. That also holds for a truncated partner that did not get the RAW file because
+    another partner of the shot failed first (E53): it waits for the RAW file instead of
+    being lost, and stays a failure only once the RAW file was analyzed.
     """
 
     def __init__(self, scan):
@@ -285,7 +287,10 @@ class RawFallback:
         self.used = {}
         self.truncated = set()  # deferred partners that failed only because their data ends early
         self.lenient = set()  # truncated partners analyzed as far as their data goes (retry)
-        self._waiting = {}  # {RAW file: its truncated partner} of the RAW files choose picked
+        # {RAW file: (its truncated partner, the partner it was picked for)} of the RAW files
+        # choose picked
+        self._waiting = {}
+        self._late_lost = []  # waiting partners that did not get the RAW file (retry decides)
         self._retry = []
 
     def strict(self, path):
@@ -297,11 +302,16 @@ class RawFallback:
 
         That is a partner with a RAW file that failed for the first time (truncated: only
         because its data ends early, E46), or the RAW file choose picked for a truncated
-        partner (its partner is retried).
+        partner (its partner is retried). A RAW file picked for another partner of the shot
+        than the truncated one that waits for it (E53) counts as that partner's failure: the
+        waiting partner is retried and counts on its own.
         """
         if path in self._waiting:
-            self._retry.append(self._waiting.pop(path))
-            return True
+            partner, picked_for = self._waiting.pop(path)
+            self._retry.append(partner)
+            if partner != picked_for:
+                self._late_lost.remove(partner)
+            return partner == picked_for
         if path not in self.fallbacks or path in self.failed or path in self.lenient:
             return False
         self.failed.append(path)
@@ -313,7 +323,9 @@ class RawFallback:
         """Return ({partner: RAW file to analyze instead}, [partners that stay failures]).
 
         analyzed(path) tells whether a photo of the search was analyzed. The deferred
-        failures are decided in the order they were deferred, each one once.
+        failures are decided in the order they were deferred, each one once. A truncated
+        partner of a shot whose RAW file another partner got is not in the list: it waits
+        for the outcome of that RAW file (E53, retry).
         """
         failed, self.failed = self.failed, []
         # only the other partners of shots with a failure are asked about
@@ -327,18 +339,29 @@ class RawFallback:
                 lost.append(partner)
             else:
                 chosen[partner] = raw
-        self._waiting = {raw: partner for partner, raw in chosen.items() if partner in self.truncated}
-        return chosen, lost
+        picked_for = {raw: partner for partner, raw in chosen.items()}
+        # the partner picked is preferred if it is truncated, else the first truncated one
+        self._waiting = {raw: (partner, partner) for partner, raw in chosen.items() if partner in self.truncated}
+        for partner in lost:
+            raw = self.fallbacks[partner]
+            if partner in self.truncated and raw in picked_for and raw not in self._waiting:
+                self._waiting[raw] = (partner, picked_for[raw])
+                self._late_lost.append(partner)
+        return chosen, [partner for partner in lost if partner not in self._late_lost]
 
     def retry(self):
-        """Return the truncated partners whose RAW file failed too, to analyze as far as their data goes (E46).
+        """Return (truncated partners whose RAW file failed too, partners that stay failures) (E46, E53).
 
-        Called once the RAW files choose picked are done; from then on they are no longer
-        strict, and a failure of theirs counts (defer returns False).
+        The first are analyzed as far as their data goes; from then on they are no longer
+        strict, and a failure of theirs counts (defer returns False). The second are the
+        truncated partners that waited for the RAW file another partner of their shot got,
+        which was analyzed (E53): they count as failures now. Called once the RAW files
+        choose picked are done.
         """
         partners, self._retry, self._waiting = self._retry, [], {}
+        lost, self._late_lost = self._late_lost, []
         self.lenient.update(partners)
-        return partners
+        return partners, lost
 
     def use(self, partner, raw):
         self.used[partner] = raw
