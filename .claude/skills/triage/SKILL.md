@@ -54,6 +54,13 @@ Priority for the roadmap, in this order:
 If the window would exceed 10 open PRs, propose what waits (tag `parked` or leave in
 the backlog) instead of exceeding it.
 
+**Fill the window.** The goal of a triage is a roadmap of about 10 open PRs. Count the
+open `- [ ]` lines that can actually start (not deferred, not waiting for the user's
+hardware or a pending decision). If the plan leaves fewer than about 8 open PRs, say so
+in the proposal, fill the gap with `minor` bundles (no decision needed) and put the
+`decision` candidates, each as a decision sheet, to the user until the window is filled or
+no candidate is left. Never leave the window short without telling the user why.
+
 Status tags (written in bold after the checkbox, `- [ ] \`tag\` **E15 – …**`):
 
 | Tag | Meaning |
@@ -86,7 +93,9 @@ them without the text). Therefore:
 
 ## 3. Apply the decisions (one docs-only PR)
 
-After the user has agreed to the plan:
+After the user has agreed to the plan: before creating any branch or PR, show the final
+plan as one table (ID, decision, tag, roadmap package) with the resulting number of open
+PRs and what is missing from the window, and wait for the user's explicit yes. Then:
 
 1. Branch `chore/triage-<YYYYMMDD>` from `origin/main`
    (`git switch --no-track -c …`), repo-local git identity (see `CLAUDE.md`).
