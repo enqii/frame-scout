@@ -67,6 +67,23 @@ Status tags (written in bold after the checkbox, `- [ ] \`tag\` **E15 – …**`
 Ask the user with `AskUserQuestion` for every real decision (one question per decision,
 your recommendation first). Do not ask about things the rules already settle.
 
+**The user must be able to decide from the chat alone** (the backlog IDs mean nothing to
+them without the text). Therefore:
+
+- Present every `decision` item that could enter the roadmap as a **decision sheet**, in
+  German and in plain words, before asking: (1) the problem in one sentence with a concrete
+  example, (2) what the user sees or does differently afterwards, (3) costs and risks (new
+  folders, breaking changes, disk use, hold points), (4) size (S/M/L) and kind (`docs`,
+  `code`, `code-risky`), (5) the options with your recommendation and why.
+- Never ask a bundled multi-select over many items. One question per decision; the option
+  descriptions must be understandable on their own (no bare IDs, no jargon), because the
+  user may see only the question dialog.
+- Name where the user can read more (the item's entry in `BACKLOG.md`, the idea in
+  `docs/IDEAS.md`) and offer to explain any item on request ("explain X"). If the user says
+  the context is not enough, give the missing context in chat instead of repeating the
+  question.
+- Items that are not proposed for the roadmap stay in the backlog without a sheet.
+
 ## 3. Apply the decisions (one docs-only PR)
 
 After the user has agreed to the plan:
