@@ -24,7 +24,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       path in installer, CI, tests, skills and docs (I31; kind `code-risky`)
 
 ### P19 – Hygiene (`minor` items bundled per area, added 2026-11-06)
-- [ ] (A) Engine: E53, E54, E56, E57
+- [x] (A) Engine: E53, E54, E56, E57
 - [ ] (B) App: A44, F16
 - [ ] (C) Installer: I34, I35, I36 (kind `code-risky`)
 

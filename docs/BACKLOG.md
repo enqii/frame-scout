@@ -171,36 +171,19 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       home PC together with E17 (P10 B); from the results adjust how many cores
       `torch_threads` leaves free, or also lower the decoding threads (E2), which are not
       reduced now. Found in F4 (PR #65).
-- [ ] `minor` **E53 – E46 detects only a JPEG whose data ends early:** a partner whose JPEG
-      data is damaged in the middle so that libjpeg gives up (`err_code < 0`) still decodes
-      with a gray part, since `LOAD_TRUNCATED_IMAGES` also suppresses that error; a truncated
-      HEIC partner was not tested. A truncated JPEG that is not the chosen partner of its shot
-      (another partner failed first and got the RAW file) is not retried if the RAW file
-      fails, so that shot is lost. Found in the PR of E46 (PR #74).
-- [ ] `minor` **E54 – The unbound check on Linux/macOS and the folder timeout:** E37 handles
-      junctions, mount points and links on Windows; on Linux/macOS an unmounted mount point
-      that stays as an empty folder makes its photos look gone. `FOLDER_TIMEOUT` (30 s) is
-      not measured: a legitimately slow folder (e.g. many absent names each confirmed by a
-      `stat` on a slow share) is not checked (the safe side). Found in the PR of E37 (PR #74).
 - [ ] `minor` **E55 – A model without `weights_repo` needs more than E39's download folder:**
       such a model would also fail `test_every_model_names_its_hub_repositories`, and
       `model_cached`/the offline import (E16), the disk space estimate and "Check
       installation" assume Hub files. Only needed when such a model is ever added. Found in
       the PR of E39 (PR #74).
-- [ ] `minor` **E56 – A damaged cache is reported only after the model load:** the engine
-      opens the cache after loading the model, so E50's message comes a few seconds (or a
-      first download) later than it could; opening the cache before the model load would
-      report it at once. Found in the PR of E50 (PR #74).
-- [ ] `minor` **E57 – E46 counts a JPEG that lacks only its end marker as truncated:** Pillow
-      sets `_ended` whenever the file ends before the EOI marker, also when the image data is
-      complete (checked with Pillow 13.0, baseline and progressive, full and draft decoding:
-      the pixels equal those of the intact file). Such a RAW partner fails with "image file
-      ends early (truncated, or only its end marker is missing)", the RAW file is analyzed
-      instead, and the error and the partner's decode repeat on every run. Pillow exposes no
-      decoder state that tells the two apart (e.g. whether all scanlines were decoded before
-      the data ended); a test that decodes again with filler bytes in place of the missing
-      end missed many truncations. Idea: count the MCUs of the scan, or a Pillow API if one
-      appears. Review of PR #74 (E46).
+- [ ] `hardware` **E58 – `FOLDER_TIMEOUT` is not measured on a slow folder:** the 30 s limit of
+      the unbound check (E37) is not tested on a legitimately slow folder (e.g. many absent
+      names, each confirmed by a `stat` on a slow share); such a folder is not checked (the safe
+      side). Measure it on the home PC or NAS and adjust the limit. Split off from E54 (PR #84).
+- [ ] `minor` **E59 – A truncated HEIC/AVIF that is not a RAW partner is analyzed as an all-black
+      image:** pillow-heif swallows its decoding error under `LOAD_TRUNCATED_IMAGES` and leaves
+      the image blank. `open_image` could always decode HEIF strictly, so such a photo fails with
+      an error instead. Found in E53 (PR #84).
 
 ### App (`app.py`)
 
