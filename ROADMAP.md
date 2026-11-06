@@ -19,18 +19,9 @@ done are in [docs/ROADMAP-DONE.md](docs/ROADMAP-DONE.md).
 - [~] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
-### P15 – Orientation during runs (added 2026-11-03)
-- [x] (A) Remaining-time estimate and a summary before the start (F12)
-- [x] (B) "Check installation" self-test (F15)
-
-### P16 – Hygiene (`minor` items bundled per area, added 2026-11-03)
-- [x] (A) Evaluation tool: E36, E49, E51, I25 (done 2026-11-04 in PR #73)
-- [x] (B) Engine and cache: E37, E39, E40, E44, E46, E50 (done 2026-11-04 in PR #74)
-- [x] (C) App: A34, A38, A40, A41, A42, A43 (done 2026-11-04 in PR #77; A38 not verified in a browser, follow-up A45)
-- [x] (D) Installer: I4, I16 (done 2026-11-05 in PR #78)
-
-### P17 – Repository layout (added 2026-11-03)
-- [x] Scoring module outside the package (I30) (done 2026-11-05 in PR #79)
+### P18 – Repository layout, step 2 (added 2026-11-06)
+- [ ] Group the loose root files into `requirements/`, `assets/` and `docs/`, update every
+      path in installer, CI, tests, skills and docs (I31; kind `code-risky`)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new

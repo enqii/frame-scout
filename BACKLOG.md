@@ -382,15 +382,17 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       redistribution), codec libraries bundled in wheels such as x265 in `pillow-heif` (GPL)
       and LibRaw in `rawpy` (LGPL/CDDL); who builds and hosts the bundle. Needs a user
       decision. Found on 2026-10-27 in P5 part C.
-- [ ] `decision` **I31 – Repository layout, step 2: group the loose root files (medium risk):** move
+- [ ] `ready` **I31 – Repository layout, step 2: group the loose root files (medium risk):** move
       `requirements*.txt`, `constraints.txt` and `pytest.ini` into `requirements/` (check
-      whether `pytest.ini` may move), `profiles.example.json` and `framescout_eval_page.html`
-      into a data folder (e.g. `assets/`), and `ROADMAP.md`/`BACKLOG.md` into `docs/`
+      whether `pytest.ini` may move; if not, it stays in the root), `profiles.example.json` and
+      `framescout_eval_page.html` into `assets/`, and `ROADMAP.md`/`BACKLOG.md` into `docs/`
       (`SECURITY.md` stays where GitHub finds it). Update `install_torch.py`, the `.bat` files,
       CI, the test that compares the torch pins, `framescout_core.create_from_example`, the
       skills and briefs in `.claude/` and every link in the docs and `CLAUDE.md`. `Install-`,
-      `Start-` and `Uninstall-FrameScout.bat` stay in the root (double-click). Needs a user
-      decision on the target names. Found on 2026-10-30 in a review of the folder structure.
+      `Start-` and `Uninstall-FrameScout.bat` stay in the root (double-click). **Decided
+      2026-11-06 (triage):** the target names above, including `ROADMAP.md`/`BACKLOG.md` into
+      `docs/` (the large variant); kind `code-risky` (installer). Found on 2026-10-30 in a
+      review of the folder structure.
 - [ ] `decision` **I32 – Repository layout, step 3: entry points in a package (breaking):** move `app.py`,
       `framescout_engine.py`, `framescout_eval.py`, `framescout_uninstall.py` and
       `install_torch.py` into a package (e.g. `src/framescout/`, started with
