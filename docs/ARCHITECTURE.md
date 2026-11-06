@@ -344,10 +344,16 @@ the module of its area and to the re-exports in `__init__.py`.
   `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
   the installer downloads into `.python`; constants only, checked against the `.bat` by
   `tests/test_installer.py`).
-- `install_check.py` (F15): the read-only installation self-test. `REQUIREMENTS_FILE` and
-  `CONSTRAINTS_FILE` (I31: `Path('requirements/requirements.txt')` and
-  `Path('requirements/constraints.txt')`, relative, re-exported; used by `install_torch.REQUIREMENTS`
-  and by `check_installation`, which reads `base / CONSTRAINTS_FILE` and `base / REQUIREMENTS_FILE`).
+- `paths.py` (I31): where the shipped files lie, relative to the FrameScout folder:
+  `REQUIREMENTS_DIR`, `REQUIREMENTS_FILE`, `CONSTRAINTS_FILE` (`requirements/`), `ASSETS_DIR`,
+  `EXAMPLE_PROFILES_FILE`, `EVAL_PAGE_FILE` (`assets/`), and `windows_path(path)` (the Windows
+  form `requirements\constraints.txt` on any system, for messages to the user). A leaf module
+  (no other FrameScout import), so `models.py` and `install_check.py` both use it. Used by
+  `install_torch.REQUIREMENTS`, `check_installation` (reads `base / CONSTRAINTS_FILE` and
+  `base / REQUIREMENTS_FILE`), the messages of `check_packages` and `model_problem`,
+  `app.EXAMPLE_PROFILES` (and its first-start error), the engine's `--profiles` help,
+  `framescout_eval.PAGE` and the tests (review of PR #82).
+- `install_check.py` (F15): the read-only installation self-test.
   `CheckResult(name, ok, text,
   fix)` (`ok` True, False or None = information); `check_environment(base)` (`.venv/pyvenv.cfg`
   `home` is this folder's `.python` (compared with `os.path.samefile`, so a link, junction or
@@ -460,8 +466,10 @@ subprocess. See "Model evaluation tool" below.
 dependencies `pytest` and `numpy` (for `framescout_scoring`, user decision in PR #11).
 `pytest.ini` stays in the root (I31): pytest finds its configuration only in the folder of the call
 or above it, and a copy under `requirements/` would need `-c` on every call and move the rootdir.
-`test_doc_links.py` checks that every relative Markdown link in the repository's documents resolves;
-`test_example_profiles.py` that the app creates `profiles.json` from `assets/profiles.example.json`;
+`test_doc_links.py` checks that every relative Markdown link (inline and reference definitions) in
+the Markdown files of every folder resolves, skipping only local gitignored folders and agent worktrees;
+`test_example_profiles.py` that the app creates `profiles.json` from `assets/profiles.example.json`
+(`app.py`'s `EXAMPLE_PROFILES` compared as a syntax tree with `BASE / EXAMPLE_PROFILES_FILE`);
 `test_eval_tool.py` that the labelling page is shipped in `assets/`; `test_constraints.py` that the
 requirement files named by the installer and CI exist.
 `test_models.py` (E22) tests the registry, and its checks of every model's open_clip

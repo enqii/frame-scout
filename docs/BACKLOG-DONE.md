@@ -1650,9 +1650,11 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `framescout_eval_page.html` to `assets/`, `ROADMAP.md` and `BACKLOG.md` to `docs/`.
       `pytest.ini` stays in the root: pytest finds its configuration only in the folder of
       the call or above it, and moving it would need `-c` on every call and change the
-      rootdir; `SECURITY.md` and the `.bat` files stay too. New `REQUIREMENTS_FILE` and
-      `CONSTRAINTS_FILE` in `framescout_core.install_check`; installer, `install_torch.py`,
-      installation check, CI, skills, briefs, PR template, `CLAUDE.md` and every link
+      rootdir; `SECURITY.md` and the `.bat` files stay too. New leaf module
+      `framescout_core/paths.py` (`REQUIREMENTS_FILE`, `CONSTRAINTS_FILE`,
+      `EXAMPLE_PROFILES_FILE`, `EVAL_PAGE_FILE`, `windows_path`; review): installer,
+      `install_torch.py`, installation check and its messages, `model_problem`, app, engine
+      help, evaluation tool, tests, CI, skills, briefs, PR template, `CLAUDE.md` and every link
       follow. New tests: `test_doc_links.py` (every relative Markdown link resolves) and
       checks that the installer and CI name existing requirement files, that the app creates
       `profiles.json` from `assets/profiles.example.json` and that the labelling page is
