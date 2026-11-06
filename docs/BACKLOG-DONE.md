@@ -1645,10 +1645,10 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       damage is detected; a JPEG that then decodes only leniently raises `TruncatedImageError`
       ("image data ends early or is damaged (decodes only in part)"), any other file (a truncated
       HEIC: pillow-heif raises `ValueError`, leniently it decodes all black) raises the strict
-      error and is not retried. `RawFallback.choose` keeps a truncated partner of a shot whose RAW
-      file another failed partner got waiting; `defer(raw)` queues it when that RAW file fails, and
-      `retry()` returns `(retry, lost)` (waiting partners whose RAW file was analyzed, counted as
-      failures). Follow-up: E59.)
+      error and is not retried. `RawFallback.choose` keeps every truncated partner of a shot whose
+      RAW file another failed partner got waiting (review: also a second one); `defer(raw)` queues
+      them when that RAW file fails, and `retry()` returns `(retry, lost)` (waiting partners whose
+      RAW file was analyzed, counted as failures). Follow-up: E59.)
 - [x] **E54 – The unbound check on Linux/macOS and the folder timeout:** E37 handles
       junctions, mount points and links on Windows; on Linux/macOS an unmounted mount point
       that stays as an empty folder makes its photos look gone. `FOLDER_TIMEOUT` (30 s) is
@@ -1657,15 +1657,20 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-06 in PR #84, roadmap P19 (A), the Linux/macOS part: an empty folder below
       `/media`, `/mnt`, `/run/media`, `/Volumes` or at an `/etc/fstab` mount point counts as an
       unmounted mount point and its photos as not checked, with a note (kind `unmounted`) saying
-      to mount it and scan again, or to delete the empty folder first. Windows unchanged. Not
-      runtime-tested on Linux/macOS (simulated in tests). Limitation: a folder emptied by hand
-      inside such a place is treated the same (safe side). The timeout measurement is E58.)
+      to mount it and scan again, or to delete the empty folder first. Review: a mount point that
+      udisks or macOS removed on unmount (missing right in a mount folder or in a folder right
+      inside one, such as `/media/<user>`, with no drive mounted on it, or a missing fstab mount
+      point) counts too, also when another drive is mounted next to it (kind `vanished`); a
+      folder deleted on a mounted drive stays gone. Windows unchanged. Not runtime-tested on
+      Linux/macOS (simulated in tests). Limitation: a folder emptied or deleted by hand at such a
+      place is treated the same (safe side). The timeout measurement is E58.)
 - [x] **E56 – A damaged cache is reported only after the model load:** the engine
       opens the cache after loading the model, so E50's message comes a few seconds (or a
       first download) later than it could; opening the cache before the model load would
       report it at once. Found in the PR of E50 (PR #74).
       (done 2026-11-06 in PR #84, roadmap P19 (A): `search` calls `prepare_cache` right after the
-      device/thread setup, before the `loading` status and the model load.)
+      device/thread setup, before the `loading` status and the model load; review: the connection
+      is closed if the cache check, the model load or a reference image fails.)
 - [x] **E57 – E46 counts a JPEG that lacks only its end marker as truncated:** Pillow
       sets `_ended` whenever the file ends before the EOI marker, also when the image data is
       complete. Such a RAW partner failed, the RAW file was analyzed instead, and the error and

@@ -17,9 +17,11 @@ suite: the CUDA path has been run on one machine only (the installer option and 
 exist since PR #8): an RTX 4070 with torch 2.14.1+cu130, Python 3.14 (I11, PR #56). CLIP and
 YOLO on CUDA, `--device auto`, the app's device choice (seen in headless Edge), 400
 synthetic photos and 4997 real full-size JPEGs on CUDA and CPU, all four search models
-and the evaluation tool with real models. The empty mount point check of the unbound photos on Linux/macOS (E54) is **not runtime-tested** (simulated in tests). A fresh `Install-FrameScout.bat cuda`, `cu126`
-and other or several GPUs are untested (I11), as are other Python versions, a fresh install on
-another machine and the edge cases in the backlog are **not** verified. Treat syntax
+and the evaluation tool with real models. The empty or missing mount point check of the
+unbound photos on Linux/macOS (E54) is **not runtime-tested** (simulated in tests). A fresh
+`Install-FrameScout.bat cuda`, `cu126` and other or several GPUs are untested (I11), as are
+other Python versions, a fresh install on another machine and the edge cases in the backlog
+are **not** verified. Treat syntax
 checks, unit tests and a real model run as distinct kinds of evidence, and do not call the
 app production-ready. The installer's download, extraction and `venv` creation with the private
 Python 3.14.9 (P5 part C) and the uninstall with it were run under `.tmp`; a full installation
@@ -281,8 +283,17 @@ the module of its area and to the re-exports in `__init__.py`.
   (`_HANGING`, like `_PROBES`) is given up at once by later passes, without a new thread;
   `_dead_link(folder)`: photos behind a junction, volume mount
   point or symbolic link whose target cannot be reached count as not checked (note names the
-  link). `_unreachable` keeps the cause as `(kind, path)` (`root`, `folder`, `link`), and
-  `_unchecked_notes` words each kind (review). Only ever fewer photos are offered as unbound.
+  link). E54, Linux/macOS only (`_EMPTY_MOUNT_POINTS`): `_unmounted(folder)` returns
+  `('vanished', path)` if the first missing part of the folder is an fstab mount point
+  (`_FSTAB`) or lies right in one of `_MOUNT_ROOTS` (`/media`, `/mnt`, `/run/media`, `/Volumes`)
+  or in a folder right inside one (such as `/media/<user>`) that has no drive mounted on it
+  (`os.path.ismount`; udisks and macOS remove their mount points on unmount, also when another
+  drive stays mounted next to it, review), else `('unmounted', path)` if the nearest existing
+  part is an empty folder inside `_MOUNT_ROOTS` or an fstab mount point; the photos behind it
+  are not checked. Limitation: a folder emptied or deleted by hand at such a place is treated
+  the same (the safe side). `_look_at` returns `(gone, reason)`. `_unreachable` keeps the cause
+  as `(kind, path)` (`root`, `folder`, `link`, `unmounted`, `vanished`), and `_unchecked_notes`
+  words each kind (review). Only ever fewer photos are offered as unbound.
   E44: `project_temp_cleanup(folder, now=None)`
   removes `profiles.json`, `profiles.json.bak` and `settings.json` temp files (`<name>.<8 chars>.tmp`,
   pattern `_PROJECT_TEMP_FILE`) at least `STALE_TEMP_AGE` old by the folder's clock
@@ -946,11 +957,11 @@ reference image of such a format fails with the reason (`missing_decoder`).
   `defer(path, truncated=True)` keeps the failure, `retry()` returns `(retry, lost)`: `retry` are the partners
   (attributes `truncated`/`lenient`) the engine analyzes as far as their data goes (log `The RAW file of ...
   could not be analyzed either; analyzing the readable part of the photo instead.`), counted once for the
-  shot. A truncated partner of a shot whose RAW file another failed partner got stays waiting in `choose`
-  (not in `lost`); `defer(raw)` then counts the RAW failure for the partner the RAW file was picked for and
-  queues the waiting one; `lost` are waiting partners whose RAW file was analyzed, which the engine counts as
-  failures. Photos without a RAW partner decode as before; a truncated partner analyzed by an earlier version
-  stays in the cache. Open: E59 (a truncated HEIC/AVIF that is not a RAW partner is analyzed as an all-black image).
+  shot. Every truncated partner of a shot whose RAW file another failed partner got stays waiting in
+  `choose` (not in `lost`); `defer(raw)` then counts the RAW failure for the partner the RAW file was picked
+  for if that one failed otherwise, and queues all waiting ones; `lost` are waiting partners whose RAW file
+  was analyzed, which the engine counts as failures. Photos without a RAW partner decode as before; a
+  truncated partner analyzed by an earlier version stays in the cache. Open: E59 (a truncated HEIC/AVIF that is not a RAW partner is analyzed as an all-black image).
 - **Damaged cache (E50):** `sqlite3.DatabaseError` / a disk I/O error of the cache file itself
   (`cache_error`) is handled by where it happens (review): opening the cache (`prepare_cache`) or
   storing (`store_group(..., fatal=cache_error)` raises it at once, without storing the group's
@@ -964,7 +975,8 @@ reference image of such a format fails with the reason (`missing_decoder`).
   be read (e.g. the table's root page is damaged), the first such error is raised after the scoring,
   so the search stops as above and the previous galleries stay. Other SQLite errors (locked, full) keep their old
   handling. The cache is opened (`prepare_cache`) right after the device/thread setup, before the `loading`
-  status and the model load, so a damaged cache is reported at once (E56).
+  status and the model load, so a damaged cache is reported at once (E56); if the cache check, the model
+  load or a reference image fails, the connection is closed before the error goes on (review).
 - **Skipped files:** the log names the RAW files skipped for a partner (count and one
   example), the files of a missing decoder with the reason (only if the folder has such
   files), and the files of other extensions by extension (`skipped_lines`); the app's
@@ -1725,7 +1737,26 @@ profile (A22, A33, `test_marks.py`, `test_copy.py`, the result list export in `t
 failing second file, nothing to export; not run: Excel import, a real browser), `require_profile` in
 `test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
 `test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py` and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache, the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in `test_disk_space.py`, `find_yolo_weights` and `open_clip_cache_dir` (E39) in `test_cache_dirs.py`, `cache_error`/`cache_error_message` with real damaged files and `cache_read_warning` (E50) in `test_cache_check.py`, `store_group(..., fatal=)` in `test_pipeline.py` and `final_status(0, warnings)` in `test_run_status.py` (E50 review), the folder timeout, a share behind a junction that stops answering, a folder that still hangs (no second thread), `_link_above`, the notes per cause, dead links and `project_temp_cleanup` without a probe file (E37, E44) in `test_cleanup.py`, `RawFallback.strict/defer/retry` (E46) and the waiting partner, `retry()` with `lost` and `jpeg_scans_missing` (E53, E57) in `test_photos.py`, `open_image(complete=True)` with a truncated JPEG, mid-data damage, a truncated HEIC and a JPEG that lacks only its end marker (E53, E57) in `test_images.py` (needs Pillow, so skipped in CI), the unmounted mount point notes (E54, simulated) in `test_cleanup.py`, the cache opened before the model load (E56) in `test_engine_defaults.py`, and the installer's check, question, stop exit code (with the `.bat` line) and the check for the other packages in `test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots simulated by patching
+`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py`
+and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results
+in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache,
+the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in
+`test_disk_space.py`, `find_yolo_weights` and `open_clip_cache_dir` (E39) in `test_cache_dirs.py`,
+`cache_error`/`cache_error_message` with real damaged files and `cache_read_warning` (E50) in
+`test_cache_check.py`, `store_group(..., fatal=)` in `test_pipeline.py` and `final_status(0,
+warnings)` in `test_run_status.py` (E50 review), the folder timeout, a share behind a junction that
+stops answering, a folder that still hangs (no second thread), `_link_above`, the notes per cause,
+dead links and `project_temp_cleanup` without a probe file (E37, E44) in `test_cleanup.py`,
+`RawFallback.strict/defer/retry` (E46) and the waiting partners (also two truncated ones of one
+shot), `retry()` with `lost` and `jpeg_scans_missing` (E53, E57) in `test_photos.py`,
+`open_image(complete=True)` with a truncated JPEG, mid-data damage, a truncated HEIC and a JPEG that
+lacks only its end marker (E53, E57) in `test_images.py` (needs Pillow, so skipped in CI), the empty
+and the missing mount point notes, also next to another mounted drive, and a folder deleted on a
+mounted drive (E54, simulated) in `test_cleanup.py`, the cache opened before the model load and
+closed if the load fails (E56, source checks) in `test_engine_defaults.py`, and the installer's
+check, question, stop exit code (with the `.bat` line) and the check for the other packages in
+`test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots
+simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the stale temporary files of
 `auto_cleanup` (E26, `test_cleanup.py`: removed; fresh ones, foreign ones and gallery names
