@@ -310,3 +310,148 @@ Disposition: parked: the app would delete files outside `results/` for the first
   source must be handled (the undo removes only the copies, never originals).
 - **Hold point:** UX decision (whether the app should ever delete files outside
   `results/`; it does not today).
+
+## 2026-11-09
+
+Checked against `ROADMAP.md`, `BACKLOG.md`, `docs/BACKLOG-DONE.md` and the earlier ideas
+(keywords: breakdown, per text, analyze only, prepare, review, keyboard, full size,
+unreviewed, OneDrive, cloud, placeholder, offline, port, 8501, instance, shortcut,
+desktop, Start menu). Closest existing items are named where they touch an idea.
+
+### 1. Show which search text matched a result
+- **Problem:** a profile with the generated templates and several custom search texts
+  ranks a photo high, but the card only shows the raw text and image similarity. Users
+  cannot tell which of their texts did the work, so they keep texts that never help or
+  delete the one that finds most matches.
+- **Solution sketch:** `framescout_scoring` already computes the best cosine per query;
+  also return the index of the winning query (template ensemble or custom text n). The
+  card caption names it ("best text: 'a red sports car'"), and the results view gets a
+  small per-profile summary: how many of the top N photos each text won. No scoring or
+  ranking change, the value is only reported.
+- **Affected:** `framescout_scoring` (return the winning query, numpy-only tests),
+  `framescout_engine.py` (card field), `framescout_core` result writing/reading
+  (`results.json` card gains an optional `best_query`), `app.py` results view, HTML
+  gallery caption, user guide "What the numbers mean", `docs/ARCHITECTURE.md` (scoring,
+  result file).
+- **Effort:** S–M.
+- **Risks:** the winning text is a heuristic like the score; with z-scoring a text can
+  win by a tiny margin, so the wording must not suggest the other texts "failed".
+  Results without the field (older runs) show nothing.
+- **Hold point:** no search-quality change; `results.json` gets an additive optional field
+  (check the format-version rule of A25).
+
+### 2. Analyze photos ahead of time, without a search
+- **Problem:** the slow part of a first search is the analysis (hours on a CPU for a big
+  folder), and it only starts once the profiles are ready. Users would like to let the
+  PC prepare a new folder overnight and write their profiles later; F10 (quick search)
+  also only searches photos that are already analyzed.
+- **Solution sketch:** an "Analyze photos now" button in the "Photo source" tab and an
+  engine option `--analyze-only` that runs the scan and the analysis phase with the
+  current model and detection setting, fills `cache.sqlite3` and stops before scoring
+  and export, so `results.json`, the galleries and the marks stay as they are. It uses
+  the normal run lock, status file, stop button and "Keep the PC responsive" (F4); the
+  pre-start summary (F12) then shows "already analyzed".
+- **Affected:** `framescout_engine.py` (option, early exit, no profiles needed),
+  `framescout_core` (status message, argument building), `app.py` (button, status
+  text), user guide "Photo source" and "Search & results", `docs/DEVELOPMENT.md` (CLI),
+  `docs/ARCHITECTURE.md` (pipeline, run state).
+- **Effort:** S–M.
+- **Risks:** a run that writes no `results.json` must not look like a failed search in the
+  results view; the analysis is only useful for the model and detection setting chosen
+  at that time (a later model change analyzes again), which the app should say.
+- **Hold point:** CLI option is additive (not breaking); no schema or cache change.
+
+### 3. One-photo review mode with a large preview
+- **Problem:** marking matches (A17) happens on small gallery thumbnails. For subtle
+  motifs or group photos the user opens each original with "Open" to decide, which is
+  slow for a few hundred results.
+- **Solution sketch:** a "Review" toggle in the results view shows one result at a time:
+  a large preview (the original, decoded downscaled in memory with the existing image
+  helpers, nothing written), the crop that scored best outlined if it is a person crop,
+  the score lines and three buttons "Match", "No match", "Skip". Marking saves through
+  `save_marks` and moves on to the next open photo of the profile. Optional later:
+  keyboard keys, only if they work without a new dependency.
+- **Affected:** `app.py` (review view, per-session position), `framescout_images.py`
+  (preview decode, outline), `framescout_core` (next open photo helper, tested), user
+  guide "Marking and copying matches".
+- **Effort:** M.
+- **Risks:** decoding a large RAW/HEIC original on every rerun is slow (cache the preview
+  per path and mtime in the session, cap its size); the crop box must come from data the
+  result already has, or this part is dropped.
+- **Hold point:** UX/product decision (where the mode lives, keyboard support); a
+  keyboard component would be a new dependency.
+
+### 4. Review progress per profile and "jump to the first unmarked photo"
+- **Problem:** after marking part of a long result list, users lose their place: the
+  gallery always opens on page 1 and does not say how much of the list has been reviewed.
+- **Solution sketch:** a caption per profile in the results view: "Top 150: 32 match,
+  41 no match, 77 open; first open photo at rank 74", and a button that opens the page
+  holding that rank. Read-only over `results.json` and `marks.json`; no new file.
+- **Affected:** `framescout_core` (count and first-open helper, tested), `app.py`
+  (caption, page jump through the existing page state), user guide "Results".
+- **Effort:** S.
+- **Risks:** "Hide photos marked as no match" (A24) changes which page holds a rank; the
+  jump must use the same page computation as the gallery.
+- **Hold point:** no.
+
+### 5. Warn about cloud-only photos before a search
+- **Problem:** a photo folder inside OneDrive (or another sync client with files on
+  demand) can hold thousands of online-only placeholders. Reading them for the analysis
+  makes Windows download every file: the search is slow, uses the internet connection,
+  and can fill the disk – surprising for a tool that promises to work locally.
+- **Solution sketch:** during the scan, `os.stat(...).st_file_attributes` (standard
+  library on Windows; `stat` itself does not download) flags files with
+  `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS` or `FILE_ATTRIBUTE_OFFLINE`. The photo source
+  tab and the pre-start summary show "N photos are only in the cloud (about X GB would be
+  downloaded)" and offer "Skip cloud-only photos" (setting, engine option
+  `--skip-cloud-only`); skipped photos are counted in the log like the RAW skips. Already
+  cached photos need no download and are still ranked.
+- **Affected:** `framescout_core` (scan attribute check, tested with fake stat results),
+  `framescout_engine.py` (option, skip count), `app.py` (setting via `setting_<name>`,
+  summary), `settings.json` defaults, user guide "Photo source", `docs/ARCHITECTURE.md`
+  (several photo folders, photo formats).
+- **Effort:** S–M.
+- **Risks:** attributes differ between sync clients and Windows versions (needs a check
+  on a real OneDrive folder, not runtime-testable in CI); thumbnails and "Open" of a
+  skipped photo would still download it; non-Windows systems report nothing.
+- **Hold point:** new optional setting and additive CLI option; the default (warn only
+  or skip) is a product decision; real-world behavior needs the user's hardware.
+
+### 6. Start: handle a busy port and an already running app
+- **Problem:** `Start-FrameScout.bat` always uses port 8501. If another program uses it,
+  or FrameScout already runs in a forgotten window, Streamlit stops with "Port 8501 is
+  already in use" and users do not know what to do; a second instance of the same folder
+  would also share `results/` with the first.
+- **Solution sketch:** before starting Streamlit, a small standard-library check: if the
+  port answers and it is this folder's FrameScout (e.g. a `results/app-instance.json`
+  with PID and port written at app start, checked for a live process), just open the
+  browser on it; if another program holds the port, pick the next free one of
+  8502–8510 and open that; otherwise start as today. The app removes its instance file
+  on a clean exit; a stale file (dead PID) is ignored.
+- **Affected:** `Start-FrameScout.bat`, a small helper (new script or `framescout_core`
+  function, tested with `tmp_path` and a local socket), `app.py` (instance file),
+  `framescout_core.NEVER_DELETED`/cleanup patterns, user guide "Starting", `docs/ARCHITECTURE.md`.
+- **Effort:** S–M.
+- **Risks:** PID reuse on Windows can make a stale file look alive (also compare the
+  process start time or the port); the browser must only ever open `127.0.0.1`, never a
+  wider bind address.
+- **Hold point:** no (no new dependency, no schema change).
+
+### 7. Optional desktop and Start menu shortcut, removed by the uninstaller
+- **Problem:** users start FrameScout by finding the project folder and double-clicking
+  a `.bat` file, which is easy to lose and looks unlike a normal Windows application.
+- **Solution sketch:** at the end of `Install-FrameScout.bat`, ask "Create a desktop
+  shortcut? (y/N)" and, if yes, create a `.lnk` to `Start-FrameScout.bat` (working
+  folder = the project folder, a FrameScout icon from `assets/`) with PowerShell's
+  `WScript.Shell` COM object – no new dependency. The installer records the shortcut's
+  path in a small file in the project folder; `framescout_uninstall.py` removes exactly
+  that shortcut (only if it still points to this folder) and nothing else. A moved
+  folder makes the check (F15) report a broken shortcut.
+- **Affected:** `Install-FrameScout.bat`, `framescout_uninstall.py`, `framescout_check.py`,
+  `assets/` (icon), README "Installation"/"Uninstalling", user guide, `docs/ARCHITECTURE.md`.
+- **Effort:** S.
+- **Risks:** it is the first file FrameScout writes outside its own folder, so the
+  "clean uninstall" promise depends on the recorded path; OneDrive-redirected desktops
+  and non-English Windows need `[Environment]::GetFolderPath('Desktop')`, not a fixed path.
+- **Hold point:** product decision (writing outside the project folder, default answer);
+  not runtime-testable in CI.
