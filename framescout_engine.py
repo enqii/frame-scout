@@ -23,7 +23,8 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, cache_error, cache_error_message,
                              cache_read_warning, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
-                             AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, run_throughput,
+                             AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, StepSpeed, gallery_thumbnails,
+                             remember_finishing, run_throughput,
                              final_status, yolo_weights,
                              RawFallback, SkippedPhotos, TruncatedImageError, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
@@ -477,7 +478,8 @@ def search(args, parser, roots, dropped, output, status, warnings):
     def store_failed(item, exc):
         failed(item[0], exc)
 
-    status.update('analyzing', total=len(paths))
+    # thumbnails: what the galleries render at most, for the app's time left (F16)
+    status.update('analyzing', total=len(paths), thumbnails=gallery_thumbnails(len(paths), args.top, len(profiles)))
     try:
         todo = to_analyze(paths)
         # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
@@ -545,6 +547,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
     visual_scores = {p['name']: [] for p in profiles}
     # a RAW file analyzed for its broken partner is scored and shown in its place (E30)
     analyzed = raw_fallback.photos(paths)
+    scoring_started = time.monotonic()
     for number, path in enumerate(analyzed, 1):
         status.update(done=number, force=number == len(analyzed))
         try:
@@ -567,6 +570,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
             if name in photo_visual:
                 visual_scores[name].append(photo_visual[name])
     con.close()
+    # the speed of scoring, for the time left of later searches (F16)
+    finishing = remember_finishing(status.state['finishing'], 'scoring', len(analyzed),
+                                   time.monotonic() - scoring_started)
+    if finishing is not None:
+        status.update(finishing=finishing)
     if unreadable and not scored:
         # not a single row could be read (e.g. the root page of the table is damaged): the
         # search stops as for a cache that cannot be opened, and the galleries of the previous
@@ -622,6 +630,10 @@ def search(args, parser, roots, dropped, output, status, warnings):
     # skips (and logs) photos deleted or unreadable since scoring instead of aborting (E6),
     # each photo tried and logged once per export (review of E12)
     skipped = SkippedPhotos(log)
+    # the speed of rendering new thumbnails (not of reused or copied ones), for the time
+    # left of later searches (F16)
+    rendering = StepSpeed()
+    render = rendering.timed(render_thumbnail)
     progress = 0
     results = []  # the content of results.json: what each gallery shows (A12)
     pages = []  # [(file name, HTML)]: published together with results.json at the end (E24)
@@ -636,7 +648,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
             if progress < planned:
                 progress += 1
                 status.update(done=progress, force=progress == total_cards)
-            return skipped.thumbnail(found[1], thumbs, legacy_thumbs, render_thumbnail)
+            return skipped.thumbnail(found[1], thumbs, legacy_thumbs, render)
 
         # ranks count only the cards shown, lower-ranked photos fill up to --top (E12)
         for rank, (match, path, label), thumb_name in gallery_cards(ranked, args.top, thumbnail):
@@ -662,6 +674,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
                         'normalized': normalized[name], 'cards': entries})
     if skipped.summary():
         log(skipped.summary())
+    finishing = rendering.remember(status.state['finishing'], 'thumbnails')
+    if finishing is not None:
+        status.update(finishing=finishing)
     # results.json is published after all galleries, so the file always describes a complete
     # export (A12); a run stopped before leaves the galleries of the previous search (E24)
     settings = {'device': device, 'batch_size': args.batch_size, 'top': args.top,
