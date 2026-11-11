@@ -20,6 +20,7 @@ Current baseline: **v1.1, prototype**, with a Streamlit frontend and a separate 
 - Change `framescout_core.ENGINE_TEMPLATE` whenever cached embeddings become incompatible for all models (preprocessing, crops); another model or weights is a new `framescout_core.MODELS` entry with its own `engine_id`; signature golden values for every model are pinned in `tests/test_signature.py`; cache rows of other signatures are never deleted automatically, only by the user's "Clean up storage" (E7/E11), which must never delete `framescout_core.NEVER_DELETED` files (e.g. `marks.json`).
 - Search terms are **English only** (E3): hint text only, no language check, warning or translation without a new user decision.
 - `torch`/`torchvision` pins in `requirements/requirements.txt` and `requirements/constraints.txt` must equal `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION` (a test checks both).
+- A new root script that imports FrameScout code sets `FRAMESCOUT_PACKAGES = True` before its first FrameScout import and joins `ENTRY_POINTS` in `tests/test_layout.py` (I35).
 - CI installs only `requirements/requirements-dev.txt` and fails if torch is installed: tests must not need torch, Pillow or model downloads.
 - `profiles.json` and `settings.json` are the user's files: never replace an unreadable file, never commit them; `framescout_core.create_from_example` never overwrites.
 - `franchise` in profiles is a legacy field name meaning "Context / origin"; the CLI option `--character` is legacy too – keep backward compatibility.

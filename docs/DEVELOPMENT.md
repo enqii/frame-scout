@@ -143,4 +143,4 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `profiles.json`, `settings.json`, `photos/`, `references/`, `results/`, `run.log` | User data and output (not in the repo) |
 | `.python/`, `.venv/`, `.cache/`, `.tmp/` | Private Python, environment, caches and model weights (not in the repo) |
 
-A new entry point (a root script that imports FrameScout code) must set `FRAMESCOUT_PACKAGES = True` before its first FrameScout import, so the import guards of `framescout_core` and `framescout_scoring` let it run next to the leftover single files of an older version (I35, I36); `tests/test_layout.py` enforces the order.
+A new entry point (a root script that imports FrameScout code) must set `FRAMESCOUT_PACKAGES = True` before its first FrameScout import, so the import guards of `framescout_core` and `framescout_scoring` let it run next to the leftover single files of an older version (I35, I36); add it to `ENTRY_POINTS` in `tests/test_layout.py`, which enforces the order.
