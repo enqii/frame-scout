@@ -3,6 +3,7 @@ import collections
 import importlib
 import os
 import time
+import types
 from pathlib import Path
 
 from .names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
@@ -27,9 +28,11 @@ SKIPPED_EXTENSIONS_SHOWN = 5
 # the same name, sorted; unsupported: Counter {extension: files} of the other files ('' for
 # files without an extension); found_again: the photos found again through another path (a
 # link or hard link) and analyzed once; folders_again: the folders reached again through a
-# link, searched once (A37; both 0 by default)
-PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported found_again folders_again',
-                                   defaults=(0, 0))
+# link, searched once (A37; both 0 by default); stats: {path: (mtime_ns, size)} of the paths
+# as the scan saw them, which the app compares with the cache rows (A44; empty by default:
+# a photo without one is looked at when needed)
+PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported found_again folders_again stats',
+                                   defaults=(0, 0, types.MappingProxyType({})))
 
 # Whether this Python environment can read AVIF (Pillow built with libavif), HEIC/HEIF
 # (pillow-heif) and camera RAW (rawpy) files.
@@ -104,15 +107,21 @@ def _identity(path):
     return (stat.st_dev, stat.st_ino) if stat.st_ino else None
 
 
-def _file_identity(path):
-    """The identity of a photo file: _identity with its size and modification time (review).
+def _file_stat(path):
+    """os.stat of a photo file, or None if it cannot be read."""
+    try:
+        return os.stat(path)
+    except (OSError, ValueError):
+        return None
+
+
+def _file_identity(stat):
+    """The identity of a photo file of its _file_stat: _identity with its size and modification time (review).
 
     Hard links and file links share all four. Including size and time keeps two different
     photos apart on a file system whose file ids are not unique.
     """
-    try:
-        stat = os.stat(path)
-    except (OSError, ValueError):
+    if stat is None:
         return None
     return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns) if stat.st_ino else None
 
@@ -172,6 +181,9 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
     reached through again: found_again, the photos found again by another path, and
     folders_again, the folder links into a folder already walked (also a loop); a folder
     listed twice or inside another listed one is not counted (see distinct_folders).
+
+    The modification time and size of each photo, read for its identity anyway, are kept in
+    stats (A44): the app compares them with the cache rows without reading them again.
     """
     exclude_path = None if exclude is None else Path(exclude)
     exclude_id = None if exclude is None else _identity(exclude)
@@ -217,19 +229,24 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
                 if suffix not in extensions:
                     unsupported[index][suffix] += 1
                     continue
-                file_identity = _file_identity(path) or _real_path_key(path)
+                stat = _file_stat(path)
+                file_identity = _file_identity(stat) or _real_path_key(path)
                 if file_identity in seen_files:
                     found_again[index] += 1
                 else:
                     seen_files.add(file_identity)
                     found[index].append(path)
+                    if stat is not None:
+                        stats[path] = (stat.st_mtime_ns, stat.st_size)
 
+    stats = {}
     while real or links:
         walk(*(real.popleft() + (False,) if real else links.popleft() + (True,)))
     scans = []
     for paths, counts, again, folders_seen in zip(found, unsupported, found_again, folders_again):
         photos, pairs = _shot_pairs(paths)
-        scans.append(PhotoScan(sorted(photos), sorted(pairs), counts, again, folders_seen))
+        scans.append(PhotoScan(sorted(photos), sorted(pairs), counts, again, folders_seen,
+                               {p: stats[p] for p in photos if p in stats}))
     return scans
 
 
@@ -629,14 +646,15 @@ def remembered_scans(memory, folders, extensions=EXT, exclude=None, recount=Fals
 
 def join_scans(scans):
     """Return one PhotoScan of the PhotoScans of several folders (the app counts each folder on its own)."""
-    paths, pairs, unsupported, found_again, folders_again = [], [], collections.Counter(), 0, 0
+    paths, pairs, unsupported, found_again, folders_again, stats = [], [], collections.Counter(), 0, 0, {}
     for scan in scans:
         paths += scan.paths
         pairs += scan.raw_pairs
         unsupported.update(scan.unsupported)
         found_again += scan.found_again
         folders_again += scan.folders_again
-    return PhotoScan(sorted(paths), sorted(pairs), unsupported, found_again, folders_again)
+        stats.update(scan.stats)
+    return PhotoScan(sorted(paths), sorted(pairs), unsupported, found_again, folders_again, stats)
 
 
 def _files(count, kind=''):

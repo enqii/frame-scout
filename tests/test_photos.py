@@ -462,8 +462,33 @@ def test_join_scans_of_folders_counted_one_by_one(tmp_path):
     a = touch(tmp_path / 'one' / 'a.jpg'); touch(tmp_path / 'one' / 'x.mov')
     b = touch(tmp_path / 'two' / 'b.jpg'); touch(tmp_path / 'two' / 'y.mov')
     scans = [scan_photos(tmp_path / 'two'), scan_photos(tmp_path / 'one')]
-    assert join_scans(scans) == PhotoScan([a, b], [], collections.Counter({'.mov': 2}))
-    assert join_scans(scans) == scan_folders([tmp_path / 'one', tmp_path / 'two'])
+    joined = join_scans(scans)
+    assert joined._replace(stats={}) == PhotoScan([a, b], [], collections.Counter({'.mov': 2}))
+    assert set(joined.stats) == {a, b}
+    assert joined == scan_folders([tmp_path / 'one', tmp_path / 'two'])
+
+
+def test_scan_keeps_the_modification_time_and_size_of_each_photo(tmp_path):
+    # the app compares them with the cache rows, like the engine, without asking the
+    # file system again for every photo (A44)
+    a = touch(tmp_path / 'one' / 'a.jpg')
+    b = tmp_path / 'one' / 'sub' / 'b.png'
+    b.parent.mkdir(parents=True)
+    b.write_bytes(b'longer')
+    raw = touch(tmp_path / 'one' / 'a.nef')
+    touch(tmp_path / 'one' / 'clip.mov')
+    scan = scan_photos(tmp_path / 'one')
+    assert scan.stats == {p: (p.stat().st_mtime_ns, p.stat().st_size) for p in (a, b)}
+    assert raw not in scan.stats  # only the photos analyzed have a row to compare with
+    # a hand-made scan has none: the photos are looked at when needed
+    assert PhotoScan([a], [], collections.Counter()).stats == {}
+
+
+def test_scan_keeps_the_times_of_each_folder_apart(tmp_path):
+    a = touch(tmp_path / 'one' / 'a.jpg')
+    b = touch(tmp_path / 'two' / 'b.jpg')
+    one, two = scan_each_folder([tmp_path / 'one', tmp_path / 'two'])
+    assert set(one.stats) == {a} and set(two.stats) == {b}
 
 
 # --- the same folder or photo by another path (A28) and links inside a folder (A29) ---
