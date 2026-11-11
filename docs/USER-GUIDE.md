@@ -195,7 +195,8 @@ galleries if earlier searches measured those; otherwise it says the search shows
 takes after its first minutes. While the search analyzes photos, the progress line adds "about 25 min
 left" once about a minute of analysis has been measured (during the analysis it includes
 scoring and the galleries once earlier searches measured them; otherwise the line says "left for
-the analysis"); if no photo is finished for five
+the analysis"; after the analysis, also on a repeat search whose photos were all analyzed
+before, it names the time left for scoring and the galleries at those speeds); if no photo is finished for five
 minutes (e.g. a very large file), it leaves the time out until the search moves on again. The
 duration before the start comes from the last search with these settings that measured at
 least five minutes (or from a shorter one if there was none). These times are rough: they are
