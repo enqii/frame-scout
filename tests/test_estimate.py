@@ -134,6 +134,17 @@ def test_remaining_text_while_scoring_and_writing_the_galleries():
     assert remaining_text(scoring(rate=None), NOW) == 'about 15 min left'
 
 
+def test_remaining_text_once_every_photo_is_analyzed_or_scored():
+    # the analysis is over (or all photos came from the cache, without a rate), but scoring
+    # and the thumbnails still take their time (review)
+    for status in (analyzing(done=1100, finishing=FINISHING, thumbnails=300),
+                   analyzing(done=1100, rate=None, finishing=FINISHING, thumbnails=300)):
+        assert remaining_text(status, NOW) == 'about 15 min left'  # 1 min of scoring, 15 of thumbnails
+    assert remaining_text(scoring(done=1100), NOW) == 'about 15 min left'  # the thumbnails alone
+    # without earlier speeds there is nothing to estimate
+    assert remaining_text(analyzing(done=1100, thumbnails=300), NOW) is None
+
+
 @pytest.mark.parametrize('status', [
     scoring(finishing=None), scoring(finishing={'scoring': 1000.0}), scoring(thumbnails=None),
     scoring(phase='exporting', done=300, total=300), scoring(phase='exporting', finishing={'scoring': 1000.0}),
