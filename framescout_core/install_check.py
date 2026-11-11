@@ -22,7 +22,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import NamedTuple
 
-from .cache_dirs import CACHE_DIR, cache_paths, find_yolo_weights
+from .cache_dirs import CACHE_DIR, find_yolo_weights
 from .cleanup import _reachable_roots, size_text
 from .devices import cuda_hint
 from .disk_space import (SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _engine_environ, _existing_folder, _reachable,
@@ -290,7 +290,7 @@ def check_installation(base, environ, run=subprocess.run):
     """Run every check for the FrameScout folder base; environ is os.environ (not changed). Returns CheckResults.
 
     The packages are checked only if .venv has a Python, PyTorch is imported (with the
-    environment's Python and the cache variables the engine gets, cache_paths) only if the
+    environment's Python and the cache variables the engine gets, engine_cache_env) only if the
     environment check found no problem; otherwise they are information "Not checked", so a
     broken environment counts as one problem.
     """
@@ -304,8 +304,7 @@ def check_installation(base, environ, run=subprocess.run):
         results.append(CheckResult('Packages', None, 'Not checked, since there is no Python environment.', ''))
     if environment[0].ok:
         torch = installed_versions(site).get('torch')
-        env = {**environ, **{key: str(path) for key, path in cache_paths(base).items()}}
-        results += check_torch(venv_python(base), env, torch, run=run, cwd=base)
+        results += check_torch(venv_python(base), _engine_environ(base, environ), torch, run=run, cwd=base)
     else:
         results.append(CheckResult('PyTorch', None, 'Not checked, since the Python environment does not work.', ''))
     results += check_writable(base / CACHE_DIR, CACHE_DIR)

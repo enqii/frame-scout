@@ -191,11 +191,14 @@ def test_app_search_needs_use_the_folders_the_app_gives_the_engine(tmp_path):
     base.mkdir()
     results, model = base / 'results', MODELS['vit-b-32-openai']
     cache = base / '.cache'
-    # the variables cache_env sets: a YOLO_CONFIG_DIR of the user is replaced, as for the engine
+    # the variables cache_env sets: the project's cache folders, unless the user set one (A36)
+    assert app_search_needs(base, results, {}, 100, 150, 2, model, True, analyzed=40) == [
+        (results, search_space_bytes(100, 150, 2, 40)), (cache / 'huggingface' / 'hub', download_bytes(model.download)),
+        (cache / 'ultralytics', DETECTOR_DOWNLOAD)]
     environ = {'YOLO_CONFIG_DIR': str(tmp_path / 'own')}
     assert app_search_needs(base, results, environ, 100, 150, 2, model, True, analyzed=40) == [
         (results, search_space_bytes(100, 150, 2, 40)), (cache / 'huggingface' / 'hub', download_bytes(model.download)),
-        (cache / 'ultralytics', DETECTOR_DOWNLOAD)]
+        (tmp_path / 'own', DETECTOR_DOWNLOAD)]
     # a HF_HUB_CACHE of the user is kept (cache_env does not set it); weights an older version
     # downloaded into the project folder are moved, not downloaded; detection off: no weights
     (base / 'yolo11n.pt').write_bytes(b'w')
@@ -224,7 +227,10 @@ def test_downloaded_models_look_in_the_cache_the_app_gives_the_engine(tmp_path):
     cache_weights(base / '.cache' / 'huggingface' / 'hub', MODELS['vit-b-32-openai'].weights_repo)
     # SigLIP needs its tokenizer files too
     cache_weights(base / '.cache' / 'huggingface' / 'hub', MODELS['vit-b-16-siglip'].weights_repo)
-    assert downloaded_models(base, {'HF_HOME': str(tmp_path / 'own')}) == {'vit-b-32-openai'}
+    assert downloaded_models(base, {}) == {'vit-b-32-openai'}
+    # a HF_HOME the user set is kept, as for the engine (A36)
+    cache_weights(tmp_path / 'own' / 'hub', MODELS['vit-l-14-datacomp'].weights_repo)
+    assert downloaded_models(base, {'HF_HOME': str(tmp_path / 'own')}) == {'vit-l-14-datacomp'}
     # a HF_HUB_CACHE of the user is kept, as for the engine
     hub = tmp_path / 'hub'
     cache_weights(hub, MODELS['vit-l-14-datacomp'].weights_repo)

@@ -346,12 +346,19 @@ def test_check_installation_runs_every_check_and_writes_nothing(tmp_path, monkey
                                          'Results folder (results)', 'Model files', 'Free disk space']
     assert problems(results) == []
     assert sorted(p for p in tmp_path.rglob('*')) == before
-    # the engine's cache variables point into the folder, a value of the user is overridden as the app does
+    # the engine's cache variables point into the folder
     env = calls[0][1]['env']
     assert env['PATH'] == 'x' and env['HF_HOME'] == str(tmp_path / '.cache' / 'huggingface')
     # PyTorch is imported with the sys.path the engine gets: its first entry is the FrameScout
     # folder, not the caller's working folder (review)
     assert calls[0][1]['cwd'] == str(tmp_path)
+    # a cache variable the user set is kept, as the app and the engine do (A36)
+    calls.clear()
+    own = str(tmp_path / 'own-hf')
+    check_installation(tmp_path, {'PATH': 'x', 'HF_HOME': own},
+                       run=fake_run(probe(False, None, torch='2.14.1+cpu'), calls=calls))
+    env = calls[0][1]['env']
+    assert env['HF_HOME'] == own and env['TORCH_HOME'] == str(tmp_path / '.cache' / 'torch')
 
 
 def test_check_installation_skips_pytorch_without_an_environment(tmp_path, monkeypatch):
