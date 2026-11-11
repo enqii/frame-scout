@@ -248,12 +248,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       ignores e.g. a `HF_HOME` the user exported, a manual run honours it. Probably intended
       (the app keeps the install self-contained), but undecided and undocumented; decide and
       document, or use `default_cache_env` in the app too. Review of PR #42, finding 12. **Decided 2026-11-06 (triage):** the app behaves like the CLI, a variable the user set wins (ROADMAP P20 with E41, E42).
-- [ ] `minor` **A44 – "Already analyzed" ignores modification time and size:** the count of F3 and
-      the summary before the start (F12) use `analyzed_photos`, which counts cache rows of the
-      signature without a `stat`. A photo edited since its analysis counts as analyzed, so the
-      summary may undercount the photos to analyze (and the duration). Fix idea: compare size and
-      modification time like the engine does, reusing the scan cache (A6/A27) so that a rerun
-      does not stat every photo again. Found in F12 (PR #71).
 - [ ] `minor` **A45 – The mark colors in the gallery caption are not checked in a browser:** since
       A38 (PR #77) the `<style>` block of `mark_style` is prepended to the caption above the
       cards (`st.caption(..., unsafe_allow_html=True)`) instead of an own `st.markdown`
@@ -462,9 +456,3 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
       may show people (say so in the guide). **Question:** the contents of the new bundle format
       (no `profiles.json` schema change). Size M.
-- [ ] `minor` **F16 – The time estimate does not cover scoring and the gallery export:** the
-      "about N min left" of F12 and the duration before the start cover only the analysis of the
-      remaining photos. Scoring and especially the gallery export (thumbnails of top x profiles)
-      are not estimated, so a run can take noticeably longer after the estimate reached zero.
-      Idea: record an export rate in `run-status.json` like `throughput` and add it to the
-      summary. Found in F12 (PR #71).

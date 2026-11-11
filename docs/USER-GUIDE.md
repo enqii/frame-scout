@@ -190,16 +190,19 @@ analyze – ranking only"; the detector is loaded only when a photo has to be an
 Before a search the run tab summarizes what it will do: how many photos were found, how many
 are already analyzed with the current settings and how many remain to analyze. If an earlier
 search with the same settings (search model, person detection) ran on the same device, it also
-gives a rough duration for the analysis; otherwise it says the search shows how long it takes
-after its first minutes. While the search analyzes photos, the progress line adds "about 25 min
-left" once about a minute of analysis has been measured; if no photo is finished for five
+gives a rough duration for the analysis, plus an upper bound for scoring and writing the
+galleries if earlier searches measured those; otherwise it says the search shows how long it
+takes after its first minutes. While the search analyzes photos, the progress line adds "about 25 min
+left" once about a minute of analysis has been measured (during the analysis it includes
+scoring and the galleries once earlier searches measured them; otherwise the line says "left for
+the analysis"); if no photo is finished for five
 minutes (e.g. a very large file), it leaves the time out until the search moves on again. The
 duration before the start comes from the last search with these settings that measured at
 least five minutes (or from a shorter one if there was none). These times are rough: they are
-rounded generously (never to seconds), change with what else the PC is doing, and cover only
-the analysis of new photos, not scoring and writing the galleries, which add a little time at
-the end. A photo that you edited after its analysis still counts as already analyzed in the
-summary.
+rounded generously (never to seconds) and change with what else the PC is doing. The gallery
+part assumes that every thumbnail is new, so on a repeat search it is an overestimate. A photo
+that you edited after its analysis counts as not yet analyzed; one edited while the page is open
+counts as analyzed until you press "Recount".
 
 Before a search the run tab warns when a drive would keep less than 1 GB free after the
 search: it lists the drives with the space needed and the space free, and what the search

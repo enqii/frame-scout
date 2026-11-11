@@ -867,6 +867,13 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       the next successful save (the backup then holds the new names) or offer such files
       in "Clean up storage". Review of PR #69, finding 4.
       (done 2026-11-04 in PR #77: no new mechanism: the next save of the profiles replaces `profiles.json.bak`, after which "Reference images no profile uses" offers the old names; pinned by a test in `tests/test_reference_move.py`, and the notice after a failed backup rewrite says so.)
+- [x] **A44 – "Already analyzed" ignores modification time and size:** the count of F3 and
+      the summary before the start (F12) use `analyzed_photos`, which counts cache rows of the
+      signature without a `stat`. A photo edited since its analysis counts as analyzed, so the
+      summary may undercount the photos to analyze (and the duration). Fix idea: compare size and
+      modification time like the engine does, reusing the scan cache (A6/A27) so that a rerun
+      does not stat every photo again. Found in F12 (PR #71).
+      (done 2026-11-11 in PR #86: the count compares `(mtime_ns, size)` of the cache row with the photo's, as the engine does. The scan already `stat`s every photo for its identity and now keeps the result in `PhotoScan.stats`; `analyzed_photos(..., stats=None)` compares with it first and `stat`s only a photo whose row differs, so a photo re-analyzed after the count still counts and a rerun does not `stat` everything again. An unreadable photo counts as not analyzed. A photo edited after the count counts as analyzed until "Recount", like an added photo (A27).)
 
 ### Installation / project
 
@@ -1707,3 +1714,10 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `profiles.json` from `assets/profiles.example.json` and that the labelling page is
       shipped in `assets/`. A newer ZIP extracted over an older folder leaves the old root
       files behind; nothing reads them.)
+- [x] **F16 – The time estimate does not cover scoring and the gallery export:** the
+      "about N min left" of F12 and the duration before the start cover only the analysis of the
+      remaining photos. Scoring and especially the gallery export (thumbnails of top x profiles)
+      are not estimated, so a run can take noticeably longer after the estimate reached zero.
+      Idea: record an export rate in `run-status.json` like `throughput` and add it to the
+      summary. Found in F12 (PR #71).
+      (done 2026-11-11 in PR #86: `run-status.json` gets `thumbnails` (planned gallery thumbnails, `min(photos, top x profiles)`) and `finishing` (photos scored and new thumbnails rendered per minute, kept from the previous status file like `throughput`). The engine times the scoring loop and the newly rendered thumbnails (at least 16 items) and stores both speeds. "About N min left" now includes scoring and the planned thumbnails during the analysis, and appears in the phases "scoring" and "exporting"; the summary before the start adds "scoring and writing the galleries up to about N min more". Without stored speeds (first search, older engine) only the analysis is estimated and the text says so. The thumbnail part assumes every thumbnail is new, so it is an upper bound on a repeat search. New functions in `framescout_core/estimate.py`. Not runtime-tested: the timing in a real engine run.)

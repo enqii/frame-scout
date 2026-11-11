@@ -124,7 +124,7 @@ the module of its area and to the re-exports in `__init__.py`.
   can be read here), `supported_extensions` (`EXT` without the extensions of a missing
   decoder), `missing_decoder`, `scan_each_folder` (one `PhotoScan` per folder, A28/A29) and `scan_photos` (the photos
   of one folder as a `PhotoScan`, built on it), `remembered_scans` (A27: `scan_each_folder` result kept in a
-  caller-owned dict, scanned again only when the folders, extensions or output folder change or on `recount`; cleared without folders), `skipped_lines` (the log lines about skipped files, plus A37: photos and folders found again), `PhotoScan.found_again`/`folders_again` (A37, default 0, counted by `scan_each_folder`, summed by `join_scans`),
+  caller-owned dict, scanned again only when the folders, extensions or output folder change or on `recount`; cleared without folders), `skipped_lines` (the log lines about skipped files, plus A37: photos and folders found again), `PhotoScan.found_again`/`folders_again` (A37, default 0, counted by `scan_each_folder`, summed by `join_scans`), `PhotoScan.stats` (A44: `{path: (mtime_ns, size)}` of `paths` from the `os.stat` of the identity, helper `_file_stat`; default an empty read-only mapping),
   `distinct_folders`/`output_folder_problem`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
   (several photo folders per search, A25; see "Several photo folders"),
   `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
@@ -178,8 +178,11 @@ the module of its area and to the re-exports in `__init__.py`.
   `duration_text` (generous rounding, never seconds: under 2 min "under 2 min", under 10 min
   whole minutes, under 60 min steps of 5, under 5 h steps of 30 min as "about 1 h 30 min",
   else whole hours), `remaining_text(status, now=None)` ("about 25 min left" from the status fields
-  `rate`, `done`, `total`; only in the phase `analyzing`, where `done` counts the cache hits
-  first, so `total - done` are the photos left to analyze; `None` once `updated` is more than
+  `rate`, `done`, `total`; in the phase `analyzing`, where `done` counts the cache hits
+  first, so `total - done` are the photos left to analyze, plus (F16) scoring of all photos and
+  the planned `thumbnails` at the stored `finishing` speeds, else "... left for the analysis";
+  in `scoring` (photos left + planned thumbnails) and `exporting` (cards left, each counted as a
+  new thumbnail) only with stored speeds; `None` once `updated` is more than
   `RATE_STALE` = 300 s old or unreadable, since the rate changes only when photos are stored
   and a stalled analysis would keep its last estimate, review), `stored_throughput`
   (validates the `throughput` list of a status file), `remember_throughput`
@@ -189,8 +192,14 @@ the module of its area and to the re-exports in `__init__.py`.
   written at once, an existing one is replaced only after `THROUGHPUT_MIN_SECONDS` = 300 s of
   measurement, so a run stopped early keeps an earlier, longer run's speed, review),
   `known_throughput(status, signature, device)` (the matching record;
-  device `None` = any device of the signature) and `start_summary(photos, analyzed, per_minute)`
-  (the text of the box before the start).
+  device `None` = any device of the signature) and `start_summary(photos, analyzed, per_minute, finishing=None)`
+  (the text of the box before the start; F16: with a known analysis speed it adds ", scoring and
+  writing the galleries up to about N min more", with everything analyzed "... writes the galleries,
+  which takes up to about N ..."). F16: `FINISHING_STEPS` (`scoring`, `thumbnails`),
+  `FINISHING_MIN_ITEMS` = 16, `StepSpeed` (times one step; `timed` wraps a call),
+  `stored_finishing` (validates the `finishing` dict of a status file), `remember_finishing`
+  (keeps a step's speed only from at least 16 items), `finishing_minutes(finishing, photos,
+  thumbnails)` and `gallery_thumbnails(photos, top, profiles) = min(photos, top * profiles)`.
 - `devices.py`: `detection_options` (YOLO arguments on the CLIP device, E14),
   `device_choices`/`cuda_status`/`cuda_hint` (the app's device choice, CUDA status and the
   way to GPU support, A7), `ULTRALYTICS_ENV`/`import_detector_class` (the engine's only
@@ -321,8 +330,10 @@ the module of its area and to the re-exports in `__init__.py`.
   `SPACE_CHECK_TIMEOUT` (1 s), `LowSpace(folder, needed, free)`, `download_bytes("605 MB")`
   (parses `SearchModel.download`), `search_space_bytes(photos, top, profiles, analyzed=0)`
   (cache rows for the photos not analyzed yet), `analyzed_photos(cache_file, signature,
-  paths)` (how many of the paths have rows of the signature; read-only, an index-only query,
-  a missing or unreadable cache counts as empty), `search_space_needs` (looks at the hub
+  paths, stats=None)` (how many of the paths have rows of the signature whose `(mtime_ns, size)`
+  equal the photo's, as the engine compares, A44; read-only; compares with the scan's `stats`
+  first and `os.stat`s only a photo whose row differs or that has none, an unreadable photo
+  counts as not analyzed; a missing or unreadable cache counts as empty), `search_space_needs` (looks at the hub
   cache and the detector weights only if their root answers in time), `app_search_needs`
   (the needs of a search the app starts: the `cache_paths(base)` variables over the
   environment, as `cache_env` sets them, the hub cache from `hub_cache_dir`, the weights
@@ -1512,7 +1523,7 @@ F2) when no photo needed an analysis; `status_text` appends the message of a run
 phase, e.g. `Scoring photos: 3/10 · Nothing new to analyze – ranking only`, while the
 message of a final phase is shown by the app in its own line. A successful finish clears it.
 
-Time estimate (F12, additive, `STATUS_FORMAT` stays 1): the status file has two more fields.
+Time estimate (F12, additive, `STATUS_FORMAT` stays 1): the status file has two more fields (F16 adds `thumbnails`, the gallery thumbnails the run renders at most, written at the start of "analyzing", `null` before, and `finishing` `{'scoring': photos/min, 'thumbnails': new thumbnails/min}`, kept from the previous file like `throughput` and validated by `stored_finishing`; the engine stores a speed after the scoring loop and the export, timing only newly rendered thumbnails, at least 16 items; older apps ignore both).
 `rate` is the photos per minute of this run's analysis (`AnalysisRate.per_minute()`, `null`
 until measured) and `throughput` a list of at most 8 records `{signature, device, per_minute}`
 (newest first; the average of a whole analysis, written by the engine's `finished()` through
@@ -1565,7 +1576,7 @@ Disk space warning (F3): while photo folders exist and no search runs, the run t
 shows an `st.warning` for the drives that would keep less than 1 GB free: what the search
 writes (cache, thumbnails, first-use model and detector downloads) and the hint to free
 space or lower "Maximum matches per search profile". Start stays enabled. `analyzed` comes
-from `cached_analyzed_photos` (`analyzed_photos` of the scanned paths with the current
+from `cached_analyzed_photos(…, _scan)` (`analyzed_photos` of the scan's paths and `stats` with the current
 settings' signature `cleanup_signature()`, an `st.cache_data` keyed on `file_key` of the
 cache file, the signature and the scan's folders and `counted_at`), so a repeat search of
 an analyzed collection counts no cache rows (review). The folders come from
@@ -1586,8 +1597,7 @@ no warning, any other error a note; the runs start in every case (review).
 
 Summary before the start (F12): in the same place, above the disk space warning, the run tab
 shows `st.info(start_summary(photos found, analyzed, known_throughput(run_status, cleanup_signature(), device)))`
-with the `analyzed` count of F3 (`analyzed_photos`: cache rows of the signature, no `stat`, so
-a changed photo still counts as analyzed). The device "auto" is resolved as CUDA if PyTorch
+with the `analyzed` count of F3 (`analyzed_photos`: cache rows of the signature that match the photo's modification time and size, A44; a photo edited after the count counts as analyzed until "Recount"). The device "auto" is resolved as CUDA if PyTorch
 can use it (`info['cuda']`), else CPU; without the system details (`info` is `None`) any
 device's record of the signature counts. The text is "N photos found · A already analyzed with
 these settings · T to analyze." plus the rough duration of the analysis from the throughput
@@ -1597,8 +1607,7 @@ photo found that the search has nothing to analyze (review). In the progress
 line of a running search (`show_status`), `remaining_text(status)` is appended after
 `status_text` ("· about 25 min left") only when the run is active (`now_active`), because a
 crashed run keeps its last rate in the file, and only while the engine wrote its status in the
-last 5 minutes (a stalled analysis names no time). The estimate covers only the analysis of the
-remaining photos, not scoring or the gallery export (F16); the count ignores changed photos (A44).
+last 5 minutes (a stalled analysis names no time). With stored `finishing` speeds the estimate adds scoring and the planned thumbnails (F16), also in the phases `scoring` and `exporting`; the summary before the start passes `finishing_minutes(run_status['finishing'], photos, gallery_thumbnails(photos, top, profiles))`.
 
 ### Stopping a search
 
