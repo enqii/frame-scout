@@ -26,7 +26,8 @@ windows_only = pytest.mark.skipif(sys.platform != 'win32', reason='runs a .bat f
 # the scripts that are run (they set the marker) and the modules only imported by them
 ENTRY_POINTS = ('app.py', 'framescout_engine.py', 'framescout_eval.py', 'install_torch.py', 'framescout_check.py',
                 'framescout_uninstall.py')
-# added after I15 (E49), so no older version next to the single file has it
+# added after I15 (E49), so no version with the single file framescout_core.py has it; the
+# versions with the single file framescout_scoring.py (before I30) since E49 do (review)
 LIBRARY_MODULES = ('framescout_images.py',)
 OBSOLETE_SCORING_FILE = f'{SCORING_PACKAGE}.py'
 
@@ -160,17 +161,22 @@ def test_only_a_marked_script_of_the_same_folder_may_load_next_to_the_single_fil
         assert refused_import(tmp_path, main_module) == problem, main_module
 
 
+def imported_by(node):
+    """The top-level modules one AST node imports (import, from-import or import_module('<name>'))."""
+    if isinstance(node, ast.Import):
+        return {alias.name.split('.')[0] for alias in node.names}
+    if isinstance(node, ast.ImportFrom) and node.module and not node.level:
+        return {node.module.split('.')[0]}
+    if (isinstance(node, ast.Call) and getattr(node.func, 'attr', getattr(node.func, 'id', None)) == 'import_module'
+            and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)):
+        return {node.args[0].value.split('.')[0]}
+    return set()
+
+
 def module_names(path):
-    """The top-level modules a script imports (import, from-import and import_module('<name>'))."""
+    """The top-level modules a script imports anywhere in it."""
     tree = ast.parse(path.read_text(encoding='utf-8'))
-    names = {alias.name.split('.')[0] for node in ast.walk(tree) if isinstance(node, ast.Import)
-             for alias in node.names}
-    names |= {node.module.split('.')[0] for node in ast.walk(tree)
-              if isinstance(node, ast.ImportFrom) and node.module and not node.level}
-    names |= {node.args[0].value.split('.')[0] for node in ast.walk(tree)
-              if isinstance(node, ast.Call) and getattr(node.func, 'attr', getattr(node.func, 'id', None)) == 'import_module'
-              and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)}
-    return names
+    return {name for node in ast.walk(tree) for name in imported_by(node)}
 
 
 def test_every_script_that_imports_framescout_is_an_entry_point_or_a_library():
@@ -180,22 +186,37 @@ def test_every_script_that_imports_framescout_is_an_entry_point_or_a_library():
     assert importing == set(ENTRY_POINTS) | set(LIBRARY_MODULES)
 
 
+def framescout_import_lines(tree):
+    """The lines of every FrameScout import anywhere in `tree`, also inside try/if/with blocks (review)."""
+    return [node.lineno for node in ast.walk(tree)
+            if any(module.startswith('framescout') for module in imported_by(node))]
+
+
+def marker_lines(tree):
+    """The lines of the top-level assignments LAYOUT_MARKER = True (only those run before any import)."""
+    return [node.lineno for node in tree.body if isinstance(node, ast.Assign)
+            and [getattr(target, 'id', None) for target in node.targets] == [LAYOUT_MARKER]
+            and isinstance(node.value, ast.Constant) and node.value.value is True]
+
+
 @pytest.mark.parametrize('name', ENTRY_POINTS)
 def test_every_entry_point_sets_the_marker_before_its_first_framescout_import(name):
-    body = ast.parse((ROOT / name).read_text(encoding='utf-8')).body
-    first_import = next(i for i, node in enumerate(body)
-                        if isinstance(node, (ast.Import, ast.ImportFrom))
-                        and any(module.startswith('framescout') for module in module_names_of(node)))
-    marker = [i for i, node in enumerate(body) if isinstance(node, ast.Assign)
-              and [getattr(target, 'id', None) for target in node.targets] == [LAYOUT_MARKER]
-              and isinstance(node.value, ast.Constant) and node.value.value is True]
-    assert marker and marker[0] < first_import, name
+    tree = ast.parse((ROOT / name).read_text(encoding='utf-8'))
+    imports, marker = framescout_import_lines(tree), marker_lines(tree)
+    assert imports and marker and marker[0] < min(imports), name
 
 
-def module_names_of(node):
-    if isinstance(node, ast.Import):
-        return [alias.name for alias in node.names]
-    return [node.module or '']
+@pytest.mark.parametrize('source', [
+    'try:\n    import framescout_core\nexcept ImportError:\n    pass\nFRAMESCOUT_PACKAGES = True\nimport framescout_scoring\n',
+    'if True:\n    from framescout_core import x\nFRAMESCOUT_PACKAGES = True\n',
+    'import importlib\nimportlib.import_module("framescout_images")\nFRAMESCOUT_PACKAGES = True\n',
+    'if True:\n    FRAMESCOUT_PACKAGES = True\nimport framescout_core\n',
+])
+def test_the_marker_check_sees_a_framescout_import_inside_a_block(source):
+    # review: a nested import before the marker, or a marker only inside a block, is found
+    tree = ast.parse(source)
+    imports, marker = framescout_import_lines(tree), marker_lines(tree)
+    assert not (imports and marker and marker[0] < min(imports))
 
 
 @pytest.mark.parametrize('name', ENTRY_POINTS)
@@ -264,6 +285,9 @@ def test_the_scoring_guard_says_what_the_core_guard_says(tmp_path):
     for main_module in (types.SimpleNamespace(__file__=str(tmp_path / 'framescout_engine.py'), **{LAYOUT_MARKER: True}),
                         types.SimpleNamespace(__file__=str(tmp_path / 'framescout_engine.py')),
                         types.SimpleNamespace(__file__=str(tmp_path / 'x' / 'app.py'), **{LAYOUT_MARKER: True}),
+                        # review: a marker that is truthy but not True, and a __main__ without __file__
+                        types.SimpleNamespace(__file__=str(tmp_path / 'framescout_engine.py'), **{LAYOUT_MARKER: 'yes'}),
+                        types.SimpleNamespace(**{LAYOUT_MARKER: True}),
                         None):
         assert (scoring_layout.scoring_import_refused(tmp_path, main_module)
                 == refused_import(tmp_path, main_module, SCORING_PACKAGE)), main_module
