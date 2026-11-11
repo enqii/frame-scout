@@ -16,6 +16,7 @@ from .cache_dirs import cache_paths, find_yolo_weights
 from .cleanup import _reachable_roots, _read_only_uri, _root_of, size_text
 from .hub import hub_cache_dir, model_cached
 from .models import MODELS
+from .photos import _file_stat, _file_times
 from .signature import DEFAULT_YOLO_MODEL
 
 # in the units size_text shows them in (and Windows Explorer shows free space in): a "GB"
@@ -76,15 +77,6 @@ def search_space_bytes(photos, top, profiles, analyzed=0):
     return max(0, photos - analyzed) * CACHE_BYTES_PER_PHOTO + min(top, photos) * profiles * THUMBNAIL_BYTES
 
 
-def _file_times(path):
-    """(mtime_ns, size) of the file path, or None if it cannot be read."""
-    try:
-        stat = os.stat(path)
-    except (OSError, ValueError):
-        return None
-    return stat.st_mtime_ns, stat.st_size
-
-
 def analyzed_photos(cache_file, signature, paths, stats=None):
     """Return how many of the photo paths have a current row of signature in the feature cache cache_file.
 
@@ -117,7 +109,7 @@ def analyzed_photos(cache_file, signature, paths, stats=None):
         if row is None:
             continue
         known = stats.get(path)
-        if (known is not None and row == tuple(known)) or row == _file_times(path):
+        if (known is not None and row == tuple(known)) or row == _file_times(_file_stat(path)):
             count += 1
     return count
 
