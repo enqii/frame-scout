@@ -1,6 +1,8 @@
 """The photos of a search: supported extensions, RAW+JPEG pairs, skipped files and RAW previews (E25)."""
 import collections
+import copy
 import os
+import pickle
 import types
 from pathlib import Path
 
@@ -482,6 +484,14 @@ def test_scan_keeps_the_modification_time_and_size_of_each_photo(tmp_path):
     assert raw not in scan.stats  # only the photos analyzed have a row to compare with
     # a hand-made scan has none: the photos are looked at when needed
     assert PhotoScan([a], [], collections.Counter()).stats == {}
+
+
+def test_a_scan_can_be_pickled_and_copied(tmp_path):
+    # e.g. as the value of st.cache_data, which pickles it (review)
+    touch(tmp_path / 'a.jpg')
+    for scan in (scan_photos(tmp_path), PhotoScan([tmp_path / 'b.jpg'], [], collections.Counter())):
+        assert pickle.loads(pickle.dumps(scan)) == scan
+        assert copy.deepcopy(scan) == scan
 
 
 def test_scan_keeps_the_times_of_each_folder_apart(tmp_path):
