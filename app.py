@@ -22,7 +22,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_BACKUP,
                              MARKS_FILE, PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES,
                              SETTING_STEPS, SETTINGS_FILE, RunLock, StatusReporter, cache_paths, check_cache,
-                             engine_cache_env,
+                             default_cache_env,
                              clean_up, cleanup_running, cleanup_summary_text, marks_restore_offer, restore_marks,
                              cache_check_current, set_cache_aside,
                              copy_photos, copy_summary_text, copy_target, count_text, create_from_example, EXAMPLE_PROFILES_FILE,
@@ -1134,12 +1134,13 @@ def show_cache_check():
                   disabled=active, key='cache_set_aside')
 
 def cache_env():
-    # A36: a cache variable the user set is kept, as for a manual engine run; the project's
-    # own cache folders are created up front, a folder the user named is left to the libraries
-    env = engine_cache_env(os.environ, BASE)
-    for name, path in cache_paths(BASE).items():
-        if env[name] == str(path):
-            path.mkdir(parents=True, exist_ok=True)
+    # A36: a cache variable the user set is kept, as for a manual engine run (engine_cache_env
+    # is this copy plus default_cache_env); the project's own cache folders default_cache_env
+    # set are created up front, a folder the user named is left to the libraries
+    env = os.environ.copy()
+    paths = cache_paths(BASE)
+    for name in default_cache_env(env, BASE):
+        paths[name].mkdir(parents=True, exist_ok=True)
     temp = BASE/'.tmp'
     temp.mkdir(parents=True, exist_ok=True)
     env['TMP'] = env['TEMP'] = str(temp)

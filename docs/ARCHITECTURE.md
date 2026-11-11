@@ -1667,9 +1667,10 @@ about 600 MB for the default model, on the first search). Since E9/I10 the engin
 it still precedes the first use of the libraries: torch reads `TORCH_HOME`/`XDG_CACHE_HOME`
 per call, huggingface_hub and Ultralytics are imported later via `import_open_clip` and
 `import_detector_class`; a user's value is kept, so no opt-out is needed; no folder is
-created). The app's `cache_env` uses `engine_cache_env(os.environ, BASE)` (A36), so a user's
-value wins there too and only the project's own `.cache` subfolders it sets (and `.tmp`) are
-created. `disk_space._engine_environ` and `install_check` (`check_models`, the PyTorch
+created). The app's `cache_env` builds the same environment as `engine_cache_env(os.environ,
+BASE)` (A36: a copy of `os.environ` plus `default_cache_env`), so a user's value wins there
+too, and creates only the `.cache` subfolders of the names `default_cache_env` returns (and
+`.tmp`; review: no comparison of path strings). `disk_space._engine_environ` and `install_check` (`check_models`, the PyTorch
 probe) keep a user's value as well. A worktree
 engine therefore defaults to the worktree's own `.cache/`: smoke runs there still point the
 variables at the main checkout's `.cache/` to avoid a new download. Open: open_clip's URL
