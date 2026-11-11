@@ -1313,6 +1313,38 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       tests now check the re-exports of `framescout_scoring` (`tests/test_core_package.py`)
       and that every program folder's `__pycache__` is in `UNINSTALL_ITEMS`; the code stays in
       `ranking.py` (same layout as `framescout_core`). Tests: full pytest 1297 passed, 2 skipped; no engine smoke run.)
+- [x] **I34 – `Check-FrameScout.bat` shows a Python traceback in a folder with files of two versions:**
+      when both `framescout_core.py` and `framescout_core/` exist, the import guard of I16 raises
+      its `ImportError` before `framescout_check.py` can print a check line, so the user sees a
+      traceback with the message instead of a check line. Running `Install-FrameScout.bat` fixes
+      it and the message names the fix, so this is cosmetic. Fix idea: catch the `ImportError`
+      in `framescout_check.py` and print it as a failed check. Found in PR #78 (I16). (The
+      uninstall had the same problem; the review of PR #78 fixed it there: the guard lets
+      `framescout_uninstall.py` load.) (Done 2026-11-11 in PR #88: `framescout_core.install_check.check_program_files` is a new first check line `Program files` in `check_installation`, so `Check-FrameScout.bat` and the app's check print `[PROBLEM]` per leftover `<package>.py` next to `<package>/__init__.py` with the fix, and exit with 2, instead of a traceback. Tests: full pytest 1400 passed, 2 skipped; `Check-FrameScout.bat` itself not run in a real two-version folder.)
+- [x] **I35 – Entry points stop next to the update leftover until Install or Start ran:**
+      after a ZIP of a version with the package was extracted over a folder of a version
+      before I15, the I16 guard also stops the newer `framescout_engine.py` (CLI),
+      `framescout_eval.py` and `install_torch.py` run directly, until `Install-FrameScout.bat`
+      or `Start-FrameScout.bat` deleted `framescout_core.py`; before I16 they ran, because the
+      package wins. Only going back to an older version needs the stop, but the engine and
+      `install_torch.py` existed before I15 too, and the (newer) evaluation tool imports
+      `framescout_scoring`, which may then be the older version's, so the guard cannot tell
+      them apart by name as it does for the uninstall. The message
+      names the fix (delete `framescout_core.py`). Fix idea: a marker that only newer entry
+      points set in `__main__` before importing `framescout_core` and that
+      `layout.refuse_mixed_versions` accepts, checked with Streamlit's `__main__` for `app.py`.
+      Found in the review of PR #78 (I16). (Done 2026-11-11 in PR #88: every entry point (`app.py`, engine, evaluation tool, `install_torch.py`, `framescout_check.py`, `framescout_uninstall.py`) sets `FRAMESCOUT_PACKAGES = True` before its first FrameScout import (`framescout_core.LAYOUT_MARKER`); `layout.refused_import` accepts a marked script in the package's own folder next to the leftover single file and still refuses unmarked ones (an older version's `app.py`/engine/`install_torch.py`); `PACKAGE_ONLY_SCRIPTS` is removed. `tests/test_layout.py` checks the order in each entry point and that every root script importing FrameScout code is an entry point or `framescout_images.py`. Manual: Streamlit `AppTest` ran with the marker and raised the guard's error without it. A future guard for another replaced module needs a new marker name. Not run: a real ZIP update/rollback.)
+- [x] **I36 – A rollback ZIP over a newer folder leaves `framescout_scoring/`, which shadows the old `framescout_scoring.py`:**
+      after going back to an older version by extracting its ZIP over a newer folder, the
+      leftover package `framescout_scoring/` wins over that version's `framescout_scoring.py`
+      (a package beats a module of the same name), so the older engine silently scores with the
+      newer code. Today harmless (the code is identical), it matters once the scoring changes:
+      do it before or with the first change of `framescout_scoring` behavior, since the guard
+      must be in the newer package that is left over. Like I16 for `framescout_core.py`. Fix
+      ideas: a guard in `framescout_scoring/__init__.py` similar to `framescout_core.layout`
+      (then `Install-FrameScout.bat`/`Start-FrameScout.bat` must also delete the leftover
+      `framescout_scoring.py` of an update, which they do not today), or only the existing
+      advice to extract a ZIP into a new, empty folder. Found in PR #79 (I30, review finding 1). (Done 2026-11-11 in PR #88: new `framescout_scoring/layout.py` and a guard in `framescout_scoring/__init__.py` with the same rule and wording as the core's, written out because `framescout_core` may be an older version's after a rollback (a test checks equality and that the package imports no FrameScout module); `Install-FrameScout.bat` and `Start-FrameScout.bat` delete a leftover `framescout_scoring.py` like `framescout_core.py`; `Uninstall-FrameScout.bat` deletes neither. `Install-FrameScout.bat` itself not run (its lines equal Start's by test).)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
