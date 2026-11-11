@@ -173,6 +173,17 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       image:** pillow-heif swallows its decoding error under `LOAD_TRUNCATED_IMAGES` and leaves
       the image blank. `open_image` could always decode HEIF strictly, so such a photo fails with
       an error instead. Found in E53 (PR #84).
+- [ ] `decision` **E60 – The feature cache signature names the detector weights only by the name
+      given:** `feature_signature` records `--yolo-model` as given (`yolo11n.pt`), not which file
+      `yolo_weights` loaded. Since E41 a `yolo11n.pt` in the working folder of a manual run wins
+      over the cached official weights, so a run with fine-tuned weights of the same name reuses
+      the person crop embeddings of a run with the official ones (and writes its own into the same
+      signature): the rankings mix two detectors without notice. Before E41 this happened only
+      when the cache had no copy; a relative path (`models\w.pt`) from different working folders
+      has the same problem. Question: log which file was loaded (cheap, no cache change), or put
+      the resolved path or a hash of non-cache weights into the signature (cache invalidation
+      for those runs: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched until
+      decided). Review of PR #89, finding 3.
 
 ### App (`app.py`)
 
