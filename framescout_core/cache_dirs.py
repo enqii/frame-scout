@@ -1,8 +1,9 @@
 """Model downloads and library config files under the project's .cache folder (E9, I10).
 
-The .bat files, the app and the evaluation tool set the cache variables for the engine;
-a manual engine run gets the same folders from default_cache_env, so nothing lands in the
-user profile and the uninstall stays clean.
+The .bat files, the app (engine_cache_env) and a manual engine run (default_cache_env in
+its main()) set the cache variables a user did not set, so nothing lands in the user
+profile and the uninstall stays clean; a variable the user set wins (A36, E42). The
+evaluation tool sets all of them to its --cache-dir.
 """
 import os
 from pathlib import Path
@@ -40,6 +41,17 @@ def default_cache_env(environ, base):
             environ[name] = str(path)
             added.append(name)
     return added
+
+
+def engine_cache_env(environ, base):
+    """A copy of environ with the cache variables default_cache_env sets for base (A36).
+
+    The environment the app gives the engine it starts: a variable the user set is kept,
+    as for a manual engine run. environ itself is not changed.
+    """
+    env = dict(environ)
+    default_cache_env(env, base)
+    return env
 
 
 def open_clip_cache_dir(model, environ, base):

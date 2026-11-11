@@ -52,10 +52,12 @@ pause
 exit /b 1
 :obsolete_scoring_done
 set "PIP_CACHE_DIR=%CD%\.cache\pip"
-set "TORCH_HOME=%CD%\.cache\torch"
-set "HF_HOME=%CD%\.cache\huggingface"
-set "YOLO_CONFIG_DIR=%CD%\.cache\ultralytics"
-set "XDG_CACHE_HOME=%CD%\.cache"
+rem Model downloads and library settings go to .cache, unless the user set a variable
+rem (A36): as for a manual engine run, that one wins. Start-FrameScout.bat has the same lines.
+if not defined TORCH_HOME set "TORCH_HOME=%CD%\.cache\torch"
+if not defined HF_HOME set "HF_HOME=%CD%\.cache\huggingface"
+if not defined YOLO_CONFIG_DIR set "YOLO_CONFIG_DIR=%CD%\.cache\ultralytics"
+if not defined XDG_CACHE_HOME set "XDG_CACHE_HOME=%CD%\.cache"
 set "TMP=%CD%\.tmp"
 set "TEMP=%CD%\.tmp"
 if not exist ".tmp" mkdir ".tmp"

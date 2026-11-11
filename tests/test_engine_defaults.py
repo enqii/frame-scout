@@ -98,6 +98,17 @@ def test_the_app_starts_the_engine_with_utf8_output():
     assert assigned.get("env['PYTHONIOENCODING']") == "'utf-8'"
 
 
+def test_the_app_keeps_the_cache_variables_a_user_set():
+    # A36: the engine the app starts gets them as a manual run does (engine_cache_env), not
+    # all of cache_paths over the user's values
+    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    [cache_env] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'cache_env']
+    assert 'env = engine_cache_env(os.environ, BASE)' in ast.unparse(cache_env)
+    stored = {ast.unparse(node.slice) for node in ast.walk(cache_env)
+              if isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store)}
+    assert stored == {"'TMP'", "'TEMP'", "'PYTHONIOENCODING'"}
+
+
 def test_the_engine_uses_the_shared_default_yolo_model():
     # known_signatures computes the cache signatures of the app's settings with it (E11)
     default = option_default_node('--yolo-model')

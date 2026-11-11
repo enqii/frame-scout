@@ -12,7 +12,7 @@ import sqlite3
 from pathlib import Path
 from typing import NamedTuple
 
-from .cache_dirs import cache_paths, find_yolo_weights
+from .cache_dirs import engine_cache_env, find_yolo_weights
 from .cleanup import _reachable_roots, _read_only_uri, _root_of, size_text
 from .hub import hub_cache_dir, model_cached
 from .models import MODELS
@@ -160,10 +160,11 @@ def app_search_needs(base, results, environ, photos, top, profiles, model, perso
                      timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
     """Return the search_space_needs of a search the app starts (F3 review: tested here, not in app.py).
 
-    The app runs the engine in base with the cache variables of cache_paths(base) set over
-    environ (cache_env), so the model comes from the Hugging Face cache those give (a
-    HF_HUB_CACHE of the user is kept) and the person detector's weights are looked up as
-    yolo_weights does (find_yolo_weights); person_detection False needs no weights.
+    The app runs the engine in base with the cache variables of cache_paths(base) set where
+    environ has none (cache_env, engine_cache_env; a value of the user is kept, A36), so the
+    model comes from the Hugging Face cache those give (a HF_HUB_CACHE of the user is kept)
+    and the person detector's weights are looked up as yolo_weights does
+    (find_yolo_weights); person_detection False needs no weights.
     """
     environ = _engine_environ(base, environ)
     weights = None
@@ -175,8 +176,8 @@ def app_search_needs(base, results, environ, photos, top, profiles, model, perso
 
 
 def _engine_environ(base, environ):
-    """environ with the cache variables cache_env sets for the engine the app runs (cache_paths(base))."""
-    return {**environ, **{name: str(path) for name, path in cache_paths(base).items()}}
+    """environ with the cache variables cache_env sets for the engine the app runs (engine_cache_env)."""
+    return engine_cache_env(environ, base)
 
 
 def downloaded_models(base, environ, timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):

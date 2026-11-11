@@ -4,10 +4,13 @@ import os
 import subprocess
 import sys
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+
+import pytest
 
 from framescout_core import (DEFAULT_MODEL, DEFAULT_YOLO_MODEL, MODELS, cache_folder_paths, cache_paths,
-                             default_cache_env, find_yolo_weights, open_clip_cache_dir, yolo_weights)
+                             default_cache_env, engine_cache_env, find_yolo_weights, open_clip_cache_dir,
+                             yolo_weights)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -174,6 +177,18 @@ def test_the_default_weights_in_the_project_folder_stay_an_older_download(tmp_pa
     assert yolo_weights('yolo11s.pt', tmp_path, tmp_path, {}) == 'yolo11s.pt'
 
 
+def test_engine_cache_env_keeps_the_variables_a_user_set(tmp_path):
+    # A36: the app gives the engine the cache variables as a manual run gets them
+    environ = {'PATH': 'x', 'HF_HOME': r'D:\hf', 'TORCH_HOME': ''}
+    env = engine_cache_env(environ, tmp_path)
+    paths = cache_paths(tmp_path)
+    assert env == {'PATH': 'x', 'HF_HOME': r'D:\hf', 'TORCH_HOME': str(paths['TORCH_HOME']),
+                   'YOLO_CONFIG_DIR': str(paths['YOLO_CONFIG_DIR']), 'XDG_CACHE_HOME': str(paths['XDG_CACHE_HOME'])}
+    # a copy: the caller's environment is not changed
+    assert environ == {'PATH': 'x', 'HF_HOME': r'D:\hf', 'TORCH_HOME': ''}
+    assert not (tmp_path / '.cache').exists()
+
+
 def test_find_yolo_weights_looks_where_yolo_weights_does_without_moving(tmp_path):
     # the free disk space check asks whether the detector needs a download (F3 review)
     base, cwd = tmp_path / 'project', tmp_path / 'elsewhere'
@@ -214,6 +229,43 @@ def test_open_clip_downloads_from_a_url_into_the_project_cache(tmp_path):
     assert open_clip_cache_dir(url_model, {}, tmp_path) == str(tmp_path / '.cache' / 'clip')
     for model in MODELS.values():
         assert open_clip_cache_dir(model, {'XDG_CACHE_HOME': str(tmp_path)}, tmp_path) is None
+
+
+BAT_FILES = ('Start-FrameScout.bat', 'Install-FrameScout.bat')
+
+
+def cache_lines(name):
+    """The lines of the .bat file name that set one of the cache variables of cache_paths."""
+    lines = [line.strip() for line in (ROOT / name).read_text(encoding='utf-8').splitlines()]
+    return [line for line in lines if any(f'"{variable}=' in line for variable in cache_paths(ROOT))]
+
+
+def test_the_bat_files_set_only_the_cache_variables_a_user_did_not_set():
+    # A36: as for a manual engine run (default_cache_env), a variable the user set wins
+    expected = [f'if not defined {variable} set "{variable}=%CD%\\{PureWindowsPath(path.relative_to(ROOT))}"'
+                for variable, path in cache_paths(ROOT).items()]
+    for name in BAT_FILES:
+        assert sorted(cache_lines(name)) == sorted(expected), name
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='runs a .bat file')
+def test_the_cache_lines_of_the_bat_files_keep_a_variable_the_user_set(tmp_path):
+    # the lines themselves, run by cmd.exe in a folder with a space, "!" and ")" in its name
+    folder = tmp_path / 'Fo!to (old) & co'
+    folder.mkdir()
+    names = list(cache_paths(ROOT))
+    script = folder / 'cache.bat'
+    script.write_text('\r\n'.join(['@echo off', 'setlocal', 'cd /d "%~dp0"', *cache_lines('Start-FrameScout.bat'),
+                                   # quoted: the "&" of the folder path would end the echo
+                                   *[f'echo "{name}=%{name}%"' for name in names]]) + '\r\n', encoding='utf-8')
+    env = {k: v for k, v in os.environ.items() if k.upper() not in names}
+    env['HF_HOME'] = str(tmp_path / 'own-hf')
+    result = subprocess.run(['cmd.exe', '/d', '/c', '.\\cache.bat'], cwd=folder, env=env, capture_output=True,
+                            text=True, errors='replace', timeout=60)
+    assert result.returncode == 0, result.stderr
+    expected = {name: str(path) for name, path in cache_paths(folder).items()}
+    expected['HF_HOME'] = env['HF_HOME']
+    assert result.stdout.splitlines() == [f'"{name}={expected[name]}"' for name in names]
 
 
 def test_the_engine_passes_the_url_cache_folder_to_open_clip():
