@@ -115,10 +115,21 @@ def find_yolo_weights(name, base, cwd, environ):
     cached = Path(folder) / name
     legacy = Path(base) / name if name == DEFAULT_YOLO_MODEL else None
     own = Path(cwd) / name
-    if own.is_file() and not (legacy is not None and legacy.is_file() and own.samefile(legacy)):
+    # the project folder is told by its path, not by the file's identity (samefile): that
+    # stats a file another search may be moving into the cache, and some Windows volumes
+    # (exFAT, network shares) report no unique file index (review)
+    if own.is_file() and not (legacy is not None and _same_folder(cwd, base)):
         return own, cached
     if cached.is_file():
         return cached, cached
     if legacy is not None and legacy.is_file():
         return legacy, cached
     return None, cached
+
+
+def _same_folder(a, b):
+    """Whether the folders a and b are the same folder, by their resolved paths."""
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except (OSError, RuntimeError):  # e.g. a symbolic link loop
+        return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))

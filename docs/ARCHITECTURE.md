@@ -1036,8 +1036,10 @@ call under a lock (several photos per call: E18). The detector is created with
 or URL as given; a bare name in the working folder wins (E41: a copy the user put next to
 the run is deliberate), then one in the folder of `YOLO_CONFIG_DIR` (a user's value is kept,
 as in `default_cache_env`; else `.cache/ultralytics/`) if present. Exception: the default
-`yolo11n.pt` in the project folder (also when the engine runs there, as the app does) is
-treated as an older version's download: a cached copy wins, otherwise it is moved into the
+`yolo11n.pt` in the project folder (also when the engine runs there, as the app does; the
+working folder counts as the project folder by its resolved path, not by `samefile`, which
+would stat a file another search may be moving and is unreliable on volumes without a unique
+file index, review) is treated as an older version's download: a cached copy wins, otherwise it is moved into the
 cache folder once (used in place with a `run.log` line if the move fails; with a copy
 already there it stays for the uninstall); otherwise the cache path,
 where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged.
