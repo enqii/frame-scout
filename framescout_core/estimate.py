@@ -125,7 +125,8 @@ def remaining_text(status, now=None):
     photos left are the ones to analyze) the time comes from the run's rate; scoring all
     photos and rendering the planned gallery thumbnails ("thumbnails" of the status) are
     added at the speeds of earlier searches ("finishing", F16). Without these the text names
-    the analysis alone ("... left for the analysis"). During "scoring" and "exporting" only
+    the analysis alone ("... left for the analysis"); once every photo is analyzed, only
+    the earlier speeds count (review). During "scoring" and "exporting" only
     the earlier speeds count, for the photos and cards left (each card may need a new
     thumbnail). now: the current time (an aware datetime; default now). A status not
     written for RATE_STALE seconds names no time (review: else a stalled analysis kept
@@ -135,26 +136,32 @@ def remaining_text(status, now=None):
     if phase not in ('analyzing', 'scoring', 'exporting'):
         return None
     done, total = _count(status, 'done'), _count(status, 'total')
-    if done is None or total is None or total - done <= 0:
+    if done is None or total is None or total <= 0:
         return None
     if _stalled(status, now or datetime.now().astimezone()):
         return None
-    left = total - done
+    left = max(0, total - done)
     thumbnails = _count(status, 'thumbnails')
     finishing = status.get('finishing')
     if phase == 'analyzing':
-        rate = _positive(status.get('rate'))
-        if rate is None:
-            return None
         rest = None if thumbnails is None else finishing_minutes(finishing, total, thumbnails)
-        if rest is None:
-            return f'{duration_text(left / rate)} left for the analysis'
-        return f'{duration_text(left / rate + rest)} left'
+        if not left:
+            # every photo is analyzed (or came from the cache, without a rate), but scoring
+            # and the thumbnails still take their time (review)
+            analysis = 0.0
+        else:
+            rate = _positive(status.get('rate'))
+            if rate is None:
+                return None
+            analysis = left / rate
+            if rest is None:
+                return f'{duration_text(analysis)} left for the analysis'
+        return None if rest is None else f'{duration_text(analysis + rest)} left'
     if phase == 'scoring':
         rest = None if thumbnails is None else finishing_minutes(finishing, left, thumbnails)
     else:
         rest = finishing_minutes(finishing, 0, left)
-    return None if rest is None else f'{duration_text(rest)} left'
+    return None if not rest else f'{duration_text(rest)} left'
 
 
 def stored_finishing(value):

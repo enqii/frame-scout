@@ -181,7 +181,8 @@ the module of its area and to the re-exports in `__init__.py`.
   `rate`, `done`, `total`; in the phase `analyzing`, where `done` counts the cache hits
   first, so `total - done` are the photos left to analyze, plus (F16) scoring of all photos and
   the planned `thumbnails` at the stored `finishing` speeds, else "... left for the analysis";
-  in `scoring` (photos left + planned thumbnails) and `exporting` (cards left, each counted as a
+  once every photo is analyzed (or came from the cache, without a `rate`) only scoring and
+  thumbnails, review; in `scoring` (photos left + planned thumbnails) and `exporting` (cards left, each counted as a
   new thumbnail) only with stored speeds; `None` once `updated` is more than
   `RATE_STALE` = 300 s old or unreadable, since the rate changes only when photos are stored
   and a stalled analysis would keep its last estimate, review), `stored_throughput`
