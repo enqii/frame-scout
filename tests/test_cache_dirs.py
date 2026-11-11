@@ -143,6 +143,37 @@ def test_yolo_weights_in_the_working_folder_are_used_as_before(tmp_path):
     assert yolo_weights('yolo11m.pt', base, cwd, {}) == str(base / '.cache' / 'ultralytics' / 'yolo11m.pt')
 
 
+def test_yolo_weights_in_the_working_folder_win_over_a_cached_copy(tmp_path):
+    # E41: a copy the user put into the working folder is deliberate, so it wins over the cache
+    base, cwd, own = tmp_path / 'project', tmp_path / 'elsewhere', tmp_path / 'own'
+    base.mkdir(), cwd.mkdir()
+    for name in (DEFAULT_YOLO_MODEL, 'yolo11s.pt'):
+        for folder in (base / '.cache' / 'ultralytics', own):
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / name).write_bytes(b'cached')
+        (cwd / name).write_bytes(b'mine')
+        for environ in ({}, {'YOLO_CONFIG_DIR': str(own)}):
+            cached = Path(environ.get('YOLO_CONFIG_DIR') or base / '.cache' / 'ultralytics') / name
+            assert find_yolo_weights(name, base, cwd, environ) == (cwd / name, cached)
+            assert yolo_weights(name, base, cwd, environ) == name
+            # nothing moved or replaced
+            assert (cwd / name).read_bytes() == b'mine' and cached.read_bytes() == b'cached'
+
+
+def test_the_default_weights_in_the_project_folder_stay_an_older_download(tmp_path):
+    # E41: started in the project folder, the default file there is what an older version
+    # downloaded (E9), not a copy of the user: a cached copy still wins and it is not used
+    cached = tmp_path / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
+    cached.parent.mkdir(parents=True)
+    cached.write_bytes(b'w')
+    (tmp_path / DEFAULT_YOLO_MODEL).write_bytes(b'old')
+    assert find_yolo_weights(DEFAULT_YOLO_MODEL, tmp_path, tmp_path, {}) == (cached, cached)
+    # another name in the project folder is the user's own copy, used as given
+    (tmp_path / 'yolo11s.pt').write_bytes(b'mine')
+    cached.with_name('yolo11s.pt').write_bytes(b'w')
+    assert yolo_weights('yolo11s.pt', tmp_path, tmp_path, {}) == 'yolo11s.pt'
+
+
 def test_find_yolo_weights_looks_where_yolo_weights_does_without_moving(tmp_path):
     # the free disk space check asks whether the detector needs a download (F3 review)
     base, cwd = tmp_path / 'project', tmp_path / 'elsewhere'
