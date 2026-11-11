@@ -177,6 +177,24 @@ def test_the_default_weights_in_the_project_folder_stay_an_older_download(tmp_pa
     assert yolo_weights('yolo11s.pt', tmp_path, tmp_path, {}) == 'yolo11s.pt'
 
 
+def test_the_project_folder_is_told_by_its_path_not_by_the_file(tmp_path, monkeypatch):
+    # review: samefile stats a file another search may be moving into the cache meanwhile, and
+    # on volumes without a unique file index (exFAT, network shares) two files compare equal
+    base, cwd = tmp_path / 'project', tmp_path / 'elsewhere'
+    (base / 'sub').mkdir(parents=True), cwd.mkdir()
+    (base / DEFAULT_YOLO_MODEL).write_bytes(b'old')
+    (cwd / DEFAULT_YOLO_MODEL).write_bytes(b'mine')
+    cached = base / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
+
+    def no_stat(self, other):
+        raise AssertionError('samefile is not needed')
+
+    monkeypatch.setattr(Path, 'samefile', no_stat)
+    assert find_yolo_weights(DEFAULT_YOLO_MODEL, base, cwd, {}) == (cwd / DEFAULT_YOLO_MODEL, cached)
+    # another spelling of the project folder is still the project folder
+    assert find_yolo_weights(DEFAULT_YOLO_MODEL, base, base / 'sub' / '..', {}) == (base / DEFAULT_YOLO_MODEL, cached)
+
+
 def test_engine_cache_env_keeps_the_variables_a_user_set(tmp_path):
     # A36: the app gives the engine the cache variables as a manual run gets them
     environ = {'PATH': 'x', 'HF_HOME': r'D:\hf', 'TORCH_HOME': ''}
