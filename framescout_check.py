@@ -3,7 +3,8 @@
     python framescout_check.py
 
 Read-only: it writes, downloads and repairs nothing (a temporary file shows whether .cache
-and results can be written and is deleted right away). It checks that the Python
+and results can be written and is deleted right away). It checks that the program files are
+of one FrameScout version (I34), the Python
 environment (.venv) belongs to this folder, the package versions equal requirements/constraints.txt,
 PyTorch imports (in a subprocess) and finds the GPU for a CUDA build, .cache and results can
 be written, which model files are downloaded and the free disk space, and names one fix per
@@ -18,7 +19,7 @@ from pathlib import Path
 
 # I35: a script of a version with the packages framescout_core and framescout_scoring, which
 # load for it next to an older version's leftover single files (framescout_core.layout); set
-# before the first FrameScout import
+# before the first FrameScout import. The check reports such leftovers as a problem (I34).
 FRAMESCOUT_PACKAGES = True
 
 from framescout_core import check_installation, check_lines

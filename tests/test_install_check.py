@@ -342,7 +342,7 @@ def test_check_installation_runs_every_check_and_writes_nothing(tmp_path, monkey
     calls = []
     results = check_installation(tmp_path, {'PATH': 'x'}, run=fake_run(probe(False, None, torch='2.14.1+cpu'),
                                                                         calls=calls))
-    assert [r.name for r in results] == ['Python environment', 'Packages', 'PyTorch', 'Cache folder (.cache)',
+    assert [r.name for r in results] == ['Program files', 'Python environment', 'Packages', 'PyTorch', 'Cache folder (.cache)',
                                          'Results folder (results)', 'Model files', 'Free disk space']
     assert problems(results) == []
     assert sorted(p for p in tmp_path.rglob('*')) == before
