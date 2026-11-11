@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from framescout_core import (FINISHING_MIN_ITEMS, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, RATE_WINDOW,
-                             THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS, AnalysisRate, StepSpeed, duration_text,
+from framescout_core import (FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, RATE_MIN_PHOTOS, RATE_MIN_SECONDS,
+                             RATE_STALE, RATE_WINDOW, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS, AnalysisRate, StepSpeed, duration_text,
                              finishing_minutes,
                              gallery_thumbnails, known_throughput, remaining_text, remember_finishing,
                              remember_throughput, run_throughput, start_summary, stored_finishing, stored_throughput)
@@ -261,6 +261,18 @@ def test_remember_finishing_needs_enough_items():
     assert remember_finishing({}, 'scoring', FINISHING_MIN_ITEMS - 1, 10.0) is None
     assert remember_finishing({}, 'scoring', FINISHING_MIN_ITEMS, 0.0) is None
     assert remember_finishing({}, 'thumbnails', 30, 60.0) == {'thumbnails': pytest.approx(30.0)}
+
+
+def test_a_short_measurement_does_not_replace_a_stored_speed():
+    # a small search measured too little to replace the speed of an earlier one (review);
+    # the first speed of a step is stored at once
+    before = {'scoring': 500.0, 'thumbnails': 10.0}
+    assert remember_finishing(before, 'thumbnails', 100, FINISHING_MIN_SECONDS - 1) is None
+    assert remember_finishing(before, 'thumbnails', 100, FINISHING_MIN_SECONDS) == {
+        'scoring': 500.0, 'thumbnails': pytest.approx(100 * 60 / FINISHING_MIN_SECONDS)}
+    assert remember_finishing({'scoring': 500.0}, 'thumbnails', 100, 1.0) == {
+        'scoring': 500.0, 'thumbnails': pytest.approx(6000.0)}
+    assert remember_finishing({'thumbnails': 0}, 'thumbnails', 100, 1.0) == {'thumbnails': pytest.approx(6000.0)}
 
 
 def test_remember_finishing_replaces_one_step_and_keeps_the_other():
