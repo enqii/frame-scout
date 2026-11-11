@@ -3,8 +3,8 @@
 After a Windows update, a moved folder or an interrupted installation, a search fails with a
 traceback in run.log, and nothing says whether to reinstall. Check-FrameScout.bat
 (framescout_check.py) and the app's AI settings tab run these checks and name one fix per
-problem: the Python environment belongs to this folder, the installed package versions are
-those of requirements/constraints.txt, PyTorch imports (and finds the GPU for a CUDA build), .cache and
+problem: the program files are of one FrameScout version (I34), the Python environment
+belongs to this folder, the installed package versions are those of requirements/constraints.txt, PyTorch imports (and finds the GPU for a CUDA build), .cache and
 results can be written, which model files are downloaded, and the free disk space.
 
 Read-only: nothing is written, downloaded or repaired. The only file operation is a temporary
@@ -28,6 +28,7 @@ from .devices import cuda_hint
 from .disk_space import (SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _engine_environ, _existing_folder, _reachable,
                          downloaded_models)
 from .hub import hub_cache_dir
+from .layout import REPLACED_PACKAGES, leftover_fix, leftover_text
 from .models import MODELS
 from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
 from .portable_python import PRIVATE_PYTHON
@@ -112,6 +113,17 @@ def _same_folder(first, second):
         return os.path.samefile(first, second)
     except OSError:
         return False
+
+
+def check_program_files(base):
+    """Are the program files in base of one FrameScout version (I34)? A single file next to its package is a leftover."""
+    name = 'Program files'
+    found = [package for package in REPLACED_PACKAGES
+             if (Path(base) / f'{package}.py').is_file() and (Path(base) / package / '__init__.py').is_file()]
+    if not found:
+        return [CheckResult(name, True, 'No leftovers of another FrameScout version.', '')]
+    return [CheckResult(name, False, f'The FrameScout folder holds {leftover_text(package)}', leftover_fix(package))
+            for package in found]
 
 
 def check_environment(base):
@@ -283,13 +295,14 @@ def check_installation(base, environ, run=subprocess.run):
     broken environment counts as one problem.
     """
     base = Path(base)
-    results = check_environment(base)
+    environment = check_environment(base)
+    results = check_program_files(base) + environment
     site = venv_site_packages(base)
     if venv_python(base).is_file():
         results += check_packages(site, _read_text(base / CONSTRAINTS_FILE), _read_text(base / REQUIREMENTS_FILE))
     else:
         results.append(CheckResult('Packages', None, 'Not checked, since there is no Python environment.', ''))
-    if results[0].ok:
+    if environment[0].ok:
         torch = installed_versions(site).get('torch')
         env = {**environ, **{key: str(path) for key, path in cache_paths(base).items()}}
         results += check_torch(venv_python(base), env, torch, run=run, cwd=base)

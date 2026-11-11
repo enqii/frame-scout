@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (CORE_PACKAGE, LAYOUT_MARKER, OBSOLETE_CORE_FILE, REPLACED_PACKAGES, SCORING_PACKAGE,
-                             mixed_versions_message, refused_import)
+                             check_program_files, mixed_versions_message, refused_import)
 from framescout_scoring import layout as scoring_layout
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -437,3 +437,39 @@ def test_start_stops_when_the_single_file_cannot_be_deleted(tmp_path, package):
     # it stops before it looks for the environment
     assert 'run Install-FrameScout.bat first' not in result.stdout
 
+
+# --- the check reports the leftovers instead of a traceback (I34) ---
+
+@leftovers
+def test_the_check_reports_a_single_file_next_to_its_package(tmp_path, package):
+    folder_with_the_package(tmp_path, package)
+    [fine] = check_program_files(tmp_path)
+    assert fine.ok is True
+    (tmp_path / f'{package}.py').write_text('', encoding='utf-8')
+    [problem] = check_program_files(tmp_path)
+    assert problem.ok is False and f'{package}.py next to the folder {package}' in problem.text
+    assert f'delete {package}.py' in problem.fix and f'delete the folder {package}' in problem.fix
+
+
+def test_the_check_reports_both_single_files_and_ignores_other_cases(tmp_path):
+    for package in REPLACED_PACKAGES:
+        folder_with_the_package(tmp_path, package)
+        (tmp_path / f'{package}.py').write_text('', encoding='utf-8')
+    assert [result.ok for result in check_program_files(tmp_path)] == [False, False]
+    # a folder named like the file, or the file without its package, is no leftover
+    other = tmp_path / 'other'
+    folder_with_the_package(other, CORE_PACKAGE)
+    (other / OBSOLETE_CORE_FILE).mkdir()
+    (other / OBSOLETE_SCORING_FILE).write_text('', encoding='utf-8')
+    assert [result.ok for result in check_program_files(other)] == [True]
+
+
+def test_check_bat_shows_a_check_line_instead_of_a_traceback_next_to_the_single_file(tmp_path):
+    # I34: the check of this version runs next to the leftover and names it as a problem
+    folder = mixed_folder(tmp_path)
+    shutil.copy(ROOT / 'framescout_check.py', folder)
+    result = subprocess.run([sys.executable, '-B', '-E', '-s', 'framescout_check.py'], cwd=folder,
+                            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120)
+    assert 'Traceback' not in result.stderr, result.stderr
+    assert result.returncode == 2
+    assert f'[PROBLEM] Program files: The FrameScout folder holds {OBSOLETE_CORE_FILE}' in result.stdout
