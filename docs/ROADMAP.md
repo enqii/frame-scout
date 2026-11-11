@@ -29,7 +29,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] (C) Installer: I34, I35, I36 (kind `code-risky`)
 
 ### P20 – Cache variables (added 2026-11-06)
-- [ ] The app and the CLI honour cache variables the user set; the engine sets its defaults
+- [x] The app and the CLI honour cache variables the user set; the engine sets its defaults
       in `main()`, not on import; a `yolo11n.pt` in the working folder wins (E41, E42, A36;
       kind `code-risky`)
 

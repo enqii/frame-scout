@@ -146,6 +146,13 @@ usage analytics and automatic package installs (`YOLO_OFFLINE=true`,
 asking the Hugging Face Hub; missing files are downloaded with a note. Set
 `HF_HUB_OFFLINE=0` or `1` for a manual run to decide this yourself.
 
+Model downloads go to `.cache` unless you have set `TORCH_HOME`, `HF_HOME`,
+`YOLO_CONFIG_DIR` or `XDG_CACHE_HOME` in Windows: the app, the start script and a manual
+run then use your folder instead. If you set one after models were downloaded, the first
+search downloads them again there (about 600 MB for the default model). The uninstall
+script lists such folders outside the project but does not delete them. A `yolo11n.pt` in
+the folder of a manual run is used instead of the cached copy.
+
 ### AI settings
 
 - **Search model:** the default, OpenAI CLIP ViT-B/32, is the fastest and the one the

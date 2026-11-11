@@ -139,24 +139,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       downloading what is missing) and the first download into an empty cache were covered
       by unit tests only, since a real run downloads at least 605 MB. Verify on the home PC
       (P10 A, next to E34) and fix what shows up. Found in the PR of E16.
-- [ ] `ready` **E41 – A user's own `yolo11n.pt` in the working folder is ignored once a cached copy
-      exists:** `yolo_weights` looks in the cache folder first and in the working folder only
-      afterwards, so the "used as before" file of the working folder loses against any copy in
-      `.cache/ultralytics/`. Decide which one should win (a copy the user put next to the run
-      is arguably more deliberate) and document it. Review of PR #42, finding 7. **Decided 2026-11-06 (triage):** the file in the working folder wins (a deliberate copy); one PR with E42 and A36 (ROADMAP P20), kind `code-risky`.
-- [ ] `ready` **E42 – The engine sets the cache variables when it is imported:** `default_cache_env`
-      runs at module level in `framescout_engine.py` (so it precedes the torch import), which
-      changes `HF_HOME`, `TORCH_HOME` and `XDG_CACHE_HOME` for every importer of the module and
-      means models cached in the user profile are no longer found by a manual run (documented
-      consequence of E9/I10). Decide whether to move it into `main()` (the heavy imports are
-      lazy or must be reordered; `tests/test_engine_defaults.py` pins the module-level call)
-      and whether a note or an opt-out is needed for users who keep models elsewhere. Review of
-      PR #42, findings 8 and 9. **Decided 2026-11-06 (triage):** a variable the user set wins; move the call out of the import (ROADMAP P20 with E41, A36).
 - [ ] `hardware` **E43 – `yolo_weights` returns a path in `.cache/ultralytics/` without creating the folder
       (not verified):** Ultralytics should create the parent folder when it downloads to that
       path, but this was not run; if it does not, the first download fails. Check on the first
       download into an empty cache (P10 A, next to E38) or create the folder in
-      `yolo_weights`/the engine. Review of PR #42, finding 10.
+      `yolo_weights`/the engine. Review of PR #42, finding 10. Since PR #89 (P20) the app still
+      pre-creates `.cache/ultralytics` when it sets `YOLO_CONFIG_DIR` itself; a user's own
+      `YOLO_CONFIG_DIR` is not pre-created by the app (Ultralytics creates its config folder on import).
 - [ ] `parked` **E45 – `publish_export` is not one step across files (minor):** a kill between the
       renames (milliseconds) can still leave some galleries newer than `results.json`. A
       rename that fails every retry (a file held open for over 2 s; the run then fails)
@@ -242,12 +231,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       them, and (user decision) neither category is selected by default any more. Idea:
       record the volume serial number (or mount) per root, which changes the cache or a
       side file (hold point). Found in the PR of E8.
-- [ ] `ready` **A36 – The app overwrites cache variables a user set, the engine keeps them:**
-      `cache_env()` in `app.py` assigns all of `cache_paths(BASE)` to the engine's environment,
-      while `default_cache_env` keeps a value that is set. A search from the app therefore
-      ignores e.g. a `HF_HOME` the user exported, a manual run honours it. Probably intended
-      (the app keeps the install self-contained), but undecided and undocumented; decide and
-      document, or use `default_cache_env` in the app too. Review of PR #42, finding 12. **Decided 2026-11-06 (triage):** the app behaves like the CLI, a variable the user set wins (ROADMAP P20 with E41, E42).
 - [ ] `minor` **A45 – The mark colors in the gallery caption are not checked in a browser:** since
       A38 (PR #77) the `<style>` block of `mark_style` is prepended to the caption above the
       cards (`st.caption(..., unsafe_allow_html=True)`) instead of an own `st.markdown`
