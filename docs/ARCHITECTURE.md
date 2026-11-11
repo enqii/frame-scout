@@ -117,7 +117,7 @@ so callers write `import framescout_core` or `from framescout_core import <name>
 logic here when both sides need it or it should be unit-tested without models; add it to
 the module of its area and to the re-exports in `__init__.py`.
 
-- `layout.py` (I16): `OBSOLETE_CORE_FILE` (`framescout_core.py`, the single file of FrameScout before I15) and `mixed_versions_message(folder)` (the error text if that file lies next to the package, else `None`). `__init__.py` calls `refuse_mixed_versions(__file__)` **before any other import**, which raises an `ImportError` with that text unless `refused_import(folder, main_file)` lets the running script (`__main__.__file__`) load: so every entry point (app, engine, evaluation tool, check) stops in a folder with files of two versions: Python would import the package either way, and after going back to an older version the older `app.py` would run silently against the newer core (another `ENGINE` and cache signature). The exception are the `PACKAGE_ONLY_SCRIPTS` (`framescout_uninstall.py`) in the same folder: they came after the package and import no other FrameScout module (a test checks that), so they are never an older version's and the uninstall works in such a folder too (review). The newer engine, evaluation tool and `install_torch.py` stop until Install or Start removed the leftover (I35). The message names both fixes (updated: delete `framescout_core.py`; went back: delete the folder `framescout_core`; best: extract a ZIP into a new, empty folder).
+- `layout.py` (I16): `OBSOLETE_CORE_FILE` (`framescout_core.py`, the single file of FrameScout before I15) and `mixed_versions_message(folder)` (the error text if that file lies next to the package, else `None`). `__init__.py` calls `refuse_mixed_versions(__file__)` **before any other import**, which raises an `ImportError` with that text unless `refused_import(folder, main_file)` lets the running script (`__main__.__file__`) load: so every entry point (app, engine, evaluation tool, check) stops in a folder with files of two versions: Python would import the package either way, and after going back to an older version the older `app.py` would run silently against the newer core (another `ENGINE` and cache signature). The exception is a **marked script** (I35, `marked_script`): every entry point of this version (`app.py`, `framescout_engine.py`, `framescout_eval.py`, `install_torch.py`, `framescout_check.py`, `framescout_uninstall.py`) sets the module global `FRAMESCOUT_PACKAGES = True` (`LAYOUT_MARKER`) before its first FrameScout import, and `refused_import(folder, main_module, package)` lets a `__main__` with that marker `is True` load when the script's folder equals the package's folder (for `app.py` the marker is a global of Streamlit's `__main__`, whose `__file__` is the script path). An unmarked script (an older version's `app.py`, engine or `install_torch.py`, or `python -c`) is refused as before. `tests/test_layout.py` checks the marker comes before the first FrameScout import in each entry point and that every root script importing a FrameScout module is an entry point or the library `framescout_images.py`. Rollback: after going back to a version before I15, the entry points that version lacks (evaluation tool, check, uninstall) stay as this version's and load this core; they import only the two packages (each with its guard) and `framescout_images`, which a test checks. The marker means "a version with both packages": a future guard for another module that becomes a package needs a **new marker name**, because this version's scripts carry only the current one. Other public names: `CORE_PACKAGE`, `SCORING_PACKAGE`, `REPLACED_PACKAGES`, `leftover_text`, `leftover_fix`; `mixed_versions_message(folder, package='framescout_core')`. Without the marker, the engine, evaluation tool and `install_torch.py` of an older version stop. The message names both fixes (updated: delete `framescout_core.py`; went back: delete the folder `framescout_core`; best: extract a ZIP into a new, empty folder).
 - `names.py`: `EXT` (supported image extensions, including `HEIF_EXT` and `RAW_EXT`,
   E25), `slugify`, `profile_slugs` (unique gallery file names, used by the engine).
 - `photos.py` (E25): `available_decoders` (`Decoders`: whether AVIF, HEIC/HEIF and RAW
@@ -380,7 +380,11 @@ the module of its area and to the re-exports in `__init__.py`.
   `framescout_eval.PAGE` and the tests (review of PR #82).
 - `install_check.py` (F15): the read-only installation self-test.
   `CheckResult(name, ok, text,
-  fix)` (`ok` True, False or None = information); `check_environment(base)` (`.venv/pyvenv.cfg`
+  fix)` (`ok` True, False or None = information); `check_program_files(base)` (I34: the check
+  line `Program files`, `[OK] No leftovers of another FrameScout version.`, or one problem per
+  `<package>.py` of `REPLACED_PACKAGES` that lies next to `<package>/__init__.py`, with the fix
+  of `leftover_fix`; so `Check-FrameScout.bat` prints a line and exits with 2 instead of
+  showing a traceback); `check_environment(base)` (`.venv/pyvenv.cfg`
   `home` is this folder's `.python` (compared with `os.path.samefile`, so a link, junction or
   8.3 name counts) or an installed Python of an older installer; a problem if
   that Python is missing (moved folder or deleted Python: the installer repairs it) or is the
@@ -399,7 +403,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `check_models` (information: `downloaded_models`, `find_yolo_weights`; "not known" if the
   model cache's drive does not answer within `SPACE_CHECK_TIMEOUT`); `check_disk_space`
   (a problem below `SPACE_RESERVE`, 1 GB, on the drive of the folder); `check_installation`
-  (all of them; packages and PyTorch are information "Not checked" when `.venv` has no Python or
+  (all of them, `check_program_files` first; packages and PyTorch are information "Not checked" when `.venv` has no Python or
   the environment check failed, so a broken environment counts once); `check_lines` (CLI text);
   `requirement_names` (moved here from `install_torch.py`, which imports it). Standard library
   only.
@@ -471,9 +475,15 @@ own module (`monkeypatch.setattr(os, 'replace', …)`), which reaches every area
 The code lives in `ranking.py`; `__init__.py` re-exports its public names, so
 `from framescout_scoring import ...` works as before (`tests/test_core_package.py` checks
 the re-exports as for `framescout_core`). It is a package of its own so that
-`framescout_core/` stays standard library only. A leftover `framescout_scoring.py` of an
-older version next to it is never imported (the package wins, `tests/test_layout.py`); the
-`.bat` files do not delete it. The reverse case, a rollback, is I36. Functions: `text_queries`
+`framescout_core/` stays standard library only. `layout.py` (I36) holds the guard of
+the leftover `framescout_scoring.py` (a rollback ZIP over a newer folder: the package would
+shadow that older version's module): `__init__.py` raises an `ImportError` (`refuse_scoring_leftover`,
+`scoring_import_refused`, `scoring_leftover_message`, `PACKAGE`, `LAYOUT_MARKER`) unless the running
+script is marked, with the same rule and message wording as `framescout_core.layout`; it is
+written out again because `framescout_core` may be an older version's after a rollback (a test
+checks equality with the core's and that the package imports no FrameScout module).
+`Install-FrameScout.bat` and `Start-FrameScout.bat` delete the leftover like `framescout_core.py`.
+Functions: `text_queries`
 (the generated templates averaged into one query, custom prompts kept apart, E4),
 `best_scores`, `spread`/`MIN_SCORES`/`MIN_SPREAD`, `rank_photos`/`Match` (per-profile
 z-scores and their combination, E5) and `score_caption` (the numbers on a gallery card).
@@ -584,7 +594,7 @@ FrameScout version."; a folder of that name is skipped (`if exist "framescout_co
 since `del` would ask and delete its files; `del /f` also removes a read-only file, and a file
 that stays (open in another program) stops the script with "framescout_core.py could not be
 deleted. ..." and exit code 1; the same lines as in `Start-FrameScout.bat`, kept identical by
-`tests/test_layout.py`; the jumps to `:obsolete_done` avoid a block). Then it sets `PIP_CONSTRAINT=requirements\constraints.txt` (I18),
+`tests/test_layout.py`; the jumps to `:obsolete_done` avoid a block). Right after it the same block deletes a leftover `framescout_scoring.py` when `framescout_scoring\__init__.py` exists (I36; label `:obsolete_scoring_done`, messages "Deleting framescout_scoring.py, a leftover of an older FrameScout version." / "framescout_scoring.py could not be deleted. ..."). Then it sets `PIP_CONSTRAINT=requirements\constraints.txt` (I18),
 installs PyTorch with `install_torch.py` (passing the argument on; torch's dependencies
 come in their pinned versions), then `pip install --no-cache-dir -r requirements\requirements.txt -c
 requirements\constraints.txt` (on a re-run this moves installed packages to the pinned versions and may
@@ -663,16 +673,17 @@ otherwise exit code 0. The "FrameScout is running" check still looks at the `.ve
 programs. "Python itself was installed separately and stays" is printed only when there is
 no `.python`. Not deleted: the program files themselves, also not a leftover
 `framescout_core.py` of I16 (after going back to a version before I15, which had no
-uninstaller, it is that version's core); the import guard lets `framescout_uninstall.py` run
-next to it. Opt-in deletion of user data is I19.
+uninstaller, it is that version's core) nor a leftover `framescout_scoring.py` (I36; tested for
+both); the marker (I35) lets `framescout_uninstall.py` run next to them. Opt-in deletion of user data is I19.
 
 ### `Start-FrameScout.bat`
 
 `Start-FrameScout.bat`: launches app via that venv on `127.0.0.1:8501`. Right after the `cd` it
 deletes `framescout_core.py` when `framescout_core\__init__.py` exists (I16, same lines and
-message as in the installer, including the skipped folder and the stop when the file stays).
-`Check-FrameScout.bat` stays read-only: in such a folder it shows the `ImportError` of the guard
-(see I34) and then its advice to run the installer.
+message as in the installer, including the skipped folder and the stop when the file stays), and
+the same for `framescout_scoring.py` (I36).
+`Check-FrameScout.bat` stays read-only: in such a folder it prints the `Program files` problem
+line (I34) and exits with 2.
 
 ### `README.md`
 
@@ -1839,7 +1850,7 @@ never inside a block; the real download, extraction and `venv` creation and the 
 `Fo!to (old)\fs` were run by hand under `.tmp`, as were the repair paths of the review
 (`python.exe` of `.python` deleted, pip removed from `.venv`, a failed `venv`, `Lib\venv`
 removed from `.python`, the folder renamed, the move blocked by an open file for 7 s and
-for 25 s); a full install with PyTorch on the private Python was not), and the files of two versions (I16, `tests/test_layout.py`: the message, the package guard through a subprocess import of a package copy, the uninstall exception (a stand-in `framescout_uninstall.py` loads, an `app.py` does not; only from the same folder; the real script imports no other FrameScout module), the `.bat` cleanup lines of Install and Start identical (with their messages) and before any Python run, the uninstaller without them, Start run on a copy in `Fo!to (old) & co`, with a folder named `framescout_core.py` (kept with its file), a read-only leftover (deleted) and a leftover held open (stop, exit code 1); `Install-FrameScout.bat cpu` was run by hand on a scratch copy and deleted the leftover), and the uninstall script (P5, `test_uninstall.py`, I4: order and version check of the `pyvenv.cfg` fallback, tests on `tmp_path` trees: plan, kept
+for 25 s); a full install with PyTorch on the private Python was not), and the files of two versions (I16, `tests/test_layout.py`: the message, the package guard through a subprocess import of a package copy, the marker rule (I35: a marked script from the package's folder loads, an unmarked one does not; the marker comes before the first FrameScout import in every entry point; root scripts importing FrameScout code are entry points or `framescout_images.py`; the rollback entry points import only the two packages and `framescout_images`), the guard of `framescout_scoring` (I36: refusal, equality with the core's, no FrameScout import), the `Program files` check line (I34), the `.bat` cleanup lines of Install and Start identical (with their messages, for `framescout_core.py` and `framescout_scoring.py`) and before any Python run, the uninstaller without them, Start run on a copy in `Fo!to (old) & co`, with a folder named `framescout_core.py` (kept with its file), a read-only leftover (deleted) and a leftover held open (stop, exit code 1); `Install-FrameScout.bat cpu` was run by hand on a scratch copy and deleted the leftover), and the uninstall script (P5, `test_uninstall.py`, I4: order and version check of the `pyvenv.cfg` fallback, tests on `tmp_path` trees: plan, kept
 entries (also in another case, Windows only), protected folders from settings (invalid
 values, read once, photo folder around the project), links and junctions, read-only
 files and folders, unlistable items, failures reported once, user-data and outside

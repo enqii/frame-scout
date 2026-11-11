@@ -22,9 +22,10 @@ delete `.python` and run it once more.
 When you update from a ZIP, extract it into a fresh folder instead of over an old one,
 so no files of earlier versions stay behind. If you extracted over an old folder anyway,
 `Install-FrameScout.bat` and `Start-FrameScout.bat` delete the leftover `framescout_core.py`
-of the older version (if another program holds it open, they stop and ask you to close it).
-`Uninstall-FrameScout.bat` works in such a folder too. If you went back to an older version this way, FrameScout stops with an
-error that names the file and the folder `framescout_core` to delete.
+and `framescout_scoring.py` of the older version (if another program holds one open, they stop and ask you to close it).
+`Uninstall-FrameScout.bat` and the engine, evaluation tool and `install_torch.py` of this version work in such a folder too.
+If you went back to an older version this way, FrameScout stops with an
+error that names the file and the folder (`framescout_core` or `framescout_scoring`) to delete.
 
 ### Checking the installation
 
@@ -35,6 +36,10 @@ nothing and downloads nothing (it only creates and deletes a small temporary fil
 `.cache` and `results` to see whether they can be written). It reports, with one sentence
 of what to do for each problem:
 
+- **Program files:** no files of two FrameScout versions in the folder (for example
+  `framescout_core.py` next to the folder `framescout_core` after extracting a ZIP over an old
+  folder). The fix: delete the file after an update, or the folder after going back to an
+  older version.
 - **Python environment:** `.venv` belongs to this folder and its Python still exists. After
   a moved or copied folder, delete `.venv` and run `Install-FrameScout.bat`; if the Python is
   missing, run the installer, which repairs it.

@@ -26,7 +26,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 ### P19 – Hygiene (`minor` items bundled per area, added 2026-11-06)
 - [x] (A) Engine: E53, E54, E56, E57
 - [x] (B) App: A44, F16
-- [ ] (C) Installer: I34, I35, I36 (kind `code-risky`)
+- [x] (C) Installer: I34, I35, I36 (kind `code-risky`)
 
 ### P20 – Cache variables (added 2026-11-06)
 - [ ] The app and the CLI honour cache variables the user set; the engine sets its defaults
