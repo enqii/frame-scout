@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ._common import _replace_with_retry
-from .estimate import stored_throughput
+from .estimate import stored_finishing, stored_throughput
 
 
 # One search at a time per output folder (A4): the engine holds RUN_LOCK in the output
@@ -55,12 +55,15 @@ class StatusReporter:
         self.interval, self.clock, self.retries, self.retry_delay = interval, clock, retries, retry_delay
         started = _timestamp()
         # rate: photos per minute of this run's analysis (None until measured); throughput:
-        # the speed of earlier runs per settings, kept from the file this run replaces (F12)
+        # the speed of earlier runs per settings, kept from the file this run replaces (F12);
+        # thumbnails: the gallery thumbnails this run plans at most (None until known);
+        # finishing: the speeds of scoring and thumbnails, also kept (F16)
         previous = read_status(self.path) or {}
         self.state = {'format': STATUS_FORMAT, 'pid': pid, 'phase': None, 'started': started, 'updated': started,
                       'done': 0, 'total': 0, 'new': 0, 'cached': 0, 'errors': 0,
                       'exit_code': None, 'message': None, 'rate': None,
-                      'throughput': stored_throughput(previous.get('throughput'))}
+                      'throughput': stored_throughput(previous.get('throughput')), 'thumbnails': None,
+                      'finishing': stored_finishing(previous.get('finishing'))}
         self._written = None  # clock() of the last successful write
 
     def update(self, phase=None, force=False, **fields):

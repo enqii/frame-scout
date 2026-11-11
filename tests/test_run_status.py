@@ -252,9 +252,22 @@ def test_a_first_run_or_an_unreadable_status_has_no_throughput(tmp_path):
     path = tmp_path / RUN_STATUS
     StatusReporter(path, 1).update('loading')
     assert read_status(path)['throughput'] == []
+    assert read_status(path)['finishing'] == {} and read_status(path)['thumbnails'] is None
     path.write_text('{"broken', encoding='utf-8')
     StatusReporter(path, 1).update('loading')
     assert read_status(path)['throughput'] == []
+    assert read_status(path)['finishing'] == {}
+
+
+def test_a_new_run_keeps_the_speed_of_scoring_and_thumbnails_but_not_their_plan(tmp_path):
+    # the estimate of what follows the analysis needs an earlier search's speeds (F16)
+    path = tmp_path / RUN_STATUS
+    write_status(path, {'pid': 1, 'phase': 'finished', 'thumbnails': 300,
+                        'finishing': {'scoring': 900.0, 'thumbnails': 0, 'x': 1.0}})
+    StatusReporter(path, 2).update('starting')
+    status = read_status(path)
+    assert status['finishing'] == {'scoring': 900.0}
+    assert status['thumbnails'] is None
 
 
 # --- run_active: is a search running in this output folder? ---

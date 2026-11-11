@@ -26,7 +26,8 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              cuda_status, default_copy_folder, default_settings, delete_marks, device_choices,
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
                              analyzed_photos, app_search_needs, downloaded_models, low_space, low_space_lines,
-                             known_throughput, remaining_text, start_summary, check_installation,
+                             finishing_minutes, gallery_thumbnails, known_throughput, remaining_text, start_summary,
+                             check_installation,
                              hidden_text, hide_no_match, mark_style, windows_path,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
                              project_temp_cleanup, read_copy_folders,
@@ -1670,8 +1671,11 @@ with run_tab:
         chosen_device = st.session_state[setting_key('device')]
         if chosen_device == 'auto':
             chosen_device = ('cuda' if info['cuda'] else 'cpu') if info else None
+        # and scoring and the gallery thumbnails at the speeds of earlier searches (F16)
+        finishing = finishing_minutes((run_status or {}).get('finishing'), len(photo_scan.paths),
+                                      gallery_thumbnails(len(photo_scan.paths), settings['top'], len(profiles)))
         st.info(start_summary(len(photo_scan.paths), analyzed,
-                              known_throughput(run_status, cleanup_signature(), chosen_device)))
+                              known_throughput(run_status, cleanup_signature(), chosen_device), finishing))
         space_warning = low_space_warning(len(photo_scan.paths), settings['top'], len(profiles), settings['model'],
                                           settings['person_detection'], analyzed)
         if space_warning:

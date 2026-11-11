@@ -1,11 +1,13 @@
-"""The remaining-time estimate of a search and the summary before its start (F12)."""
+"""The remaining-time estimate of a search and the summary before its start (F12, F16)."""
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from framescout_core import (RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, RATE_WINDOW, THROUGHPUT_KEPT,
-                             THROUGHPUT_MIN_SECONDS, AnalysisRate, duration_text, known_throughput, remaining_text,
-                             remember_throughput, run_throughput, start_summary, stored_throughput)
+from framescout_core import (FINISHING_MIN_ITEMS, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, RATE_WINDOW,
+                             THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS, AnalysisRate, StepSpeed, duration_text,
+                             finishing_minutes,
+                             gallery_thumbnails, known_throughput, remaining_text, remember_finishing,
+                             remember_throughput, run_throughput, start_summary, stored_finishing, stored_throughput)
 
 
 # --- AnalysisRate: photos per minute of the analysis, measured in the engine ---
@@ -97,7 +99,48 @@ def analyzing(**fields):
 
 
 def test_remaining_text_from_the_rate_and_the_photos_left():
-    assert remaining_text(analyzing(), NOW) == 'about 25 min left'
+    assert remaining_text(analyzing(), NOW) == 'about 25 min left for the analysis'
+
+
+# an earlier search scored 1,000 photos and rendered 20 thumbnails per minute (F16)
+FINISHING = {'scoring': 1000.0, 'thumbnails': 20.0}
+
+
+def test_remaining_text_of_the_analysis_adds_scoring_and_thumbnails():
+    # 1,000 photos left at 40 per minute, then 1,100 photos to score (1.1 min) and 300
+    # thumbnails to render (15 min): the estimate no longer ends with the analysis (F16)
+    status = analyzing(finishing=FINISHING, thumbnails=300)
+    assert remaining_text(status, NOW) == 'about 40 min left'
+
+
+def test_remaining_text_names_the_analysis_alone_without_earlier_speeds():
+    # a first search knows no speed of scoring and galleries yet: the time is the analysis's
+    assert remaining_text(analyzing(thumbnails=300), NOW) == 'about 25 min left for the analysis'
+    partial = {'scoring': 1000.0}
+    assert remaining_text(analyzing(thumbnails=300, finishing=partial), NOW) == 'about 25 min left for the analysis'
+    # nor a status without the planned thumbnails (an older engine)
+    assert remaining_text(analyzing(finishing=FINISHING), NOW) == 'about 25 min left for the analysis'
+
+
+def scoring(**fields):
+    return {**analyzing(phase='scoring', done=100, total=1100, finishing=FINISHING, thumbnails=300), **fields}
+
+
+def test_remaining_text_while_scoring_and_writing_the_galleries():
+    assert remaining_text(scoring(), NOW) == 'about 15 min left'  # 1 min of scoring, 15 of thumbnails
+    exporting = scoring(phase='exporting', done=140, total=300)  # 160 cards left
+    assert remaining_text(exporting, NOW) == 'about 8 min left'
+    # the rate of the analysis does not matter after it
+    assert remaining_text(scoring(rate=None), NOW) == 'about 15 min left'
+
+
+@pytest.mark.parametrize('status', [
+    scoring(finishing=None), scoring(finishing={'scoring': 1000.0}), scoring(thumbnails=None),
+    scoring(phase='exporting', done=300, total=300), scoring(phase='exporting', finishing={'scoring': 1000.0}),
+    scoring(updated=(NOW - timedelta(seconds=RATE_STALE + 1)).isoformat()), scoring(done='x'),
+])
+def test_no_remaining_text_after_the_analysis_without_earlier_speeds(status):
+    assert remaining_text(status, NOW) is None
 
 
 def test_no_remaining_text_while_the_analysis_stalls():
@@ -106,14 +149,14 @@ def test_no_remaining_text_while_the_analysis_stalls():
     stalled = (NOW - timedelta(seconds=RATE_STALE + 1)).isoformat(timespec='seconds')
     assert remaining_text(analyzing(updated=stalled), NOW) is None
     recent = (NOW - timedelta(seconds=RATE_STALE - 1)).isoformat(timespec='seconds')
-    assert remaining_text(analyzing(updated=recent), NOW) == 'about 25 min left'
+    assert remaining_text(analyzing(updated=recent), NOW) == 'about 25 min left for the analysis'
     # the same moment in another time zone
     other_zone = (NOW - timedelta(seconds=5)).astimezone(timezone.utc).isoformat()
-    assert remaining_text(analyzing(updated=other_zone), NOW) == 'about 25 min left'
+    assert remaining_text(analyzing(updated=other_zone), NOW) == 'about 25 min left for the analysis'
 
 
 def test_remaining_text_uses_the_current_time_by_default():
-    assert remaining_text(analyzing(updated=datetime.now().astimezone().isoformat())) == 'about 25 min left'
+    assert remaining_text(analyzing(updated=datetime.now().astimezone().isoformat())) == 'about 25 min left for the analysis'
 
 
 @pytest.mark.parametrize('status', [
@@ -201,6 +244,59 @@ def test_known_throughput_matches_signature_and_device():
     assert known_throughput({'throughput': 'broken'}, 'a', 'cpu') is None
 
 
+# --- the speed of scoring and of the gallery thumbnails, kept in the status file (F16) ---
+
+def test_remember_finishing_needs_enough_items():
+    assert remember_finishing({}, 'scoring', FINISHING_MIN_ITEMS - 1, 10.0) is None
+    assert remember_finishing({}, 'scoring', FINISHING_MIN_ITEMS, 0.0) is None
+    assert remember_finishing({}, 'thumbnails', 30, 60.0) == {'thumbnails': pytest.approx(30.0)}
+
+
+def test_remember_finishing_replaces_one_step_and_keeps_the_other():
+    before = {'scoring': 500.0, 'thumbnails': 10.0}
+    assert remember_finishing(before, 'scoring', 2000, 60.0) == {'scoring': 2000.0, 'thumbnails': 10.0}
+    assert before == {'scoring': 500.0, 'thumbnails': 10.0}  # its input is not changed
+
+
+def test_stored_finishing_drops_what_is_not_a_speed():
+    assert stored_finishing({'scoring': 5.0, 'thumbnails': 0, 'other': 3.0}) == {'scoring': 5.0}
+    assert stored_finishing({'scoring': True, 'thumbnails': float('nan')}) == {}
+    for value in (None, 'x', [], 3):
+        assert stored_finishing(value) == {}
+
+
+def test_step_speed_counts_the_calls_that_return():
+    ticks = iter(range(0, 1000, 3))  # every call takes 3 seconds of this clock
+    speed = StepSpeed(clock=lambda: next(ticks))
+    render = speed.timed(lambda path, target: f'{path}->{target}')
+    assert render('a.jpg', target='t.jpg') == 'a.jpg->t.jpg'
+
+    def broken(path):
+        raise OSError('cannot decode')
+    with pytest.raises(OSError):
+        speed.timed(broken)('b.jpg')
+    assert (speed.items, speed.seconds) == (1, 3)
+    assert speed.remember({}, 'thumbnails') is None  # too few
+    for _ in range(FINISHING_MIN_ITEMS):
+        render('c.jpg', 'd.jpg')
+    assert speed.remember({'scoring': 9.0}, 'thumbnails') == {'scoring': 9.0, 'thumbnails': pytest.approx(20.0)}
+
+
+def test_finishing_minutes():
+    assert finishing_minutes(FINISHING, 2000, 100) == pytest.approx(2 + 5)
+    assert finishing_minutes(FINISHING, 0, 0) == 0
+    assert finishing_minutes({'thumbnails': 20.0}, 0, 100) == pytest.approx(5)  # no photo left to score
+    assert finishing_minutes({'thumbnails': 20.0}, 1, 100) is None
+    assert finishing_minutes(None, 1, 0) is None
+
+
+def test_gallery_thumbnails_count_each_photo_once():
+    # a photo in several galleries has one thumbnail; on the safe side, every one is new
+    assert gallery_thumbnails(5000, 150, 3) == 450
+    assert gallery_thumbnails(200, 150, 3) == 200
+    assert gallery_thumbnails(0, 150, 3) == 0
+
+
 # --- start_summary: what the run tab says before "Start search" ---
 
 def test_start_summary_with_a_known_speed():
@@ -223,6 +319,18 @@ def test_start_summary_with_everything_analyzed():
     text = start_summary(5000, 5000, 20.0)
     assert 'all already analyzed' in text
     assert 'to analyze' not in text
+    assert 'about' not in text  # no speed of scoring and galleries known
+
+
+def test_start_summary_adds_scoring_and_galleries_at_the_speed_of_earlier_searches():
+    # F16: the duration also covers what follows the analysis, as an upper bound
+    text = start_summary(5000, 3200, 20.0, 15.0)
+    assert 'about 1 h 30 min' in text
+    assert 'up to about 15 min more' in text
+    text = start_summary(5000, 5000, 20.0, 15.0)
+    assert 'all already analyzed' in text and 'up to about 15 min' in text
+    # without the speed of the analysis, the time after it is not named alone either
+    assert 'about' not in start_summary(5000, 0, None, 15.0)
 
 
 def test_start_summary_of_one_photo():
