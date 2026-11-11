@@ -223,6 +223,10 @@ def test_engine_cache_env_keeps_the_variables_a_user_set(tmp_path):
     # a copy: the caller's environment is not changed
     assert environ == {'PATH': 'x', 'HF_HOME': r'D:\hf', 'TORCH_HOME': ''}
     assert not (tmp_path / '.cache').exists()
+    # applied again it changes nothing: check_installation hands its result on to check_models (review)
+    for environ in (environ, {'XDG_CACHE_HOME': r'D:\x', 'HF_HOME': ''}):
+        env = engine_cache_env(environ, tmp_path)
+        assert engine_cache_env(env, tmp_path) == env
 
 
 def test_find_yolo_weights_looks_where_yolo_weights_does_without_moving(tmp_path):

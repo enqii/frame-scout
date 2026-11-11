@@ -22,11 +22,10 @@ from importlib import metadata
 from pathlib import Path
 from typing import NamedTuple
 
-from .cache_dirs import CACHE_DIR, find_yolo_weights
+from .cache_dirs import CACHE_DIR, engine_cache_env, find_yolo_weights
 from .cleanup import _reachable_roots, size_text
 from .devices import cuda_hint
-from .disk_space import (SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _engine_environ, _existing_folder, _reachable,
-                         downloaded_models)
+from .disk_space import SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _existing_folder, _reachable, downloaded_models
 from .hub import hub_cache_dir
 from .layout import REPLACED_PACKAGES, leftover_fix, leftover_text
 from .models import MODELS
@@ -249,12 +248,13 @@ def check_models(base, environ, timeout=SPACE_CHECK_TIMEOUT, reachable=_reachabl
     drive of the model cache does not answer within timeout seconds (reachable: cleanup's root
     probe), the result says that it is not known instead of "not downloaded yet" (review).
     """
-    hub_cache = hub_cache_dir(_engine_environ(base, environ))
+    env = engine_cache_env(environ, base)  # the engine's cache variables, as the app gives them
+    hub_cache = hub_cache_dir(env)
     if not _reachable([hub_cache], timeout, reachable)[hub_cache]:
         return [CheckResult('Model files', None, f'The model folder {hub_cache} did not answer within {timeout:g} '
                             'seconds, so which model files are downloaded is not known.', '')]
-    downloaded = downloaded_models(base, environ)
-    found, _ = find_yolo_weights(DEFAULT_YOLO_MODEL, base, base, _engine_environ(base, environ))
+    downloaded = downloaded_models(base, env)
+    found, _ = find_yolo_weights(DEFAULT_YOLO_MODEL, base, base, env)
     have = [MODELS[key].label for key in MODELS if key in downloaded] + (['person detection'] if found else [])
     missing = [f'{MODELS[key].label} ({MODELS[key].download})' for key in MODELS if key not in downloaded] + (
         [] if found else ['person detection'])
@@ -295,6 +295,7 @@ def check_installation(base, environ, run=subprocess.run):
     broken environment counts as one problem.
     """
     base = Path(base)
+    env = engine_cache_env(environ, base)  # the engine's cache variables, as the app gives them
     environment = check_environment(base)
     results = check_program_files(base) + environment
     site = venv_site_packages(base)
@@ -304,12 +305,12 @@ def check_installation(base, environ, run=subprocess.run):
         results.append(CheckResult('Packages', None, 'Not checked, since there is no Python environment.', ''))
     if environment[0].ok:
         torch = installed_versions(site).get('torch')
-        results += check_torch(venv_python(base), _engine_environ(base, environ), torch, run=run, cwd=base)
+        results += check_torch(venv_python(base), env, torch, run=run, cwd=base)
     else:
         results.append(CheckResult('PyTorch', None, 'Not checked, since the Python environment does not work.', ''))
     results += check_writable(base / CACHE_DIR, CACHE_DIR)
     results += check_writable(base / 'results', 'results')
-    results += check_models(base, environ)
+    results += check_models(base, env)  # engine_cache_env again keeps env as it is
     results += check_disk_space(base)
     return results
 
