@@ -9,8 +9,8 @@ from pathlib import Path, PureWindowsPath
 import pytest
 
 from framescout_core import (DEFAULT_MODEL, DEFAULT_YOLO_MODEL, MODELS, cache_folder_paths, cache_paths,
-                             default_cache_env, engine_cache_env, find_yolo_weights, open_clip_cache_dir,
-                             yolo_weights)
+                             default_cache_env, engine_cache_env, find_yolo_weights, hub_cache_dir,
+                             open_clip_cache_dir, yolo_weights, XDG_DERIVED)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -46,6 +46,24 @@ def test_default_cache_env_keeps_variables_a_user_set(tmp_path):
     # an empty value is not a folder: it counts as unset
     assert environ['TORCH_HOME'] == str(tmp_path / '.cache' / 'torch')
     assert 'HF_HOME' not in added and 'TORCH_HOME' in added
+
+
+def test_default_cache_env_leaves_torch_and_hugging_face_to_an_xdg_cache_home_a_user_set(tmp_path):
+    # review: torch and huggingface_hub derive TORCH_HOME and HF_HOME from XDG_CACHE_HOME, so a
+    # user's XDG_CACHE_HOME alone keeps their models there; Ultralytics does not read it
+    own = str(tmp_path / 'own')
+    environ = {'XDG_CACHE_HOME': own, 'HF_HOME': ''}
+    assert default_cache_env(environ, tmp_path) == ['YOLO_CONFIG_DIR']
+    # an empty HF_HOME is removed: huggingface_hub would take the empty value as a folder
+    assert environ == {'XDG_CACHE_HOME': own, 'YOLO_CONFIG_DIR': str(cache_paths(tmp_path)['YOLO_CONFIG_DIR'])}
+    assert hub_cache_dir(environ, tmp_path / 'home') == Path(own) / 'huggingface' / 'hub'
+    # a TORCH_HOME or HF_HOME the user set as well is kept
+    environ = {'XDG_CACHE_HOME': own, 'TORCH_HOME': r'D:\t'}
+    default_cache_env(environ, tmp_path)
+    assert environ['TORCH_HOME'] == r'D:\t' and 'HF_HOME' not in environ
+    # an empty XDG_CACHE_HOME counts as unset
+    environ = {'XDG_CACHE_HOME': ''}
+    assert sorted(default_cache_env(environ, tmp_path)) == sorted(cache_paths(tmp_path))
 
 
 def test_importing_framescout_core_imports_no_third_party_module():
@@ -259,11 +277,35 @@ def cache_lines(name):
 
 
 def test_the_bat_files_set_only_the_cache_variables_a_user_did_not_set():
-    # A36: as for a manual engine run (default_cache_env), a variable the user set wins
-    expected = [f'if not defined {variable} set "{variable}=%CD%\\{PureWindowsPath(path.relative_to(ROOT))}"'
-                for variable, path in cache_paths(ROOT).items()]
+    # A36: as for a manual engine run (default_cache_env), a variable the user set wins; the
+    # lines of the variables derived from XDG_CACHE_HOME come before the line that sets it (review)
+    expected = []
+    for variable, path in cache_paths(ROOT).items():
+        condition = f'if not defined {variable} '
+        if variable in XDG_DERIVED:
+            condition += 'if not defined XDG_CACHE_HOME '
+        expected.append(f'{condition}set "{variable}=%CD%\\{PureWindowsPath(path.relative_to(ROOT))}"')
     for name in BAT_FILES:
-        assert sorted(cache_lines(name)) == sorted(expected), name
+        lines = cache_lines(name)
+        assert sorted(lines) == sorted(expected), name
+        assert lines[-1] == expected[-1] and expected[-1].startswith('if not defined XDG_CACHE_HOME set'), name
+
+
+def run_cache_lines(folder, environ):
+    """The four cache variables after the cache lines of Start-FrameScout.bat ran in folder with environ, as {name: value}."""
+    names = list(cache_paths(ROOT))
+    script = folder / 'cache.bat'
+    script.write_text('\r\n'.join(['@echo off', 'setlocal', 'cd /d "%~dp0"', *cache_lines('Start-FrameScout.bat'),
+                                   # quoted: the "&" of the folder path would end the echo
+                                   *[f'echo "{name}=%{name}%"' for name in names]]) + '\r\n', encoding='utf-8')
+    env = {k: v for k, v in os.environ.items() if k.upper() not in names}
+    env.update(environ)
+    result = subprocess.run(['cmd.exe', '/d', '/c', '.\\cache.bat'], cwd=folder, env=env, capture_output=True,
+                            text=True, errors='replace', timeout=60)
+    assert result.returncode == 0, result.stderr
+    # an unset variable is empty in a batch file
+    return {name: value for name, value in (line.strip('"').split('=', 1) for line in result.stdout.splitlines())
+            if value}
 
 
 @pytest.mark.skipif(sys.platform != 'win32', reason='runs a .bat file')
@@ -271,19 +313,17 @@ def test_the_cache_lines_of_the_bat_files_keep_a_variable_the_user_set(tmp_path)
     # the lines themselves, run by cmd.exe in a folder with a space, "!" and ")" in its name
     folder = tmp_path / 'Fo!to (old) & co'
     folder.mkdir()
-    names = list(cache_paths(ROOT))
-    script = folder / 'cache.bat'
-    script.write_text('\r\n'.join(['@echo off', 'setlocal', 'cd /d "%~dp0"', *cache_lines('Start-FrameScout.bat'),
-                                   # quoted: the "&" of the folder path would end the echo
-                                   *[f'echo "{name}=%{name}%"' for name in names]]) + '\r\n', encoding='utf-8')
-    env = {k: v for k, v in os.environ.items() if k.upper() not in names}
-    env['HF_HOME'] = str(tmp_path / 'own-hf')
-    result = subprocess.run(['cmd.exe', '/d', '/c', '.\\cache.bat'], cwd=folder, env=env, capture_output=True,
-                            text=True, errors='replace', timeout=60)
-    assert result.returncode == 0, result.stderr
     expected = {name: str(path) for name, path in cache_paths(folder).items()}
-    expected['HF_HOME'] = env['HF_HOME']
-    assert result.stdout.splitlines() == [f'"{name}={expected[name]}"' for name in names]
+    assert run_cache_lines(folder, {}) == expected
+    expected['HF_HOME'] = str(tmp_path / 'own-hf')
+    assert run_cache_lines(folder, {'HF_HOME': expected['HF_HOME']}) == expected
+    # review: with the user's XDG_CACHE_HOME, torch and Hugging Face derive their folders from it,
+    # as default_cache_env leaves them
+    own = str(tmp_path / 'own cache')
+    environ = {'XDG_CACHE_HOME': own}
+    assert run_cache_lines(folder, environ) == {'YOLO_CONFIG_DIR': expected['YOLO_CONFIG_DIR'], 'XDG_CACHE_HOME': own}
+    default_cache_env(environ, folder)
+    assert environ == {'YOLO_CONFIG_DIR': expected['YOLO_CONFIG_DIR'], 'XDG_CACHE_HOME': own}
 
 
 def test_the_engine_passes_the_url_cache_folder_to_open_clip():

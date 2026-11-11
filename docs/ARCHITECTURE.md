@@ -225,7 +225,8 @@ the module of its area and to the re-exports in `__init__.py`.
   cache variables under a cache folder itself; `cache_paths(base)` and the evaluation tool's
   `engine_env` use it)/`default_cache_env`/`engine_cache_env`/`yolo_weights`/`find_yolo_weights`
   (the project's `.cache/` folders and the engine's defaults for them; A36:
-  `engine_cache_env(environ, base)` is a copy of the environment plus `default_cache_env`,
+  `engine_cache_env(environ, base)` is a copy of the environment plus `default_cache_env`
+  (which leaves `TORCH_HOME`/`HF_HOME` to a user's `XDG_CACHE_HOME`, `XDG_DERIVED`, review),
   what the app and the disk space and install checks give the engine; `find_yolo_weights`
   is `yolo_weights`' lookup without moving anything, also used by the disk space check,
   working folder first (E41); see
@@ -1660,7 +1661,14 @@ The Windows batch scripts set cache/temp environment variables under the project
 easy cleanup. Since A36 the four cache variables are set only `if not defined` (`TMP`,
 `TEMP` and `PIP_CACHE_DIR` unconditionally): a user's Windows variable wins, so the models
 are downloaded there, also by the app (a user who had such a variable gets a new download,
-about 600 MB for the default model, on the first search). Since E9/I10 the engine also fills `TORCH_HOME`, `HF_HOME`,
+about 600 MB for the default model, on the first search). A user's `XDG_CACHE_HOME` alone
+keeps `TORCH_HOME` and `HF_HOME` unset (review): torch and huggingface_hub derive them from
+it (`XDG_CACHE_HOME/torch`, `/huggingface`), as do `hub_cache_dir` and the uninstall's
+`outside_leftovers`, so the models stay in the user's folder; the `.bat` lines for these two
+(`if not defined TORCH_HOME if not defined XDG_CACHE_HOME set …`) come before the
+`XDG_CACHE_HOME` line, and `default_cache_env` (`XDG_DERIVED`) leaves them unset too (an empty
+one is removed). Ultralytics does not read `XDG_CACHE_HOME` on Windows, so `YOLO_CONFIG_DIR`
+still defaults to `.cache/ultralytics`. Since E9/I10 the engine also fills `TORCH_HOME`, `HF_HOME`,
 `XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` itself when they are unset or empty
 (`default_cache_env(os.environ, <engine folder>)`, E42: the first statement of `main()` in
 `framescout_engine.py`, not on import, which therefore sets nothing for other importers;
@@ -1807,7 +1815,10 @@ open file; a rename that fails every try restores the files renamed before it, a
 restore is skipped), the cache folders and the `yolo11n.pt`
 location (E9/I10: `test_cache_dirs.py`, also that importing `framescout_core` loads no
 third-party module; E41: the working folder wins; A36: `engine_cache_env`, `cache_env` and
-the cache lines of both `.bat` files, run by cmd.exe, keep a user's value; the engine's defaults call
+the cache lines of both `.bat` files, run by cmd.exe, keep a user's value and leave
+`TORCH_HOME`/`HF_HOME` to a user's `XDG_CACHE_HOME`, as `default_cache_env` does; the
+project folder is told by its path, not `samefile`; `cache_env` itself run on `tmp_path`
+in `test_engine_defaults.py`; the engine's defaults call
 as the first statement of `main()` (E42) and its `yolo_weights`
 use from its syntax tree plus a subprocess import, skipped without torch, in
 `test_engine_defaults.py`; no run with real models, no app session with a user-set variable) and the photo scan

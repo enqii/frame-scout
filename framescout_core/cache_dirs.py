@@ -28,16 +28,28 @@ def cache_folder_paths(cache):
             'YOLO_CONFIG_DIR': cache / 'ultralytics', 'XDG_CACHE_HOME': cache}
 
 
+# the variables torch and huggingface_hub derive from XDG_CACHE_HOME when they are unset
+XDG_DERIVED = ('TORCH_HOME', 'HF_HOME')
+
+
 def default_cache_env(environ, base):
     """Set the cache variables that are unset or empty in environ to base/.cache (I10).
 
-    A value the user set is kept. Must run before torch, huggingface_hub and Ultralytics
-    are imported (they read some of the variables on import). Creates no folder; returns
-    the names it set.
+    A value the user set is kept. With an XDG_CACHE_HOME of the user, TORCH_HOME and HF_HOME
+    stay unset, so torch and huggingface_hub use its torch and huggingface folders as they do
+    without FrameScout (review; an empty one is removed, as cmd.exe has no empty variables).
+    Must run before torch, huggingface_hub and Ultralytics are imported (they read some of
+    the variables on import). Creates no folder; returns the names it set, each to its
+    folder in cache_paths(base).
     """
+    user_cache = environ.get('XDG_CACHE_HOME')
     added = []
     for name, path in cache_paths(base).items():
-        if not environ.get(name):
+        if environ.get(name):
+            continue
+        if user_cache and name in XDG_DERIVED:
+            environ.pop(name, None)
+        else:
             environ[name] = str(path)
             added.append(name)
     return added
