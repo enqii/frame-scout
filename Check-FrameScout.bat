@@ -2,8 +2,9 @@
 setlocal
 cd /d "%~dp0"
 rem Checks the FrameScout installation in this folder (F15) and names a fix per problem:
-rem the Python environment, the package versions, PyTorch (and CUDA), whether .cache and
-rem results can be written, the downloaded model files and the free disk space. Read-only:
+rem leftover program files of another FrameScout version (I34), the Python environment,
+rem the package versions, PyTorch (and CUDA), whether .cache and results can be written,
+rem the downloaded model files and the free disk space. Read-only:
 rem nothing is written (-B: no compiled files), downloaded or repaired.
 rem It runs with the Python of .venv if that starts, otherwise with the private Python in
 rem .python (the check needs only the standard library), so it can also say why .venv
