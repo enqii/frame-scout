@@ -197,9 +197,11 @@ the module of its area and to the re-exports in `__init__.py`.
   (the text of the box before the start; F16: with a known analysis speed it adds ", scoring and
   writing the galleries up to about N min more", with everything analyzed "... writes the galleries,
   which takes up to about N ..."). F16: `FINISHING_STEPS` (`scoring`, `thumbnails`),
-  `FINISHING_MIN_ITEMS` = 16, `StepSpeed` (times one step; `timed` wraps a call),
-  `stored_finishing` (validates the `finishing` dict of a status file), `remember_finishing`
-  (keeps a step's speed only from at least 16 items), `finishing_minutes(finishing, photos,
+  `FINISHING_MIN_ITEMS` = 16, `FINISHING_MIN_SECONDS` = 10, `StepSpeed` (times one step;
+  `timed` wraps a call), `stored_finishing` (validates the `finishing` dict of a status file),
+  `remember_finishing` (keeps a step's speed only from at least 16 items; a stored speed is
+  replaced only by a measurement of at least 10 s, so a small search keeps a larger one's
+  speed, review), `finishing_minutes(finishing, photos,
   thumbnails)` and `gallery_thumbnails(photos, top, profiles) = min(photos, top * profiles)`.
 - `devices.py`: `detection_options` (YOLO arguments on the CLIP device, E14),
   `device_choices`/`cuda_status`/`cuda_hint` (the app's device choice, CUDA status and the

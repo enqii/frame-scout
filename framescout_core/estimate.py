@@ -29,8 +29,12 @@ THROUGHPUT_MIN_SECONDS = RATE_WINDOW
 # rendered per minute}, from the last search that measured each. A thumbnail copied or
 # reused from an earlier search is not counted, so the estimate is on the safe side.
 FINISHING_STEPS = ('scoring', 'thumbnails')
-# a step's speed is stored only if it measured at least this many items
+# a step's speed is stored only if it measured at least this many items, and it replaces
+# a stored speed of the step only after this many seconds: a small search (e.g. a few
+# thumbnails from a cold disk) is a poor sample of a large one (review). Both steps are far
+# faster than the analysis, so a large search measures this long, unlike THROUGHPUT_MIN_SECONDS
 FINISHING_MIN_ITEMS = RATE_MIN_PHOTOS
+FINISHING_MIN_SECONDS = 10
 
 
 def _rate(first, last):
@@ -174,11 +178,16 @@ def stored_finishing(value):
 def remember_finishing(finishing, step, items, seconds):
     """Return finishing with the speed of step (FINISHING_STEPS) measured over items in seconds, or None.
 
-    None (keep finishing as it is) if fewer than FINISHING_MIN_ITEMS items were measured.
+    None (keep finishing as it is) if fewer than FINISHING_MIN_ITEMS items were measured,
+    or if a speed of step is stored and the measurement took less than FINISHING_MIN_SECONDS
+    (review: the first speed of a step is stored at once).
     """
     if items < FINISHING_MIN_ITEMS or not seconds > 0:
         return None
-    return {**stored_finishing(finishing), step: items * 60 / seconds}
+    stored = stored_finishing(finishing)
+    if step in stored and seconds < FINISHING_MIN_SECONDS:
+        return None
+    return {**stored, step: items * 60 / seconds}
 
 
 class StepSpeed:
