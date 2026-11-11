@@ -76,27 +76,50 @@ def search_space_bytes(photos, top, profiles, analyzed=0):
     return max(0, photos - analyzed) * CACHE_BYTES_PER_PHOTO + min(top, photos) * profiles * THUMBNAIL_BYTES
 
 
-def analyzed_photos(cache_file, signature, paths):
-    """Return how many of the photo paths have a row of signature in the feature cache cache_file.
+def _file_times(path):
+    """(mtime_ns, size) of the file path, or None if it cannot be read."""
+    try:
+        stat = os.stat(path)
+    except (OSError, ValueError):
+        return None
+    return stat.st_mtime_ns, stat.st_size
 
-    Read-only (a missing file is not created); a missing or unreadable cache counts as
-    empty, on the safe side. Paths are compared as the engine writes them (str of the path
-    of the scan), case-insensitively on Windows.
+
+def analyzed_photos(cache_file, signature, paths, stats=None):
+    """Return how many of the photo paths have a current row of signature in the feature cache cache_file.
+
+    A row is current, as for the engine, if its modification time and size are the photo's
+    (A44): a photo edited since its analysis is analyzed again. stats: {path: (mtime_ns,
+    size)} as the photo scan saw them (PhotoScan.stats), so that a large collection is not
+    read again on every count. Only a photo whose row differs from them (or that has none
+    in stats) is looked at now, so a photo analyzed again by a search after the scan still
+    counts; a photo that cannot be read counts as not analyzed. Read-only (a missing file is
+    not created); a missing or unreadable cache counts as empty, on the safe side. Paths are
+    compared as the engine writes them (str of the path of the scan), case-insensitively on
+    Windows.
     """
+    stats = stats or {}
     cache_file = Path(cache_file)
     try:
         if not cache_file.is_file():
             return 0
         con = sqlite3.connect(_read_only_uri(cache_file), uri=True, timeout=1)
         try:
-            # the primary key (path, signature) covers this query: only the index is read
-            cached = {os.path.normcase(path) for (path,) in
-                      con.execute('SELECT path FROM features WHERE signature=?', (signature,))}
+            cached = {os.path.normcase(path): (mtime_ns, size) for path, mtime_ns, size in
+                      con.execute('SELECT path,mtime_ns,size FROM features WHERE signature=?', (signature,))}
         finally:
             con.close()
     except (sqlite3.Error, OSError):
         return 0
-    return sum(os.path.normcase(str(path)) in cached for path in paths)
+    count = 0
+    for path in paths:
+        row = cached.get(os.path.normcase(str(path)))
+        if row is None:
+            continue
+        known = stats.get(path)
+        if (known is not None and row == tuple(known)) or row == _file_times(path):
+            count += 1
+    return count
 
 
 def search_space_needs(results, photos, top, profiles, model, hub_cache, detector_weights=None, analyzed=0,

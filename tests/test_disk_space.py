@@ -71,29 +71,66 @@ def test_photos_in_the_cache_need_no_cache_rows(tmp_path):
 
 
 def make_cache(path, rows):
-    """A feature cache with (photo path, signature) rows, as the engine writes it."""
+    """A feature cache with (photo path, signature[, mtime_ns, size]) rows, as the engine writes it."""
     con = sqlite3.connect(path)
     con.execute('CREATE TABLE features (path TEXT NOT NULL, signature TEXT NOT NULL, mtime_ns INTEGER NOT NULL, '
                 'size INTEGER NOT NULL, labels TEXT NOT NULL, vectors BLOB NOT NULL, PRIMARY KEY(path, signature))')
-    con.executemany('INSERT INTO features VALUES (?,?,0,0,?,?)', [(p, s, '[]', b'') for p, s in rows])
+    con.executemany('INSERT INTO features VALUES (?,?,?,?,?,?)',
+                    [(p, s, *(times or (0, 0)), '[]', b'') for p, s, *times in rows])
     con.commit()
     con.close()
 
 
 def test_analyzed_photos_counts_the_photos_with_rows_of_the_signature(tmp_path):
     photos = [tmp_path / 'photos' / f'{n}.jpg' for n in range(4)]
+    stats = {p: (0, 0) for p in photos}  # as the scan saw them
     cache = tmp_path / 'cache.sqlite'
-    assert analyzed_photos(cache, 'abc', photos) == 0  # no cache yet
+    assert analyzed_photos(cache, 'abc', photos, stats) == 0  # no cache yet
     assert not cache.exists()  # not created
     make_cache(cache, [(str(photos[0]), 'abc'), (str(photos[1]), 'abc'), (str(photos[2]), 'other'),
                        (str(tmp_path / 'elsewhere.jpg'), 'abc')])
     # rows of other settings or of photos outside this search do not count
-    assert analyzed_photos(cache, 'abc', photos) == 2
-    assert analyzed_photos(cache, 'other', photos) == 1
+    assert analyzed_photos(cache, 'abc', photos, stats) == 2
+    assert analyzed_photos(cache, 'other', photos, stats) == 1
     # a damaged file counts as no cache (on the safe side)
     broken = tmp_path / 'broken.sqlite'
     broken.write_bytes(b'not a database')
-    assert analyzed_photos(broken, 'abc', photos) == 0
+    assert analyzed_photos(broken, 'abc', photos, stats) == 0
+
+
+def test_analyzed_photos_leaves_out_photos_changed_since_their_analysis(tmp_path):
+    # the engine analyzes a photo again when its modification time or size differs from its
+    # row, so the count before the start does too (A44)
+    photos = [tmp_path / f'{n}.jpg' for n in range(4)]
+    cache = tmp_path / 'cache.sqlite'
+    make_cache(cache, [(str(p), 'abc', 100, 5) for p in photos])
+    stats = {photos[0]: (100, 5), photos[1]: (200, 5), photos[2]: (100, 6)}
+    # photos[3] is not in the scan's times and cannot be looked at (missing): not analyzed
+    assert analyzed_photos(cache, 'abc', photos, stats) == 1
+
+
+def test_analyzed_photos_looks_at_photos_without_times(tmp_path):
+    # without the scan's times (e.g. a hand-made scan) each photo is looked at as the engine does
+    photo = tmp_path / 'a.jpg'
+    photo.write_bytes(b'12345')
+    stat = photo.stat()
+    cache = tmp_path / 'cache.sqlite'
+    make_cache(cache, [(str(photo), 'abc', stat.st_mtime_ns, stat.st_size),
+                       (str(tmp_path / 'gone.jpg'), 'abc', 1, 1)])
+    assert analyzed_photos(cache, 'abc', [photo, tmp_path / 'gone.jpg']) == 1
+    photo.write_bytes(b'edited')
+    assert analyzed_photos(cache, 'abc', [photo]) == 0
+
+
+def test_analyzed_photos_counts_a_photo_analyzed_again_after_the_scan(tmp_path):
+    # the scan saw the photo before an edit, a search analyzed it since: its row is the
+    # photo's again, so only the photos whose row differs from the scan are looked at (A44)
+    photo = tmp_path / 'a.jpg'
+    photo.write_bytes(b'edited')
+    stat = photo.stat()
+    cache = tmp_path / 'cache.sqlite'
+    make_cache(cache, [(str(photo), 'abc', stat.st_mtime_ns, stat.st_size)])
+    assert analyzed_photos(cache, 'abc', [photo], {photo: (1, 5)}) == 1
 
 
 def test_search_needs_name_downloads_only_when_missing(tmp_path):

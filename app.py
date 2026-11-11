@@ -1138,10 +1138,14 @@ def cache_env():
     return env
 
 @st.cache_data(show_spinner=False, max_entries=2)
-def cached_analyzed_photos(cache_key, signature, scan_key, _paths):
-    """analyzed_photos of the photo scan, counted again only when the cache file (cache_key:
-    file_key, or None without one), the settings or the photo count (scan_key) change (F3 review)."""
-    return analyzed_photos(cache_key[0], signature, _paths) if cache_key else 0
+def cached_analyzed_photos(cache_key, signature, scan_key, _scan):
+    """analyzed_photos of the photo scan _scan, counted again only when the cache file (cache_key:
+    file_key, or None without one), the settings or the photo count (scan_key) change (F3 review).
+
+    The photos' modification times and sizes are the scan's (A44), so a photo edited after the
+    count counts as analyzed until "Recount", as an added photo is missing until then (A27).
+    """
+    return analyzed_photos(cache_key[0], signature, _scan.paths, _scan.stats) if cache_key else 0
 
 # seconds the free disk space check of the run tab is reused: not asked again on every click (review)
 LOW_SPACE_TTL = 30
@@ -1659,7 +1663,7 @@ with run_tab:
         # photos analyzed with these settings need no new cache rows (review: else a large,
         # analyzed collection kept the warning for good)
         analyzed = cached_analyzed_photos(cache_key, cleanup_signature(), (tuple(map(str, existing)), counted_at),
-                                          photo_scan.paths)
+                                          photo_scan)
         # what the search will do and, if an earlier search with these settings measured its
         # speed on this device, roughly how long its analysis takes (F12). "auto" picks CUDA
         # if PyTorch can use it; without the system details any device's record counts
