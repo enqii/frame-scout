@@ -348,7 +348,7 @@ the module of its area and to the re-exports in `__init__.py`.
   detector_weights)` (E51: the needs of `framescout_eval.py run`: each model's output folder
   `engine/<model>` with every photo counted as new, the downloads of the models missing in the
   Hub cache of `--cache-dir` added up, the detector weights once; shares `_download_needs`
-  with `search_space_needs`), `downloaded_models(base, environ, timeout, reachable)` (A39: model keys whose files are in the Hub cache the engine loads from, via `_engine_environ` shared with `app_search_needs`; a cache on a drive that does not answer is not read: empty set), `torch_install_needs(build, venv, temp, torch=True)`,
+  with `search_space_needs`), `downloaded_models(base, environ, timeout, reachable)` (A39: model keys whose files are in the Hub cache the engine loads from, via `engine_cache_env`, as `app_search_needs`; a cache on a drive that does not answer is not read: empty set), `torch_install_needs(build, venv, temp, torch=True)`,
   `low_space` (probes the drive or share roots first with cleanup's threaded
   `_reachable_roots` and `SPACE_CHECK_TIMEOUT`, leaving out a root that does not answer;
   groups the needs by volume – device number, or the anchor if it is 0, plus the volume
@@ -1678,7 +1678,7 @@ per call, huggingface_hub and Ultralytics are imported later via `import_open_cl
 created). The app's `cache_env` builds the same environment as `engine_cache_env(os.environ,
 BASE)` (A36: a copy of `os.environ` plus `default_cache_env`), so a user's value wins there
 too, and creates only the `.cache` subfolders of the names `default_cache_env` returns (and
-`.tmp`; review: no comparison of path strings). `disk_space._engine_environ` and `install_check` (`check_models`, the PyTorch
+`.tmp`; review: no comparison of path strings). `disk_space` (`app_search_needs`, `downloaded_models`) and `install_check` (`check_models`, the PyTorch
 probe) keep a user's value as well. A worktree
 engine therefore defaults to the worktree's own `.cache/`: smoke runs there still point the
 variables at the main checkout's `.cache/` to avoid a new download. Open: open_clip's URL

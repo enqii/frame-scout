@@ -166,18 +166,13 @@ def app_search_needs(base, results, environ, photos, top, profiles, model, perso
     and the person detector's weights are looked up as yolo_weights does
     (find_yolo_weights); person_detection False needs no weights.
     """
-    environ = _engine_environ(base, environ)
+    environ = engine_cache_env(environ, base)
     weights = None
     if person_detection:
         found, cached = find_yolo_weights(DEFAULT_YOLO_MODEL, base, base, environ)
         weights = found or cached
     return search_space_needs(results, photos, top, profiles, model, hub_cache_dir(environ), weights, analyzed,
                               timeout, reachable)
-
-
-def _engine_environ(base, environ):
-    """environ with the cache variables cache_env sets for the engine the app runs (engine_cache_env)."""
-    return engine_cache_env(environ, base)
 
 
 def downloaded_models(base, environ, timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
@@ -187,7 +182,7 @@ def downloaded_models(base, environ, timeout=SPACE_CHECK_TIMEOUT, reachable=_rea
     seconds (reachable: cleanup's root probe), it is not read and no model counts as
     downloaded, so the app's model list names the download sizes as before.
     """
-    hub_cache = hub_cache_dir(_engine_environ(base, environ))
+    hub_cache = hub_cache_dir(engine_cache_env(environ, base))
     if not _reachable([hub_cache], timeout, reachable)[hub_cache]:
         return set()
     return {key for key, model in MODELS.items() if model_cached(model, hub_cache)}
