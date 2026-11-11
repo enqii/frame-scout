@@ -18,6 +18,11 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
+# I35: a script of a version with the packages framescout_core and framescout_scoring, which
+# load for it next to an older version's leftover single files (framescout_core.layout); set
+# before the first FrameScout import
+FRAMESCOUT_PACKAGES = True
+
 from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL,
                              DEVICES, EXAMPLE_PROFILES_FILE, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, cache_error, cache_error_message,

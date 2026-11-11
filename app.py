@@ -13,6 +13,11 @@ from pathlib import Path
 import psutil
 import streamlit as st
 
+# I35: a script of a version with the packages framescout_core and framescout_scoring, which
+# load for it next to an older version's leftover single files (framescout_core.layout); set
+# before the first FrameScout import. Streamlit runs this file as the module __main__.
+FRAMESCOUT_PACKAGES = True
+
 from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES,
                              FINAL_PHASES, GALLERY_PAGE_SIZE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARKS_BACKUP,
                              MARKS_FILE, PHASE_LABELS, RESULTS_FILE, RUN_LOCK, RUN_STATUS, SETTING_RANGES,

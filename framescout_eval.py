@@ -37,6 +37,11 @@ from urllib.parse import unquote, urlsplit
 
 import numpy as np
 
+# I35: a script of a version with the packages framescout_core and framescout_scoring, which
+# load for it next to an older version's leftover single files (framescout_core.layout); set
+# before the first FrameScout import
+FRAMESCOUT_PACKAGES = True
+
 from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EVAL_K, EVAL_PAGE_FILE,
                              LABELS_FORMAT, MODEL_KEYS, MODELS, SKIP_LOG_LIMIT, available_decoders, average_precision, build_pool,
                              cache_folder_paths, changed_motifs, collection_name_problem, distinct_folders,
