@@ -3,7 +3,6 @@ import collections
 import importlib
 import os
 import time
-import types
 from pathlib import Path
 
 from .names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
@@ -30,9 +29,10 @@ SKIPPED_EXTENSIONS_SHOWN = 5
 # link or hard link) and analyzed once; folders_again: the folders reached again through a
 # link, searched once (A37; both 0 by default); stats: {path: (mtime_ns, size)} of the paths
 # as the scan saw them, which the app compares with the cache rows (A44; empty by default:
-# a photo without one is looked at when needed)
+# a photo without one is looked at when needed). The default is a plain dict, so that a scan
+# can be pickled and copied (review); it is shared, so the stats of a scan are never changed
 PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported found_again folders_again stats',
-                                   defaults=(0, 0, types.MappingProxyType({})))
+                                   defaults=(0, 0, {}))
 
 # Whether this Python environment can read AVIF (Pillow built with libavif), HEIC/HEIF
 # (pillow-heif) and camera RAW (rawpy) files.
