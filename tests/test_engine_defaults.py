@@ -140,19 +140,19 @@ def test_the_engine_imports_open_clip_only_through_import_open_clip():
     assert 'hub_go_online(os.environ, sys.modules)' in ast.unparse(fallback)
 
 
-def test_the_engine_sets_the_cache_folders_before_the_model_libraries_are_imported():
-    # I10: a manual run keeps the model downloads and config files under the project's .cache
+def test_the_engine_sets_the_cache_folders_in_main_not_on_import():
+    # I10: a manual run keeps the model downloads and config files under the project's .cache;
+    # E42: set in main(), so importing the engine changes no variable of the importer.
+    # huggingface_hub and Ultralytics, which read them on import, are imported later in main()
+    # (import_open_clip, import_detector_class; tests above)
     tree = ast.parse(ENGINE.read_text(encoding='utf-8'))
-    calls = [node for node in tree.body if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
-             and getattr(node.value.func, 'id', None) == 'default_cache_env']
-    assert len(calls) == 1, 'the engine must call default_cache_env once at module level'
-    assert ast.unparse(calls[0].value) == 'default_cache_env(os.environ, Path(__file__).resolve().parent)'
-    third_party = [node.lineno for node in tree.body
-                   if (isinstance(node, ast.Import) and any(a.name.split('.')[0] not in sys.stdlib_module_names
-                                                            for a in node.names))
-                   or (isinstance(node, ast.ImportFrom) and (node.module or '').split('.')[0]
-                       not in sys.stdlib_module_names | {'framescout_core'})]
-    assert third_party and calls[0].lineno < min(third_party)
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and getattr(node.func, 'id', None) == 'default_cache_env']
+    assert len(calls) == 1, 'the engine must call default_cache_env once'
+    assert ast.unparse(calls[0]) == 'default_cache_env(os.environ, Path(__file__).resolve().parent)'
+    [main] = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'main']
+    first = main.body[0]
+    assert isinstance(first, ast.Expr) and first.value is calls[0], 'main() must call default_cache_env first'
 
 
 def test_the_engine_loads_the_detector_weights_from_the_cache():
@@ -165,20 +165,31 @@ def test_the_engine_loads_the_detector_weights_from_the_cache():
     assert 'args.yolo_model' in [ast.unparse(arg) for arg in prepare.args]
 
 
-def test_importing_the_engine_sets_the_unset_cache_variables():
-    # needs the engine's own imports (torch, Pillow), so it is skipped in CI
+def test_the_engine_sets_the_unset_cache_variables_when_it_runs():
+    # E42: importing the engine changes none of them, main() sets the unset ones and keeps a
+    # value the user set; torch, imported before, reads them only when it uses them. Needs
+    # the engine's own imports (torch, Pillow), so it is skipped in CI
     pytest.importorskip('torch')
     pytest.importorskip('PIL')
     names = ('TORCH_HOME', 'HF_HOME', 'YOLO_CONFIG_DIR', 'XDG_CACHE_HOME')
-    env = {k: v for k, v in os.environ.items() if k not in names}
+    env = {k: v for k, v in os.environ.items() if k.upper() not in names}
     env['HF_HOME'] = str(ENGINE.parent / '.tmp' / 'own-hf')  # set by the user: kept
-    script = f'import os, framescout_engine\nprint([os.environ[n] for n in {names!r}])'
+    script = ('import contextlib, io, os, sys, torch, framescout_engine\n'
+              f'names = {names!r}\n'
+              'print([os.environ.get(n) for n in names])\n'
+              "sys.argv = ['framescout_engine.py', '--help']\n"
+              'with contextlib.suppress(SystemExit), contextlib.redirect_stdout(io.StringIO()):\n'
+              '    framescout_engine.main()\n'
+              'print([os.environ.get(n) for n in names])\n'
+              'print(torch.hub.get_dir())\n')
     result = subprocess.run([sys.executable, '-c', script], cwd=ENGINE.parent, capture_output=True, text=True,
                             timeout=300, env=env)
     assert result.returncode == 0, result.stderr
     cache = ENGINE.parent / '.cache'
-    assert result.stdout.strip().splitlines()[-1] == repr(
-        [str(cache / 'torch'), env['HF_HOME'], str(cache / 'ultralytics'), str(cache)])
+    assert result.stdout.strip().splitlines()[-3:] == [
+        repr([None, env['HF_HOME'], None, None]),
+        repr([str(cache / 'torch'), env['HF_HOME'], str(cache / 'ultralytics'), str(cache)]),
+        str(cache / 'torch' / 'hub')]
 
 
 def test_importing_the_engine_does_not_import_a_hugging_face_library():

@@ -41,11 +41,8 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
                              store_group, supported_extensions, write_scores, lower_priority, torch_threads)
 
-# model downloads and library config files go to the project's .cache folder, as with the
-# .bat files and the app, also for a manual run; a variable the user set is kept (I10).
-# Before torch, huggingface_hub and Ultralytics are imported: they read them on import.
-default_cache_env(os.environ, Path(__file__).resolve().parent)
-
+# torch reads the cache variables only when it uses them; huggingface_hub and Ultralytics,
+# which read them on import, are imported in main() after default_cache_env (E42)
 import numpy as np
 import torch
 # PIL.Image only for import_detector_class; importing framescout_images registers the
@@ -126,6 +123,12 @@ def unpack(blob):
 
 
 def main():
+    # model downloads and library config files go to the project's .cache folder, as with the
+    # .bat files and the app, also for a manual run; a variable the user set is kept (I10,
+    # A36). Set here, not on import, so an importer's environment stays as it is (E42), and
+    # before import_open_clip and import_detector_class import the libraries that read them
+    # on import
+    default_cache_env(os.environ, Path(__file__).resolve().parent)
     # a character the encoding of a redirected stdout cannot hold (the ANSI code page on
     # Windows, e.g. cp932 for "·" in a model label, or a profile name) is escaped instead of
     # ending the search; the app starts the engine with UTF-8 output (E22 review)
