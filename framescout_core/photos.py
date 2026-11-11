@@ -115,6 +115,11 @@ def _file_stat(path):
         return None
 
 
+def _file_times(stat):
+    """(mtime_ns, size) of a photo file of its _file_stat, as the engine compares them with its cache rows, or None."""
+    return None if stat is None else (stat.st_mtime_ns, stat.st_size)
+
+
 def _file_identity(stat):
     """The identity of a photo file of its _file_stat: _identity with its size and modification time (review).
 
@@ -237,7 +242,7 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
                     seen_files.add(file_identity)
                     found[index].append(path)
                     if stat is not None:
-                        stats[path] = (stat.st_mtime_ns, stat.st_size)
+                        stats[path] = _file_times(stat)
 
     stats = {}
     while real or links:
