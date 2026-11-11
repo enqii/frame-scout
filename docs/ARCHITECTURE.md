@@ -223,9 +223,12 @@ the module of its area and to the re-exports in `__init__.py`.
   tokenizer from; `''` = built-in tokenizer; tested against open_clip's config).
 - `cache_dirs.py` (E9/I10): `CACHE_DIR`/`cache_paths`/`cache_folder_paths` (I25: the four
   cache variables under a cache folder itself; `cache_paths(base)` and the evaluation tool's
-  `engine_env` use it)/`default_cache_env`/`yolo_weights`/`find_yolo_weights`
-  (the project's `.cache/` folders and the engine's defaults for them; `find_yolo_weights`
-  is `yolo_weights`' lookup without moving anything, also used by the disk space check; see
+  `engine_env` use it)/`default_cache_env`/`engine_cache_env`/`yolo_weights`/`find_yolo_weights`
+  (the project's `.cache/` folders and the engine's defaults for them; A36:
+  `engine_cache_env(environ, base)` is a copy of the environment plus `default_cache_env`,
+  what the app and the disk space and install checks give the engine; `find_yolo_weights`
+  is `yolo_weights`' lookup without moving anything, also used by the disk space check,
+  working folder first (E41); see
   "Environment variables and caches"). E39: `open_clip_cache_dir(model, environ, base)` is the
   `cache_dir=` the engine passes to `open_clip.create_model_and_transforms`: `XDG_CACHE_HOME/clip`
   (`.cache/clip`) for a model without `weights_repo` (open_clip's URL download path, which
@@ -339,7 +342,7 @@ the module of its area and to the re-exports in `__init__.py`.
   counts as not analyzed; a missing or unreadable cache counts as empty), `search_space_needs` (looks at the hub
   cache and the detector weights only if their root answers in time), `app_search_needs`
   (the needs of a search the app starts: the `cache_paths(base)` variables over the
-  environment, as `cache_env` sets them, the hub cache from `hub_cache_dir`, the weights
+  environment, as `cache_env` sets them (a user's value wins, A36), the hub cache from `hub_cache_dir`, the weights
   from `find_yolo_weights`), `eval_run_needs(runs, photos, top, profiles, hub_cache,
   detector_weights)` (E51: the needs of `framescout_eval.py run`: each model's output folder
   `engine/<model>` with every photo counted as new, the downloads of the models missing in the
@@ -1030,11 +1033,13 @@ person crops **in addition to the full original image**. Detection is deliberate
 optional for non-person motifs; the detector runs on the CLIP device (E14), one photo per
 call under a lock (several photos per call: E18). The detector is created with
 `YOLO(yolo_weights(args.yolo_model, <engine folder>, cwd, os.environ, log))` (E9): a path
-or URL as given; a bare name from the folder of `YOLO_CONFIG_DIR` (a user's value is kept,
-as in `default_cache_env`; else `.cache/ultralytics/`) if present; an old `yolo11n.pt`
-(default name only) in the project folder is moved there once unless a copy is there
-already (then it stays for the uninstall; used in place with a `run.log` line if the move
-fails); a file of that name in the working folder as before; otherwise the cache path,
+or URL as given; a bare name in the working folder wins (E41: a copy the user put next to
+the run is deliberate), then one in the folder of `YOLO_CONFIG_DIR` (a user's value is kept,
+as in `default_cache_env`; else `.cache/ultralytics/`) if present. Exception: the default
+`yolo11n.pt` in the project folder (also when the engine runs there, as the app does) is
+treated as an older version's download: a cached copy wins, otherwise it is moved into the
+cache folder once (used in place with a `run.log` line if the move fails; with a copy
+already there it stays for the uninstall); otherwise the cache path,
 where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged.
 
 The detector is created lazily (F2): the engine wraps the creation in `framescout_core.Lazy`
@@ -1552,7 +1557,7 @@ so cache hits do not count. Older versions ignore the fields.
 ### Starting a search from the app
 
 The frontend spawns the engine via `subprocess.Popen` and redirects stdout/stderr to
-`run.log`, with `PYTHONIOENCODING=utf-8` (`cache_env`), as it reads `run.log` as UTF-8;
+`run.log`, with `PYTHONIOENCODING=utf-8` (`cache_env`, which also keeps cache variables the user set, A36), as it reads `run.log` as UTF-8;
 it passes `--model` from the setting `model` (the AI settings tab starts with
 the "Search model" selectbox, key `setting_model`, `format_func=model_label`, with a
 caption per model and a warning from `model_problem`, E22; `models_downloaded` (`st.cache_data`, `LOW_SPACE_TTL`) marks cached models "downloaded" in the list and the caption, A39; with such a problem Start is
@@ -1595,8 +1600,8 @@ settings' signature `cleanup_signature()`, an `st.cache_data` keyed on `file_key
 cache file, the signature and the scan's folders and `counted_at`), so a repeat search of
 an analyzed collection counts no cache rows (review). The folders come from
 `app_search_needs(BASE, RESULTS, os.environ, …)`: `results/`, the Hub cache
-(`hub_cache_dir` with the `cache_paths(BASE)` variables, as `cache_env` sets them; a
-user's `HF_HUB_CACHE` is respected) and the detector weights (`find_yolo_weights` with base
+(`hub_cache_dir` with the variables of `engine_cache_env(os.environ, BASE)`, as `cache_env`
+sets them: a user's `HF_HOME` etc. is kept (A36), as is a user's `HF_HUB_CACHE`) and the detector weights (`find_yolo_weights` with base
 and working folder `BASE`, as the engine runs; none when person detection is off).
 `low_space_warning` is an `st.cache_data` with `ttl=LOW_SPACE_TTL` (30 s), and a drive
 root that does not answer within `SPACE_CHECK_TIMEOUT` is left out, so a disconnected
@@ -1650,12 +1655,20 @@ cuda` and start it again, since the running app keeps the loaded torch and the c
 
 The Windows batch scripts set cache/temp environment variables under the project directory
 (`TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `TMP`, `TEMP`), aiming for
-easy cleanup. Since E9/I10 the engine also fills `TORCH_HOME`, `HF_HOME`,
+easy cleanup. Since A36 the four cache variables are set only `if not defined` (`TMP`,
+`TEMP` and `PIP_CACHE_DIR` unconditionally): a user's Windows variable wins, so the models
+are downloaded there, also by the app (a user who had such a variable gets a new download,
+about 600 MB for the default model, on the first search). Since E9/I10 the engine also fills `TORCH_HOME`, `HF_HOME`,
 `XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` itself when they are unset or empty
-(`default_cache_env(os.environ, <engine folder>)`, module level in `framescout_engine.py`
-after the `framescout_core` import and before numpy/torch/Pillow, so before
-huggingface_hub, open_clip and Ultralytics; a user's value is kept, no folder is created).
-The app's `cache_env` still overrides them, built from `cache_paths(BASE)`. A worktree
+(`default_cache_env(os.environ, <engine folder>)`, E42: the first statement of `main()` in
+`framescout_engine.py`, not on import, which therefore sets nothing for other importers;
+it still precedes the first use of the libraries: torch reads `TORCH_HOME`/`XDG_CACHE_HOME`
+per call, huggingface_hub and Ultralytics are imported later via `import_open_clip` and
+`import_detector_class`; a user's value is kept, so no opt-out is needed; no folder is
+created). The app's `cache_env` uses `engine_cache_env(os.environ, BASE)` (A36), so a user's
+value wins there too and only the project's own `.cache` subfolders it sets (and `.tmp`) are
+created. `disk_space._engine_environ` and `install_check` (`check_models`, the PyTorch
+probe) keep a user's value as well. A worktree
 engine therefore defaults to the worktree's own `.cache/`: smoke runs there still point the
 variables at the main checkout's `.cache/` to avoid a new download. Open: open_clip's URL
 download path ignores the variables (E39); `framescout_eval.py` builds its own paths
@@ -1790,9 +1803,11 @@ nothing; all files complete before the first rename and `results.json` last; ret
 open file; a rename that fails every try restores the files renamed before it, a failed
 restore is skipped), the cache folders and the `yolo11n.pt`
 location (E9/I10: `test_cache_dirs.py`, also that importing `framescout_core` loads no
-third-party module, so the engine may fill the variables after it; the engine's defaults call and its `yolo_weights`
+third-party module; E41: the working folder wins; A36: `engine_cache_env`, `cache_env` and
+the cache lines of both `.bat` files, run by cmd.exe, keep a user's value; the engine's defaults call
+as the first statement of `main()` (E42) and its `yolo_weights`
 use from its syntax tree plus a subprocess import, skipped without torch, in
-`test_engine_defaults.py`; no run with real models) and the photo scan
+`test_engine_defaults.py`; no run with real models, no app session with a user-set variable) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
 the RAW fallback's mapping, its agreement with the scan's pairs across mixed-case names
 and joined folders, and the deferred decision (`raw_fallbacks`, `RawFallback`, E30,

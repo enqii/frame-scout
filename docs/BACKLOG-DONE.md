@@ -503,6 +503,21 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       before. `--cache-dir` keeps its name and still wins; `docs/DEVELOPMENT.md` describes
       the default. Unit-tested (`test_eval_tool.py`, both cases seen failing first); no
       real `run` with models was made.)
+- [x] **E41 – A user's own `yolo11n.pt` in the working folder is ignored once a cached copy
+      exists:** `yolo_weights` looks in the cache folder first and in the working folder only
+      afterwards, so the "used as before" file of the working folder loses against any copy in
+      `.cache/ultralytics/`. Decide which one should win (a copy the user put next to the run
+      is arguably more deliberate) and document it. Review of PR #42, finding 7. **Decided 2026-11-06 (triage):** the file in the working folder wins (a deliberate copy); one PR with E42 and A36 (ROADMAP P20), kind `code-risky`.
+      (done 2026-11-11 in PR #89: `yolo_weights`/`find_yolo_weights` look in the working folder first: a bare weights name there wins over the cache folder (`.cache/ultralytics/` or a user's `YOLO_CONFIG_DIR`). Exception: the default `yolo11n.pt` in the project folder is still treated as an older version's download (a cached copy wins, otherwise it is moved into the cache), also when the engine runs in the project folder, as the app does. Unit-tested in `test_cache_dirs.py`; no real search with models.)
+- [x] **E42 – The engine sets the cache variables when it is imported:** `default_cache_env`
+      runs at module level in `framescout_engine.py` (so it precedes the torch import), which
+      changes `HF_HOME`, `TORCH_HOME` and `XDG_CACHE_HOME` for every importer of the module and
+      means models cached in the user profile are no longer found by a manual run (documented
+      consequence of E9/I10). Decide whether to move it into `main()` (the heavy imports are
+      lazy or must be reordered; `tests/test_engine_defaults.py` pins the module-level call)
+      and whether a note or an opt-out is needed for users who keep models elsewhere. Review of
+      PR #42, findings 8 and 9. **Decided 2026-11-06 (triage):** a variable the user set wins; move the call out of the import (ROADMAP P20 with E41, A36).
+      (done 2026-11-11 in PR #89: `default_cache_env(os.environ, <engine folder>)` is the first statement of `main()` in `framescout_engine.py`, no longer module level, so importing the engine sets nothing. torch reads `TORCH_HOME`/`XDG_CACHE_HOME` per call and huggingface_hub/Ultralytics are imported later (`import_open_clip`, `import_detector_class`). A variable the user set wins, so no separate opt-out is needed. `test_engine_defaults.py` pins the call as the first statement of `main()`. Not runtime-tested: no search with real models.)
 
 ### App (`app.py`)
 
@@ -874,6 +889,13 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       modification time like the engine does, reusing the scan cache (A6/A27) so that a rerun
       does not stat every photo again. Found in F12 (PR #71).
       (done 2026-11-11 in PR #86: the count compares `(mtime_ns, size)` of the cache row with the photo's, as the engine does. The scan already `stat`s every photo for its identity and now keeps the result in `PhotoScan.stats`; `analyzed_photos(..., stats=None)` compares with it first and `stat`s only a photo whose row differs, so a photo re-analyzed after the count still counts and a rerun does not `stat` everything again. An unreadable photo counts as not analyzed. A photo edited after the count counts as analyzed until "Recount", like an added photo (A27). Review: the count reuses the scan's `_file_stat`/`_file_times`, and a scan stays picklable (`stats` defaults to a plain dict).)
+- [x] **A36 – The app overwrites cache variables a user set, the engine keeps them:**
+      `cache_env()` in `app.py` assigns all of `cache_paths(BASE)` to the engine's environment,
+      while `default_cache_env` keeps a value that is set. A search from the app therefore
+      ignores e.g. a `HF_HOME` the user exported, a manual run honours it. Probably intended
+      (the app keeps the install self-contained), but undecided and undocumented; decide and
+      document, or use `default_cache_env` in the app too. Review of PR #42, finding 12. **Decided 2026-11-06 (triage):** the app behaves like the CLI, a variable the user set wins (ROADMAP P20 with E41, E42).
+      (done 2026-11-11 in PR #89: new `framescout_core.engine_cache_env(environ, base)` (copy plus `default_cache_env`); `app.cache_env` uses it, so a variable the user set wins in the app as in the CLI, and creates only the project's own `.cache` subfolders it sets, plus `.tmp`. `Start-FrameScout.bat` and `Install-FrameScout.bat` set `TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR` and `XDG_CACHE_HOME` only `if not defined` (`TMP`/`TEMP`/`PIP_CACHE_DIR` stay unconditional); the user approved this extension of the scope. `disk_space._engine_environ` and `install_check` keep a user's value too. Compatibility: with such a Windows variable the models are downloaded there on the first search (about 600 MB for the default model) even if `.cache/` already holds them. `framescout_eval.py engine_env` is unchanged. Tests: `test_cache_dirs.py` (including the `.bat` lines run by cmd.exe), `test_disk_space.py`, `test_install_check.py`. Not tested: a full app session with a user-set variable.)
 
 ### Installation / project
 

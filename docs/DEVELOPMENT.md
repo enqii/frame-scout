@@ -32,7 +32,11 @@ also runs with the private Python (`.python\python.exe`).
 
 - A manual run needs no environment variables: unless set, the engine puts model weights,
   the Ultralytics settings and `yolo11n.pt` under the project's `.cache\`, like the `.bat`
-  files do.
+  files do. A variable you set (`TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`,
+  `XDG_CACHE_HOME`) wins, in the app and the `.bat` files too. The defaults are set when
+  `main()` runs, not when the module is imported. A `yolo11n.pt` in the working folder is
+  used before the cached copy (the project folder's own `yolo11n.pt` counts as an older
+  version's download).
 - The engine takes one or more photo folders (also between or after the options), e.g.
   `framescout_engine.py D:\Event2024 E:\Holiday --profiles .\profiles.json --output .\results`.
   The output folder must neither be a listed folder nor contain one.
