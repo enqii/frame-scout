@@ -27,6 +27,11 @@ import tempfile
 from importlib import metadata
 from pathlib import Path
 
+# I35: a script of a version with the packages framescout_core and framescout_scoring, which
+# load for it next to an older version's leftover single files (framescout_core.layout); set
+# before the first FrameScout import
+FRAMESCOUT_PACKAGES = True
+
 from framescout_core import (CUDA_BUILDS, REQUIREMENTS_FILE, cuda_build, driver_text, installed_build_matches,
                              installed_cuda_build, low_space, low_space_lines, parse_gpu_query, requirement_names, torch_index_url,
                              torch_install_needs,

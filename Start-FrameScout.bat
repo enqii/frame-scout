@@ -19,6 +19,19 @@ echo yourself, then run this file again.
 pause
 exit /b 1
 :obsolete_done
+rem I36: the same for framescout_scoring.py, the single file before the package
+rem framescout_scoring (I30), which refuses to load next to it for older scripts.
+if not exist "framescout_scoring.py" goto obsolete_scoring_done
+if exist "framescout_scoring.py\*" goto obsolete_scoring_done
+if not exist "framescout_scoring\__init__.py" goto obsolete_scoring_done
+echo Deleting framescout_scoring.py, a leftover of an older FrameScout version.
+del /f "framescout_scoring.py"
+if not exist "framescout_scoring.py" goto obsolete_scoring_done
+echo framescout_scoring.py could not be deleted. Close the programs that use it or delete it
+echo yourself, then run this file again.
+pause
+exit /b 1
+:obsolete_scoring_done
 set "TORCH_HOME=%CD%\.cache\torch"
 set "HF_HOME=%CD%\.cache\huggingface"
 set "YOLO_CONFIG_DIR=%CD%\.cache\ultralytics"
