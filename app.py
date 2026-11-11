@@ -1168,8 +1168,8 @@ def low_space_warning(photos, top, profile_count, model, person_detection, analy
 
     Counts cache rows for the photos not analyzed yet (analyzed: those with cache rows of
     these settings) and thumbnails in results/, and the downloads of a model or detector
-    weights not in .cache/ yet, on the drives they are on (app_search_needs: the folders
-    cache_env sets). A drive that does not answer within SPACE_CHECK_TIMEOUT is left out. An
+    weights not in the cache folders the engine uses yet (engine_cache_env: .cache/ or a
+    folder of the user's cache variables, A36), on the drives they are on (app_search_needs). A drive that does not answer within SPACE_CHECK_TIMEOUT is left out. An
     estimate: a warning, never a block; a check that fails (OSError, ValueError) gives none.
     """
     try:
