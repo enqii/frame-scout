@@ -311,6 +311,17 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (then `Install-FrameScout.bat`/`Start-FrameScout.bat` must also delete the leftover
       `framescout_scoring.py` of an update, which they do not today), or only the existing
       advice to extract a ZIP into a new, empty folder. Found in PR #79 (I30, review finding 1).
+- [ ] `ready` **I37 – The reviewer must verify that its findings are on the PR before swapping the label:**
+      in PR #86 the reviewer reported its medium finding as posted, but it was missing from
+      the PR; the label had already been swapped to `fs:review-done` and an empty-bodied
+      review had been left behind. An inline post failed with HTTP 422 and was not retried
+      as a general comment. Proposed change in `.claude/skills/roadmap/reviewer-brief.md`:
+      the reviewer sets `fs:review-done` only after the number of comments on the PR
+      (inline + general) provably matches its list of findings; an inline post that fails
+      with HTTP 422 is reposted immediately as a general `Finding <n> – <file>:<line>`
+      comment; an empty-bodied review must not be left behind (check
+      `gh api repos/enqii/frame-scout/pulls/<n>/reviews`). Effort S. Found in the retro of
+      PR #86.
 - [ ] `decision` **I9 – CI action pins are updated by hand only:** `.github/workflows/tests.yml`
       pins `actions/checkout` and `actions/setup-python` to commit SHAs (with a version
       comment). That avoids moved tags, but security and runtime updates
