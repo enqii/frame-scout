@@ -4,8 +4,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+from framescout_core import cache_paths, default_cache_env, engine_cache_env
 
 ENGINE = Path(__file__).resolve().parent.parent / 'framescout_engine.py'
 APP = ENGINE.with_name('app.py')
@@ -98,15 +101,27 @@ def test_the_app_starts_the_engine_with_utf8_output():
     assert assigned.get("env['PYTHONIOENCODING']") == "'utf-8'"
 
 
-def test_the_app_keeps_the_cache_variables_a_user_set():
+def test_the_app_keeps_the_cache_variables_a_user_set(tmp_path):
     # A36: the engine the app starts gets them as a manual run does (engine_cache_env), not
     # all of cache_paths over the user's values
     tree = ast.parse(APP.read_text(encoding='utf-8'))
     [cache_env] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'cache_env']
-    assert 'env = engine_cache_env(os.environ, BASE)' in ast.unparse(cache_env)
     stored = {ast.unparse(node.slice) for node in ast.walk(cache_env)
               if isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store)}
     assert stored == {"'TMP'", "'TEMP'", "'PYTHONIOENCODING'"}
+    # run app.cache_env itself on a project folder in tmp_path: the cache variables are those
+    # of engine_cache_env, and only the folders default_cache_env set are created (review)
+    own = tmp_path / 'own-hf'
+    environ = {'PATH': 'x', 'HF_HOME': str(own)}
+    namespace = {'os': SimpleNamespace(environ=environ), 'BASE': tmp_path, 'cache_paths': cache_paths,
+                 'default_cache_env': default_cache_env}
+    exec(compile(ast.Module(body=[cache_env], type_ignores=[]), str(APP), 'exec'), namespace)
+    env = namespace['cache_env']()
+    temp = str(tmp_path / '.tmp')
+    assert env == {**engine_cache_env(environ, tmp_path), 'TMP': temp, 'TEMP': temp, 'PYTHONIOENCODING': 'utf-8'}
+    assert environ == {'PATH': 'x', 'HF_HOME': str(own)}
+    assert sorted(p.name for p in (tmp_path / '.cache').iterdir()) == ['torch', 'ultralytics']
+    assert (tmp_path / '.tmp').is_dir() and not own.exists()
 
 
 def test_the_engine_uses_the_shared_default_yolo_model():
