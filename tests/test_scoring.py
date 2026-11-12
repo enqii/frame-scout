@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from framescout_scoring import (MIN_SCORES, Match, best_scores, photo_scores, rank_photos, score_caption, spread,
-                                text_queries)
+from framescout_scoring import (MIN_SCORES, Match, best_scores, photo_scores, rank_photos, rank_similar, score_caption,
+                                spread, text_queries)
 
 
 def unit(*rows):
@@ -129,6 +129,25 @@ def test_no_photos():
 def test_caption_of_a_normalized_score_names_the_raw_similarities():
     assert score_caption(Match(1.8449, 0, .28149, .7123), True) == ('Score +1.84', 'text 0.281 · image 0.712')
     assert score_caption(Match(-0.5, 0, .2, None), True) == ('Score -0.50', 'text 0.200')
+
+
+def test_rank_similar_scores_the_image_similarity_alone():
+    # F11: z-scored over all crops like a text-only profile, but the raw value is an image similarity
+    normalized, matches = rank_similar(VISUAL)
+    assert normalized
+    assert matches[1] == Match(pytest.approx(z(VISUAL, .90)), 0, None, pytest.approx(.90))
+    assert [m.crop for m in matches] == [0, 0, 1, 0, 0, 0, 1, 0]
+    assert rank_similar([]) == (False, [])
+
+
+def test_rank_similar_keeps_the_raw_similarity_for_too_few_crops():
+    normalized, matches = rank_similar(VISUAL[:2])
+    assert not normalized
+    assert matches[0] == Match(pytest.approx(.60), 0, None, pytest.approx(.60))
+
+
+def test_caption_of_find_similar_names_only_the_image_similarity():
+    assert score_caption(Match(1.5, 0, None, .8731), True) == ('Score +1.50', 'image 0.873')
 
 
 def test_caption_of_raw_scores_keeps_the_similarity():
