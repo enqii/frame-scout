@@ -372,6 +372,8 @@ def test_every_result_card_of_the_app_offers_find_similar():
     assert ast.unparse(branch.test) == 'active' and 'run_notice' in ast.unparse(branch.body)
     # it loads no model, so a missing model package does not disable it
     assert 'model_missing' not in button
+    # the quick result caption names the photo by its file name, as the gallery title does
+    assert 'Photos similar to {plain(Path(like).name)}' in ast.unparse(functions['show_quick_results'])
 
 
 def test_the_app_shows_the_quick_search_from_its_own_folder():
