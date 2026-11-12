@@ -169,9 +169,11 @@ For every worktree under `.claude/worktrees/` (`git worktree list`):
    `git branch -d <branch>` when `git log --oneline origin/main..<branch>` is empty.
 3. Uncommitted or unpushed work is never removed: first row of the state machine (report).
 
-If `git worktree remove` refuses only because of ignored files (`.tmp/` smoke data), check
-that `git -C <path> status --porcelain --ignored` lists nothing but `.tmp/`; then delete that
-folder and remove the worktree without `--force`. Any other ignored or untracked file: report.
+Order of the checks: first steps 1 and 3 (clean `status --porcelain`, fully pushed). Only if
+both hold and `git worktree remove` refuses just because of ignored files (`.tmp/` smoke
+data), check that `git -C <path> status --porcelain --ignored` lists nothing but `.tmp/`;
+then delete that folder and remove the worktree without `--force`. Any other ignored file:
+report instead.
 
 `git worktree unlock/remove/prune`, `git branch -d` and `git branch -D` (not on `main`) are
 pre-approved in `.claude/settings.json` (I27); forced removals (`-f`/`--force`) still ask.
