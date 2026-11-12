@@ -847,6 +847,10 @@ def show_results(results, photo_folders):
                             'stay the same.')
     pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
     key = 'results_page_' + name
+    if st.session_state.get(key, 1) not in range(1, pages + 1):
+        # a page of a longer list of an earlier search; dropped before the jump button below
+        # compares the page shown with its target (F20 review)
+        st.session_state.pop(key, None)
     # review progress (F20), only where photos can be marked: without readable marks every
     # photo would count as undecided, and a renamed profile took its marks along
     progress = review_progress(entry['cards'], marks, GALLERY_PAGE_SIZE) if can_mark else None
@@ -863,8 +867,6 @@ def show_results(results, photo_folders):
     # (A24): filtering first pulled the photos of the following pages up into this one
     page = 1
     if pages > 1:
-        if st.session_state.get(key, 1) not in range(1, pages + 1):
-            st.session_state.pop(key, None)  # a page of a longer list of an earlier search
         page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key)
     shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
     if hidden:
