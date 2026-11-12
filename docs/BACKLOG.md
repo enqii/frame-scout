@@ -259,6 +259,21 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       a real browser, light and dark theme: the mark colors still apply after mark clicks and
       page changes (fragment reruns), the caption shows no stray text, and no gap is left above
       the cards. If not, try `st.html` (A38). Review of PR #77, finding 1.
+- [ ] **A46 – Split `app.py` into modules (simplification):** `app.py` has about 1,900 lines
+      and holds process control (start/stop of the engine), marks, copying, export, storage
+      cleanup, cache check, settings widgets and the result views in one file. Move the areas
+      into modules (e.g. `ui/results.py`, `ui/cleanup.py`, `ui/settings.py`, `ui/run.py`) or
+      Streamlit pages, without changing behavior; `app.py` keeps the page layout. Check first
+      how Streamlit's `AppTest` tests and the `setting_<name>` session-state keys are affected.
+      Found on 2026-11-12 in a simplification review of the whole project.
+- [ ] **A47 – Decide the frontend framework before distribution (simplification):** a large
+      part of `app.py` works around Streamlit's rerun model (session-state keys for every
+      widget, fragments, `cached_*` functions keyed by mtime/size, notices carried over
+      reruns). Before P5 (distribution) decide once whether Streamlit stays or a small local
+      server with a static HTML frontend replaces it (the galleries are HTML already). Notes
+      for the decision: size and start time of the bundle, the effort of a rewrite against the
+      code that would go away, and what the tests can check then. Product decision and new
+      dependency (hold point). Found on 2026-11-12 in a simplification review.
 
 ### Installation / project
 
@@ -343,6 +358,93 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       unpacked size of the CUDA build of PyTorch and pip's peak space use are not measured;
       `TORCH_INSTALL_SPACE['cuda']` (3 GB download, 6 GB installed) is an estimate. Measure on
       the home PC and correct it; could go into the rest of I11. Found in F3 (PR #64).
+- [ ] **I39 – Shrink `docs/ARCHITECTURE.md` to what the code cannot say (simplification):**
+      the file has about 177 KB and retells the code function by function, so every PR has to
+      update it and the workflow needs a separate `docs-update` agent for that (I17). Cut it to
+      roughly 20–30 KB: the search pipeline, cache signature, data formats (`profiles.json`,
+      `settings.json`, result file, marks), invariants and the verified status. Per-function
+      descriptions go into docstrings (most exist already), the per-file test list is dropped
+      (the test files are the list). Then check whether the separate docs step is still needed
+      (I41). Found on 2026-11-12 in a simplification review of the whole project: the search
+      core (engine, scoring, image loading) has about 1,300 lines, against about 7,500 lines
+      of `framescout_core`, 13,800 lines of tests and 530 KB of Markdown.
+- [ ] **I40 – Reduce `docs/BACKLOG-DONE.md` to one line per ID (simplification):** the file
+      has about 170 KB of reports that repeat the PR descriptions and the git history. Keep
+      one line per finished item (ID, title, date, PR link); the report stays in the PR.
+      Change the rule "moved with its report" in `CLAUDE.md`, the roadmap skill and the briefs
+      accordingly. Items finished without a PR keep a short report. Found on 2026-11-12 in a
+      simplification review.
+- [ ] **I41 – Lighter PR workflow (simplification):** four state labels, fresh agents per
+      phase and a separate docs agent are heavy for a one-person project. After I39/I40
+      decide: fold the docs update back into the implementer (the reason for I17 was the
+      context size, mostly caused by the docs), reduce the labels to two (`fs:in-progress`,
+      `fs:ready`), and shorten `CLAUDE.md` → "PR workflow", `.claude/skills/roadmap/SKILL.md`
+      and the briefs (together about 50 KB). Keep: one PR per item, one review round, merge
+      only after approval, user data protection. Workflow rule change, so a user decision.
+      Found on 2026-11-12 in a simplification review.
+- [ ] **I42 – Replace the mixed-versions guard by something simpler (simplification):**
+      `framescout_core/layout.py`, `framescout_scoring/layout.py`, the `FRAMESCOUT_PACKAGES`
+      marker in six entry points and about 500 lines of `tests/test_layout.py` (I16, I35, I36)
+      only protect against extracting a ZIP over another version's folder. Options: the
+      installer and the start script refuse a folder that holds files of another version (one
+      version file); or the user guide says "extract into an empty folder" and the `.bat`
+      files keep deleting the two known leftover files. Removes a gotcha from `CLAUDE.md`.
+      Decide which protection stays. Found on 2026-11-12 in a simplification review.
+- [ ] **I43 – Drop legacy names with one migration (simplification, breaking):** the prototype
+      has no release yet but carries compatibility code for its own earlier states: the crop
+      label `Gesamtbild` in old cache rows, the thumbnail folder `results/vorschaubilder/`,
+      the profile field `franchise` (meaning "Context / origin"), the CLI option
+      `--character` and `LEGACY_PHOTO_FOLDER` in the settings. Migrate the user's files once
+      (with a backup, as the profile conversion does), rename, and remove the compatibility
+      paths; best together with the first release `v1.1.0` as the cut. Breaking change of the
+      `profiles.json` schema and the CLI (hold point): decide per name. Found on 2026-11-12 in
+      a simplification review.
+- [ ] **I44 – Reduce defensive handling of rare cases, starting with the storage cleanup
+      (simplification):** `framescout_core/cleanup.py` has about 1,300 lines and
+      `tests/test_cleanup.py` about 1,500, more than the whole engine: reachability probes of
+      drive roots in threads, hanging network shares, fstab mount points, dead links. A
+      simpler rule ("a root that does not answer → offer nothing of that category") would
+      probably need a third of the code. Review `uninstall.py`, `install_check.py` and
+      `disk_space.py` in the same way. Each removal gives up protection against a rare case,
+      so list per module what would go and let the user decide (the deletion rules for user
+      data and `NEVER_DELETED` stay). Found on 2026-11-12 in a simplification review, by
+      sampling, not by reading every module.
+- [ ] **I45 – Flatten the package structure (simplification):** `framescout_core/__init__.py`
+      re-exports about 200 names by hand, and every new function has to be added there; import
+      from the modules instead (`from framescout_core.settings import …`) and keep
+      `__init__.py` nearly empty (the mixed-versions guard depends on I42).
+      `framescout_scoring` (about 190 lines, numpy only) is an own package with an own guard:
+      make it one module or a subpackage, keeping the rule "core is standard library only" as
+      a test. Do it together with I32 (entry points into a package), so the imports change
+      once. Found on 2026-11-12 in a simplification review.
+- [ ] **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
+      versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
+      `constraints.txt`, as constants in `framescout_core/torch_build.py` and
+      `portable_python.py`, with tests that compare them. A `pyproject.toml` with a lock file
+      (e.g. `uv.lock`) would be one source; `uv` could also download the private Python and
+      choose the CPU/CUDA index, replacing parts of `Install-FrameScout.bat`,
+      `install_torch.py` and `portable_python.py`. New tool and download in the installer
+      (hold point); check the offline behavior, the checksum of the `uv` download and the
+      clean uninstall first. Found on 2026-11-12 in a simplification review.
+- [ ] **I47 – Keep unneeded complexity out from the start (workflow):** the items I39–I46,
+      A46 and A47 remove complexity that entered one reasonable PR at a time, mostly through
+      review findings about rare cases, compatibility with earlier prototype states and docs
+      that retell the code. Rules to introduce:
+      (a) a rule in `CLAUDE.md` → "Engineering principles": handle a failure case in code only
+      if it was observed or would lose user data; otherwise document it as a known limit;
+      (b) no compatibility code for states that were never released; a format change gets one
+      migration and the old path is removed in the same PR;
+      (c) review findings about hypothetical cases default to "declined, known limit" instead
+      of a fix or a backlog item, unless user data is at risk; the reviewer brief asks for
+      simplification findings too ("what could this PR delete?");
+      (d) every PR states its net line change (code, tests, docs) in the template; a PR that
+      adds more than about 300 lines of non-test code explains why a smaller solution was not
+      enough;
+      (e) every `/triage` round schedules at least one item that only removes code or docs.
+      The user agreed to (a)–(e) in chat on 2026-11-12 and declined a further proposal (a
+      `/triage` question "what observed problem does this solve, and what is the smallest
+      change?" for every new item). Open: write the rules into `CLAUDE.md`, the PR template,
+      the reviewer brief and the triage skill. Found on 2026-11-12 in a simplification review.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
