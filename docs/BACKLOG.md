@@ -188,8 +188,11 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       a quick search counts a JPEG/HEIC partner whose other partner of the shot is analyzed as
       "not analyzed", although a full search would not analyze it either; and the app's count
       before a quick search (`analyzed_photos`, no RAW fallback, the scan's stats) can differ
-      slightly from the engine's count. Affected: `framescout_core/quick.py` (`quick_photos`),
-      `app.py`. Found in F10 (PR #90). Size S.
+      slightly from the engine's count. In the extreme case of a folder whose analyzed photos
+      are all RAW files analyzed in place of their broken JPEG/HEIC partner (E30), the app
+      counts 0 and disables "Quick search", although the engine would search them (review of
+      PR #90, finding 4). Affected: `framescout_core/quick.py` (`quick_photos`), `app.py`
+      (`cached_analyzed_photos`). Found in F10 (PR #90). Size S.
 
 ### App (`app.py`)
 

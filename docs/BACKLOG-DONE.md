@@ -1794,5 +1794,6 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `settings.engine_command` builds the command of both searches. The app has a "Quick search"
       section in "Search & results" with its own result view; the cleanup of `results/` does not look
       into `results/quick/`, the quick search cleans its own folder. Scores are scaled over the photos
-      searched and say so in a note. Tests: `tests/test_quick.py`. Not tested: a real browser
-      click-through, person detection on, CUDA. Left over: E61.)
+      searched and say so in a note. Review: the cache check runs before the model load, a shot
+      appears once, and the app notes results of other photo folders. Tests: `tests/test_quick.py`.
+      Not tested: a real browser click-through, person detection on, CUDA. Left over: E61.)
