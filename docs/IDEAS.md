@@ -455,3 +455,22 @@ desktop, Start menu). Closest existing items are named where they touch an idea.
   and non-English Windows need `[Environment]::GetFolderPath('Desktop')`, not a fixed path.
 - **Hold point:** product decision (writing outside the project folder, default answer);
   not runtime-testable in CI.
+
+## 2026-11-12
+
+Single idea added by hand (no brainstorming run); not checked against the earlier ideas.
+
+### 1. UI/UX overall review
+- **Problem:** the results page has become overloaded and hard to navigate through new
+  features (marks, quick search, "Find similar", several views). The application should
+  be simple and well navigable.
+- **Solution sketch:** look at the whole user interface once and assess it. Clarify the
+  information hierarchy, the actions per card, a split into tabs or sections, and the
+  consistency between the app and the HTML gallery. Also check whether design skills
+  exist that could help (for example via `find-skills`).
+- **Affected:** `app.py`, the HTML gallery in `framescout_engine.py`, user guide,
+  `docs/ARCHITECTURE.md`.
+- **Effort:** to be assessed by the review itself.
+- **Risks:** a redesign touches many screens at once; keep general-purpose wording and
+  the existing settings/state keys working.
+- **Hold point:** product decision (design decisions).
