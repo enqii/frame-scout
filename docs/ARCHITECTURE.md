@@ -180,7 +180,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `stage_reference_move`/`update_backup_references` (under `<filename>.lock`, A32)/`finish_reference_move`/`undo_reference_move`
   (a renamed profile's references follow its name, A1), `write_new_file` (reference
   uploads without overwriting).
-- `profiles.py`: `create_from_example` (first-start `profiles.json`), `generic_prompts`, `query_labels` (F17: the names of a profile's text queries in `text_queries` order, `motif "<name>"` for the averaged generated texts, then each custom text in quotes; `[]` for "Find similar")
+- `profiles.py`: `create_from_example` (first-start `profiles.json`), `generic_prompts`, `query_labels` (F17: the names of a profile's text queries in `text_queries` order, `motif "<name>"` for the averaged generated texts, then each custom text in quotes with its white space joined to single spaces; `[]` for "Find similar"; a test with one-hot prompt vectors ties it to `text_queries`)
   and `load_profiles` (profile loading/validation, used by the engine),
   `read_profiles`/`read_profiles_versioned`/`save_profiles` (the app's `profiles.json`:
   same validation, v3 conversion, atomic save with `profiles.json.bak`, A2; versioned
@@ -301,7 +301,7 @@ the module of its area and to the re-exports in `__init__.py`.
   pages, and opening only existing image files, A12). F17: `result_card(best_query=)` adds the
   optional card key `best_query`; `closest_query(index, queries)` maps `Match.query` to a name (None for a single text or
   "Find similar"); `query_caption` is the card line "Closest search text: …"; `query_summary(entry)` the results view's
-  caption with the per-text counts (None without `queries`, with fewer than 2 texts or without named cards); `QUERY_NOTE`
+  caption with the per-text counts (each distinct text once, so a custom text given twice is listed once; None without `queries`, with fewer than 2 texts or without named cards); `QUERY_NOTE`
   the gallery's note; `read_results` rejects a non-string `best_query` and a `queries` that is no list of strings.
 - `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`marks_restore_offer`/`hide_no_match`/`hidden_text`/`mark_style`/`ReviewProgress`/`review_progress`/`progress_text`
   (the user's marks, A17; every change goes through `_common._update_locked(..., backup=True)`
@@ -545,7 +545,7 @@ checks equality with the core's and that the package imports no FrameScout modul
 `Install-FrameScout.bat` and `Start-FrameScout.bat` delete the leftover like `framescout_core.py`.
 Functions: `text_queries`
 (the generated templates averaged into one query, custom prompts kept apart, E4),
-`best_scores`, `best_queries(features, queries)` (F17: the index of each crop's closest text, ties name the first), `spread`/`MIN_SCORES`/`MIN_SPREAD`, `rank_photos(text, visual, weight, best=None)`/`Match` (5th field `query`, default None, also for `rank_similar`; `photo_scores` returns `(text, visual, best)`; the ranking does not depend on `best`) (per-profile
+`best_matches(features, queries)` (F17: each crop's best score and the index of its closest text from one similarity matrix, ties name the first; `best_scores` and `photo_scores` use it), `best_scores`, `spread`/`MIN_SCORES`/`MIN_SPREAD`, `rank_photos(text, visual, weight, best=None)`/`Match` (5th field `query`, default None, also for `rank_similar`; `photo_scores` returns `(text, visual, best)`; the ranking does not depend on `best`; the engine keeps and passes `best` only for a profile with two or more texts, `None` otherwise) (per-profile
 z-scores and their combination, E5) and `score_caption` (the numbers on a gallery card). F11: `rank_similar(similarity)` ranks by one vector's similarities (z-scored over all crops, raw when too few); `Match.text` is Optional (None for a "Find similar" card) and `score_caption` then omits the text similarity.
 
 ### `framescout_eval.py` and `assets/framescout_eval_page.html`
@@ -1413,8 +1413,11 @@ the callback `go_to_page` (disabled while that page is shown); read-only, and th
 range (a page of a longer list of an earlier search) is dropped right after the page count, before
 the button and the page box read it; cards are counted per card like the pages show them, so a
 photo listed twice counts twice. F17: `show_results` adds a caption under the run caption
-(`query_summary(entry)`, the per-text counts of the gallery's photos) and a card line under the detail line
-(`query_caption(card['best_query'])`, only when the card has the key); the quick search is unchanged. The
+(`query_summary(entry)`, the per-text counts of the gallery's photos, counted per card like the run caption
+and F20) and a card line under the detail line (`query_caption(card['best_query'])`, only when the card has
+the key); the named text is the closest one of the card's best-scoring part, the crop `rank_photos` chose by
+the combined score (with reference images another crop can be closer to another text, so the wording, also
+of `QUERY_NOTE`, names the part, not the whole photo); the quick search is unchanged. The
 selected option is colored by state (green match, red no match) by one `<style>` block per
 page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]`
 with `!important`; this relies on Streamlit internals (the key class and the button kind,
@@ -1914,7 +1917,7 @@ listed folder, repeated file ids, link loops without file ids and an unreadable 
 A29, `test_photos.py`), the counts of photos and folders found again (A37), the backup rewrite under the lock (A32, `test_reference_move.py`, `test_profile_file.py` with `profiles_changed_notice`, A31) and `downloaded_models` (A39, `test_disk_space.py`, `test_models.py`; the app side of A31/A39 was not run), the installation self-test (F15, `test_install_check.py`: environment cases from `pyvenv.cfg`, pins and requirements with fake metadata, the torch probe with a fake subprocess (CPU, CUDA without a GPU, timeout, crash), writability and disk space with fake folders and usage, the combined result and its "not checked" cases; not run: the CUDA branch on a real GPU and `Check-FrameScout.bat` by double-click), the time estimate (F12: `AnalysisRate` window and thresholds, `duration_text` rounding, `remaining_text` (also its stale-status cut-off), throughput records with `run_throughput` (a short run keeps a longer run's record) and `start_summary` (also without photos) in `test_estimate.py`; the carry-over of `throughput` between status files in `test_run_status.py`; the run tab summary was checked with Streamlit `AppTest` only, the engine side and the live "time left" are not runtime-tested),
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
-hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the review progress `review_progress`/`progress_text` (F20; the app side was run with `AppTest` only), the closest search text (F17: `best_queries`, `rank_photos(best=)` unchanged ranking, `query_labels`, `closest_query`, `query_summary`, `read_results` validation in `test_scoring.py`/`test_profiles.py`/`test_results.py`/`test_engine_defaults.py`; the engine on synthetic photos and the app's caption with `AppTest` only), the
+hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the review progress `review_progress`/`progress_text` (F20; the app side was run with `AppTest` only), the closest search text (F17: `best_matches`, `rank_photos(best=)` unchanged ranking, `query_labels` and its order against `text_queries`, `closest_query`, `query_summary`, `read_results` validation in `test_scoring.py`/`test_profiles.py`/`test_results.py`/`test_engine_defaults.py`; the engine on synthetic photos and the app's caption with `AppTest` only), the
 CSS of `mark_style` and its Streamlit pin, `marks_restore_offer`, `remove_marks(unless_profile_of=)`, `test_marks.py`; the cleanup categories `marks_profiles` and `broken_files`, `test_cleanup.py`; `unlisted_paths`, `test_export.py`) and the AI settings reset
 (`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
 `test_settings.py`; A24, A26; the buttons and the mark colors were run with `AppTest`/the

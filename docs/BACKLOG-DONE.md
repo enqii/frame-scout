@@ -1898,7 +1898,7 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       its closest text ("Closest search text: ...") in the app and in the HTML gallery, and the
       results view captions the per-text counts of the gallery's photos (every text listed, also
       with 0), worded as "often by a small margin: the other texts can be nearly as close".
-      `framescout_scoring`: `best_queries` (argmax per crop, ties name the first), `photo_scores`
+      `framescout_scoring`: `best_matches` (best score and argmax per crop, ties name the first), `photo_scores`
       returns `(text, visual, best)`, `rank_photos(best=None)` and `Match.query` (None for
       "Find similar"); the ranking is unchanged (tested). `framescout_core`: `query_labels`,
       `closest_query`, `query_caption`, `query_summary`, `QUERY_NOTE`, optional card key
@@ -1908,4 +1908,9 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       CLI, cache signature or scores file. Tests: 1498 passed, 2 skipped (`tests/test_scoring.py`,
       `test_profiles.py`, `test_results.py`, `test_engine_defaults.py`); a CPU engine smoke run on
       synthetic photos under `.tmp/` and a headless `AppTest` render of the results view passed.
-      Not tested: a real model run on real photos, a browser click-through. Follow-up: F25.)
+      Not tested: a real model run on real photos, a browser click-through. Follow-up: F25.
+      Review: the wording names the best-scoring part of the photo, not the whole photo (with
+      reference images another crop can be closer to another text); a custom text given twice is
+      listed once in the summary; custom texts are named without stray white space; the engine
+      keeps the indexes only for profiles with two or more texts; a test ties `query_labels` to
+      `text_queries`. The summary counts per card like the run caption and F20.)
