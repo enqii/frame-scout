@@ -83,8 +83,9 @@ are `results/quick/`, its `results.json` and `thumbnails/`): a text input (`quic
 most `QUICK_QUERY_MAX` = 300 characters) and the button "Quick search" (disabled while a search
 runs, without folders, with a missing model package or while no photo is analyzed), the
 caption `quick_scope_text` (N of M photos analyzed and searched) and the expander "Results of
-the last quick search" (`show_quick_results`: text, date, model, count, the `quick_note`,
-model-mismatch info, "Open gallery in browser", "Open quick search folder", 48 per page,
+the last quick search" (`show_quick_results`: text, date, photo folders, model, count, the
+`quick_note`, a note if it searched other photo folders than the ones chosen now
+(`quick_folders_differ`), model-mismatch info, "Open gallery in browser", "Open quick search folder", 48 per page,
 "Open"/"Folder" per photo; no marks, copying or export). `load_results(path)` reads either
 result file. Both searches start through `start_engine`, which builds the command with
 `framescout_core.engine_command`; the settings-taken-over guard applies to both. The AI settings tab ends
@@ -109,9 +110,10 @@ tool"); it changes no cache, profile, settings or `results.json`. The additive
 without profiles: it excludes `--profiles`/`--character` (usage error), refuses an empty text
 or one over `QUICK_QUERY_MAX` and builds the profile with `quick_profile`. It loads no detector
 and analyzes nothing; phases `scanning`, `loading`, `scoring` (total = photos searched),
-`exporting`. Only photos with a current cache row are scored (`quick_photos`); with none the
-run fails with "None of these photos is analyzed with these settings yet …" (a damaged cache
-raises its error as before, E50). The output goes to `results/quick/` (see "Outputs and
+`exporting`. Only photos with a current cache row are scored (`quick_photos` with the engine's
+`analyzed` check, run right after `prepare_cache` and before the model load); with none the
+run fails at once with "None of these photos is analyzed with these settings yet …" (a damaged
+cache raises its error as before, E50). The output goes to `results/quick/` (see "Outputs and
 thumbnail cleanup"). The image decoding
 (`open_image`, `open_raw`, `raw_preview`, `render_thumbnail`, `DECODERS`, `ORIENTATION`,
 `THUMBNAIL_SIZE`, the HEIF registration, Pillow's `MAX_IMAGE_PIXELS`/`LOAD_TRUNCATED_IMAGES`) lives in
@@ -136,7 +138,7 @@ logic here when both sides need it or it should be unit-tested without models; a
 the module of its area and to the re-exports in `__init__.py`.
 
 - `layout.py` (I16): `OBSOLETE_CORE_FILE` (`framescout_core.py`, the single file of FrameScout before I15) and `mixed_versions_message(folder)` (the error text if that file lies next to the package, else `None`). `__init__.py` calls `refuse_mixed_versions(__file__)` **before any other import**, which raises an `ImportError` with that text unless the running script is marked (see below): so an unmarked script stops in a folder with files of two versions: Python would import the package either way, and after going back to an older version the older `app.py` would run silently against the newer core (another `ENGINE` and cache signature). The exception is a **marked script** (I35, `marked_script`): every entry point of this version (`app.py`, `framescout_engine.py`, `framescout_eval.py`, `install_torch.py`, `framescout_check.py`, `framescout_uninstall.py`) sets the module global `FRAMESCOUT_PACKAGES = True` (`LAYOUT_MARKER`) before its first FrameScout import, and `refused_import(folder, main_module, package)` lets a `__main__` with that marker `is True` load when the script's folder equals the package's folder (for `app.py` the marker is a global of Streamlit's `__main__`, whose `__file__` is the script path). An unmarked script (an older version's `app.py`, engine or `install_torch.py`, or `python -c`) is refused as before. `tests/test_layout.py` checks the marker comes before the first FrameScout import in each entry point and that every root script importing a FrameScout module is an entry point or the library `framescout_images.py`. Rollback: after going back to a version before I15, the entry points that version lacks (evaluation tool, check, uninstall) stay as this version's and load this core; they import only the two packages (each with its guard) and `framescout_images`, which a test checks. This holds only for going back before I15: `framescout_images.py` came with E49, so the versions with the single file `framescout_scoring.py` since E49 have it too; all of today's entry points existed then, so going back to such a version replaces them with its unmarked ones. The marker means "a version with both packages": a future guard for another module that becomes a package needs a **new marker name**, because this version's scripts carry only the current one. Other public names: `CORE_PACKAGE`, `SCORING_PACKAGE`, `REPLACED_PACKAGES`, `leftover_text`, `leftover_fix`; `mixed_versions_message(folder, package='framescout_core')`. Without the marker, the engine, evaluation tool and `install_torch.py` of an older version stop. The message names both fixes (updated: delete `framescout_core.py`; went back: delete the folder `framescout_core`; best: extract a ZIP into a new, empty folder).
-- `quick.py` (F10): the quick search's pure helpers: `QUICK_DIR` (`quick`), `QUICK_GALLERY` (`quick.html`), `QUICK_QUERY_MAX` (300), `quick_profile(text)` (white space joined, no `|` split, the four generated prompts of a profile of that name), `quick_photos(paths, fallbacks, current, trouble=None)` (the photos with a current cache row; a partner without a row through its RAW file if it has one, once per shot), `quick_scope_text(photos, analyzed)` (the app's caption) and `quick_note(searched, not_analyzed)` (the gallery note and app caption). `settings.engine_command(python, engine, folders, output, settings, device, *, profiles=None, quick_query=None)` builds the engine command line of both searches (exactly one of the two, else `ValueError`; the text is passed as `--quick-query=<text>`, so a text starting with `-` is no option).
+- `quick.py` (F10): the quick search's pure helpers: `QUICK_DIR` (`quick`), `QUICK_GALLERY` (`quick.html`), `QUICK_QUERY_MAX` (300), `quick_profile(text)` (white space joined, no `|` split, the four generated prompts of a profile of that name), `quick_photos(paths, fallbacks, analyzed)` (the photos with a current cache row; a partner without a row through its RAW file if that has one and no other partner of the shot has a row, once per shot; each photo checked once), `quick_folders_differ(searched, folders)` (whether the last quick search searched other photo folders than the existing ones chosen now), `quick_scope_text(photos, analyzed)` (the app's caption) and `quick_note(searched, not_analyzed)` (the gallery note and app caption). `settings.engine_command(python, engine, folders, output, settings, device, *, profiles=None, quick_query=None)` builds the engine command line of both searches (exactly one of the two, else `ValueError`; the text is passed as `--quick-query=<text>`, so a text starting with `-` is no option).
 - `names.py`: `EXT` (supported image extensions, including `HEIF_EXT` and `RAW_EXT`,
   E25), `slugify`, `profile_slugs` (unique gallery file names, used by the engine).
 - `photos.py` (E25): `available_decoders` (`Decoders`: whether AVIF, HEIC/HEIF and RAW
@@ -1881,10 +1883,11 @@ the gain in responsiveness are not measured, E52; `os.nice` is not run on a non-
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as is the quick search (F10:
-`tests/test_quick.py` for `quick_profile`, `quick_photos`, `quick_scope_text`, `quick_note`,
+`tests/test_quick.py` for `quick_profile`, `quick_photos`, `quick_folders_differ`, `quick_scope_text`, `quick_note`,
 `engine_command`, the quick output folder, its cleanup and that the `results/` cleanup keeps
 `results/quick/`; `test_engine_defaults.py` for the engine's `--quick-query` (exclusive with
-`--profiles`, no detector, no analysis) from its syntax tree; the app's section is covered by a
+`--profiles`, no detector, no analysis, the cache check before the model load, the output
+folder) from its syntax tree; the app's section is covered by a
 headless AppTest run, not by a unit test; no real browser click-through, no person detection on, no CUDA), as are the search
 model registry, the per-model signatures and cleanup category and the `model` setting
 (E22, `test_models.py`; the engine's `--model`, its `stdout.reconfigure` and the app's

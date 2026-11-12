@@ -235,7 +235,8 @@ searches only the photos already analyzed with the current AI settings (the capt
 "N of M photos analyzed and searched"), so it is fast and loads no person detector or analysis;
 it is not available while no photo is analyzed, while a search runs or without photo folders.
 The result goes to `results/quick/` and appears under "Results of the last quick search"
-(thumbnails, 48 per page, "Open"/"Folder" per photo, the gallery and the folder). A new quick
+(thumbnails, 48 per page, "Open"/"Folder" per photo, the gallery and the folder), with the
+photo folders it searched and a note if you have chosen other folders since. A new quick
 search replaces the last one. The scores are scaled over the photos searched, so they differ
 from a search with profiles; a quick search has no marks, copying or export, and it never
 changes your profile galleries, `results.json` or marks.
