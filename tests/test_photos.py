@@ -480,8 +480,9 @@ def test_scan_keeps_the_modification_time_and_size_of_each_photo(tmp_path):
     raw = touch(tmp_path / 'one' / 'a.nef')
     touch(tmp_path / 'one' / 'clip.mov')
     scan = scan_photos(tmp_path / 'one')
-    assert scan.stats == {p: (p.stat().st_mtime_ns, p.stat().st_size) for p in (a, b)}
-    assert raw not in scan.stats  # only the photos analyzed have a row to compare with
+    # and of each RAW file skipped for a partner: the app counts a quick search with the RAW
+    # files analyzed in place of a broken partner (E61) without a stat per RAW file (review)
+    assert scan.stats == {p: (p.stat().st_mtime_ns, p.stat().st_size) for p in (a, b, raw)}
     # a hand-made scan has none: the photos are looked at when needed
     assert PhotoScan([a], [], collections.Counter()).stats == {}
 
