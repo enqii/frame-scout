@@ -399,6 +399,15 @@ def test_review_progress_follows_the_list_order_not_the_rank_numbers():
     assert review_progress(cards, {'a.jpg': MARK_MATCH}, 1) == ReviewProgress(1, 0, 1, 3, 2)
 
 
+def test_review_progress_counts_every_card_of_a_photo_listed_twice():
+    # review: the gallery shows a card per entry, each with the photo's one mark, so the
+    # caption counts per card like the pages do
+    cards = [{'rank': 1, 'path': 'a.jpg'}, {'rank': 2, 'path': 'b.jpg'}, {'rank': 3, 'path': 'a.jpg'},
+             {'rank': 4, 'path': 'c.jpg'}]
+    assert review_progress(cards, {'a.jpg': MARK_MATCH}, 2) == ReviewProgress(2, 0, 2, 2, 1)
+    assert review_progress(cards, {'a.jpg': MARK_NO_MATCH, 'b.jpg': MARK_MATCH}, 2) == ReviewProgress(1, 2, 1, 4, 2)
+
+
 def test_review_progress_of_a_fully_checked_or_empty_list_has_no_first_open_photo():
     cards = cards_of(3)
     marks = {'photo1.jpg': MARK_MATCH, 'photo2.jpg': MARK_NO_MATCH, 'photo3.jpg': MARK_NO_MATCH}
