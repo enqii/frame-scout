@@ -94,6 +94,20 @@ def test_quick_photos_leaves_out_the_whole_shot_of_find_similar():
     assert (chosen, missing) == ([other], [])
 
 
+def test_quick_photos_leaves_out_every_partner_of_the_shot_of_find_similar():
+    # review: a partner with a row of its own is left out too, whether the chosen photo is
+    # the RAW file (e.g. analyzed while the JPEG was broken) or another partner
+    jpeg, heic, raw, other = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3'), Path('other.jpg')
+    fallbacks = {jpeg: raw, heic: raw}
+    rows = {jpeg, heic, raw, other}.__contains__
+    for exclude in (raw, jpeg, heic):
+        chosen, missing = quick_photos([jpeg, heic, other], fallbacks, rows, exclude=exclude)
+        assert (chosen, missing) == ([other], []), exclude
+    # a partner of the shot without a row is not counted as not analyzed either
+    chosen, missing = quick_photos([jpeg, heic, other], fallbacks, {raw, other}.__contains__, exclude=raw)
+    assert (chosen, missing) == ([other], [])
+
+
 def test_quick_folders_differ_tells_a_search_of_other_folders(tmp_path):
     # review: the app notes quick results of folders no longer chosen; the order does not matter
     a, b = tmp_path / 'a', tmp_path / 'b'
