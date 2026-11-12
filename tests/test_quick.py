@@ -4,9 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, auto_cleanup, engine_command,
-                             generic_prompts, quick_folders_differ, quick_note, quick_photos, quick_profile, quick_scope_text,
-                             read_results, results_document, publish_export, result_card, scan_cleanup)
+from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, auto_cleanup,
+                             engine_command, generic_prompts, like_crop, like_profile, quick_folders_differ, quick_note,
+                             quick_photos, quick_profile, quick_scope_text, read_results, results_document,
+                             publish_export, result_card, scan_cleanup)
 
 
 def test_quick_results_go_to_their_own_folder_and_gallery():
@@ -75,6 +76,24 @@ def test_quick_photos_asks_about_each_photo_once():
     assert sorted(asked) == sorted([jpeg, heic, other, raw])
 
 
+def test_quick_photos_leaves_out_the_photo_of_find_similar():
+    # F11: the chosen photo is neither compared with itself nor counted as not analyzed
+    paths = [Path('a.jpg'), Path('b.jpg'), Path('c.jpg')]
+    chosen, missing = quick_photos(paths, {}, lambda path: path.name != 'c.jpg', exclude=Path('a.jpg'))
+    assert chosen == [Path('b.jpg')]
+    assert missing == [Path('c.jpg')]
+
+
+def test_quick_photos_leaves_out_the_whole_shot_of_find_similar():
+    # the RAW file of the chosen JPEG is not shown as its best match, nor the partner whose
+    # RAW file was chosen (E30)
+    jpeg, raw, other = Path('shot.jpg'), Path('shot.cr3'), Path('other.jpg')
+    chosen, missing = quick_photos([jpeg, other], {jpeg: raw}, {jpeg, raw, other}.__contains__, exclude=jpeg)
+    assert (chosen, missing) == ([other], [])
+    chosen, missing = quick_photos([jpeg, other], {jpeg: raw}, {raw, other}.__contains__, exclude=raw)
+    assert (chosen, missing) == ([other], [])
+
+
 def test_quick_folders_differ_tells_a_search_of_other_folders(tmp_path):
     # review: the app notes quick results of folders no longer chosen; the order does not matter
     a, b = tmp_path / 'a', tmp_path / 'b'
@@ -107,6 +126,36 @@ def test_quick_note_says_how_many_photos_were_searched_and_that_scores_differ():
     assert 'not analyzed' not in quick_note(800, 0)
 
 
+def test_quick_note_of_find_similar_names_the_photos_compared():
+    # F11: the photo itself is not among them
+    note = quick_note(799, 200, like=True)
+    assert note.startswith('Photos similar to the chosen one among the other 799 photos analyzed with these AI '
+                           'settings; 200 photos were not analyzed and not searched.')
+    assert 'differ from those of a search with profiles' in note
+    assert quick_note(1, 0, like=True).startswith('Photos similar to the chosen one among the other photo analyzed')
+
+
+def test_like_profile_has_no_text_and_names_the_photo_and_its_part():
+    # F11: ranked by the photo's cached vector alone, no search text
+    photo = Path('D:/photos/IMG_0001.jpg')
+    assert like_profile(photo, FULL_IMAGE_LABEL) == {'name': 'Similar to IMG_0001.jpg', 'prompts': [],
+                                                     'generated': 0, 'refs': []}
+    assert like_profile(photo, 'Person 2')['name'] == 'Similar to IMG_0001.jpg (Person 2)'
+
+
+def test_like_crop_finds_the_part_shown_on_the_card():
+    assert like_crop(['Full image', 'Person 1', 'Person 3'], 'Person 3') == 2
+    assert like_crop(['Full image', 'Person 1'], FULL_IMAGE_LABEL) == 0
+    # rows written before I7 carry the German label of the whole photo
+    assert like_crop(['Gesamtbild', 'Person 1'], FULL_IMAGE_LABEL) == 0
+
+
+def test_like_crop_refuses_a_part_the_photo_has_not():
+    # e.g. a card of a search with person detection, compared with settings without it
+    with pytest.raises(ValueError, match='Person 2.*Full image, Person 1'):
+        like_crop(['Full image', 'Person 1'], 'Person 2')
+
+
 def command(**kwargs):
     settings = {'batch_size': 8, 'top': 150, 'max_persons': 12, 'person_confidence': 0.3, 'reference_weight': 0.3,
                 'model': 'vit-b-32', 'person_detection': True, 'low_priority': False}
@@ -136,11 +185,26 @@ def test_engine_command_of_a_quick_search_passes_the_text_in_one_argument():
     assert cmd[6:] == command(profiles=Path('p.json'))[7:]
 
 
+def test_engine_command_of_find_similar_passes_the_photo_and_its_part_in_one_argument_each():
+    # F11: "--like=<path>" and "--like-part=<part>", so a name starting with "-" is no option
+    photo = Path('D:/a/-shot.jpg')
+    cmd = command(like=photo, like_part='Person 2')
+    assert '--profiles' not in cmd and not any(arg.startswith('--quick-query') for arg in cmd)
+    assert cmd[5:7] == [f'--like={photo}', '--like-part=Person 2']
+    # the same settings, so it uses the cache rows of the current settings
+    assert cmd[7:] == command(profiles=Path('p.json'))[7:]
+    assert command(like=photo)[5:7] == [f'--like={photo}', '--output']
+
+
 def test_engine_command_needs_profiles_or_a_quick_query():
     with pytest.raises(ValueError):
         command()
     with pytest.raises(ValueError):
         command(profiles=Path('p.json'), quick_query='dog')
+    with pytest.raises(ValueError):
+        command(quick_query='dog', like=Path('x.jpg'))
+    with pytest.raises(ValueError):
+        command(profiles=Path('p.json'), like_part='Person 1')
 
 
 def quick_export(folder, thumbnail, query='dog'):
