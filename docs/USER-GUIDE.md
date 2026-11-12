@@ -244,7 +244,9 @@ changes your profile galleries, `results.json` or marks.
 **Find similar** (button on every result card, in "Results" and in the quick results) shows
 more photos that look like that one. It compares the photo (or the part named on the card,
 e.g. "Person 1") with all other photos already analyzed with the current AI settings; no search
-text is used, nothing is analyzed and no model is loaded. The result replaces the last quick
+text is used, nothing is analyzed and no model is loaded. The photo itself and the other files
+of its shot (a JPEG and the RAW file of the same name) are not part of the result. The result
+replaces the last quick
 search in `results/quick/` and is shown under "Results of the last quick search or "Find
 similar"" (title "Similar to <file>"). The scores are relative to the photos compared, and
 shots of a burst may take the top places. If the photo is not analyzed with the current

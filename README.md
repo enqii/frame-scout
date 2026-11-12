@@ -50,7 +50,9 @@ Details, GPU support and updating: [user guide](docs/USER-GUIDE.md#installation-
 4. **AI settings:** keep the defaults, or choose another search model, the GPU or turn
    person detection off for motifs other than people.
 5. **Search & results:** start the search, browse the ranked photos, mark matches and
-   copy them to a folder or export the list as CSV / text file. A quick search tries a motif over the already analyzed photos without a profile, and "Find similar" on a result card finds more photos like it. HTML galleries are written to `results/`.
+   copy them to a folder or export the list as CSV / text file. A quick search and "Find
+   similar" search the analyzed photos without a profile. HTML galleries are written to
+   `results/`.
 
 Supported formats: JPG, PNG, WebP, BMP, TIFF, AVIF, HEIC/HEIF and common camera RAW
 formats. Everything else, including what each setting does and how to clean up storage,
