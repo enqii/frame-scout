@@ -172,21 +172,31 @@ def test_strict_loading_holds_only_in_its_own_thread():
     assert run_with_pillow(script)[-1] == '[False, True, True]'
 
 
-def test_a_truncated_heic_partner_fails_without_being_retried(tmp_path):
-    # E53: pillow-heif decodes a truncated HEIC all black where truncated images are allowed;
-    # a partner fails instead, and not as truncated (a retry would only analyze black)
+@pytest.mark.parametrize('kind, suffix, module', [('HEIF', 'heic', 'pillow_heif'), ('AVIF', 'avif', 'PIL')],
+                         ids=['heic', 'avif'])
+def test_a_truncated_heif_or_avif_photo_fails_without_being_retried(tmp_path, kind, suffix, module):
+    # E53, E59: pillow-heif decodes a truncated HEIC all black where truncated images are
+    # allowed, so it is always decoded strictly: any photo fails instead of being analyzed as
+    # a black image, and a partner not as truncated (a retry would only analyze black).
+    # Pillow's own AVIF reader already rejects a truncated AVIF.
     pytest.importorskip('PIL')
-    pytest.importorskip('pillow_heif')
+    pytest.importorskip(module)
     script = OUTCOME + (
-        'photo = sys.argv[1]\n'
+        'photo, kind = sys.argv[1], sys.argv[2]\n'
         'try:\n'
-        '    noise(320, 240).save(photo, "HEIF", quality=80)\n'
+        '    noise(320, 240).save(photo, kind, quality=80)\n'
         'except Exception as exc:\n'
         '    print("no encoder:", exc); sys.exit()\n'
         'data = open(photo, "rb").read()\n'
-        'open(photo, "wb").write(data[:len(data) // 2])\n'
-        'print(outcome(photo), "|", outcome(photo, complete=True))\n')
-    last = run_with_pillow(script, tmp_path / 'photo.heic')[-1]
-    if last.startswith('no encoder:'):
-        pytest.skip(f'pillow-heif cannot write HEIC here ({last})')
-    assert last == '(320, 240) | failed: ValueError'
+        'print(outcome(photo))\n'
+        'outcomes = []\n'
+        'for part in (0.5, 0.9, 0.99):\n'
+        '    open(photo, "wb").write(data[:int(len(data) * part)])\n'
+        '    outcomes += [outcome(photo), outcome(photo, min_size=100), outcome(photo, complete=True)]\n'
+        'print(sorted(set(map(str, outcomes))))\n')
+    lines = run_with_pillow(script, tmp_path / f'photo.{suffix}', kind)
+    if lines[-1].startswith('no encoder:'):
+        pytest.skip(f'cannot write {kind} here ({lines[-1]})')
+    whole, truncated = lines[-2:]
+    assert whole == '(320, 240)'
+    assert truncated == ("['failed: ValueError']" if kind == 'HEIF' else "['failed: UnidentifiedImageError']")
