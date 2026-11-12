@@ -476,7 +476,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
         raise
 
     # the registry's input size (tested against the OpenCLIP config) if the model does not name it
-    if not quick:  # only the analysis decodes photos; "Find similar" loads no model (F11)
+    # whenever a model is loaded, as before F11; "Find similar" loads none and decodes no photo,
+    # only the analysis (never run in a quick search) needs them (review)
+    if not like:
         image_size = getattr(model.visual, 'image_size', search_model.image_size)
         min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
                               person_detection)
