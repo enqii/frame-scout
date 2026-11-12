@@ -534,13 +534,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `framescout_core`, user guide. Risks: decoding large RAW/HEIC on every rerun is slow
       (cache the preview per path and mtime). **Question:** where the mode lives, keyboard
       support; decide after the UI/UX review (F24). Size M.
-- [ ] `ready` **F20 – Review progress per profile and "jump to the first open photo":** after
-      marking part of a long list users lose their place. Sketch: a caption per profile ("Top
-      150: 32 match, 41 no match, 77 open; first open photo at rank 74") and a button that opens
-      the page holding that rank; read-only over `results.json` and `marks.json`. Affected:
-      `framescout_core` (count and first-open helper), `app.py`, user guide. Risks: "Hide photos
-      marked as no match" (A24) changes which page holds a rank; use the gallery's page
-      computation. Size S. Roadmap P25 (A).
 - [ ] `parked` **F21 – Warn about cloud-only photos before a search:** photos in OneDrive-style
       folders with files on demand are downloaded when read. Sketch: flag files with
       `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`/`FILE_ATTRIBUTE_OFFLINE` during the scan, show a

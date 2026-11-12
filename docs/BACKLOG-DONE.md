@@ -1859,3 +1859,25 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       looked up by the scan's path, a broken row fails as "not analyzed", a request is taken at once
       and named when a search runs, the button works without the model package, the caption names
       the file.)
+- [x] **F20 – Review progress per profile and "jump to the first open photo":** after
+      marking part of a long list users lose their place. Sketch: a caption per profile ("Top
+      150: 32 match, 41 no match, 77 open; first open photo at rank 74") and a button that opens
+      the page holding that rank; read-only over `results.json` and `marks.json`. Affected:
+      `framescout_core` (count and first-open helper), `app.py`, user guide. Risks: "Hide photos
+      marked as no match" (A24) changes which page holds a rank; use the gallery's page
+      computation. Size S. Roadmap P25 (A).
+      (done 2026-11-12 in PR #98: above the page box of the results view a caption per profile
+      counts the photos, e.g. "100 photos: 30 match, 30 no match, 40 undecided. The first
+      undecided photo is #61 on page 2." (page named only with more than one page; "Every photo
+      is marked." when none is left). With more than one page the button "Go to the first
+      undecided photo" (disabled while that page is shown) sets the page box through the
+      callback `go_to_page`. Caption and button only where photos can be marked (`can_mark`):
+      not when `marks.json` cannot be read, not for a profile that is no longer a search
+      profile. Read-only over `results.json`/`marks.json`; the page follows `page_cards`, and
+      A24's "Hide photos marked as no match" never hides an undecided photo, so that page
+      shows it. The wording says "undecided" (the mark control's label) instead of "open".
+      New `framescout_core` names in `marks.py`: `ReviewProgress`, `review_progress(cards,
+      marks, size)` (states other than match/no match count as open; list order, not rank
+      numbers, decides "first"), `progress_text(progress, paged)`. Tests: `tests/test_marks.py`
+      (1479 passed, 2 skipped; CI green on Python 3.12/3.13/3.14) and a headless `AppTest`
+      check. Not tested: a real browser click-through. No schema, CLI, cache or folder change.)

@@ -269,6 +269,11 @@ No match). "Hide photos marked as no match" hides the rejected ones within the p
 are looking at only, so the pages keep their photos and ranks; a caption tells how many
 are hidden, and a page where every photo was rejected says so (see the next page).
 
+Above the page box a caption per profile shows your progress, e.g. "100 photos: 30 match,
+30 no match, 40 undecided. The first undecided photo is #61 on page 2." (or "Every photo
+is marked."). With more than one page, **Go to the first undecided photo** opens that page;
+it is disabled while you are on it. Both appear only where marks can be set.
+
 Before each change of a mark FrameScout keeps the previous `marks.json` as `marks.json.bak`
 (one generation). If `marks.json` is damaged, the gallery warns that no marks are shown
 and, when the backup is readable, offers **Restore marks from backup** with the backup's
