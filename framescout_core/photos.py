@@ -28,8 +28,9 @@ SKIPPED_EXTENSIONS_SHOWN = 5
 # files without an extension); found_again: the photos found again through another path (a
 # link or hard link) and analyzed once; folders_again: the folders reached again through a
 # link, searched once (A37; both 0 by default); stats: {path: (mtime_ns, size)} of the paths
-# as the scan saw them, which the app compares with the cache rows (A44; empty by default:
-# a photo without one is looked at when needed). The default is a plain dict, so that a scan
+# and raw_pairs as the scan saw them, which the app compares with the cache rows (A44, E61
+# review; empty by default: a photo without one is looked at when needed). The default is a
+# plain dict, so that a scan
 # can be pickled and copied (review); it is shared, so the stats of a scan are never changed
 PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported found_again folders_again stats',
                                    defaults=(0, 0, {}))
@@ -187,8 +188,9 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
     folders_again, the folder links into a folder already walked (also a loop); a folder
     listed twice or inside another listed one is not counted (see distinct_folders).
 
-    The modification time and size of each photo, read for its identity anyway, are kept in
-    stats (A44): the app compares them with the cache rows without reading them again.
+    The modification time and size of each photo and skipped RAW file, read for its identity
+    anyway, are kept in stats (A44): the app compares them with the cache rows without reading
+    them again (a RAW file's for a quick search, E61 review).
     """
     exclude_path = None if exclude is None else Path(exclude)
     exclude_id = None if exclude is None else _identity(exclude)
@@ -251,7 +253,7 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
     for paths, counts, again, folders_seen in zip(found, unsupported, found_again, folders_again):
         photos, pairs = _shot_pairs(paths)
         scans.append(PhotoScan(sorted(photos), sorted(pairs), counts, again, folders_seen,
-                               {p: stats[p] for p in photos if p in stats}))
+                               {p: stats[p] for p in (*photos, *pairs) if p in stats}))
     return scans
 
 
