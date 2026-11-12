@@ -358,7 +358,20 @@ def test_every_result_card_of_the_app_offers_find_similar():
     assert 'st.rerun()' in button
     [start] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
                and getattr(node.func, 'id', None) == 'start_engine' and node.keywords[0].arg == 'like']
-    assert ast.unparse(start) == 'start_engine(like=similar[0], like_part=similar[1])'
+    assert ast.unparse(start) == 'start_engine(like=find_similar_request[0], like_part=find_similar_request[1])'
+    # review: the request is taken from the session state first thing in the page run (before
+    # any st.stop), and one that cannot start while a search runs gets a notice
+    pops = [node for node in tree.body if isinstance(node, ast.Assign) and 'find_similar' in ast.unparse(node)]
+    assert [ast.unparse(node) for node in pops] == ["find_similar_request = st.session_state.pop('find_similar', None)"]
+    stops = [node.lineno for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and ast.unparse(node.func) == 'st.stop']
+    assert stops and pops[0].lineno < min(stops)
+    [handled] = [node for node in ast.walk(tree) if isinstance(node, ast.If)
+                 and ast.unparse(node.test) == 'find_similar_request']
+    [branch] = handled.body
+    assert ast.unparse(branch.test) == 'active' and 'run_notice' in ast.unparse(branch.body)
+    # it loads no model, so a missing model package does not disable it
+    assert 'model_missing' not in button
 
 
 def test_the_app_shows_the_quick_search_from_its_own_folder():

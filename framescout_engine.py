@@ -303,8 +303,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
         for ref in p['refs']:
             if not ref.is_file():
                 parser.error(f'Reference image not found: {ref}')
-    # e.g. SigLIP without transformers: say so before the photos are scanned (E22)
-    problem = model_problem(args.model)
+    # e.g. SigLIP without transformers: say so before the photos are scanned (E22); "Find
+    # similar" loads no model and compares the photos analyzed with it before (F11 review)
+    problem = None if like else model_problem(args.model)
     if problem:
         parser.error(problem)
     search_model = MODELS[args.model]

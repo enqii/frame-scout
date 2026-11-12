@@ -745,8 +745,9 @@ def find_similar_button(card, key):
 
     A fragment cannot start the engine (start_engine reruns the whole page), so the click
     stores the photo and the part shown on the card and reruns the page, which starts it.
+    A missing model package does not disable it: it loads no model (review).
     """
-    if st.button('Find similar', key=key, width='stretch', disabled=active or not folder_scans or bool(model_missing),
+    if st.button('Find similar', key=key, width='stretch', disabled=active or not folder_scans,
                  help='Finds photos similar to this one (the part named on the card) among the photos analyzed with '
                       'the current AI settings, without analyzing anything. The result replaces the last quick '
                       'search.'):
@@ -1304,6 +1305,11 @@ def clean_project_folder():
 st.title('🔎 FrameScout')
 st.caption('Local AI search in large photo collections · your images stay on your computer')
 
+# "Find similar" clicked on a result card (F11): its fragment asked this page run to start it.
+# Taken at once, so a page run that stops early (e.g. at an unreadable profiles.json) drops it
+# instead of leaving it for a later run to start unexpectedly (review); handled under "Start search"
+find_similar_request = st.session_state.pop('find_similar', None)
+
 clean_project_folder()
 try:
     create_from_example(PROFILES, EXAMPLE_PROFILES)  # first start only; never overwrites
@@ -1752,10 +1758,14 @@ with run_tab:
         st.rerun()
     if start:
         start_engine(profiles=PROFILES)
-    # "Find similar" clicked on a result card (F11): its fragment asked this page run to start it
-    similar = st.session_state.pop('find_similar', None)
-    if similar and not active:
-        start_engine(like=similar[0], like_part=similar[1])
+    if find_similar_request:
+        # the card's button may have been drawn before a search started (its fragment reruns
+        # alone): never dropped without a word (review)
+        if active:
+            st.session_state.run_notice = ('"Find similar" was not started: a search is running already. Try again '
+                                           'when it has finished.')
+        else:
+            start_engine(like=find_similar_request[0], like_part=find_similar_request[1])
     if stop:
         try:
             st.session_state.run_notice = stop_run()
