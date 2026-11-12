@@ -229,6 +229,17 @@ second (e.g. a disconnected network share) is left out. The warning does not blo
 search"; free some space or lower "Maximum matches per search profile" to reduce the
 thumbnails.
 
+**Quick search** (between the search status and **Results**) tries a motif without creating a
+profile: type a search text in English (up to 300 characters) and press "Quick search". It
+searches only the photos already analyzed with the current AI settings (the caption says
+"N of M photos analyzed and searched"), so it is fast and loads no person detector or analysis;
+it is not available while no photo is analyzed, while a search runs or without photo folders.
+The result goes to `results/quick/` and appears under "Results of the last quick search"
+(thumbnails, 48 per page, "Open"/"Folder" per photo, the gallery and the folder). A new quick
+search replaces the last one. The scores are scaled over the photos searched, so they differ
+from a search with profiles; a quick search has no marks, copying or export, and it never
+changes your profile galleries, `results.json` or marks.
+
 **Results** shows the last finished search per profile: thumbnails, best first, 48 per
 page, with rank, score, the best-matching part ("Full image" or "Person 1", …) and the
 file name. "Open" opens a photo, "Folder" shows it in its folder, and buttons open the
@@ -326,6 +337,7 @@ Everything a search writes lands in `results/`:
 | `<profile>.html` | One HTML gallery per profile, named in plain ASCII (e.g. "Red car" → `red-car.html`). Clicking a photo opens the original. |
 | `thumbnails/` | The galleries' thumbnails. Keep the `results` folder together: a gallery copied on its own has no thumbnails, and links to originals work only on this computer. |
 | `results.json` | What the galleries of the last finished search show; the app reads it. Replaced only when a search finishes, so a stopped search keeps the previous results. |
+| `quick/` | The last quick search: `quick.html`, `results.json` and `thumbnails/`. A new quick search replaces it; **Clean up storage** does not look into it. |
 | `marks.json` | Your Match / No match marks. The search never changes it and the cleanup never deletes it. Marks belong to a photo's full path, so moving or renaming a photo drops them. |
 | `marks.json.bak` | The state of `marks.json` before your last change of a mark (one generation). If `marks.json` is damaged, the gallery offers to restore it. The cleanup never deletes it. |
 | `marks.json.broken-<date>`, `cache.sqlite3.broken-<date>` | Damaged files FrameScout set aside when you restored the marks or renamed the cache. They are never deleted on their own: **Clean up storage → Damaged files set aside** lists them (unselected). |

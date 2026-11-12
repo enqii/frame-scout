@@ -15,6 +15,9 @@ After `Install-FrameScout.bat`:
 # Engine directly (CLI)
 .\.venv\Scripts\python.exe framescout_engine.py .\photos --profiles .\profiles.json --output .\results --device cpu --batch-size 8 --top 150
 
+# Quick search of the photos already analyzed (no profile; result in .\results\quick\)
+.\.venv\Scripts\python.exe framescout_engine.py .\photos --quick-query "red car" --output .\results --device cpu
+
 # All engine options
 .\.venv\Scripts\python.exe framescout_engine.py --help
 

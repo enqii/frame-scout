@@ -184,6 +184,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       the resolved path or a hash of non-cache weights into the signature (cache invalidation
       for those runs: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched until
       decided). Review of PR #89, finding 3.
+- [ ] `minor` **E61 – The quick search counts a JPEG/HEIC partner as "not analyzed", and the app's count can differ:**
+      a quick search counts a JPEG/HEIC partner whose other partner of the shot is analyzed as
+      "not analyzed", although a full search would not analyze it either; and the app's count
+      before a quick search (`analyzed_photos`, no RAW fallback, the scan's stats) can differ
+      slightly from the engine's count. Affected: `framescout_core/quick.py` (`quick_photos`),
+      `app.py`. Found in F10 (PR #90). Size S.
 
 ### App (`app.py`)
 
@@ -388,17 +394,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (`export_csv`), `app.py` (`show_export`), user guide, `tests/test_export.py`.
       **Question:** whether a second format is wanted at all, and which. Found in the review of
       F5 (PR #67). Size S.
-- [ ] `ready` **F10 – Quick search over the analyzed photos, without a profile:** trying a
-      search text means creating a profile and starting a full run that also analyzes every
-      uncached photo. Sketch: a "Quick search" field in "Search & results"; the engine gets an
-      option (e.g. `--quick-query "<text>"`) that skips the analysis phase, scores only photos with
-      cache rows of the current signature and writes gallery and result to `results/quick/`, so
-      profile results and `marks.json` stay untouched; the app says how many photos are not
-      analyzed and therefore not searched. Affected: `framescout_engine.py`, `framescout_core`
-      (result paths, cleanup must know `results/quick/`), `app.py`, user guide,
-      `docs/ARCHITECTURE.md`. Risks: z-scoring over fewer photos makes scores differ from a full
-      run (label it); the text model still loads; cleanup of the second results folder. **Question:**
-      the new `results/` folder (UX/product decision); the CLI option is additive. Size M. **Decided 2026-11-06 (triage):** the new folder `results/quick/` is accepted; ROADMAP P21, kind `code`.
 - [ ] `ready` **F11 – "Find similar" from a result card:** no way to ask for "more like this
       one" short of copying the photo into a profile's references. Sketch: a button per card; the
       engine ranks all cached photos by cosine similarity to that photo's cached embedding (full

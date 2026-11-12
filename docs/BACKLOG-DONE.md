@@ -1775,3 +1775,24 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       Idea: record an export rate in `run-status.json` like `throughput` and add it to the
       summary. Found in F12 (PR #71).
       (done 2026-11-11 in PR #86: `run-status.json` gets `thumbnails` (planned gallery thumbnails, `min(photos, top x profiles)`) and `finishing` (photos scored and new thumbnails rendered per minute, kept from the previous status file like `throughput`). The engine times the scoring loop and the newly rendered thumbnails (at least 16 items) and stores both speeds. "About N min left" now includes scoring and the planned thumbnails during the analysis, and appears in the phases "scoring" and "exporting"; the summary before the start adds "scoring and writing the galleries up to about N min more". Without stored speeds (first search, older engine) only the analysis is estimated and the text says so. The thumbnail part assumes every thumbnail is new, so it is an upper bound on a repeat search. New functions in `framescout_core/estimate.py`. Review: the time left is also named once every photo is analyzed (e.g. a fully cached repeat search), and a stored step speed is replaced only by a measurement of at least `FINISHING_MIN_SECONDS` = 10 s. Not runtime-tested: the timing in a real engine run.)
+- [x] **F10 – Quick search over the analyzed photos, without a profile:** trying a
+      search text means creating a profile and starting a full run that also analyzes every
+      uncached photo. Sketch: a "Quick search" field in "Search & results"; the engine gets an
+      option (e.g. `--quick-query "<text>"`) that skips the analysis phase, scores only photos with
+      cache rows of the current signature and writes gallery and result to `results/quick/`, so
+      profile results and `marks.json` stay untouched; the app says how many photos are not
+      analyzed and therefore not searched. Affected: `framescout_engine.py`, `framescout_core`
+      (result paths, cleanup must know `results/quick/`), `app.py`, user guide,
+      `docs/ARCHITECTURE.md`. Risks: z-scoring over fewer photos makes scores differ from a full
+      run (label it); the text model still loads; cleanup of the second results folder. **Question:**
+      the new `results/` folder (UX/product decision); the CLI option is additive. Size M. **Decided 2026-11-06 (triage):** the new folder `results/quick/` is accepted; ROADMAP P21, kind `code`.
+      (done 2026-11-12 in PR #90: `framescout_engine.py --quick-query TEXT` (exclusive with
+      `--profiles`/`--character`; at most 300 characters) scores only the photos with a current cache
+      row, loads no detector and analyzes nothing; the result goes to `results/quick/` (`quick.html`,
+      `results.json` with the key `quick`, `thumbnails/`), leaving the profile galleries,
+      `results/results.json` and `marks.json` untouched. `framescout_core/quick.py` holds the helpers,
+      `settings.engine_command` builds the command of both searches. The app has a "Quick search"
+      section in "Search & results" with its own result view; the cleanup of `results/` does not look
+      into `results/quick/`, the quick search cleans its own folder. Scores are scaled over the photos
+      searched and say so in a note. Tests: `tests/test_quick.py`. Not tested: a real browser
+      click-through, person detection on, CUDA. Left over: E61.)
