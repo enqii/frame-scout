@@ -382,3 +382,14 @@ def test_find_similar_reads_its_photo_before_and_instead_of_the_model_load():
     loads = [node for node in ast.walk(search) if isinstance(node, ast.Call)
              and getattr(node.func, 'id', '') in ('import_open_clip', 'load_with_hub_fallback')]
     assert loads and all(id(node) in unloaded for node in loads)
+
+
+def test_find_similar_uses_no_name_of_the_model_load():
+    # review: the names the model load defines (the model and the input size of a photo
+    # analysis) are only used where a model was loaded, never on the "Find similar" path
+    search = search_node()
+    branches = [part for test in ast.walk(search) for part in
+                (test.orelse if like_test(test) else test.body if like_test(test, negated=True) else [])]
+    guarded = {id(node) for part in branches for node in ast.walk(part)}
+    uses = [node for node in ast.walk(search) if isinstance(node, ast.Name) and node.id in ('model', 'image_size')]
+    assert uses and all(id(node) in guarded for node in uses)
