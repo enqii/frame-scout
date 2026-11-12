@@ -1367,6 +1367,29 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (then `Install-FrameScout.bat`/`Start-FrameScout.bat` must also delete the leftover
       `framescout_scoring.py` of an update, which they do not today), or only the existing
       advice to extract a ZIP into a new, empty folder. Found in PR #79 (I30, review finding 1). (Done 2026-11-11 in PR #88: new `framescout_scoring/layout.py` and a guard in `framescout_scoring/__init__.py` with the same rule and wording as the core's, written out because `framescout_core` may be an older version's after a rollback (a test checks equality and that the package imports no FrameScout module); `Install-FrameScout.bat` and `Start-FrameScout.bat` delete a leftover `framescout_scoring.py` like `framescout_core.py`; `Uninstall-FrameScout.bat` deletes neither. `Install-FrameScout.bat` itself not run (its lines equal Start's by test).)
+- [x] **I37 – The reviewer must verify that its findings are on the PR before swapping the label:**
+      in PR #86 the reviewer reported its medium finding as posted, but it was missing from
+      the PR; the label had already been swapped to `fs:review-done` and an empty-bodied
+      review had been left behind. An inline post failed with HTTP 422 and was not retried
+      as a general comment. Proposed change in `.claude/skills/roadmap/reviewer-brief.md`:
+      the reviewer sets `fs:review-done` only after the number of comments on the PR
+      (inline + general) provably matches its list of findings; an inline post that fails
+      with HTTP 422 is reposted immediately as a general `Finding <n> – <file>:<line>`
+      comment; an empty-bodied review must not be left behind (check
+      `gh api repos/enqii/frame-scout/pulls/<n>/reviews`). Effort S. Found in the retro of
+      PR #86. (Done 2026-11-12 in this PR: `reviewer-brief.md` step 3 requires the count of new comments (inline + general) to cover every finding before `fs:review-done`, reposting a missing one at once as a general `Finding <n> – <file>:<line>` comment, and a check of `pulls/<n>/reviews` for an empty-bodied review. Docs only; not exercised on a real review.)
+- [x] **I38 – Agent worktrees block the user's manual test and need forced removal (workflow):**
+      observed in the roadmap run of PR #91 (2026-11-12): (1) while an implementer's
+      worktree holds the PR branch, the user cannot `git switch` to it in the main checkout
+      ("already used by worktree") to test manually; (2) removing a finished agent's
+      worktree sometimes needs `--force` (which asks for approval), presumably because
+      gitignored smoke data under `.tmp/` is left in it (guess, not verified). Sketch: the
+      implementer deletes its own `.tmp/` smoke data before returning; the `/roadmap` skill
+      removes the agent's worktree (section 4 cleanup) before the PR reaches `fs:ready` and
+      its report to the user names the commands to check the branch out in the main
+      checkout (`git fetch origin`, `git switch <branch>`, back with `git switch main`
+      before the merge). Affected: `.claude/skills/roadmap/SKILL.md`,
+      `.claude/skills/roadmap/implementer-brief.md`. Effort S. (Done 2026-11-12 in this PR: the implementer brief makes every agent delete its own `.tmp/` data before returning; `SKILL.md` section 4 allows removing a worktree whose only ignored content is `.tmp/` without `--force`, and the `fs:ready` report runs the worktree cleanup first and names `git fetch origin`, `git switch <branch>`, `git switch main`. The `--force` cause was a guess and is not verified. Docs only.)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 

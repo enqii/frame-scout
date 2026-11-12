@@ -20,7 +20,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
 ### P23 – Workflow fixes (added 2026-11-12)
-- [ ] Reviewer verifies its findings are on the PR before the label swap; agent worktrees no
+- [x] Reviewer verifies its findings are on the PR before the label swap; agent worktrees no
       longer block the user's manual test (I37, I38; kind `docs`)
 
 ### P24 – Hygiene: engine and core (added 2026-11-12)

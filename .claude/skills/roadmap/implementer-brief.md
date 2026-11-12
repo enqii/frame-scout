@@ -116,6 +116,9 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   IDs, the commit SHAs, behavior and compatibility changes, out-of-scope findings and which
   docs to update (README, user guide, DEVELOPMENT, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md`; new items). Leave the
   label `fs:in-progress` and return; the orchestrator spawns the `docs-update` agent.
+- Before you return (every mode), delete your own smoke and scratch data under the
+  worktree's `.tmp/` (gitignored leftovers make the orchestrator's worktree removal need
+  `--force`, I38) and check `git status --porcelain --ignored` shows nothing you created.
 - Wait for CI quietly: `gh pr checks {PR} --watch --interval 60 > /dev/null 2>&1; gh pr checks {PR}`
   (Git Bash; `--watch` reprints the whole table on every poll, so discard it and print
   only the final state). Run it in the background (`run_in_background`) and wait for the
