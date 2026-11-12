@@ -141,15 +141,20 @@ def quick_photos(paths, fallbacks, analyzed, exclude=None):
 
 
 def quick_scope(scan, analyzed):
-    """Return (photos searched, photos not analyzed) of a quick search over scan, as the engine counts them (E61).
+    """Return (searched, not analyzed, partners) of a quick search over scan, as the engine counts them (E61).
 
     scan: the PhotoScan of the chosen folders; analyzed: the paths among its photos and RAW
     files (raw_pairs) that have a current cache row of the search's signature
-    (analyzed_paths). A RAW file analyzed in place of its partner counts as searched, as in
-    the engine (quick_photos).
+    (analyzed_paths). Each count is of the scan's photos, so they add up to them (review):
+    searched, the photos with a row of their own (analyzed_photos of scan.paths); not
+    analyzed, those quick_photos counts as missing; partners, the JPEG/HEIC partners searched
+    through another file of their shot (another partner or the RAW file the engine analyzes
+    in their place), which quick_photos neither scores nor counts as missing.
     """
     chosen, missing = quick_photos(scan.paths, raw_fallbacks(scan), analyzed.__contains__)
-    return len(chosen), len(missing)
+    photos = set(scan.paths)
+    own = photos.intersection(chosen)
+    return len(own), len(missing), len(photos - own - set(missing))
 
 
 def quick_folders_differ(searched, folders):
@@ -161,37 +166,47 @@ def quick_folders_differ(searched, folders):
     return {str(folder) for folder in searched} != {str(folder) for folder in folders}
 
 
-def quick_scope_text(photos, searched, not_analyzed):
+def quick_scope_text(photos, searched, not_analyzed, partners=0):
     """Return what the app says before a quick search: how many photos it searches and how many not.
 
-    photos: the photos counted in the folders; searched, not_analyzed: the counts of
-    quick_scope (E61). The photos neither searched nor not analyzed are partners whose shot
-    is searched through another file of it.
+    photos: the photos counted in the folders; searched, not_analyzed, partners: the counts
+    of quick_scope (E61): the photos analyzed and searched, those not analyzed, and the
+    partners whose shot is searched through another file of it.
     """
     if photos <= 0:
         return 'No supported photos found in these folders: there is nothing to search.'
     searched = min(max(searched, 0), photos)
-    not_analyzed = min(max(not_analyzed, 0), photos - searched)
-    partners = photos - searched - not_analyzed
-    if not searched:
+    partners = min(max(partners, 0), photos - searched)
+    not_analyzed = min(max(not_analyzed, 0), photos - searched - partners)
+    if not searched and not partners:
         return (f'None of the {photos:,} photos is analyzed with these AI settings yet, so a quick search finds '
                 'nothing. Start a search with your profiles first: it analyzes them.')
     if searched == photos:
         return f'All {photos:,} photos are analyzed with these AI settings and searched.'
+    shots = 'its shot' if partners == 1 else 'their shots'
+    through = f'another file of {shots} (the same picture in another format) is searched'
+
+    def rest(count):
+        return 'the other photo is' if count == 1 else f'the other {count:,} are'
+
+    if not searched:
+        # every photo searched is a partner, searched through another file of its shot (review)
+        if partners == photos:
+            lead = 'The photo is' if photos == 1 else f'The {photos:,} photos are'
+        else:
+            lead = f'{partners:,} of {photos:,} photos {"is" if partners == 1 else "are"}'
+        itself = 'itself' if partners == 1 else 'themselves'
+        text = f'{lead} not analyzed with these AI settings {itself}, but {through}'
+        if not_analyzed:
+            text += f'; {rest(not_analyzed)} not searched until a search with your profiles analyzes them'
+        return text + '.'
     text = f'{searched:,} of {photos:,} photos are analyzed with these AI settings and searched'
     if not_analyzed:
-        if partners:
-            others = f'{not_analyzed:,} {"is" if not_analyzed == 1 else "are"}'
-        else:
-            others = f'the other {not_analyzed:,} are' if not_analyzed > 1 else 'the other photo is'
+        others = f'{not_analyzed:,} {"is" if not_analyzed == 1 else "are"}' if partners else rest(not_analyzed)
         text += f'; {others} not searched until a search with your profiles analyzes them'
     if partners:
-        if not_analyzed:
-            lead = '1 other is' if partners == 1 else f'{partners:,} others are'
-        else:
-            lead = 'the other photo is' if partners == 1 else f'the other {partners:,} are'
-        shots = 'its shot' if partners == 1 else 'their shots'
-        text += f'; {lead} not analyzed, but another file of {shots} (the same picture in another format) is searched'
+        lead = ('1 other is' if partners == 1 else f'{partners:,} others are') if not_analyzed else rest(partners)
+        text += f'; {lead} not analyzed, but {through}'
     return text + '.'
 
 

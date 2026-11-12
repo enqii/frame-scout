@@ -158,24 +158,44 @@ def test_quick_scope_text_names_the_photos_that_are_not_searched():
 
 def test_quick_scope_text_names_the_partners_whose_shot_is_searched():
     # E61: a JPEG/HEIC partner without a row whose shot is searched through another file
-    assert quick_scope_text(10, 8, 0) == ('8 of 10 photos are analyzed with these AI settings and searched; the other '
-                                          '2 are not analyzed, but another file of their shots (the same picture in '
-                                          'another format) is searched.')
-    assert quick_scope_text(10, 6, 3) == ('6 of 10 photos are analyzed with these AI settings and searched; 3 are not '
-                                          'searched until a search with your profiles analyzes them; 1 other is not '
-                                          'analyzed, but another file of its shot (the same picture in another '
-                                          'format) is searched.')
+    assert quick_scope_text(10, 8, 0, 2) == ('8 of 10 photos are analyzed with these AI settings and searched; the '
+                                             'other 2 are not analyzed, but another file of their shots (the same '
+                                             'picture in another format) is searched.')
+    assert quick_scope_text(10, 6, 3, 1) == ('6 of 10 photos are analyzed with these AI settings and searched; 3 are '
+                                             'not searched until a search with your profiles analyzes them; 1 other '
+                                             'is not analyzed, but another file of its shot (the same picture in '
+                                             'another format) is searched.')
+    # review: only partners whose shot is searched through its RAW file, with or without
+    # photos that are not analyzed; the count is given, not inferred from the others
+    assert quick_scope_text(2, 0, 0, 2) == ('The 2 photos are not analyzed with these AI settings themselves, but '
+                                            'another file of their shots (the same picture in another format) is '
+                                            'searched.')
+    assert quick_scope_text(1, 0, 0, 1) == ('The photo is not analyzed with these AI settings itself, but another '
+                                            'file of its shot (the same picture in another format) is searched.')
+    assert quick_scope_text(5, 0, 3, 2) == ('2 of 5 photos are not analyzed with these AI settings themselves, but '
+                                            'another file of their shots (the same picture in another format) is '
+                                            'searched; the other 3 are not searched until a search with your '
+                                            'profiles analyzes them.')
+    assert quick_scope_text(5, 0, 4, 1) == ('1 of 5 photos is not analyzed with these AI settings itself, but another '
+                                            'file of its shot (the same picture in another format) is searched; the '
+                                            'other 4 are not searched until a search with your profiles analyzes '
+                                            'them.')
 
 
 def test_quick_scope_counts_as_the_engine_does(tmp_path):
     # E61: the app counts a quick search with the RAW files of the scan, as the engine does;
     # a folder whose analyzed photos are all RAW files in place of their broken partner (E30)
-    # has photos to search
+    # has photos to search. Review: (searched, not analyzed, partners) count the scan's
+    # photos, so they add up to them; searched are the photos with a row of their own
     jpeg, heic, raw, other = (tmp_path / name for name in ('a.jpg', 'a.heic', 'a.cr3', 'b.jpg'))
     scan = PhotoScan([jpeg, heic, other], [raw], collections.Counter(), 0, 0, {})
-    assert quick_scope(scan, {raw}) == (1, 1)
-    assert quick_scope(scan, {jpeg, other}) == (2, 0)
-    assert quick_scope(scan, set()) == (0, 3)
+    assert quick_scope(scan, {raw}) == (0, 1, 2)
+    assert quick_scope(scan, {jpeg, other}) == (2, 0, 1)
+    assert quick_scope(scan, {jpeg, raw}) == (1, 1, 1)
+    assert quick_scope(scan, set()) == (0, 3, 0)
+    # a shot of a JPEG and a HEIC whose only row is its RAW file's: both are partners
+    pair = PhotoScan([jpeg, heic], [raw], collections.Counter(), 0, 0, {})
+    assert quick_scope(pair, {raw}) == (0, 0, 2)
 
 
 def test_quick_note_says_how_many_photos_were_searched_and_that_scores_differ():
