@@ -41,7 +41,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
                              store_group, supported_extensions, write_scores, lower_priority, torch_threads,
                              QUICK_DIR, QUICK_GALLERY, RESULTS_FILE, quick_note, quick_photos, quick_profile,
-                             like_crop, like_profile)
+                             like_crop, like_labels_fit, like_profile)
 
 # torch reads the cache variables only when it uses them; huggingface_hub and Ultralytics,
 # which read them on import, are imported in main() after default_cache_env (E42)
@@ -382,7 +382,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
                     if cache_error(exc):  # the cache file itself is damaged (E50)
                         raise
                     row = None  # a broken row counts as none
-                if row is None or not np.isfinite(row[2]).all():
+                # so is one whose labels and vectors do not match (as photo_scores checks the
+                # other photos), so like_crop's index always names a vector (review)
+                if row is None or not like_labels_fit(row[1], len(row[2])) or not np.isfinite(row[2]).all():
                     parser.error(f'This photo is not analyzed with these settings (or it changed since), so there is '
                                  f'nothing to compare with: {like_photo}. Start a search with profiles over its '
                                  'folder first: it analyzes it.')

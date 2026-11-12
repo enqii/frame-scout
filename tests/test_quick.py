@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, auto_cleanup,
-                             engine_command, generic_prompts, like_crop, like_profile, quick_folders_differ, quick_note,
+                             engine_command, generic_prompts, like_crop, like_labels_fit, like_profile, quick_folders_differ,
+                             quick_note,
                              quick_photos, quick_profile, quick_scope_text, read_results, results_document,
                              publish_export, result_card, scan_cleanup)
 
@@ -168,6 +169,25 @@ def test_like_crop_refuses_a_part_the_photo_has_not():
     # e.g. a card of a search with person detection, compared with settings without it
     with pytest.raises(ValueError, match='Person 2.*Full image, Person 1'):
         like_crop(['Full image', 'Person 1'], 'Person 2')
+
+
+def test_like_labels_fit_only_one_text_per_vector():
+    # review: a broken row of the chosen photo counts as not analyzed instead of crashing
+    # with an IndexError (more labels than vectors) or a TypeError (labels that are no texts)
+    assert like_labels_fit(['Full image', 'Person 1'], 2)
+    assert not like_labels_fit(['Full image', 'Person 1'], 1)
+    assert not like_labels_fit(['Full image'], 2)
+    assert not like_labels_fit([], 0)
+    assert not like_labels_fit({'Full image': 0}, 1)
+    assert not like_labels_fit([['Full image']], 1)
+
+
+def test_the_engine_checks_the_row_of_find_similar_before_like_crop():
+    tree = ast.parse((Path(__file__).resolve().parents[1] / 'framescout_engine.py').read_text(encoding='utf-8'))
+    lines = {name: [node.lineno for node in ast.walk(tree) if isinstance(node, ast.Call)
+                    and getattr(node.func, 'id', '') == name] for name in ('like_labels_fit', 'like_crop')}
+    assert len(lines['like_labels_fit']) == 1 and len(lines['like_crop']) == 1
+    assert lines['like_labels_fit'][0] < lines['like_crop'][0]
 
 
 def command(**kwargs):
