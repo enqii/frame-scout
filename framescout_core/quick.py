@@ -60,6 +60,15 @@ def quick_photos(paths, fallbacks, analyzed):
     return chosen, missing
 
 
+def quick_folders_differ(searched, folders):
+    """Whether a quick search searched other photo folders than folders, the ones chosen now (review).
+
+    searched: the "photo_folders" of its result file; folders: the app's resolved folders, of
+    which the engine searches those that exist. The order does not matter.
+    """
+    return {str(folder) for folder in searched} != {str(folder) for folder in folders}
+
+
 def quick_scope_text(photos, analyzed):
     """Return what the app says before a quick search: how many photos it searches and how many not.
 

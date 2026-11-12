@@ -45,7 +45,8 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              size_text, skipped_lines, stage_reference_move, started_in_time, status_fraction,
                              status_text, stopped_status, supported_extensions, undo_reference_move,
                              update_backup_references, write_new_file, write_status,
-                             QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, engine_command, quick_note, quick_scope_text)
+                             QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, engine_command, quick_folders_differ, quick_note,
+                             quick_scope_text)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -877,10 +878,11 @@ def show_results(results, photo_folders):
     show_export(name, entry, marks, marks_error)
 
 @st.fragment
-def show_quick_results(results):
+def show_quick_results(results, folders):
     """The gallery of the last quick search (F10) as a grid of thumbnails; no marks, copying or export.
 
-    Its buttons rerun only this part, as in show_results.
+    folders: the photo folders chosen now, to tell whether it searched others. Its buttons
+    rerun only this part, as in show_results.
     """
     entries = results['profiles']
     if not entries:
@@ -890,7 +892,9 @@ def show_quick_results(results):
     run_settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
     model_key = results_model(run_settings)
     result_model = MODELS.get(model_key) if model_key else None
-    st.caption(f"Quick search for \"{plain(entry['name'])}\" from {run_date(results)} · "
+    searched_folders = results['photo_folders']  # also for a format 1 file (A25)
+    st.caption(f"Quick search for \"{plain(entry['name'])}\" from {run_date(results)} · photo "
+               f"folder{'s' if len(searched_folders) > 1 else ''} {plain('; '.join(searched_folders))} · "
                + (f'search model {plain(result_model.label)} · ' if result_model else '') +
                f"{len(entry['cards']):,} photos (at most {run_settings.get('top', '?')}), best first. "
                'A ranking by similarity, not a guaranteed identification.')
@@ -898,6 +902,10 @@ def show_quick_results(results):
     searched, not_analyzed = quick.get('searched'), quick.get('not_analyzed')
     if all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in (searched, not_analyzed)):
         st.caption(quick_note(searched, not_analyzed))
+    if quick_folders_differ(searched_folders, [folder for folder in folders if folder.is_dir()]):
+        # review: the profile galleries name their folders; these may be of a folder no longer chosen
+        st.info('This quick search searched other photo folders than the ones chosen now. Start a quick search '
+                'again for the current folders.')
     if model_key != settings['model']:
         made_with = f'the search model {plain(result_model.label)}' if result_model else 'another search model'
         st.info(f'This quick search was made with {made_with}; the AI settings now choose '
@@ -1837,7 +1845,7 @@ with run_tab:
                    f'Details: {plain(str(quick_error))}')
     if quick_results:
         with st.expander('Results of the last quick search', expanded=True):
-            show_quick_results(quick_results)
+            show_quick_results(quick_results, search_folders)
     st.divider()
     st.subheader('Results')
     # the galleries of the last complete search, as the engine wrote them (A12)
