@@ -65,6 +65,9 @@ Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = _LOAD_TRUNCATED
 # the errors with which Pillow and pillow-heif reject image data they cannot decode
 _DECODE_ERRORS = (OSError, ValueError, SyntaxError, EOFError)
+# formats whose truncated images decode without any of their pixels (E59): always loaded
+# strictly (_open); Pillow's own AVIF reader already rejects a truncated AVIF
+_STRICT_FORMATS = ('HEIF', 'AVIF')
 # the end of image marker of a JPEG, and the restart markers RST0-RST7 (_ends_only_its_marker)
 _JPEG_END = b'\xff\xd9'
 _JPEG_RESTARTS = [bytes((0xFF, 0xD0 + n)) for n in range(8)]
@@ -82,7 +85,8 @@ def open_image(path, min_size=None, complete=False):
     With min_size, a JPEG is decoded at 1/2, 1/4 or 1/8 scale (Image.draft) as long as
     both edges stay at least min_size pixels long; other formats ignore it (E2). A camera
     RAW file is read with open_raw (E25). A JPEG whose data ends early or is damaged decodes
-    with the missing part gray (LOAD_TRUNCATED_IMAGES). With complete, the image must
+    with the missing part gray (LOAD_TRUNCATED_IMAGES); a truncated HEIC/HEIF raises (E59),
+    since it would decode all black. With complete, the image must
     decode completely (_open_complete): such a JPEG raises TruncatedImageError instead, so
     that the engine analyzes the RAW file of its shot (E46, E53).
     """
@@ -100,10 +104,17 @@ def open_image(path, min_size=None, complete=False):
 
 
 def _open(path, min_size=None):
-    """Return (path as an upright RGB image, whether it is a JPEG whose data ended before its end marker)."""
+    """Return (path as an upright RGB image, whether it is a JPEG whose data ended before its end marker).
+
+    A HEIF image (_STRICT_FORMATS) is always loaded strictly (E59): pillow-heif decodes a
+    truncated one all black where truncated images are allowed, which is no part of the photo.
+    """
     with Image.open(path) as image:
         if min_size:
             image.draft(None, (min_size, min_size))
+        if image.format in _STRICT_FORMATS:
+            with _strict():
+                image.load()
         upright = ImageOps.exif_transpose(image).convert('RGB')
         # Pillow's JPEG reader sets _ended when the file ends before its end marker (it then
         # pretends the marker); tests/test_images.py pins it
