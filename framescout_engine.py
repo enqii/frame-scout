@@ -748,7 +748,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
     names = [p['name'] for p in profiles]
     # the names of each profile's text queries, in the order of Match.query (F17)
     query_names = {p['name']: query_labels(p) for p in profiles}
-    galleries ={names[0]: QUICK_GALLERY} if quick else {name: slug + '.html'
+    galleries = {names[0]: QUICK_GALLERY} if quick else {name: slug + '.html'
                                                          for name, slug in zip(names, profile_slugs(names))}
     # with several photo folders, a card names the photo's folder before its path in it (A25)
     labels = folder_labels(roots)
