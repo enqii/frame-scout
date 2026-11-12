@@ -6,8 +6,9 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (RESULTS_FILE, RESULTS_FORMAT, load_profiles, open_command, openable_photo, page_count,
-                             page_cards, profile_fingerprints, profile_state, publish_export, read_results,
-                             result_card, results_document, reveal_command, search_fingerprint)
+                             page_cards, profile_fingerprints, profile_state, publish_export, query_caption,
+                             query_summary, read_results, result_card, results_document, reveal_command,
+                             search_fingerprint)
 
 THUMB = '1c6b57780fa2df6f925b878c.jpg'
 
@@ -38,6 +39,48 @@ def test_a_card_holds_what_the_app_shows_and_opens():
     assert c == {'rank': 2, 'path': str(Path('/photos/sub/a.jpg')), 'relative': 'sub/a.jpg', 'label': 'Person 1',
                  'score': 1.5, 'text': 0.3, 'visual': 0.8, 'caption': 'Score +1.50',
                  'detail': 'text 0.300 · image 0.800', 'thumbnail': THUMB}
+
+
+def test_a_card_names_its_closest_search_text_only_when_given():
+    # F17: an optional key; a card without it is one of an older search or of a single text
+    c = result_card(1, Path('/photos/a.jpg'), 'a.jpg', 'Full image', 1.5, 0.3, None, 'Score +1.50', 'text 0.300',
+                    THUMB, best_query='"a red sports car"')
+    assert c['best_query'] == '"a red sports car"'
+    assert 'best_query' not in card()
+
+
+def test_the_caption_of_the_closest_search_text():
+    assert query_caption('"a red sports car"') == 'Closest search text: "a red sports car"'
+
+
+QUERIES = ['motif "Red car"', '"a red sports car"', '"a car in the snow"']
+
+
+def test_the_summary_counts_the_photos_each_text_was_closest_to():
+    cards = [card(1, best_query=QUERIES[1]), card(2, best_query=QUERIES[1]), card(3, best_query=QUERIES[0])]
+    summary = query_summary({'queries': QUERIES, 'cards': cards})
+    # every text in profile order, also one that no photo was closest to
+    assert summary.startswith('Closest search text of these 3 photos: motif "Red car" 1 · "a red sports car" 2 · '
+                              '"a car in the snow" 0.')
+    # a text closest to a photo can lead by a tiny margin: the others did not "fail"
+    assert 'small margin' in summary
+
+
+@pytest.mark.parametrize('entry', [
+    {'cards': [card()]},                                              # a search before F17
+    {'queries': QUERIES[:1], 'cards': [card()]},                      # a single text: nothing to compare
+    {'queries': QUERIES, 'cards': [card()]},                          # no card names a text
+    {'queries': QUERIES, 'cards': []},
+])
+def test_no_summary_without_texts_to_compare(entry):
+    assert query_summary(entry) is None
+
+
+def test_results_with_closest_search_texts_round_trip(tmp_path):
+    path = tmp_path / RESULTS_FILE
+    data = document(cards=[card(best_query=QUERIES[1])], queries=QUERIES)
+    publish_export(tmp_path, [], data)
+    assert read_results(path) == data
 
 
 def test_the_document_names_the_run_and_its_profiles():
@@ -227,6 +270,9 @@ def test_an_unreadable_result_file_raises(tmp_path, content):
     {'cards': [card(rank='1')]},
     {'cards': [card(path=5)]},
     {'cards': [card(caption=None)]},
+    {'cards': [card(best_query=3)]},
+    {'queries': 'motif "Red car"'},
+    {'queries': ['motif "Red car"', None]},
 ])
 def test_names_that_could_leave_the_results_folder_are_rejected(tmp_path, profile):
     # the app joins the gallery and thumbnail names to the results folder and opens them
