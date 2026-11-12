@@ -402,8 +402,14 @@ def test_the_engine_names_the_closest_search_text_of_each_card():
     for node in ast.walk(search_node()):
         if isinstance(node, ast.Call):
             calls.setdefault(getattr(node.func, 'id', getattr(node.func, 'attr', None)), []).append(node)
+    # review: the values of the profile at hand flow through, not only the keyword names
     [rank] = calls['rank_photos']
-    assert [k.arg for k in rank.keywords] == ['best']
+    assert [(k.arg, ast.unparse(k.value)) for k in rank.keywords] == [('best', 'best_queries[name]')]
     [card] = calls['result_card']
-    assert [k.arg for k in card.keywords] == ['best_query']
-    assert {'closest_query', 'query_caption', 'query_labels'} <= set(calls)
+    assert [(k.arg, ast.unparse(k.value)) for k in card.keywords] == [('best_query', 'best_query')]
+    [closest] = calls['closest_query']
+    assert [ast.unparse(a) for a in closest.args] == ['match.query', 'query_names[name]']
+    [labels] = calls['query_labels']
+    assert [ast.unparse(a) for a in labels.args] == ['p']
+    assert 'query_caption' in calls
+
