@@ -1885,3 +1885,27 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       on Python 3.12/3.13/3.14; the exact output is in PR #98) and a headless `AppTest` check
       before the review; `app.py` itself has no automated tests (I2). Not tested: a real
       browser click-through. No schema, CLI, cache or folder change.)
+- [x] **F17 – Show which search text matched a result:** a card shows only the raw text
+      and image similarity, so users cannot tell which of their texts did the work. Sketch:
+      `framescout_scoring` already computes the best cosine per query; also return the index of
+      the winning query. The card caption names it ("best text: '…'"), and the results view gets
+      a per-profile summary of how many top photos each text won. No ranking change. Affected:
+      `framescout_scoring`, `framescout_engine.py`, `framescout_core` (optional `best_query` in
+      `results.json`, check the format-version rule of A25), `app.py`, HTML gallery, user guide,
+      `docs/ARCHITECTURE.md`. Risks: a text can win by a tiny margin, so the wording must not
+      suggest the other texts "failed"; older results show nothing. Size S–M. Roadmap P25 (B).
+      (done 2026-11-12 in PR #99: with two or more search texts of a profile, each card names
+      its closest text ("Closest search text: ...") in the app and in the HTML gallery, and the
+      results view captions the per-text counts of the gallery's photos (every text listed, also
+      with 0), worded as "often by a small margin: the other texts can be nearly as close".
+      `framescout_scoring`: `best_queries` (argmax per crop, ties name the first), `photo_scores`
+      returns `(text, visual, best)`, `rank_photos(best=None)` and `Match.query` (None for
+      "Find similar"); the ranking is unchanged (tested). `framescout_core`: `query_labels`,
+      `closest_query`, `query_caption`, `query_summary`, `QUERY_NOTE`, optional card key
+      `best_query` and profile key `queries` in `results.json`, validated by `read_results`.
+      Format stays 2 (A25 rule: additive optional keys); older apps ignore them, this app shows
+      nothing for older files, a single text, or "Find similar". No change to `profiles.json`,
+      CLI, cache signature or scores file. Tests: 1498 passed, 2 skipped (`tests/test_scoring.py`,
+      `test_profiles.py`, `test_results.py`, `test_engine_defaults.py`); a CPU engine smoke run on
+      synthetic photos under `.tmp/` and a headless `AppTest` render of the results view passed.
+      Not tested: a real model run on real photos, a browser click-through. Follow-up: F25.)

@@ -508,15 +508,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
       may show people (say so in the guide). **Question:** the contents of the new bundle format
       (no `profiles.json` schema change). Size M.
-- [ ] `ready` **F17 – Show which search text matched a result:** a card shows only the raw text
-      and image similarity, so users cannot tell which of their texts did the work. Sketch:
-      `framescout_scoring` already computes the best cosine per query; also return the index of
-      the winning query. The card caption names it ("best text: '…'"), and the results view gets
-      a per-profile summary of how many top photos each text won. No ranking change. Affected:
-      `framescout_scoring`, `framescout_engine.py`, `framescout_core` (optional `best_query` in
-      `results.json`, check the format-version rule of A25), `app.py`, HTML gallery, user guide,
-      `docs/ARCHITECTURE.md`. Risks: a text can win by a tiny margin, so the wording must not
-      suggest the other texts "failed"; older results show nothing. Size S–M. Roadmap P25 (B).
 - [ ] `ready` **F18 – Analyze photos ahead of time, without a search:** the analysis is the slow
       part; users would like to prepare a folder overnight (and F10 only searches analyzed
       photos). Sketch: an "Analyze photos now" button and an engine option `--analyze-only`
@@ -566,3 +557,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       a new document under `docs/`, backlog items for the follow-ups. Risks: a later redesign
       touches many screens; keep the settings/state keys and general-purpose wording working.
       Size S (`docs`). Roadmap P28.
+- [ ] `minor` **F25 – Closest search text in the result list export:** the CSV of F5
+      (`EXPORT_COLUMNS`) has no column for the closest search text of F17 (`best_query` of a card).
+      Add an optional `closest_text` column, empty for a single text or older results. Affected:
+      `framescout_core` export, `app.py`, user guide. Found in F17. Size S.
