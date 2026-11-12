@@ -59,8 +59,10 @@ def test_a_card_names_the_closest_text_only_among_several():
     # one text: it is always the closest, nothing to tell; no index: "Find similar" (F11)
     assert closest_query(0, queries[:1]) is None
     assert closest_query(None, queries) is None
-    # the gallery note does not suggest that the other texts failed
-    assert 'small margin' in QUERY_NOTE
+    # the gallery note does not suggest that the other texts failed, and names the part of the
+    # photo the text was compared with, not the whole photo (review)
+    assert 'small margin' in QUERY_NOTE and 'best-scoring part' in QUERY_NOTE
+    assert 'a photo is most similar' not in QUERY_NOTE
 
 
 QUERIES = ['motif "Red car"', '"a red sports car"', '"a car in the snow"']
@@ -72,8 +74,9 @@ def test_the_summary_counts_the_photos_each_text_was_closest_to():
     # every text in profile order, also one that no photo was closest to
     assert summary.startswith('Closest search text of these 3 photos: motif "Red car" 1 · "a red sports car" 2 · '
                               '"a car in the snow" 0.')
-    # a text closest to a photo can lead by a tiny margin: the others did not "fail"
-    assert 'small margin' in summary
+    # a text closest to a photo can lead by a tiny margin: the others did not "fail"; it is the
+    # text of the part the card names (review)
+    assert 'small margin' in summary and 'best-scoring part' in summary
 
 
 def test_the_summary_lists_a_repeated_text_once():
