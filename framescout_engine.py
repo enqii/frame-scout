@@ -295,6 +295,31 @@ def search(args, parser, roots, dropped, output, status, warnings):
     cpu_threads = torch_threads(torch.get_num_threads(), args.low_priority)
     torch.set_num_threads(cpu_threads)
     person_detection = not args.no_person_detection
+
+    # the cache checks; they use con and signature, set below before the first check
+    def cached(path):
+        """True if the cache has the features of path with its current modification time and size."""
+        stat = path.stat()
+        record = con.execute('SELECT mtime_ns,size FROM features WHERE path=? AND signature=?', (str(path), signature)).fetchone()
+        return record == (stat.st_mtime_ns, stat.st_size)
+
+    # photos whose cache row could not be read because the cache file itself is damaged or
+    # unreadable: each is left out like a photo that fails, the search goes on (a damaged page
+    # may hit only a few rows), and its end points to "Check cache" (E50, review)
+    unreadable = {}  # path -> its error
+
+    def cache_trouble(path, exc):
+        if cache_error(exc):
+            unreadable.setdefault(path, exc)
+
+    def analyzed(path):
+        """True if path has a current cache row; a file that cannot be read counts as not analyzed."""
+        try:
+            return cached(path)
+        except Exception as exc:
+            cache_trouble(path, exc)
+            return False
+
     # opened before the model load, so that a damaged cache is reported at once (E50, E56),
     # not after the seconds (or the first download) of loading the model
     con = sqlite3.connect(output / CACHE_FILE)
@@ -302,6 +327,21 @@ def search(args, parser, roots, dropped, output, status, warnings):
         # also records which engine version and settings the signature stands for (E11)
         signature = prepare_cache(con, person_detection, args.max_persons, args.person_confidence,
                                   args.yolo_model, model=args.model)
+        if quick:
+            # nothing is analyzed (F10): only the photos with a current cache row are scored, a
+            # partner without one through the RAW file a full search analyzed in its place (E30);
+            # checked before the model load, so that a folder with nothing analyzed fails at once,
+            # not after the seconds (or the first download) of loading the model (review)
+            to_score, not_analyzed = quick_photos(paths, raw_fallback.fallbacks, analyzed)
+            print(f'Quick search: {len(to_score)} of {len(paths)} photos are analyzed with these settings and '
+                  'searched' + (f'; {len(not_analyzed)} {"is" if len(not_analyzed) == 1 else "are"} not analyzed '
+                                'and not searched (a search with profiles analyzes them).' if not_analyzed else '.'),
+                  flush=True)
+            if not to_score:
+                if unreadable:  # the cache file itself is damaged (E50)
+                    raise next(iter(unreadable.values()))
+                parser.error('None of these photos is analyzed with these settings yet, so the quick search has '
+                             'nothing to search. Start a search with profiles first: it analyzes them.')
         status.update('loading')
         what = f'quick search for "{profiles[0]["name"]}"' if quick else f'{len(profiles)} search profiles'
         print(f'{len(paths)} photos; {what}; search model: {search_model.label} '
@@ -427,29 +467,6 @@ def search(args, parser, roots, dropped, output, status, warnings):
         # the status file is written at most once a second, the last photo always (A5)
         status.update(done=done, new=fresh, cached=reused, errors=errors, force=done == len(paths), **measured)
 
-    def cached(path):
-        """True if the cache has the features of path with its current modification time and size."""
-        stat = path.stat()
-        record = con.execute('SELECT mtime_ns,size FROM features WHERE path=? AND signature=?', (str(path), signature)).fetchone()
-        return record == (stat.st_mtime_ns, stat.st_size)
-
-    # photos whose cache row could not be read because the cache file itself is damaged or
-    # unreadable: each is left out like a photo that fails, the search goes on (a damaged page
-    # may hit only a few rows), and its end points to "Check cache" (E50, review)
-    unreadable = {}  # path -> its error
-
-    def cache_trouble(path, exc):
-        if cache_error(exc):
-            unreadable.setdefault(path, exc)
-
-    def analyzed(path):
-        """True if path has a current cache row; a file that cannot be read counts as not analyzed."""
-        try:
-            return cached(path)
-        except Exception as exc:
-            cache_trouble(path, exc)
-            return False
-
     def failed(path, exc):
         """Log a photo that cannot be analyzed (cache scan, decoding or storing).
 
@@ -504,20 +521,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
     def store_failed(item, exc):
         failed(item[0], exc)
 
-    if quick:
-        # nothing is analyzed (F10): only the photos with a current cache row are scored, a
-        # partner without one through the RAW file a full search analyzed in its place (E30)
-        analyzed, not_analyzed = quick_photos(paths, raw_fallback.fallbacks, cached, cache_trouble)
-        print(f'Quick search: {len(analyzed)} of {len(paths)} photos are analyzed with these settings and searched'
-              + (f'; {len(not_analyzed)} {"is" if len(not_analyzed) == 1 else "are"} not analyzed and not searched '
-                 '(a search with profiles analyzes them).' if not_analyzed else '.'), flush=True)
-        if not analyzed:
-            con.close()
-            if unreadable:  # the cache file itself is damaged (E50)
-                raise next(iter(unreadable.values()))
-            parser.error('None of these photos is analyzed with these settings yet, so the quick search has nothing '
-                         'to search. Start a search with profiles first: it analyzes them.')
-    else:
+    if not quick:
         # thumbnails: what the galleries render at most, for the app's time left (F16)
         status.update('analyzing', total=len(paths), thumbnails=gallery_thumbnails(len(paths), args.top, len(profiles)))
         try:
@@ -581,19 +585,19 @@ def search(args, parser, roots, dropped, output, status, warnings):
     print('Scoring the photos for each search profile ...', flush=True)
     if quick:
         # the photos it scores; thumbnails, as for an analysis, for the app's time left (F16)
-        status.update('scoring', total=len(analyzed), thumbnails=gallery_thumbnails(len(analyzed), args.top, 1))
+        status.update('scoring', total=len(to_score), thumbnails=gallery_thumbnails(len(to_score), args.top, 1))
     else:
         status.update('scoring', total=len(paths))
         # a RAW file analyzed for its broken partner is scored and shown in its place (E30)
-        analyzed = raw_fallback.photos(paths)
+        to_score = raw_fallback.photos(paths)
     # first the per-crop text and reference scores of every photo, then per profile the
     # normalization over all crops of this search and the combination (E4, E5)
     scored, crop_labels, mtimes = [], [], []
     text_scores = {p['name']: [] for p in profiles}
     visual_scores = {p['name']: [] for p in profiles}
     scoring_started = time.monotonic()
-    for number, path in enumerate(analyzed, 1):
-        status.update(done=number, force=number == len(analyzed))
+    for number, path in enumerate(to_score, 1):
+        status.update(done=number, force=number == len(to_score))
         try:
             stat = path.stat()
             record = con.execute('SELECT mtime_ns,size,labels,vectors FROM features WHERE path=? AND signature=?',
@@ -615,7 +619,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 visual_scores[name].append(photo_visual[name])
     con.close()
     # the speed of scoring, for the time left of later searches (F16)
-    finishing = remember_finishing(status.state['finishing'], 'scoring', len(analyzed),
+    finishing = remember_finishing(status.state['finishing'], 'scoring', len(to_score),
                                    time.monotonic() - scoring_started)
     if finishing is not None:
         status.update(finishing=finishing)
