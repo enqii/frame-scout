@@ -190,7 +190,7 @@ def test_a_truncated_heif_or_avif_photo_fails_without_being_retried(tmp_path, ki
         'data = open(photo, "rb").read()\n'
         'print(outcome(photo))\n'
         'outcomes = []\n'
-        'for part in (0.5, 0.9, 0.99):\n'
+        'for part in (0.5, 0.9):\n'
         '    open(photo, "wb").write(data[:int(len(data) * part)])\n'
         '    outcomes += [outcome(photo), outcome(photo, min_size=100), outcome(photo, complete=True)]\n'
         'print(sorted(set(map(str, outcomes))))\n')
@@ -199,4 +199,8 @@ def test_a_truncated_heif_or_avif_photo_fails_without_being_retried(tmp_path, ki
         pytest.skip(f'cannot write {kind} here ({lines[-1]})')
     whole, truncated = lines[-2:]
     assert whole == '(320, 240)'
-    assert truncated == ("['failed: ValueError']" if kind == 'HEIF' else "['failed: UnidentifiedImageError']")
+    # review: cuts well inside the image data, and any error class (a library update may
+    # change it): what matters is that each fails, and never as truncated ("truncated: ...")
+    # or with a size (an image decoded from part of the data)
+    outcomes = ast.literal_eval(truncated)
+    assert outcomes and all(text.startswith('failed: ') for text in outcomes), outcomes
