@@ -36,6 +36,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              check_installation,
                              hidden_text, hide_no_match, mark_style, progress_text, review_progress, windows_path,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
+                             query_caption, query_summary,
                              project_temp_cleanup, read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
                              reconcile_settings, reference_folder,
@@ -793,6 +794,9 @@ def show_results(results, photo_folders):
                + (f'search model {plain(result_model.label)} · ' if result_model else '') +
                f"{len(entry['cards']):,} photos (at most {run_settings.get('top', '?')}), best first. "
                'A ranking by similarity, not a guaranteed identification.')
+    # which of the profile's texts the photos were closest to (F17); none for older results
+    if summary := query_summary(entry):
+        st.caption(plain(summary))
     if model_key != settings['model']:
         # E22 review: the gallery must not look like one of the model chosen now
         made_with = f'the search model {plain(result_model.label)}' if result_model else 'another search model'
@@ -897,7 +901,10 @@ def show_results(results, photo_folders):
                     else:
                         st.caption('No thumbnail')
                     st.markdown(f"**#{card['rank']}** · {plain(card['caption'])} · {plain(card['label'])}")
-                    st.caption(f"{plain(card['detail'])}  \n{plain(card['relative'])}")
+                    closest = card.get('best_query')  # F17: only with several texts
+                    st.caption(f"{plain(card['detail'])}  \n"
+                               + (f'{plain(query_caption(closest))}  \n' if closest else '')
+                               + plain(card['relative']))
                     b1, b2 = st.columns(2)
                     b1.button('Open', key=f"open_{card['rank']}", on_click=open_photo, args=(card['path'],),
                               width='stretch', help='Opens the photo in your image viewer.')
