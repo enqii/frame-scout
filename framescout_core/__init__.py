@@ -58,8 +58,8 @@ from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
     read_settings, save_settings, reconcile_settings, changed_from_defaults, setting_text, engine_command)
 from .quick import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, quick_profile, quick_photos, quick_scope, quick_scope_text,
     quick_note, quick_folders_differ, like_profile, like_crop, like_labels_fit, like_scan_path)
-from .results import (RESULTS_FILE, RESULTS_FORMAT, GALLERY_PAGE_SIZE, search_fingerprint,
-    profile_fingerprints, profile_state, result_card, query_caption, query_summary, results_document, publish_export,
+from .results import (RESULTS_FILE, RESULTS_FORMAT, GALLERY_PAGE_SIZE, QUERY_NOTE, search_fingerprint,
+    profile_fingerprints, profile_state, result_card, closest_query, query_caption, query_summary, results_document, publish_export,
     read_results, page_count, page_cards, openable_photo, open_command, reveal_command)
 from .marks import (MARKS_FILE, MARKS_BACKUP, MARKS_FORMAT, MARK_OPEN, MARK_MATCH, MARK_NO_MATCH, MARK_STATES,
     MARKS_LOCK_TIMEOUT, marks_backup, read_marks, save_marks, rename_marks, delete_marks, remove_marks,

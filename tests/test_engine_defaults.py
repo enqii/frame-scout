@@ -393,3 +393,17 @@ def test_find_similar_uses_no_name_of_the_model_load():
     guarded = {id(node) for part in branches for node in ast.walk(part)}
     uses = [node for node in ast.walk(search) if isinstance(node, ast.Name) and node.id in ('model', 'image_size')]
     assert uses and all(id(node) in guarded for node in uses)
+
+
+def test_the_engine_names_the_closest_search_text_of_each_card():
+    # F17: rank_photos gets each crop's best query (no ranking change, tests/test_scoring.py),
+    # and the cards of results.json and the HTML gallery name the closest text
+    calls = {}
+    for node in ast.walk(search_node()):
+        if isinstance(node, ast.Call):
+            calls.setdefault(getattr(node.func, 'id', getattr(node.func, 'attr', None)), []).append(node)
+    [rank] = calls['rank_photos']
+    assert [k.arg for k in rank.keywords] == ['best']
+    [card] = calls['result_card']
+    assert [k.arg for k in card.keywords] == ['best_query']
+    assert {'closest_query', 'query_caption', 'query_labels'} <= set(calls)

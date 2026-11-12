@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (RESULTS_FILE, RESULTS_FORMAT, load_profiles, open_command, openable_photo, page_count,
+from framescout_core import (QUERY_NOTE, RESULTS_FILE, RESULTS_FORMAT, closest_query, load_profiles, open_command, openable_photo, page_count,
                              page_cards, profile_fingerprints, profile_state, publish_export, query_caption,
                              query_summary, read_results, result_card, results_document, reveal_command,
                              search_fingerprint)
@@ -51,6 +51,16 @@ def test_a_card_names_its_closest_search_text_only_when_given():
 
 def test_the_caption_of_the_closest_search_text():
     assert query_caption('"a red sports car"') == 'Closest search text: "a red sports car"'
+
+
+def test_a_card_names_the_closest_text_only_among_several():
+    queries = ['motif "Red car"', '"a red sports car"']
+    assert closest_query(1, queries) == '"a red sports car"'
+    # one text: it is always the closest, nothing to tell; no index: "Find similar" (F11)
+    assert closest_query(0, queries[:1]) is None
+    assert closest_query(None, queries) is None
+    # the gallery note does not suggest that the other texts failed
+    assert 'small margin' in QUERY_NOTE
 
 
 QUERIES = ['motif "Red car"', '"a red sports car"', '"a car in the snow"']

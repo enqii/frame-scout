@@ -38,6 +38,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              prefetch,
                              prepare_cache, profile_slugs, progress_due, publish_export,
                              progress_line, result_card, results_document,
+                             QUERY_NOTE, closest_query, query_caption, query_labels,
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
                              store_group, supported_extensions, write_scores, lower_priority, torch_threads,
                              QUICK_DIR, QUICK_GALLERY, RESULTS_FILE, quick_note, quick_photos, quick_profile,
@@ -675,6 +676,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
     scored, crop_labels, mtimes = [], [], []
     text_scores = {p['name']: [] for p in profiles}
     visual_scores = {p['name']: [] for p in profiles}
+    best_queries = {p['name']: [] for p in profiles}  # per crop the index of its closest text (F17)
     scoring_started = time.monotonic()
     for number, path in enumerate(to_score, 1):
         status.update(done=number, force=number == len(to_score))
@@ -692,6 +694,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
         scored.append(path); crop_labels.append(labels); mtimes.append(stat.st_mtime_ns)
         for name in profile_vectors:
             text_scores[name].append(photo_text[name])
+            best_queries[name].append(photo_best[name])
             if name in photo_visual:
                 visual_scores[name].append(photo_visual[name])
     con.close()
@@ -719,10 +722,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
     for p in profiles:
         name = p['name']
         has_refs = profile_vectors[name][1] is not None
-        # "Find similar" scores the image similarity with its photo alone (F11)
+        # "Find similar" scores the image similarity with its photo alone (F11); each match of
+        # a search with texts names its closest text, which does not change the ranking (F17)
         normalized[name], matches = (rank_similar(text_scores[name]) if like else
                                      rank_photos(text_scores[name], visual_scores[name] if has_refs else None,
-                                                 args.reference_weight))
+                                                 args.reference_weight, best=best_queries[name]))
         if not normalized[name] and scored:
             print(f'{name}: too few photos (or no spread) to normalize the scores; '
                   'the gallery shows the raw similarity.', flush=True)
@@ -742,7 +746,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
         print(message, flush=True)
 
     names = [p['name'] for p in profiles]
-    galleries = {names[0]: QUICK_GALLERY} if quick else {name: slug + '.html'
+    # the names of each profile's text queries, in the order of Match.query (F17)
+    query_names = {p['name']: query_labels(p) for p in profiles}
+    galleries ={names[0]: QUICK_GALLERY} if quick else {name: slug + '.html'
                                                          for name, slug in zip(names, profile_slugs(names))}
     # with several photo folders, a card names the photo's folder before its path in it (A25)
     labels = folder_labels(roots)
@@ -789,10 +795,12 @@ def search(args, parser, roots, dropped, output, status, warnings):
             rel = html.escape(relative)
             score, detail = score_caption(match, normalized[name])
             label = crop_label(label)
+            best_query = closest_query(match.query, query_names[name])  # F17
             entries.append(result_card(rank, path, relative, label, match.score, match.text, match.visual, score, detail,
-                                       thumb_name))
+                                       thumb_name, best_query=best_query))
+            closest = f'<small>{html.escape(query_caption(best_query))}</small><br>' if best_query else ''
             cards.append(f'<article><a href="{uri}" target="_blank"><img loading="lazy" src="thumbnails/{quote(thumb_name)}" alt="{rel}"></a>'
-                         f'<p><b>#{rank}</b> · {score} · {html.escape(label)}<br><small>{detail}</small><br>'
+                         f'<p><b>#{rank}</b> · {score} · {html.escape(label)}<br><small>{detail}</small><br>{closest}'
                          f'<a href="{uri}" target="_blank">{html.escape(path.name)}</a></p><small>{rel}</small></article>')
         page = ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                 f'<title>FrameScout – {html.escape(name)}</title><style>{style}</style>' + nav +
@@ -800,12 +808,15 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 + (html.escape(quick_note(len(scored), len(not_analyzed), like=like)) + ' ' if quick else '')
                 + ((LIKE_SCORE_NOTE if normalized[name] else LIKE_RAW_NOTE) if like else
                    (SCORE_NOTE if normalized[name] else RAW_NOTE)) +
-                ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original. '
+                ' "Full image" or "Person" names the best-scoring part of the photo. '
+                + (QUERY_NOTE + ' ' if len(query_names[name]) > 1 else '') + 'Click a photo to open the original. '
                 f'Search model: {html.escape(search_model.label)}.</p><main>' + ''.join(cards) + '</main></html>')
         gallery = galleries[name]
         pages.append((gallery, page))
         results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': gallery,
-                        'normalized': normalized[name], 'cards': entries})
+                        'normalized': normalized[name], 'cards': entries,
+                        # the texts a card's best_query names, for the app's summary (F17)
+                        **({'queries': query_names[name]} if query_names[name] else {})})
     if skipped.summary():
         log(skipped.summary())
     finishing = rendering.remember(status.state['finishing'], 'thumbnails')
