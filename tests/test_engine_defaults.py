@@ -404,7 +404,7 @@ def test_the_engine_names_the_closest_search_text_of_each_card():
             calls.setdefault(getattr(node.func, 'id', getattr(node.func, 'attr', None)), []).append(node)
     # review: the values of the profile at hand flow through, not only the keyword names
     [rank] = calls['rank_photos']
-    assert [(k.arg, ast.unparse(k.value)) for k in rank.keywords] == [('best', 'best_queries[name]')]
+    assert [(k.arg, ast.unparse(k.value)) for k in rank.keywords] == [('best', 'best_queries.get(name)')]
     [card] = calls['result_card']
     assert [(k.arg, ast.unparse(k.value)) for k in card.keywords] == [('best_query', 'best_query')]
     [closest] = calls['closest_query']
@@ -413,3 +413,15 @@ def test_the_engine_names_the_closest_search_text_of_each_card():
     assert [ast.unparse(a) for a in labels.args] == ['p']
     assert 'query_caption' in calls
 
+
+def test_the_engine_keeps_the_closest_texts_only_where_a_card_names_them():
+    # review: a profile with a single text ("Find similar" has none) names no closest text,
+    # so its per-crop indexes are not kept for the whole run
+    assigned = {target.id: node for node in ast.walk(search_node()) if isinstance(node, ast.Assign)
+                for target in node.targets if isinstance(target, ast.Name)}
+    best, names = assigned['best_queries'], assigned['query_names']
+    assert names.lineno < best.lineno
+    assert ast.unparse(best.value) == "{name: [] for name, texts in query_names.items() if len(texts) > 1}"
+    [append] = [node for node in ast.walk(search_node()) if isinstance(node, ast.If)
+                and any('best_queries[name].append' in ast.unparse(part) for part in node.body)]
+    assert ast.unparse(append.test) == 'name in best_queries'

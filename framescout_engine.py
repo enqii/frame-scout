@@ -676,7 +676,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
     scored, crop_labels, mtimes = [], [], []
     text_scores = {p['name']: [] for p in profiles}
     visual_scores = {p['name']: [] for p in profiles}
-    best_queries = {p['name']: [] for p in profiles}  # per crop the index of its closest text (F17)
+    # the names of each profile's text queries, in the order of Match.query (F17)
+    query_names = {p['name']: query_labels(p) for p in profiles}
+    # per crop the index of its closest text, kept only where a card names it: a profile with
+    # several texts (F17; review: not for a single text or "Find similar")
+    best_queries = {name: [] for name, texts in query_names.items() if len(texts) > 1}
     scoring_started = time.monotonic()
     for number, path in enumerate(to_score, 1):
         status.update(done=number, force=number == len(to_score))
@@ -694,7 +698,8 @@ def search(args, parser, roots, dropped, output, status, warnings):
         scored.append(path); crop_labels.append(labels); mtimes.append(stat.st_mtime_ns)
         for name in profile_vectors:
             text_scores[name].append(photo_text[name])
-            best_queries[name].append(photo_best[name])
+            if name in best_queries:
+                best_queries[name].append(photo_best[name])
             if name in photo_visual:
                 visual_scores[name].append(photo_visual[name])
     con.close()
@@ -726,7 +731,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
         # a search with texts names its closest text, which does not change the ranking (F17)
         normalized[name], matches = (rank_similar(text_scores[name]) if like else
                                      rank_photos(text_scores[name], visual_scores[name] if has_refs else None,
-                                                 args.reference_weight, best=best_queries[name]))
+                                                 args.reference_weight, best=best_queries.get(name)))
         if not normalized[name] and scored:
             print(f'{name}: too few photos (or no spread) to normalize the scores; '
                   'the gallery shows the raw similarity.', flush=True)
@@ -746,8 +751,6 @@ def search(args, parser, roots, dropped, output, status, warnings):
         print(message, flush=True)
 
     names = [p['name'] for p in profiles]
-    # the names of each profile's text queries, in the order of Match.query (F17)
-    query_names = {p['name']: query_labels(p) for p in profiles}
     galleries = {names[0]: QUICK_GALLERY} if quick else {name: slug + '.html'
                                                          for name, slug in zip(names, profile_slugs(names))}
     # with several photo folders, a card names the photo's folder before its path in it (A25)
