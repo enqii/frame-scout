@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, auto_cleanup, engine_command,
-                             generic_prompts, quick_note, quick_photos, quick_profile, quick_scope_text,
+                             generic_prompts, quick_folders_differ, quick_note, quick_photos, quick_profile, quick_scope_text,
                              read_results, results_document, publish_export, result_card, scan_cleanup)
 
 
@@ -73,6 +73,15 @@ def test_quick_photos_asks_about_each_photo_once():
     asked = []
     quick_photos([jpeg, heic, other], {jpeg: raw, heic: raw}, lambda path: asked.append(path) or False)
     assert sorted(asked) == sorted([jpeg, heic, other, raw])
+
+
+def test_quick_folders_differ_tells_a_search_of_other_folders(tmp_path):
+    # review: the app notes quick results of folders no longer chosen; the order does not matter
+    a, b = tmp_path / 'a', tmp_path / 'b'
+    assert not quick_folders_differ([str(a), str(b)], [b, a])
+    assert quick_folders_differ([str(a)], [a, b])
+    assert quick_folders_differ([str(a), str(b)], [a])
+    assert quick_folders_differ([], [a])
 
 
 def test_quick_scope_text_names_the_photos_that_are_not_searched():
