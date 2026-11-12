@@ -509,8 +509,8 @@ def search(args, parser, roots, dropped, output, status, warnings):
         # partner without one through the RAW file a full search analyzed in its place (E30)
         analyzed, not_analyzed = quick_photos(paths, raw_fallback.fallbacks, cached, cache_trouble)
         print(f'Quick search: {len(analyzed)} of {len(paths)} photos are analyzed with these settings and searched'
-              + (f'; {len(not_analyzed)} are not analyzed and not searched (a search with profiles analyzes them).'
-                 if not_analyzed else '.'), flush=True)
+              + (f'; {len(not_analyzed)} {"is" if len(not_analyzed) == 1 else "are"} not analyzed and not searched '
+                 '(a search with profiles analyzes them).' if not_analyzed else '.'), flush=True)
         if not analyzed:
             con.close()
             if unreadable:  # the cache file itself is damaged (E50)
