@@ -241,6 +241,17 @@ search replaces the last one. The scores are scaled over the photos searched, so
 from a search with profiles; a quick search has no marks, copying or export, and it never
 changes your profile galleries, `results.json` or marks.
 
+**Find similar** (button on every result card, in "Results" and in the quick results) shows
+more photos that look like that one. It compares the photo (or the part named on the card,
+e.g. "Person 1") with all other photos already analyzed with the current AI settings; no search
+text is used, nothing is analyzed and no model is loaded. The result replaces the last quick
+search in `results/quick/` and is shown under "Results of the last quick search or "Find
+similar"" (title "Similar to <file>"). The scores are relative to the photos compared, and
+shots of a burst may take the top places. If the photo is not analyzed with the current
+settings (or changed since), the search stops with a message; start a search with profiles
+over its folder first. The button is disabled while a search runs. The HTML galleries have
+no button.
+
 **Results** shows the last finished search per profile: thumbnails, best first, 48 per
 page, with rank, score, the best-matching part ("Full image" or "Person 1", …) and the
 file name. "Open" opens a photo, "Folder" shows it in its folder, and buttons open the

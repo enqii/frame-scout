@@ -1797,3 +1797,23 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       searched and say so in a note. Review: the cache check runs before the model load, a shot
       appears once, and the app notes results of other photo folders. Tests: `tests/test_quick.py`.
       Not tested: a real browser click-through, person detection on, CUDA. Left over: E61.)
+- [x] **F11 – "Find similar" from a result card:** no way to ask for "more like this
+      one" short of copying the photo into a profile's references. Sketch: a button per card; the
+      engine ranks all cached photos by cosine similarity to that photo's cached embedding (full
+      image or the shown crop), no text, no new analysis, result like F10 (size S if F10 exists).
+      Closest item: A20 (changes profile scoring; this is a one-off query). Affected:
+      `framescout_engine.py` (`--like <path>`), `framescout_scoring.py` (rank by one vector),
+      `app.py`, user guide, `docs/ARCHITECTURE.md`. Risks: a photo with a cache row of another
+      signature has no usable vector (say so, never analyze silently); burst shots dominate the
+      top (see F7). **Question:** gallery UX; the CLI option is additive. Size M. **Decided 2026-11-06 (triage):** after F10, ROADMAP P22, kind `code`.
+      (done 2026-11-12 in PR #91: `framescout_engine.py --like PHOTO [--like-part PART]` (exclusive with
+      `--profiles`/`--character`/`--quick-query`/`--scores-file`) ranks the other analyzed photos by
+      cosine similarity to the cached vector of the photo's part (`framescout_scoring.rank_similar`),
+      without text, model load or analysis; the photo and its shot are left out. The result goes to
+      `results/quick/` like F10 (`results.json` key `quick` gains `like` and `part`; cards have
+      `text: null`). A photo without a current cache row fails at once with exit 2. The app has a
+      "Find similar" button on every card of the profile and quick results (not in the HTML galleries:
+      static pages; to be confirmed by the user). Tests: `tests/test_quick.py`,
+      `tests/test_scoring.py`, `tests/test_engine_defaults.py` (1451 passed, 2 skipped), an engine smoke
+      run with synthetic vectors and a headless AppTest run. Not tested: a real browser click-through,
+      the button on a profile-search card, real CLIP vectors, person parts, CUDA.)
