@@ -78,6 +78,8 @@ def test_quick_scope_text_names_the_photos_that_are_not_searched():
     assert quick_scope_text(1200, 1000) == ('1,000 of 1,200 photos are analyzed with these AI settings and searched; '
                                             'the other 200 are not searched until a search with your profiles '
                                             'analyzes them.')
+    assert quick_scope_text(13, 12) == ('12 of 13 photos are analyzed with these AI settings and searched; the other '
+                                        'photo is not searched until a search with your profiles analyzes them.')
     # a cache row count above the photos (e.g. counted at another time) is capped
     assert quick_scope_text(5, 7) == 'All 5 photos are analyzed with these AI settings and searched.'
 

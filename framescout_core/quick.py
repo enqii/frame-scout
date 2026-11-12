@@ -77,8 +77,9 @@ def quick_scope_text(photos, analyzed):
                 'nothing. Start a search with your profiles first: it analyzes them.')
     if analyzed == photos:
         return f'All {photos:,} photos are analyzed with these AI settings and searched.'
-    return (f'{analyzed:,} of {photos:,} photos are analyzed with these AI settings and searched; the other '
-            f'{photos - analyzed:,} are not searched until a search with your profiles analyzes them.')
+    others = (f'the other {photos - analyzed:,} are' if photos - analyzed > 1 else 'the other photo is')
+    return (f'{analyzed:,} of {photos:,} photos are analyzed with these AI settings and searched; {others} not '
+            'searched until a search with your profiles analyzes them.')
 
 
 def quick_note(searched, not_analyzed):
