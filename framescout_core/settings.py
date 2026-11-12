@@ -232,3 +232,28 @@ def setting_text(name, value):
     if isinstance(value, int):
         return f'{value:,}'
     return str(value)
+
+
+def engine_command(python, engine, folders, output, settings, device, *, profiles=None, quick_query=None):
+    """Return the command line the app starts the engine with: a search with profiles or a quick search (F10).
+
+    python, engine: the interpreter and framescout_engine.py; folders: the photo folders;
+    output: the results folder; settings: the app's settings (batch_size, top, max_persons,
+    person_confidence, reference_weight, model, person_detection, low_priority); device: the
+    --device choice. Exactly one of profiles (the profiles file) and quick_query (the search
+    text, passed as "--quick-query=<text>", so a text that starts with "-" is no option) is
+    given, else ValueError. A quick search gets the same settings, so it uses the cache rows
+    of the current settings.
+    """
+    if (profiles is None) == (quick_query is None):
+        raise ValueError('engine_command needs either profiles or quick_query')
+    search = ['--profiles', str(profiles)] if quick_query is None else [f'--quick-query={quick_query}']
+    cmd = [str(python), '-u', str(engine), *map(str, folders), *search, '--output', str(output), '--device', device,
+           '--batch-size', str(settings['batch_size']), '--top', str(settings['top']),
+           '--max-persons', str(settings['max_persons']), '--person-confidence', str(settings['person_confidence']),
+           '--reference-weight', str(settings['reference_weight']), '--model', settings['model']]
+    if not settings['person_detection']:
+        cmd.append('--no-person-detection')
+    if settings['low_priority']:
+        cmd.append('--low-priority')  # the engine lowers its own priority (F4)
+    return cmd
