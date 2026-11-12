@@ -255,11 +255,27 @@ def test_the_app_starts_both_searches_through_engine_command():
     tree = ast.parse(APP.read_text(encoding='utf-8'))
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
              and getattr(node.func, 'id', None) == 'start_engine']
-    assert sorted(k.arg for call in calls for k in call.keywords) == ['profiles', 'quick_query']
+    assert sorted(k.arg for call in calls for k in call.keywords) == ['like', 'like_part', 'profiles', 'quick_query']
     assert [node for node in ast.walk(tree) if isinstance(node, ast.Call)
             and getattr(node.func, 'id', None) == 'engine_command']
     # no second, hand-built command line
     assert not [node for node in ast.walk(tree) if isinstance(node, ast.Constant) and node.value == '--profiles']
+
+
+def test_every_result_card_of_the_app_offers_find_similar():
+    # F11: on the cards of the profile results and of the quick search; the click passes the
+    # card's photo and the part it names, and the page run (not the fragment) starts it
+    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+    for name in ('show_results', 'show_quick_results'):
+        assert 'find_similar_button' in [getattr(call.func, 'id', None) for call in ast.walk(functions[name])
+                                         if isinstance(call, ast.Call)]
+    button = ast.unparse(functions['find_similar_button'])
+    assert "st.session_state.find_similar = (card['path'], card['label'])" in button
+    assert 'st.rerun()' in button
+    [start] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+               and getattr(node.func, 'id', None) == 'start_engine' and node.keywords[0].arg == 'like']
+    assert ast.unparse(start) == 'start_engine(like=similar[0], like_part=similar[1])'
 
 
 def test_the_app_shows_the_quick_search_from_its_own_folder():

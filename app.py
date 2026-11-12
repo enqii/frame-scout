@@ -740,6 +740,20 @@ def plain(text):
 def run_date(results):
     return str(results.get('finished', '')).replace('T', ' ')[:16]
 
+def find_similar_button(card, key):
+    """The button "Find similar" of a gallery card (F11): asks the next page run to start it.
+
+    A fragment cannot start the engine (start_engine reruns the whole page), so the click
+    stores the photo and the part shown on the card and reruns the page, which starts it.
+    """
+    if st.button('Find similar', key=key, width='stretch', disabled=active or not folder_scans or bool(model_missing),
+                 help='Finds photos similar to this one (the part named on the card) among the photos analyzed with '
+                      'the current AI settings, without analyzing anything. The result replaces the last quick '
+                      'search.'):
+        st.session_state.find_similar = (card['path'], card['label'])
+        st.rerun()
+
+
 @st.fragment
 def show_results(results, photo_folders):
     """The galleries of the last search as a grid of thumbnails; its buttons rerun only this part (P4).
@@ -870,6 +884,7 @@ def show_results(results, photo_folders):
                               width='stretch', help='Opens the photo in your image viewer.')
                     b2.button('Folder', key=f"reveal_{card['rank']}", on_click=show_photo, args=(card['path'],),
                               width='stretch', help='Shows the photo in its folder.')
+                    find_similar_button(card, f"similar_{card['rank']}")
                     key = mark_keys[card['rank']]
                     st.segmented_control('Mark', list(MARK_LABELS.values()), key=key, on_change=set_mark,
                                          args=(name, card['path'], key), disabled=not can_mark,
@@ -893,19 +908,24 @@ def show_quick_results(results, folders):
     model_key = results_model(run_settings)
     result_model = MODELS.get(model_key) if model_key else None
     searched_folders = results['photo_folders']  # also for a format 1 file (A25)
-    st.caption(f"Quick search for \"{plain(entry['name'])}\" from {run_date(results)} · photo "
+    quick = results.get('quick') if isinstance(results.get('quick'), dict) else {}
+    # "Find similar" (F11) names its photo and the part compared
+    like = quick.get('like') if isinstance(quick.get('like'), str) else None
+    part = quick.get('part') if isinstance(quick.get('part'), str) else None
+    what = (f"Photos similar to {plain(like)}" + (f' ({plain(part)})' if part else '') if like
+            else f"Quick search for \"{plain(entry['name'])}\"")
+    st.caption(f"{what} from {run_date(results)} · photo "
                f"folder{'s' if len(searched_folders) > 1 else ''} {plain('; '.join(searched_folders))} · "
                + (f'search model {plain(result_model.label)} · ' if result_model else '') +
                f"{len(entry['cards']):,} photos (at most {run_settings.get('top', '?')}), best first. "
                'A ranking by similarity, not a guaranteed identification.')
-    quick = results.get('quick') if isinstance(results.get('quick'), dict) else {}
     searched, not_analyzed = quick.get('searched'), quick.get('not_analyzed')
     if all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in (searched, not_analyzed)):
-        st.caption(quick_note(searched, not_analyzed))
+        st.caption(quick_note(searched, not_analyzed, like=bool(like)))
     if quick_folders_differ(searched_folders, [folder for folder in folders if folder.is_dir()]):
         # review: the profile galleries name their folders; these may be of a folder no longer chosen
-        st.info('This quick search searched other photo folders than the ones chosen now. Start a quick search '
-                'again for the current folders.')
+        st.info('This quick search searched other photo folders than the ones chosen now. Start it again for the '
+                'current folders.')
     if model_key != settings['model']:
         made_with = f'the search model {plain(result_model.label)}' if result_model else 'another search model'
         st.info(f'This quick search was made with {made_with}; the AI settings now choose '
@@ -940,6 +960,7 @@ def show_quick_results(results, folders):
                               width='stretch', help='Opens the photo in your image viewer.')
                     b2.button('Folder', key=f"quick_reveal_{card['rank']}", on_click=show_photo,
                               args=(card['path'],), width='stretch', help='Shows the photo in its folder.')
+                    find_similar_button(card, f"quick_similar_{card['rank']}")
 
 def show_copy(name, entry, marks, photo_folders, profile_exists):
     """Copying the photos of profile name marked as match to a folder, below its gallery (A17).
@@ -1710,7 +1731,7 @@ with run_tab:
         # a cleanup holding the run lock is no search to stop (review)
         stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), width='stretch')
     def start_engine(**search):
-        """Start the engine with the current settings: search is profiles=... or quick_query=... (F10)."""
+        """Start the engine with the current settings: search is profiles=..., quick_query=... (F10) or like=... (F11)."""
         if settings_taken_over:
             # the page showed other values until this click: never start with settings the
             # user has not seen (review)
@@ -1731,6 +1752,10 @@ with run_tab:
         st.rerun()
     if start:
         start_engine(profiles=PROFILES)
+    # "Find similar" clicked on a result card (F11): its fragment asked this page run to start it
+    similar = st.session_state.pop('find_similar', None)
+    if similar and not active:
+        start_engine(like=similar[0], like_part=similar[1])
     if stop:
         try:
             st.session_state.run_notice = stop_run()
@@ -1822,7 +1847,8 @@ with run_tab:
     st.caption('Try a search text without creating a search profile. Only the photos already analyzed with the '
                'current AI settings are searched; nothing new is analyzed, so it is fast. Its result replaces the '
                f'previous quick search (folder {QUICK_DIR} in the results folder); the results and marks of your '
-               'search profiles stay as they are. Search texts are in English.')
+               'search profiles stay as they are. Search texts are in English. "Find similar" on a result card '
+               'searches the same way by the image similarity with that photo, and its result appears here too.')
     with st.form('quick_search', border=False):
         c1, c2 = st.columns([4, 1], vertical_alignment='bottom')
         c1.text_input('Search text (in English)', key='quick_query', max_chars=QUICK_QUERY_MAX, disabled=active,
@@ -1844,7 +1870,7 @@ with run_tab:
                    f'results are not shown here. The next quick search writes it anew.\n\n'
                    f'Details: {plain(str(quick_error))}')
     if quick_results:
-        with st.expander('Results of the last quick search', expanded=True):
+        with st.expander('Results of the last quick search or "Find similar"', expanded=True):
             show_quick_results(quick_results, search_folders)
     st.divider()
     st.subheader('Results')
