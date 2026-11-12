@@ -30,27 +30,19 @@ def quick_profile(query):
     return {'name': name, 'prompts': prompts, 'generated': len(prompts), 'refs': []}
 
 
-def quick_photos(paths, fallbacks, current, trouble=None):
+def quick_photos(paths, fallbacks, analyzed):
     """Return (photos to score, photos not analyzed) of a quick search, both in the order of paths.
 
     paths: the photos of the scan; fallbacks: {partner: RAW file} (raw_fallbacks, E30): a
     partner without a current row is scored through its RAW file if that has one and no other
     partner of the shot has a row (a full search analyzed the RAW file in the partner's place
-    only then), once per shot; current(path): whether path has a cache row of the search's
-    signature with its current modification time and size, asked once per photo. A photo whose
-    check raises counts as not analyzed, after trouble(path, exc) if given. A partner of a shot
-    whose other partner is analyzed counts as not analyzed, although a full search would not
-    analyze it either (E61).
+    only then), once per shot; analyzed(path): whether path has a cache row of the search's
+    signature with its current modification time and size (the engine's check, which counts
+    a row it cannot read as none), asked once per photo. A partner of a shot whose other
+    partner is analyzed counts as not analyzed, although a full search would not analyze it
+    either (E61).
     """
-    def has_row(path):
-        try:
-            return current(path)
-        except Exception as exc:
-            if trouble is not None:
-                trouble(path, exc)
-            return False
-
-    rows = {path: has_row(path) for path in paths}
+    rows = {path: analyzed(path) for path in paths}
     # the RAW files of shots with an analyzed partner: never shown in addition to it (review)
     used = {fallbacks[path] for path in paths if rows[path] and path in fallbacks}
     chosen, missing = [], []
@@ -61,7 +53,7 @@ def quick_photos(paths, fallbacks, current, trouble=None):
         raw = fallbacks.get(path)
         if raw is not None and raw not in used:
             used.add(raw)  # asked once per shot
-            if has_row(raw):
+            if analyzed(raw):
                 chosen.append(raw)
                 continue
         missing.append(path)

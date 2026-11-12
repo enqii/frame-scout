@@ -281,14 +281,48 @@ def test_the_engine_offers_a_quick_search_without_profiles():
     assert "parser.error('--quick-query searches without profiles" in source
 
 
-def test_a_quick_search_analyzes_nothing_and_scores_only_cached_photos():
-    source = search_source()
-    branch = source[source.index('if quick:\n        analyzed, not_analyzed = quick_photos('):]
-    branch = branch[:branch.index('\n    else:')]
-    # no detector, no analysis: only the cache check of quick_photos
-    for name in ('to_analyze(', 'analyze(', 'detector.get()', 'store_group('):
-        assert name not in branch
-    assert 'quick_photos(paths, raw_fallback.fallbacks, cached, cache_trouble)' in branch
+def search_node():
+    return next(node for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
+                if isinstance(node, ast.FunctionDef) and node.name == 'search')
+
+
+def called(node):
+    """The names of the functions and methods node calls (e.g. 'prepare_cache', 'get' of detector.get())."""
+    return [getattr(call.func, 'id', getattr(call.func, 'attr', None))
+            for call in ast.walk(node) if isinstance(call, ast.Call)]
+
+
+def quick_test(node, negated=False):
+    """Whether node is "if quick:" (negated: "if not quick:")."""
+    test = node.test if isinstance(node, ast.If) else None
+    if negated:
+        return isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not) and quick_test(ast.If(test=test.operand))
+    return isinstance(test, ast.Name) and test.id == 'quick'
+
+
+def test_a_quick_search_checks_the_cache_before_it_loads_the_model():
+    # F10 review: a folder with nothing analyzed fails at once, not after the seconds (or the
+    # first download) of loading the model; the cache check reuses the engine's analyzed()
+    search = search_node()
+    [branch] = [node for node in ast.walk(search) if quick_test(node) and 'quick_photos' in called(node)]
+    [call] = [node for node in ast.walk(branch) if isinstance(node, ast.Call) and getattr(node.func, 'id', '') == 'quick_photos']
+    assert isinstance(call.args[2], ast.Name) and call.args[2].id == 'analyzed'
+    lines = {}
+    for node in ast.walk(search):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            lines.setdefault(node.func.id, node.lineno)
+    assert lines['prepare_cache'] < call.lineno < lines['import_open_clip'] < lines['load_with_hub_fallback']
+
+
+def test_a_quick_search_analyzes_nothing():
+    # F10: no detector, no analysis: every analysis call is under "if not quick:"
+    search = search_node()
+    guarded = {id(node) for branch in ast.walk(search) if quick_test(branch, negated=True)
+               for node in ast.walk(branch)}
+    for node in ast.walk(search):
+        if isinstance(node, ast.Call) and getattr(node.func, 'id', getattr(node.func, 'attr', None)) in (
+                'to_analyze', 'store_group', 'choose', 'retry'):
+            assert id(node) in guarded, ast.unparse(node)
 
 
 def test_a_quick_search_writes_into_its_own_folder():

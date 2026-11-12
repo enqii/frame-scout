@@ -75,19 +75,6 @@ def test_quick_photos_asks_about_each_photo_once():
     assert sorted(asked) == sorted([jpeg, heic, other, raw])
 
 
-def test_quick_photos_counts_a_photo_whose_row_cannot_be_read_as_not_analyzed():
-    def current(path):
-        if path.name == 'bad.jpg':
-            raise OSError('disk I/O error')
-        return True
-    problems = []
-    chosen, missing = quick_photos([Path('ok.jpg'), Path('bad.jpg')], {}, current,
-                                   lambda path, exc: problems.append((path.name, str(exc))))
-    assert chosen == [Path('ok.jpg')]
-    assert missing == [Path('bad.jpg')]
-    assert problems == [('bad.jpg', 'disk I/O error')]
-
-
 def test_quick_scope_text_names_the_photos_that_are_not_searched():
     assert quick_scope_text(0, 0) == 'No supported photos found in these folders: there is nothing to search.'
     assert quick_scope_text(10, 0) == ('None of the 10 photos is analyzed with these AI settings yet, so a quick '
