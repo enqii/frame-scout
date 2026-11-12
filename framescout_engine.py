@@ -40,7 +40,8 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              progress_line, result_card, results_document,
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
                              store_group, supported_extensions, write_scores, lower_priority, torch_threads,
-                             QUICK_DIR, QUICK_GALLERY, RESULTS_FILE, quick_note, quick_photos, quick_profile)
+                             QUICK_DIR, QUICK_GALLERY, RESULTS_FILE, quick_note, quick_photos, quick_profile,
+                             like_crop, like_profile)
 
 # torch reads the cache variables only when it uses them; huggingface_hub and Ultralytics,
 # which read them on import, are imported in main() after default_cache_env (E42)
@@ -51,7 +52,7 @@ import torch
 from PIL import Image
 
 from framescout_images import DECODERS, open_image, render_thumbnail
-from framescout_scoring import photo_scores, rank_photos, score_caption, text_queries
+from framescout_scoring import photo_scores, rank_photos, rank_similar, score_caption, text_queries
 
 # Photos are decoded in threads ahead of CLIP (E2). Pillow releases the GIL while it
 # decodes; more threads would mostly compete with PyTorch for the same CPU cores.
@@ -74,6 +75,12 @@ SCORE_NOTE = ('"Score" says how far the best part of a photo lies above the aver
               'the small numbers are its raw similarity with the text and the reference images.')
 RAW_NOTE = ('The scores could not be scaled (too few photos or no spread), so "Similarity" is the raw weighted similarity; '
             'the small numbers are its raw similarity with the text and the reference images.')
+# the same of "Find similar" (F11), which compares images only
+LIKE_SCORE_NOTE = ('"Score" says how far the best part of a photo lies above the average image part (whole photo or '
+                   'person) of this search, in its standard deviations, by its similarity with the chosen photo; '
+                   'the small number is that raw image similarity.')
+LIKE_RAW_NOTE = ('The scores could not be scaled (too few photos or no spread), so "Similarity" is the raw image '
+                 'similarity with the chosen photo.')
 
 
 class Parser(argparse.ArgumentParser):
@@ -172,6 +179,16 @@ def main():
                              'analyzed with these settings are searched (nothing new is analyzed); the gallery and '
                              f'its {RESULTS_FILE} go to the folder "{QUICK_DIR}" in the output folder, the results '
                              'of the profiles stay as they are')
+    # F11: the app's "Find similar" on a result card; a quick search by an analyzed photo's
+    # cached vector instead of a text
+    parser.add_argument('--like', type=Path, default=None, metavar='PHOTO',
+                        help='find photos similar to this photo, which must be analyzed with these settings (it is '
+                             'never analyzed for this): only the photos already analyzed are searched, by their '
+                             'image similarity with it; no search text, no model load; the result goes where the '
+                             'one of --quick-query goes')
+    parser.add_argument('--like-part', default=None, metavar='PART',
+                        help=f'with --like: the part of the photo to compare, as a gallery card names it, e.g. '
+                             f'"Person 2" (default: "{FULL_IMAGE_LABEL}")')
     # the folders may come before, between or after the options, as one folder could (review)
     args = parser.parse_intermixed_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):
@@ -255,13 +272,26 @@ def search(args, parser, roots, dropped, output, status, warnings):
     for root in missing:
         print(f'Photo folder not found, searched without it (e.g. a disconnected drive): {root}', flush=True)
     roots = [root for root in roots if root not in missing]
-    # a quick search (F10) scores the photos already analyzed for one text, without profiles
-    quick = args.quick_query is not None
+    # a quick search (F10) scores the photos already analyzed for one text, without profiles;
+    # "Find similar" (F11) is one by the cached vector of one photo instead of a text
+    like = args.like is not None
+    quick = args.quick_query is not None or like
+    if args.like_part is not None and not like:
+        parser.error('--like-part needs --like.')
     if quick:
         if args.profiles or args.character:
-            parser.error('--quick-query searches without profiles: leave out --profiles and --character.')
+            parser.error('--quick-query and --like search without profiles: leave out --profiles and --character.')
+        if like and args.quick_query is not None:
+            parser.error('--quick-query and --like are two searches: give one of them.')
+        if like and args.scores_file:
+            # its scores are image similarities, not the text scores the evaluation reads
+            parser.error('--scores-file is not available with --like.')
+        like_photo = Path(os.path.abspath(args.like)) if like else None  # as the scan names it, links not resolved
+        like_part = FULL_IMAGE_LABEL if args.like_part is None else args.like_part
+        if like and not like_photo.is_file():
+            parser.error(f'Photo not found: {like_photo}')
         try:
-            profiles = [quick_profile(args.quick_query)]
+            profiles = [like_profile(like_photo, like_part) if like else quick_profile(args.quick_query)]
         except ValueError as exc:
             parser.error(str(exc))
     else:
@@ -320,6 +350,17 @@ def search(args, parser, roots, dropped, output, status, warnings):
             cache_trouble(path, exc)
             return False
 
+    def cached_features(path):
+        """(stat, crop labels, normalized vectors) of path's current cache row, or None without one."""
+        stat = path.stat()
+        record = con.execute('SELECT mtime_ns,size,labels,vectors FROM features WHERE path=? AND signature=?',
+                             (str(path), signature)).fetchone()
+        if record is None or record[:2] != (stat.st_mtime_ns, stat.st_size):
+            return None
+        features = unpack(record[3])
+        features /= np.maximum(np.linalg.norm(features, axis=1, keepdims=True), 1e-8)
+        return stat, json.loads(record[2]), features
+
     # opened before the model load, so that a damaged cache is reported at once (E50, E56),
     # not after the seconds (or the first download) of loading the model
     con = sqlite3.connect(output / CACHE_FILE)
@@ -332,67 +373,95 @@ def search(args, parser, roots, dropped, output, status, warnings):
             # partner without one through the RAW file a full search analyzed in its place (E30);
             # checked before the model load, so that a folder with nothing analyzed fails at once,
             # not after the seconds (or the first download) of loading the model (review)
-            to_score, not_analyzed = quick_photos(paths, raw_fallback.fallbacks, analyzed)
-            print(f'Quick search: {len(to_score)} of {len(paths)} photos are analyzed with these settings and '
-                  'searched' + (f'; {len(not_analyzed)} {"is" if len(not_analyzed) == 1 else "are"} not analyzed '
-                                'and not searched (a search with profiles analyzes them).' if not_analyzed else '.'),
+            if like:
+                # the query of "Find similar" is the photo's cached vector of the part shown on its
+                # card; a photo without a current cache row is never analyzed for it (F11)
+                try:
+                    row = cached_features(like_photo)
+                except Exception as exc:
+                    if cache_error(exc):  # the cache file itself is damaged (E50)
+                        raise
+                    row = None  # a broken row counts as none
+                if row is None or not np.isfinite(row[2]).all():
+                    parser.error(f'This photo is not analyzed with these settings (or it changed since), so there is '
+                                 f'nothing to compare with: {like_photo}. Start a search with profiles over its '
+                                 'folder first: it analyzes it.')
+                try:
+                    like_vector = row[2][like_crop(row[1], like_part)]
+                except ValueError as exc:
+                    parser.error(str(exc))
+            to_score, not_analyzed = quick_photos(paths, raw_fallback.fallbacks, analyzed, exclude=like_photo)
+            print(f'{"Find similar" if like else "Quick search"}: {len(to_score)} of {len(paths)} photos are analyzed '
+                  'with these settings and searched'
+                  + (f'; {len(not_analyzed)} {"is" if len(not_analyzed) == 1 else "are"} not analyzed and not '
+                     'searched (a search with profiles analyzes them).' if not_analyzed else '.'),
                   flush=True)
             if not to_score:
                 if unreadable:  # the cache file itself is damaged (E50)
                     raise next(iter(unreadable.values()))
+                if like:
+                    parser.error('No other photo of these folders is analyzed with these settings yet, so there is '
+                                 'nothing to compare with. Start a search with profiles first: it analyzes them.')
                 parser.error('None of these photos is analyzed with these settings yet, so the quick search has '
                              'nothing to search. Start a search with profiles first: it analyzes them.')
-        status.update('loading')
-        what = f'quick search for "{profiles[0]["name"]}"' if quick else f'{len(profiles)} search profiles'
-        print(f'{len(paths)} photos; {what}; search model: {search_model.label} '
-              f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
-              f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
-        print('Model weights are downloaded the first time a model is used.', flush=True)
-        # imported here, offline once the model is cached: no Hugging Face Hub request per search
-        # and no symlink warning (E16, E31, E33); huggingface_hub reads the variables on import,
-        # and its constants are set too if anything imported it earlier
-        open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model, modules=sys.modules)
+        if like:
+            # no model: the photos are compared by their cached vectors alone (F11)
+            profile_vectors = {profiles[0]['name']: (like_vector[np.newaxis, :], None)}
+            print(f'{len(paths)} photos; photos similar to {like_photo} ({like_part}); search model of the '
+                  f'compared analyses: {search_model.label}', flush=True)
+        else:
+            status.update('loading')
+            what = f'quick search for "{profiles[0]["name"]}"' if quick else f'{len(profiles)} search profiles'
+            print(f'{len(paths)} photos; {what}; search model: {search_model.label} '
+                  f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
+                  f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
+            print('Model weights are downloaded the first time a model is used.', flush=True)
+            # imported here, offline once the model is cached: no Hugging Face Hub request per search
+            # and no symlink warning (E16, E31, E33); huggingface_hub reads the variables on import,
+            # and its constants are set too if anything imported it earlier
+            open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model,
+                                                  modules=sys.modules)
 
-        def load_model():
-            # weights without a Hub repository go to .cache/clip, not ~/.cache/clip (E39)
-            model, _, preprocess = open_clip.create_model_and_transforms(
-                search_model.name, pretrained=search_model.pretrained, device=device,
-                cache_dir=open_clip_cache_dir(search_model, os.environ, Path(__file__).resolve().parent))
-            return model, preprocess, open_clip.get_tokenizer(search_model.name)
+            def load_model():
+                # weights without a Hub repository go to .cache/clip, not ~/.cache/clip (E39)
+                model, _, preprocess = open_clip.create_model_and_transforms(
+                    search_model.name, pretrained=search_model.pretrained, device=device,
+                    cache_dir=open_clip_cache_dir(search_model, os.environ, Path(__file__).resolve().parent))
+                return model, preprocess, open_clip.get_tokenizer(search_model.name)
 
-        # an incomplete cache goes online again and downloads what is missing
-        model, preprocess, tokenizer = load_with_hub_fallback(load_model, offline,
-                                                              lambda: hub_go_online(os.environ, sys.modules),
-                                                              lambda text: print(text, flush=True))
-        model.eval()
+            # an incomplete cache goes online again and downloads what is missing
+            model, preprocess, tokenizer = load_with_hub_fallback(load_model, offline,
+                                                                  lambda: hub_go_online(os.environ, sys.modules),
+                                                                  lambda text: print(text, flush=True))
+            model.eval()
 
-        def embed_pixels(pixels):
-            """Embed preprocessed images (one tensor, first dimension = images), batch_size at a time."""
-            vectors = []
+            def embed_pixels(pixels):
+                """Embed preprocessed images (one tensor, first dimension = images), batch_size at a time."""
+                vectors = []
+                with torch.inference_mode():
+                    for start in range(0, len(pixels), args.batch_size):
+                        emb = model.encode_image(pixels[start:start+args.batch_size].to(device)).float()
+                        emb /= emb.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+                        vectors.append(emb.cpu().numpy())
+                return np.concatenate(vectors, axis=0)
+
+            def embed_images(images):
+                return embed_pixels(torch.stack([preprocess(im) for im in images]))
+
+            profile_vectors = {}
             with torch.inference_mode():
-                for start in range(0, len(pixels), args.batch_size):
-                    emb = model.encode_image(pixels[start:start+args.batch_size].to(device)).float()
-                    emb /= emb.norm(dim=-1, keepdim=True).clamp_min(1e-8)
-                    vectors.append(emb.cpu().numpy())
-            return np.concatenate(vectors, axis=0)
-
-        def embed_images(images):
-            return embed_pixels(torch.stack([preprocess(im) for im in images]))
-
-        profile_vectors = {}
-        with torch.inference_mode():
-            for p in profiles:
-                t = model.encode_text(tokenizer(p['prompts']).to(device)).float()
-                t /= t.norm(dim=-1, keepdim=True).clamp_min(1e-8)
-                ref_vectors = []
-                for ref in p['refs']:
-                    try:
-                        ref_vectors.append(embed_images([open_image(ref)])[0])
-                    except Exception as exc:
-                        parser.error(f'Reference image cannot be read ({ref}): {exc}')
-                # the generated templates are averaged into one query, custom prompts stay apart (E4)
-                profile_vectors[p['name']] = (text_queries(t.cpu().numpy(), p['generated']),
-                                              np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
+                for p in profiles:
+                    t = model.encode_text(tokenizer(p['prompts']).to(device)).float()
+                    t /= t.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+                    ref_vectors = []
+                    for ref in p['refs']:
+                        try:
+                            ref_vectors.append(embed_images([open_image(ref)])[0])
+                        except Exception as exc:
+                            parser.error(f'Reference image cannot be read ({ref}): {exc}')
+                    # the generated templates are averaged into one query, custom prompts stay apart (E4)
+                    profile_vectors[p['name']] = (text_queries(t.cpu().numpy(), p['generated']),
+                                                  np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
     except BaseException:
         # a damaged cache, a model or a reference image that cannot be loaded: the cache
         # file is not left open (and locked on Windows) until the process ends (review)
@@ -400,9 +469,10 @@ def search(args, parser, roots, dropped, output, status, warnings):
         raise
 
     # the registry's input size (tested against the OpenCLIP config) if the model does not name it
-    image_size = getattr(model.visual, 'image_size', search_model.image_size)
-    min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
-                          person_detection)
+    if not quick:  # only the analysis decodes photos; "Find similar" loads no model (F11)
+        image_size = getattr(model.visual, 'image_size', search_model.image_size)
+        min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
+                              person_detection)
     detect_lock = threading.Lock()
     # the detector runs on the CLIP device (E14)
     detect_options = detection_options(device, args.max_persons, args.person_confidence)
@@ -599,13 +669,10 @@ def search(args, parser, roots, dropped, output, status, warnings):
     for number, path in enumerate(to_score, 1):
         status.update(done=number, force=number == len(to_score))
         try:
-            stat = path.stat()
-            record = con.execute('SELECT mtime_ns,size,labels,vectors FROM features WHERE path=? AND signature=?',
-                                 (str(path), signature)).fetchone()
-            if record is None or record[:2] != (stat.st_mtime_ns, stat.st_size):
+            row = cached_features(path)
+            if row is None:
                 continue
-            labels = json.loads(record[2]); features = unpack(record[3])
-            features /= np.maximum(np.linalg.norm(features, axis=1, keepdims=True), 1e-8)
+            stat, labels, features = row
             # a broken row (labels and vectors do not match, scores not finite) is skipped
             photo_text, photo_visual = photo_scores(features, labels, profile_vectors)
         except Exception as exc:
@@ -642,8 +709,10 @@ def search(args, parser, roots, dropped, output, status, warnings):
     for p in profiles:
         name = p['name']
         has_refs = profile_vectors[name][1] is not None
-        normalized[name], matches = rank_photos(text_scores[name], visual_scores[name] if has_refs else None,
-                                                args.reference_weight)
+        # "Find similar" scores the image similarity with its photo alone (F11)
+        normalized[name], matches = (rank_similar(text_scores[name]) if like else
+                                     rank_photos(text_scores[name], visual_scores[name] if has_refs else None,
+                                                 args.reference_weight))
         if not normalized[name] and scored:
             print(f'{name}: too few photos (or no spread) to normalize the scores; '
                   'the gallery shows the raw similarity.', flush=True)
@@ -718,8 +787,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
         page = ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                 f'<title>FrameScout – {html.escape(name)}</title><style>{style}</style>' + nav +
                 f'<h1>{html.escape(name)} – Top {len(cards)}</h1><p>Automatically generated ranking, not a guaranteed identification. '
-                + (html.escape(quick_note(len(scored), len(not_analyzed))) + ' ' if quick else '')
-                + (SCORE_NOTE if normalized[name] else RAW_NOTE) +
+                + (html.escape(quick_note(len(scored), len(not_analyzed), like=like)) + ' ' if quick else '')
+                + ((LIKE_SCORE_NOTE if normalized[name] else LIKE_RAW_NOTE) if like else
+                   (SCORE_NOTE if normalized[name] else RAW_NOTE)) +
                 ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original. '
                 f'Search model: {html.escape(search_model.label)}.</p><main>' + ''.join(cards) + '</main></html>')
         gallery = galleries[name]
@@ -742,6 +812,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
     if quick:
         # what the app shows above the quick search's results (F10)
         document['quick'] = {'query': names[0], 'searched': len(scored), 'not_analyzed': len(not_analyzed)}
+        if like:
+            # the photo and part of "Find similar" (F11)
+            document['quick'].update(like=str(like_photo), part=like_part)
     publish_export(target, pages, document)
     for (gallery, _), p in zip(pages, profiles):
         print(f"{p['name']}: {target / gallery}", flush=True)
@@ -764,7 +837,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
         print(warning, flush=True)
         warnings.append(warning)
     if quick:
-        print(f'Done. Quick search over {len(scored)} analyzed photos.', flush=True)
+        print(f'Done. {"Find similar" if like else "Quick search"} over {len(scored)} analyzed photos.', flush=True)
     else:
         print(f'Done. New photo analyses: {fresh}, from cache: {reused}. Further search profiles can reuse the '
               'existing cache.')
