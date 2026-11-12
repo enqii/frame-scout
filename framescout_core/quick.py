@@ -5,8 +5,15 @@ signature (no analysis, no person detector) and writes its gallery and result fi
 folder QUICK_DIR inside the output folder, with thumbnails of its own, so the galleries,
 results.json and marks.json of the profile search stay untouched. The cleanup of the output
 folder does not look into it; the quick search cleans its own folder (auto_cleanup).
+
+"Find similar" (F11, the engine's --like) is a quick search without a text: it ranks the
+analyzed photos by their image similarity with the cached vector of one photo (the part
+shown on its card) and writes to the same folder.
 """
+from pathlib import Path
+
 from .profiles import generic_prompts
+from .thumbnails import FULL_IMAGE_LABEL, crop_label
 
 QUICK_DIR = 'quick'
 QUICK_GALLERY = 'quick.html'
@@ -30,7 +37,30 @@ def quick_profile(query):
     return {'name': name, 'prompts': prompts, 'generated': len(prompts), 'refs': []}
 
 
-def quick_photos(paths, fallbacks, analyzed):
+def like_profile(photo, part):
+    """Return the search profile of "Find similar" (F11) for the part (crop label) of photo: no text.
+
+    Its name names the photo and, for a part other than the whole photo, the part.
+    """
+    name = f'Similar to {Path(photo).name}'
+    if part != FULL_IMAGE_LABEL:
+        name += f' ({part})'
+    return {'name': name, 'prompts': [], 'generated': 0, 'refs': []}
+
+
+def like_crop(labels, part):
+    """Return the index of the crop of a cache row whose label (as the gallery shows it) is part (F11).
+
+    labels: the crop labels stored in the cache row (crop_label maps the legacy ones).
+    Raises ValueError naming the parts the row has if it has no such part.
+    """
+    shown = [crop_label(label) for label in labels]
+    if part in shown:
+        return shown.index(part)
+    raise ValueError(f'The photo has no part "{part}" with these AI settings, only: {", ".join(shown)}.')
+
+
+def quick_photos(paths, fallbacks, analyzed, exclude=None):
     """Return (photos to score, photos not analyzed) of a quick search, both in the order of paths.
 
     paths: the photos of the scan; fallbacks: {partner: RAW file} (raw_fallbacks, E30): a
@@ -40,19 +70,24 @@ def quick_photos(paths, fallbacks, analyzed):
     signature with its current modification time and size (the engine's check, which counts
     a row it cannot read as none), asked once per photo. A partner of a shot whose other
     partner is analyzed counts as not analyzed, although a full search would not analyze it
-    either (E61).
+    either (E61). exclude: the photo of "Find similar" (F11): neither it nor another photo
+    of its shot is scored or counted as not analyzed.
     """
     rows = {path: analyzed(path) for path in paths}
     # the RAW files of shots with an analyzed partner: never shown in addition to it (review)
-    used = {fallbacks[path] for path in paths if rows[path] and path in fallbacks}
+    used = {fallbacks[path] for path in paths if (rows[path] or path == exclude) and path in fallbacks}
     chosen, missing = [], []
     for path in paths:
+        if path == exclude:
+            continue
         if rows[path]:
             chosen.append(path)
             continue
         raw = fallbacks.get(path)
         if raw is not None and raw not in used:
             used.add(raw)  # asked once per shot
+            if raw == exclude:
+                continue  # its shot is the photo of "Find similar"
             if analyzed(raw):
                 chosen.append(raw)
                 continue
@@ -88,9 +123,16 @@ def quick_scope_text(photos, analyzed):
             'searched until a search with your profiles analyzes them.')
 
 
-def quick_note(searched, not_analyzed):
-    """Return the note of a quick search's gallery and results: what was searched and why its scores differ."""
-    text = f'Quick search over the {searched:,} photos analyzed with these AI settings'
+def quick_note(searched, not_analyzed, like=False):
+    """Return the note of a quick search's gallery and results: what was searched and why its scores differ.
+
+    like: of "Find similar" (F11), whose photo is not among the searched ones.
+    """
+    if like:
+        text = ('Photos similar to the chosen one among the other '
+                + (f'{searched:,} photos' if searched != 1 else 'photo') + ' analyzed with these AI settings')
+    else:
+        text = f'Quick search over the {searched:,} photos analyzed with these AI settings'
     text += (f'; {not_analyzed:,} {"photo was" if not_analyzed == 1 else "photos were"} not analyzed and not '
              'searched.'
              if not_analyzed else '.')
