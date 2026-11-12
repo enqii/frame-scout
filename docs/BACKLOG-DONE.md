@@ -1878,6 +1878,10 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       shows it. The wording says "undecided" (the mark control's label) instead of "open".
       New `framescout_core` names in `marks.py`: `ReviewProgress`, `review_progress(cards,
       marks, size)` (states other than match/no match count as open; list order, not rank
-      numbers, decides "first"), `progress_text(progress, paged)`. Tests: `tests/test_marks.py`
-      (1479 passed, 2 skipped; CI green on Python 3.12/3.13/3.14) and a headless `AppTest`
-      check. Not tested: a real browser click-through. No schema, CLI, cache or folder change.)
+      numbers, decides "first"), `progress_text(progress, paged)`. Review: a page box value of an earlier,
+      longer list is now dropped right after the page count, before the button reads it; a
+      photo listed twice counts per card; malformed cards cannot reach `review_progress`
+      (`read_results` rejects them). Tests: `tests/test_marks.py` (in the full suite and in CI
+      on Python 3.12/3.13/3.14; the exact output is in PR #98) and a headless `AppTest` check
+      before the review; `app.py` itself has no automated tests (I2). Not tested: a real
+      browser click-through. No schema, CLI, cache or folder change.)

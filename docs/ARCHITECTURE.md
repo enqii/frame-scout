@@ -1405,7 +1405,10 @@ page box (only where `can_mark`: `marks.json` readable and the profile still a s
 caption from `progress_text(review_progress(...))` shows the counts and the first undecided photo,
 and with more than one page the button "Go to the first undecided photo" sets the page box through
 the callback `go_to_page` (disabled while that page is shown); read-only, and the page follows
-`page_cards` (an undecided photo is never hidden by `hide_no_match`). The
+`page_cards` (an undecided photo is never hidden by `hide_no_match`). A page box value out of
+range (a page of a longer list of an earlier search) is dropped right after the page count, before
+the button and the page box read it; cards are counted per card like the pages show them, so a
+photo listed twice counts twice. The
 selected option is colored by state (green match, red no match) by one `<style>` block per
 page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]`
 with `!important`; this relies on Streamlit internals (the key class and the button kind,
