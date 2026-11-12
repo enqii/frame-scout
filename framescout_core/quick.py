@@ -60,6 +60,16 @@ def like_crop(labels, part):
     raise ValueError(f'The photo has no part "{part}" with these AI settings, only: {", ".join(shown)}.')
 
 
+def like_labels_fit(labels, count):
+    """Whether the crop labels of the cache row of "Find similar"'s photo fit its count of vectors (F11 review).
+
+    They do if they are a list of texts, one per vector, and the row has at least one; the
+    engine counts any other row as broken (not analyzed), so like_crop's index names a vector.
+    """
+    return (isinstance(labels, list) and 0 < len(labels) == count
+            and all(isinstance(label, str) for label in labels))
+
+
 def quick_photos(paths, fallbacks, analyzed, exclude=None):
     """Return (photos to score, photos not analyzed) of a quick search, both in the order of paths.
 
