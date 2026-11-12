@@ -21,9 +21,10 @@ RESULTS_FILE = 'results.json'
 # format 2 lists the photo folders of the search ("photo_folders", A25); format 1 had one
 # ("photo_folder") and is still read. App versions before A25 reject format 2.
 RESULTS_FORMAT = 2
-# the note of an HTML gallery whose cards name their closest search text (F17)
-QUERY_NOTE = ('"Closest search text" names the search text a photo is most similar to, often by a small margin '
-              'over the others.')
+# the note of an HTML gallery whose cards name their closest search text (F17); it follows the
+# note on the best-scoring part, the crop whose text the card names (review)
+QUERY_NOTE = ('"Closest search text" names the search text that this best-scoring part of the photo is most similar '
+              'to, often by a small margin over the others.')
 # the app's gallery: cards per page
 GALLERY_PAGE_SIZE = 48
 # names the app joins to the results folder: plain file names only, never a path
@@ -104,7 +105,7 @@ def query_caption(best_query):
 
 
 def query_summary(entry):
-    """Return how many photos of a gallery each search text was closest to, or None (F17).
+    """Return how many photos of a gallery each search text was closest to (in their best-scoring part), or None (F17).
 
     entry: a profile of the result file. None for a search before F17, a profile with a
     single text (nothing to compare) or a gallery whose cards name no text. Every text is
@@ -117,7 +118,8 @@ def query_summary(entry):
         return None
     counts = ' · '.join(f'{query} {named[query]}' for query in queries)
     return (f"Closest search text of these {len(entry['cards'])} photos: {counts}. Each photo counts for the one "
-            'text it is most similar to, often by a small margin: the other texts can be nearly as close.')
+            'text that its best-scoring part (Full image or Person, as on its card) is most similar to, often by a '
+            'small margin: the other texts can be nearly as close.')
 
 
 def results_document(started, finished, folders, settings, photos, profiles):

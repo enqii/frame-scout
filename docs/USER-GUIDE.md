@@ -263,10 +263,13 @@ search is marked, since its results no longer fit it.
 ### Which search text matched
 
 With two or more search texts in a profile (the generated motif texts count as one), each result card
-also says **Closest search text: …**, and a caption under the run summary counts how many of the listed
-photos were closest to each text. This is only a hint: a text often wins by a small margin and the others can be
-nearly as close, so a text with a low count did not fail. The HTML gallery shows the same line per card. Nothing is
-shown for a single text, for "Find similar" or for results of an earlier version.
+also says **Closest search text: …**: the text that the photo's best-scoring part (the "Full image" or
+"Person" the card names) is most similar to. With reference images that part is chosen by text and image
+similarity together, so another part of the same photo can be closer to another text. A caption under the
+run summary counts how many of the listed photos were closest to each text. This is only a hint: a text often
+wins by a small margin and the others can be nearly as close, so a text with a low count did not fail. The HTML
+gallery shows the same line per card. Nothing is shown for a single text, for "Find similar" or for results of
+an earlier version.
 
 ### Marking and copying matches
 
