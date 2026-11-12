@@ -30,7 +30,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 ### P25 – Results view (added 2026-11-12)
 - [x] (A) Review progress per profile and "jump to the first open photo" (F20; done
       2026-11-12, PR #98)
-- [ ] (B) Show which search text matched a result (F17; kind `code-risky`)
+- [x] (B) Show which search text matched a result (F17; kind `code-risky`; done
+      2026-11-12, PR #99)
 
 ### P26 – Analyze ahead (added 2026-11-12)
 - [ ] "Analyze photos now" and `--analyze-only` without a search (F18)

@@ -260,6 +260,14 @@ file name. "Open" opens a photo, "Folder" shows it in its folder, and buttons op
 HTML gallery and the `results` folder. A profile changed, renamed or deleted since the
 search is marked, since its results no longer fit it.
 
+### Which search text matched
+
+With two or more search texts in a profile (the generated motif texts count as one), each result card
+also says **Closest search text: …**, and a caption under the run summary counts how many of the listed
+photos were closest to each text. This is only a hint: a text often wins by a small margin and the others can be
+nearly as close, so a text with a low count did not fail. The HTML gallery shows the same line per card. Nothing is
+shown for a single text, for "Find similar" or for results of an earlier version.
+
 ### Marking and copying matches
 
 The results are candidates, not certain hits. Mark a photo you checked as **Match** or
