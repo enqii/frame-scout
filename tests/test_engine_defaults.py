@@ -341,3 +341,44 @@ def test_a_quick_search_writes_into_its_own_folder():
                and getattr(node.func, 'id', '') in ('publish_export', 'auto_cleanup')]
     assert {node.func.id for node in writers} == {'publish_export', 'auto_cleanup'}
     assert all(isinstance(node.args[0], ast.Name) and node.args[0].id == 'target' for node in writers)
+
+
+def like_test(node, negated=False):
+    """Whether node is "if like:" (negated: "if not like:")."""
+    test = node.test if isinstance(node, ast.If) else None
+    if negated:
+        return isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not) and like_test(ast.If(test=test.operand))
+    return isinstance(test, ast.Name) and test.id == 'like'
+
+
+def test_the_engine_offers_find_similar_as_a_quick_search():
+    # F11: additive options, off by default, one argument each; "Find similar" is a quick
+    # search (quick is true), so it analyzes nothing and writes into the quick folder
+    for option in ('--like', '--like-part'):
+        default = option_default_node(option)
+        assert default is None or (isinstance(default, ast.Constant) and default.value is None)
+        keywords = {k.arg: ast.unparse(k.value) for k in add_argument_call(option).keywords}
+        assert 'nargs' not in keywords and 'action' not in keywords
+    search = search_node()
+    assigned = {node.targets[0].id: ast.unparse(node.value) for node in ast.walk(search)
+                if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id in ('like', 'quick')}
+    assert assigned == {'like': 'args.like is not None', 'quick': 'args.quick_query is not None or like'}
+    [branch] = [node for node in ast.walk(search) if quick_test(node) and 'quick_profile' in called(node)]
+    assert 'like_profile' in called(branch)
+
+
+def test_find_similar_reads_its_photo_before_and_instead_of_the_model_load():
+    # F11: its query is the photo's cached vector, so no model is loaded; a photo without a
+    # current cache row fails at once (never analyzed silently)
+    search = search_node()
+    [branch] = [node for node in ast.walk(search) if quick_test(node) and 'quick_photos' in called(node)]
+    assert 'like_crop' in called(branch)
+    [call] = [node for node in ast.walk(branch) if isinstance(node, ast.Call)
+              and getattr(node.func, 'id', '') == 'quick_photos']
+    assert [k.arg for k in call.keywords] == ['exclude']
+    unloaded = {id(node) for test in ast.walk(search) if like_test(test) for part in test.orelse
+                for node in ast.walk(part)}
+    loads = [node for node in ast.walk(search) if isinstance(node, ast.Call)
+             and getattr(node.func, 'id', '') in ('import_open_clip', 'load_with_hub_fallback')]
+    assert loads and all(id(node) in unloaded for node in loads)
