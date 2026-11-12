@@ -10,5 +10,5 @@ from .layout import PACKAGE, LAYOUT_MARKER, scoring_leftover_message, scoring_im
 # may be that older version's, which must not score with this newer code.
 refuse_scoring_leftover(__file__)
 
-from .ranking import (MIN_SCORES, MIN_SPREAD, Match, best_scores, photo_scores, rank_photos, score_caption, spread,
-                      text_queries)
+from .ranking import (MIN_SCORES, MIN_SPREAD, Match, best_scores, photo_scores, rank_photos, rank_similar, score_caption,
+                      spread, text_queries)

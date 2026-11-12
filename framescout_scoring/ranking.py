@@ -20,10 +20,13 @@ MIN_SPREAD = 1e-6
 
 
 class Match(NamedTuple):
-    """Best crop of one photo: combined score, crop index, raw text and visual similarity."""
+    """Best crop of one photo: combined score, crop index, raw text and visual similarity.
+
+    text is None for "Find similar" (F11), which compares images only.
+    """
     score: float
     crop: int
-    text: float
+    text: Optional[float]
     visual: Optional[float]
 
 
@@ -104,8 +107,21 @@ def rank_photos(text, visual, weight):
     return normalized, matches
 
 
+def rank_similar(similarity):
+    """Score every photo of "Find similar" (F11) by its image similarity with one photo.
+
+    similarity: one array per photo with the cosine similarity of each crop with the chosen
+    photo's vector. Scaled over all crops like a profile without reference images, but each
+    Match carries the raw value as its visual similarity and no text similarity. Returns
+    (normalized, matches) as rank_photos.
+    """
+    normalized, matches = rank_photos(similarity, None, 0.0)
+    return normalized, [Match(m.score, m.crop, None, m.text) for m in matches]
+
+
 def score_caption(match, normalized):
     """(main line, detail line) of a gallery card: the score and the raw similarities."""
     main = f'Score {match.score:+.2f}' if normalized else f'Similarity {match.score:.3f}'
-    detail = f'text {match.text:.3f}' + ('' if match.visual is None else f' · image {match.visual:.3f}')
-    return main, detail
+    parts = ([] if match.text is None else [f'text {match.text:.3f}']) + (
+        [] if match.visual is None else [f'image {match.visual:.3f}'])
+    return main, ' · '.join(parts)
