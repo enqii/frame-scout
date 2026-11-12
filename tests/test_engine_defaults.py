@@ -142,8 +142,11 @@ def test_the_engine_can_write_the_raw_scores_for_the_evaluation():
     assert sorted(node.func.id for node in calls) == ['scores_document', 'write_scores']
     # written from the scores the galleries rank, before the (slower) gallery export
     [search] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'search']
-    source = ast.unparse(search)
-    assert source.index('write_scores(') < source.index("thumbs = target / 'thumbnails'")
+    [scores] = [node.lineno for node in ast.walk(search)
+                if isinstance(node, ast.Call) and getattr(node.func, 'id', '') == 'write_scores']
+    thumbs = min(node.lineno for node in ast.walk(search) if isinstance(node, ast.Assign)
+                 and any(isinstance(t, ast.Name) and t.id == 'thumbs' for t in node.targets))
+    assert scores < thumbs
 
 
 def test_the_engine_imports_open_clip_only_through_import_open_clip():
@@ -263,24 +266,6 @@ def test_the_engine_closes_the_cache_if_the_model_or_a_reference_fails_to_load()
     assert any({'prepare_cache', 'load_with_hub_fallback', 'open_image'} <= calls for calls in guarded)
 
 
-def search_source():
-    tree = ast.parse(ENGINE.read_text(encoding='utf-8'))
-    [search] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'search']
-    return ast.unparse(search)
-
-
-def test_the_engine_offers_a_quick_search_without_profiles():
-    # F10: the option is additive and off by default; the text is taken as one argument
-    default = option_default_node('--quick-query')
-    assert default is None or (isinstance(default, ast.Constant) and default.value is None)
-    keywords = {k.arg: ast.unparse(k.value) for k in add_argument_call('--quick-query').keywords}
-    assert 'nargs' not in keywords and 'action' not in keywords
-    source = search_source()
-    # the profile of the text, never together with --profiles or --character
-    assert 'profiles = [quick_profile(args.quick_query)]' in source
-    assert "parser.error('--quick-query searches without profiles" in source
-
-
 def search_node():
     return next(node for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
                 if isinstance(node, ast.FunctionDef) and node.name == 'search')
@@ -298,6 +283,23 @@ def quick_test(node, negated=False):
     if negated:
         return isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not) and quick_test(ast.If(test=test.operand))
     return isinstance(test, ast.Name) and test.id == 'quick'
+
+
+def test_the_engine_offers_a_quick_search_without_profiles():
+    # F10: the option is additive and off by default; the text is taken as one argument
+    default = option_default_node('--quick-query')
+    assert default is None or (isinstance(default, ast.Constant) and default.value is None)
+    keywords = {k.arg: ast.unparse(k.value) for k in add_argument_call('--quick-query').keywords}
+    assert 'nargs' not in keywords and 'action' not in keywords
+    search = search_node()
+    # the profile of the text, never together with --profiles or --character
+    [branch] = [node for node in ast.walk(search) if quick_test(node) and 'quick_profile' in called(node)]
+    [call] = [node for node in ast.walk(branch)
+              if isinstance(node, ast.Call) and getattr(node.func, 'id', '') == 'quick_profile']
+    assert ast.unparse(call.args[0]) == 'args.quick_query'
+    [refused] = [node for node in branch.body if isinstance(node, ast.If)
+                 and {'args.profiles', 'args.character'} <= {ast.unparse(n) for n in ast.walk(node.test)}]
+    assert 'error' in called(refused)
 
 
 def test_a_quick_search_checks_the_cache_before_it_loads_the_model():
@@ -327,9 +329,15 @@ def test_a_quick_search_analyzes_nothing():
 
 def test_a_quick_search_writes_into_its_own_folder():
     # F10: the galleries, results.json and marks.json of the profiles stay untouched, and the
-    # cleanup after it looks only at the quick folder
-    source = search_source()
-    assert 'target = output / QUICK_DIR if quick else output' in source
-    assert 'publish_export(target, pages, document)' in source
-    assert 'auto_cleanup(target)' in source
-    assert 'publish_export(output' not in source and 'auto_cleanup(output)' not in source
+    # cleanup after it looks only at the quick folder: both write into target, which is the
+    # QUICK_DIR folder in the output folder for a quick search
+    search = search_node()
+    [target] = [node.value for node in ast.walk(search) if isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == 'target' for t in node.targets)]
+    assert isinstance(target, ast.IfExp) and isinstance(target.test, ast.Name) and target.test.id == 'quick'
+    assert {'output', 'QUICK_DIR'} <= {n.id for n in ast.walk(target.body) if isinstance(n, ast.Name)}
+    assert isinstance(target.orelse, ast.Name) and target.orelse.id == 'output'
+    writers = [node for node in ast.walk(search) if isinstance(node, ast.Call)
+               and getattr(node.func, 'id', '') in ('publish_export', 'auto_cleanup')]
+    assert {node.func.id for node in writers} == {'publish_export', 'auto_cleanup'}
+    assert all(isinstance(node.args[0], ast.Name) and node.args[0].id == 'target' for node in writers)
