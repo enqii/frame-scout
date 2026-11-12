@@ -57,6 +57,24 @@ def test_quick_photos_takes_the_analyzed_raw_file_of_a_partner_without_a_row():
     assert missing == [heic]
 
 
+def test_quick_photos_shows_a_shot_once_if_one_partner_and_its_raw_file_have_rows():
+    # review: the RAW file stands in for a partner only if no other partner of the shot is
+    # analyzed, as in a full search (E30); in either order of the partners
+    jpeg, heic, raw = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3')
+    rows = {jpeg, raw}
+    for paths in ([jpeg, heic], [heic, jpeg]):
+        chosen, missing = quick_photos(paths, {jpeg: raw, heic: raw}, rows.__contains__)
+        assert chosen == [jpeg]
+        assert missing == [heic]
+
+
+def test_quick_photos_asks_about_each_photo_once():
+    jpeg, heic, raw, other = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3'), Path('other.jpg')
+    asked = []
+    quick_photos([jpeg, heic, other], {jpeg: raw, heic: raw}, lambda path: asked.append(path) or False)
+    assert sorted(asked) == sorted([jpeg, heic, other, raw])
+
+
 def test_quick_photos_counts_a_photo_whose_row_cannot_be_read_as_not_analyzed():
     def current(path):
         if path.name == 'bad.jpg':

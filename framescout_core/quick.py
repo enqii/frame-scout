@@ -34,12 +34,13 @@ def quick_photos(paths, fallbacks, current, trouble=None):
     """Return (photos to score, photos not analyzed) of a quick search, both in the order of paths.
 
     paths: the photos of the scan; fallbacks: {partner: RAW file} (raw_fallbacks, E30): a
-    partner without a current row is scored through its RAW file if that has one (a full
-    search analyzed it in the partner's place), once per shot; current(path): whether path
-    has a cache row of the search's signature with its current modification time and size.
-    A photo whose check raises counts as not analyzed, after trouble(path, exc) if given.
-    A partner of a shot whose other partner is analyzed counts as not analyzed too, although
-    a full search would not analyze it either.
+    partner without a current row is scored through its RAW file if that has one and no other
+    partner of the shot has a row (a full search analyzed the RAW file in the partner's place
+    only then), once per shot; current(path): whether path has a cache row of the search's
+    signature with its current modification time and size, asked once per photo. A photo whose
+    check raises counts as not analyzed, after trouble(path, exc) if given. A partner of a shot
+    whose other partner is analyzed counts as not analyzed, although a full search would not
+    analyze it either (E61).
     """
     def has_row(path):
         try:
@@ -49,16 +50,20 @@ def quick_photos(paths, fallbacks, current, trouble=None):
                 trouble(path, exc)
             return False
 
-    chosen, missing, used = [], [], set()
+    rows = {path: has_row(path) for path in paths}
+    # the RAW files of shots with an analyzed partner: never shown in addition to it (review)
+    used = {fallbacks[path] for path in paths if rows[path] and path in fallbacks}
+    chosen, missing = [], []
     for path in paths:
-        if has_row(path):
+        if rows[path]:
             chosen.append(path)
             continue
         raw = fallbacks.get(path)
-        if raw is not None and raw not in used and has_row(raw):
-            used.add(raw)
-            chosen.append(raw)
-            continue
+        if raw is not None and raw not in used:
+            used.add(raw)  # asked once per shot
+            if has_row(raw):
+                chosen.append(raw)
+                continue
         missing.append(path)
     return chosen, missing
 
