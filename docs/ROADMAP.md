@@ -19,25 +19,30 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [~] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
-### P18 – Repository layout, step 2 (added 2026-11-06)
-- [x] Group the loose root files into `requirements/`, `assets/` and `docs/`, update every
-      path in installer, CI, tests, skills and docs (I31; kind `code-risky`)
+### P23 – Workflow fixes (added 2026-11-12)
+- [ ] Reviewer verifies its findings are on the PR before the label swap; agent worktrees no
+      longer block the user's manual test (I37, I38; kind `docs`)
 
-### P19 – Hygiene (`minor` items bundled per area, added 2026-11-06)
-- [x] (A) Engine: E53, E54, E56, E57
-- [x] (B) App: A44, F16
-- [x] (C) Installer: I34, I35, I36 (kind `code-risky`)
+### P24 – Hygiene: engine and core (added 2026-11-12)
+- [ ] A truncated HEIC/AVIF fails instead of becoming a black image; the quick search counts
+      partners and the app's count consistently (E59, E61)
 
-### P20 – Cache variables (added 2026-11-06)
-- [x] The app and the CLI honour cache variables the user set; the engine sets its defaults
-      in `main()`, not on import; a `yolo11n.pt` in the working folder wins (E41, E42, A36;
-      kind `code-risky`)
+### P25 – Results view (added 2026-11-12)
+- [ ] (A) Review progress per profile and "jump to the first open photo" (F20)
+- [ ] (B) Show which search text matched a result (F17; kind `code-risky`)
 
-### P21 – Quick search (added 2026-11-06)
-- [x] Quick search over the analyzed photos without a profile, result in `results/quick/` (F10)
+### P26 – Analyze ahead (added 2026-11-12)
+- [ ] "Analyze photos now" and `--analyze-only` without a search (F18)
 
-### P22 – Find similar (added 2026-11-06)
-- [x] "Find similar" from a result card, builds on P21 (F11)
+### P27 – Start (added 2026-11-12)
+- [ ] Start handles a busy port and an already running app (F22)
+
+### P28 – UI/UX review (added 2026-11-12)
+- [ ] Assess the whole user interface and write the findings down, no rebuild; follow-up PRs
+      are decided afterwards (F24; kind `docs`)
+
+### P29 – Detector weights (added 2026-11-12)
+- [ ] Log which detector weights file was loaded (E60)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
