@@ -34,7 +34,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              analyzed_paths, app_search_needs, downloaded_models, low_space, low_space_lines,
                              finishing_minutes, gallery_thumbnails, known_throughput, remaining_text, start_summary,
                              check_installation,
-                             hidden_text, hide_no_match, mark_style, windows_path,
+                             hidden_text, hide_no_match, mark_style, progress_text, review_progress, windows_path,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
                              project_temp_cleanup, read_copy_folders,
                              read_marks, read_profiles_versioned, read_results, read_settings, read_status,
@@ -515,6 +515,10 @@ def set_mark(profile, photo, key):
         # the next run shows the saved mark again
         st.session_state.gallery_notice = f'The mark could not be saved: {exc}'
 
+def go_to_page(key, page):
+    """Show page of the gallery whose page box has key (on_click of "Go to the first undecided photo", F20)."""
+    st.session_state[key] = page
+
 def copy_folder_value(profile, default):
     """Return the target folder of profile: typed but not saved in this session, saved, or the default."""
     unsaved = st.session_state.get('copy_folders_unsaved', {})
@@ -841,12 +845,24 @@ def show_results(results, photo_folders):
     hide = st.checkbox('Hide photos marked as no match', key='hide_rejected',
                        help='Hides them on the page shown; every page keeps its photos, so the ranks of a page '
                             'stay the same.')
+    pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
+    key = 'results_page_' + name
+    # review progress (F20), only where photos can be marked: without readable marks every
+    # photo would count as undecided, and a renamed profile took its marks along
+    progress = review_progress(entry['cards'], marks, GALLERY_PAGE_SIZE) if can_mark else None
+    if progress and (text := progress_text(progress, pages > 1)):
+        st.caption(text)
+    if progress and progress.first_open_page and pages > 1:
+        # a callback: it sets the page box below before the run that draws it
+        st.button('Go to the first undecided photo', key='first_open_' + widget_id(name),
+                  on_click=go_to_page, args=(key, progress.first_open_page),
+                  disabled=st.session_state.get(key, 1) == progress.first_open_page,
+                  help=f'Shows page {progress.first_open_page}, which holds #{progress.first_open_rank}, '
+                       'the best-ranked photo not yet marked as Match or No match.')
     # the whole ranked list is paginated and the rejects are hidden within the page shown
     # (A24): filtering first pulled the photos of the following pages up into this one
-    pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
     page = 1
     if pages > 1:
-        key = 'results_page_' + name
         if st.session_state.get(key, 1) not in range(1, pages + 1):
             st.session_state.pop(key, None)  # a page of a longer list of an earlier search
         page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key)
