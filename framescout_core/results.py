@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import re
+from collections import Counter
 from pathlib import Path
 
 from ._common import _publish_together
@@ -107,13 +108,14 @@ def query_summary(entry):
 
     entry: a profile of the result file. None for a search before F17, a profile with a
     single text (nothing to compare) or a gallery whose cards name no text. Every text is
-    listed in the profile's order, also one that no photo was closest to.
+    listed in the profile's order, also one that no photo was closest to; a custom text
+    given twice is listed once (the first copy is always the closest, review).
     """
-    queries = entry.get('queries') or []
-    named = [card['best_query'] for card in entry['cards'] if card.get('best_query') is not None]
+    queries = list(dict.fromkeys(entry.get('queries') or []))
+    named = Counter(card['best_query'] for card in entry['cards'] if card.get('best_query') is not None)
     if len(queries) < 2 or not named:
         return None
-    counts = ' · '.join(f'{query} {named.count(query)}' for query in queries)
+    counts = ' · '.join(f'{query} {named[query]}' for query in queries)
     return (f"Closest search text of these {len(entry['cards'])} photos: {counts}. Each photo counts for the one "
             'text it is most similar to, often by a small margin: the other texts can be nearly as close.')
 

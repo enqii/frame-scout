@@ -76,8 +76,18 @@ def test_the_summary_counts_the_photos_each_text_was_closest_to():
     assert 'small margin' in summary
 
 
+def test_the_summary_lists_a_repeated_text_once():
+    # review: load_profiles accepts the same custom text twice; the closest one is always the
+    # first copy, and the counts add up to the listed photos
+    queries = ['motif "Red car"', '"a red car"', '"a red car"']
+    cards = [card(1, best_query=queries[1]), card(2, best_query=queries[0])]
+    summary = query_summary({'queries': queries, 'cards': cards})
+    assert summary.startswith('Closest search text of these 2 photos: motif "Red car" 1 · "a red car" 1. ')
+
+
 @pytest.mark.parametrize('entry', [
     {'cards': [card()]},                                              # a search before F17
+    {'queries': ['"a red car"', '"a red car"'], 'cards': [card(best_query='"a red car"')]},  # one text, twice
     {'queries': QUERIES[:1], 'cards': [card()]},                      # a single text: nothing to compare
     {'queries': QUERIES, 'cards': [card()]},                          # no card names a text
     {'queries': QUERIES, 'cards': []},
