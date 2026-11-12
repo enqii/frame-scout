@@ -1816,4 +1816,8 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       static pages; to be confirmed by the user). Tests: `tests/test_quick.py`,
       `tests/test_scoring.py`, `tests/test_engine_defaults.py` (1451 passed, 2 skipped), an engine smoke
       run with synthetic vectors and a headless AppTest run. Not tested: a real browser click-through,
-      the button on a profile-search card, real CLIP vectors, person parts, CUDA.)
+      the button on a profile-search card, real CLIP vectors, person parts, CUDA. Review: every
+      partner of the photo's shot is left out (also when the photo is the RAW file), the photo is
+      looked up by the scan's path, a broken row fails as "not analyzed", a request is taken at once
+      and named when a search runs, the button works without the model package, the caption names
+      the file.)
