@@ -2,6 +2,7 @@
 import json
 import re
 from pathlib import Path
+from typing import NamedTuple, Optional
 
 from ._common import (_backup_path, _broken_names, _file_lock, _previous_content, _publish_new, _publish_via_temp,
                       _replace_with_retry, _update_locked)
@@ -312,6 +313,52 @@ def hide_no_match(cards, marks):
     """
     kept = [card for card in cards if marks.get(card['path']) != MARK_NO_MATCH]
     return kept, len(cards) - len(kept)
+
+
+class ReviewProgress(NamedTuple):
+    """How far the user got marking one profile's result list (F20), of review_progress."""
+    matches: int
+    no_matches: int
+    open: int
+    first_open_rank: Optional[int]  # the rank of the first unmarked photo of the list, or None
+    first_open_page: Optional[int]  # the gallery page (1-based) holding it, or None
+
+
+def review_progress(cards, marks, size):
+    """Return the ReviewProgress of a profile's ranked cards under its marks (F20).
+
+    cards are the result cards in the order the gallery pages them, marks one profile's
+    marks of read_marks, size the gallery's page size. Only the photos of cards count; a
+    state other than match or no match counts as open, as the gallery shows it. The page
+    follows page_cards; hide_no_match never hides an open photo, so that page shows it.
+    """
+    counts = {MARK_MATCH: 0, MARK_NO_MATCH: 0, MARK_OPEN: 0}
+    first = None
+    for index, card in enumerate(cards):
+        state = marks.get(card['path'])
+        state = state if state in (MARK_MATCH, MARK_NO_MATCH) else MARK_OPEN
+        counts[state] += 1
+        if state == MARK_OPEN and first is None:
+            first = index
+    return ReviewProgress(counts[MARK_MATCH], counts[MARK_NO_MATCH], counts[MARK_OPEN],
+                          None if first is None else cards[first]['rank'],
+                          None if first is None else first // size + 1)
+
+
+def progress_text(progress, paged):
+    """Return the caption of a profile's ReviewProgress, or '' for an empty list (F20).
+
+    paged says whether the gallery has more than one page: only then the page is named.
+    """
+    total = progress.matches + progress.no_matches + progress.open
+    if not total:
+        return ''
+    text = (f"{total:,} photo{'s' if total != 1 else ''}: {progress.matches:,} match, "
+            f'{progress.no_matches:,} no match, {progress.open:,} undecided.')
+    if progress.first_open_rank is None:
+        return text + ' Every photo is marked.'
+    return (text + f' The first undecided photo is #{progress.first_open_rank}'
+            + (f' on page {progress.first_open_page}.' if paged else '.'))
 
 
 def mark_style(states):

@@ -11,7 +11,7 @@ import pytest
 from framescout_core import (CONSTRAINTS_FILE, MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
                              MARKS_BACKUP, MARKS_FILE, NEVER_DELETED, RunLock, UnknownProfileError, delete_marks,
                              hidden_text, hide_no_match, lock_held, mark_style, marks_backup, marks_restore_offer, page_cards,
-                             read_marks,
+                             progress_text, read_marks, ReviewProgress, review_progress,
                              remove_marks, rename_marks, restore_marks, save_marks)
 
 
@@ -360,6 +360,65 @@ def test_hiding_the_rejects_of_a_page_keeps_the_pages_stable():
 ])
 def test_hidden_text_counts_the_hidden_photos_of_a_page(hidden, kept, more_pages, text):
     assert hidden_text(hidden, kept, more_pages) == text
+
+
+# --- review progress per profile and the first open photo (F20) ---
+
+def test_review_progress_counts_the_marks_of_the_ranked_photos():
+    cards = cards_of(10)
+    marks = {'photo1.jpg': MARK_MATCH, 'photo2.jpg': MARK_NO_MATCH, 'photo3.jpg': MARK_MATCH,
+             'photo5.jpg': MARK_NO_MATCH,
+             'other.jpg': MARK_MATCH}  # a photo of no card of this search: not counted
+    progress = review_progress(cards, marks, 48)
+    assert progress == ReviewProgress(matches=2, no_matches=2, open=6, first_open_rank=4, first_open_page=1)
+
+
+def test_review_progress_finds_the_page_the_gallery_shows_the_first_open_photo_on():
+    cards = cards_of(150)
+    marks = {f'photo{rank}.jpg': MARK_NO_MATCH if rank % 3 else MARK_MATCH for rank in range(1, 74)}
+    progress = review_progress(cards, marks, 48)
+    assert (progress.first_open_rank, progress.first_open_page) == (74, 2)
+    assert progress.open == 77 and progress.matches + progress.no_matches == 73
+    # the page of the gallery's pagination holds that photo, also with the rejects hidden (A24)
+    kept, _ = hide_no_match(page_cards(cards, progress.first_open_page, 48), marks)
+    assert 74 in [card['rank'] for card in kept]
+
+
+@pytest.mark.parametrize('index', [0, 47, 48, 95, 96, 149])
+def test_review_progress_page_matches_page_cards_at_page_boundaries(index):
+    cards = cards_of(150)
+    marks = {card['path']: MARK_MATCH for card in cards[:index]}
+    progress = review_progress(cards, marks, 48)
+    assert progress.first_open_rank == index + 1
+    assert cards[index] in page_cards(cards, progress.first_open_page, 48)
+
+
+def test_review_progress_follows_the_list_order_not_the_rank_numbers():
+    # the gallery pages the list as it is stored; the first open photo is the first of the list
+    cards = [{'rank': 7, 'path': 'a.jpg'}, {'rank': 3, 'path': 'b.jpg'}]
+    assert review_progress(cards, {'a.jpg': MARK_MATCH}, 1) == ReviewProgress(1, 0, 1, 3, 2)
+
+
+def test_review_progress_of_a_fully_checked_or_empty_list_has_no_first_open_photo():
+    cards = cards_of(3)
+    marks = {'photo1.jpg': MARK_MATCH, 'photo2.jpg': MARK_NO_MATCH, 'photo3.jpg': MARK_NO_MATCH}
+    assert review_progress(cards, marks, 48) == ReviewProgress(1, 2, 0, None, None)
+    assert review_progress([], marks, 48) == ReviewProgress(0, 0, 0, None, None)
+    # an unknown stored state counts as open, as the gallery shows it
+    assert review_progress(cards_of(1), {'photo1.jpg': 'maybe'}, 48) == ReviewProgress(0, 0, 1, 1, 1)
+
+
+@pytest.mark.parametrize('progress,paged,text', [
+    (ReviewProgress(0, 0, 0, None, None), False, ''),
+    (ReviewProgress(32, 41, 77, 74, 2), True,
+     '150 photos: 32 match, 41 no match, 77 undecided. The first undecided photo is #74 on page 2.'),
+    (ReviewProgress(0, 0, 5, 1, 1), False, '5 photos: 0 match, 0 no match, 5 undecided. The first undecided photo is #1.'),
+    (ReviewProgress(1, 0, 0, None, None), False, '1 photo: 1 match, 0 no match, 0 undecided. Every photo is marked.'),
+    (ReviewProgress(1200, 3, 0, None, None), True,
+     '1,203 photos: 1,200 match, 3 no match, 0 undecided. Every photo is marked.'),
+])
+def test_progress_text_summarizes_the_review_of_a_profile(progress, paged, text):
+    assert progress_text(progress, paged) == text
 
 
 # --- the colors of the selected option of a mark (A24) ---
