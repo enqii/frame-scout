@@ -1,11 +1,13 @@
 """Quick search over the analyzed photos without a profile (F10, framescout_core.quick)."""
 import ast
+import os
 from pathlib import Path
 
 import pytest
 
 from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, auto_cleanup,
-                             engine_command, generic_prompts, like_crop, like_labels_fit, like_profile, quick_folders_differ,
+                             engine_command, generic_prompts, like_crop, like_labels_fit, like_profile, like_scan_path,
+                             quick_folders_differ,
                              quick_note,
                              quick_photos, quick_profile, quick_scope_text, read_results, results_document,
                              publish_export, result_card, scan_cleanup)
@@ -171,6 +173,43 @@ def test_like_crop_refuses_a_part_the_photo_has_not():
         like_crop(['Full image', 'Person 1'], 'Person 2')
 
 
+def test_like_scan_path_names_the_photo_as_the_scan_does():
+    # review: the cache row and the shot are found by the scan's path, also for a photo given
+    # by another path to the same file (letter case, a link or junction, a mapped drive)
+    scanned = [Path('C:/photos/a.jpg'), Path('C:/photos/Sub/IMG_1.JPG'), Path('C:/photos/Sub/IMG_1.CR3')]
+    asked = []
+
+    def same_file(path, photo):
+        asked.append(path)
+        return path.as_posix().casefold() == photo.as_posix().casefold().replace('d:/', 'c:/photos/')
+
+    assert str(like_scan_path(Path('C:/photos/a.jpg'), scanned, same_file)) == str(scanned[0])
+    assert asked == []  # the scan's own path is taken as it is
+    assert str(like_scan_path(Path('c:/PHOTOS/sub/img_1.jpg'), scanned, same_file)) == str(scanned[1])
+    assert str(like_scan_path(Path('D:/Sub/IMG_1.CR3'), scanned, same_file)) == str(scanned[2])
+    # only the files of the same name are compared
+    assert set(asked) <= {scanned[1], scanned[2]}
+    # a photo the scan has not found (e.g. outside the searched folders) stays as given
+    other = Path('E:/elsewhere/IMG_1.JPG')
+    assert like_scan_path(other, scanned, lambda *_: False) == other
+
+
+def test_like_scan_path_skips_files_it_cannot_compare(tmp_path):
+    photo = tmp_path / 'b.jpg'
+    photo.write_bytes(b'x')
+
+    def same_file(path, _):
+        if path.parent.name == 'gone':
+            raise OSError('gone')
+        return path == photo
+
+    scanned = [tmp_path / 'gone' / 'b.jpg', photo]
+    assert like_scan_path(tmp_path / '.' / 'b.jpg', scanned, same_file) == photo
+    # the real comparison of the files: the same file by another path (letter case on Windows)
+    if os.name == 'nt':
+        assert str(like_scan_path(Path(str(photo).upper()), [photo])) == str(photo)
+
+
 def test_like_labels_fit_only_one_text_per_vector():
     # review: a broken row of the chosen photo counts as not analyzed instead of crashing
     # with an IndexError (more labels than vectors) or a TypeError (labels that are no texts)
@@ -188,6 +227,16 @@ def test_the_engine_checks_the_row_of_find_similar_before_like_crop():
                     and getattr(node.func, 'id', '') == name] for name in ('like_labels_fit', 'like_crop')}
     assert len(lines['like_labels_fit']) == 1 and len(lines['like_crop']) == 1
     assert lines['like_labels_fit'][0] < lines['like_crop'][0]
+
+
+def test_the_engine_names_the_photo_of_find_similar_as_its_scan_does():
+    tree = ast.parse((Path(__file__).resolve().parents[1] / 'framescout_engine.py').read_text(encoding='utf-8'))
+    [call] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+              and getattr(node.func, 'id', '') == 'like_scan_path']
+    assert ast.unparse(call) == 'like_scan_path(like_photo, [*paths, *scan.raw_pairs])'
+    reads = [node.lineno for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and getattr(node.func, 'id', '') in ('cached_features', 'quick_photos')]
+    assert reads and call.lineno < min(reads)
 
 
 def command(**kwargs):

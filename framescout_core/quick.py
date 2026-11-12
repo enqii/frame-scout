@@ -10,6 +10,7 @@ folder does not look into it; the quick search cleans its own folder (auto_clean
 analyzed photos by their image similarity with the cached vector of one photo (the part
 shown on its card) and writes to the same folder.
 """
+import os
 from pathlib import Path
 
 from .profiles import generic_prompts
@@ -58,6 +59,31 @@ def like_crop(labels, part):
     if part in shown:
         return shown.index(part)
     raise ValueError(f'The photo has no part "{part}" with these AI settings, only: {", ".join(shown)}.')
+
+
+def like_scan_path(photo, scanned, same_file=os.path.samefile):
+    """Return the path by which the scan names photo, the photo of "Find similar" (F11 review).
+
+    The cache keys a photo by the path the scan found it at, and the photo and its shot are
+    left out by that path: a photo given by another path to the same file (other letter case,
+    a link or junction, a mapped drive) is looked up by the scanned one. scanned: the scan's
+    photos and RAW files. Only files of the same name (ignoring case) are compared with
+    same_file, so the scan is not stat-ed once per photo; photo itself if none is the same
+    file (e.g. a photo outside the searched folders).
+    """
+    photo = Path(photo)
+    # by the text: Windows paths compare equal ignoring case, the cache's keys do not
+    if any(str(path) == str(photo) for path in scanned):
+        return photo
+    name = photo.name.casefold()
+    for path in scanned:
+        if path.name.casefold() == name:
+            try:
+                if same_file(path, photo):
+                    return path
+            except OSError:
+                continue
+    return photo
 
 
 def like_labels_fit(labels, count):
