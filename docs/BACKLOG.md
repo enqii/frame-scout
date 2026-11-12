@@ -181,6 +181,17 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       for those runs: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched until
       decided). Decided 2026-11-12: only log which file was loaded (roadmap P29); the
       signature variant stays open as a hold point. Review of PR #89, finding 3.
+- [ ] `minor` **E62 – Rows cached as black images for a truncated HEIC stay valid after E59:**
+      before E59 a truncated HEIC/HEIF that is not a RAW partner was analyzed as an all-black
+      image; its cache row has the file's modification time and size, so it stays current and
+      keeps being ranked (and searched by a quick search) until the file changes; "Clean up
+      storage" deletes it only with other settings than the current ones (`cache_old`,
+      `cache_other`, `cache_models`), never as a row of the current settings for a photo that
+      still exists. Options: leave it (rare: needs a truncated HEIC analyzed before E59),
+      detect black rows (e.g. compare with the embedding of a black image per model) and
+      analyze those photos again, or invalidate HEIF rows only
+      (cache invalidation: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched
+      until decided). Review of PR #96, finding 2.
 
 ### App (`app.py`)
 
