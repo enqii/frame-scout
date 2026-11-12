@@ -910,10 +910,11 @@ def show_quick_results(results, folders):
     result_model = MODELS.get(model_key) if model_key else None
     searched_folders = results['photo_folders']  # also for a format 1 file (A25)
     quick = results.get('quick') if isinstance(results.get('quick'), dict) else {}
-    # "Find similar" (F11) names its photo and the part compared
+    # "Find similar" (F11) names its photo (by its file name, as the gallery title does, review)
+    # and the part compared
     like = quick.get('like') if isinstance(quick.get('like'), str) else None
     part = quick.get('part') if isinstance(quick.get('part'), str) else None
-    what = (f"Photos similar to {plain(like)}" + (f' ({plain(part)})' if part else '') if like
+    what = (f"Photos similar to {plain(Path(like).name)}" + (f' ({plain(part)})' if part else '') if like
             else f"Quick search for \"{plain(entry['name'])}\"")
     st.caption(f"{what} from {run_date(results)} · photo "
                f"folder{'s' if len(searched_folders) > 1 else ''} {plain('; '.join(searched_folders))} · "
