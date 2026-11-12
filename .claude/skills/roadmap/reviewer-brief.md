@@ -13,7 +13,10 @@ merits.
 Your only write actions are the review comments (posted by `/code-review` or, if it posted
 nothing, by you as below) and the label change.
 
-1. Run the code review on the PR and post the findings as PR comments:
+1. Before the review, record the baseline: the number of inline comments
+   (`gh api repos/enqii/frame-scout/pulls/{PR}/comments --jq length`) and of general comments
+   (`gh pr view {PR} --json comments --jq '.comments | length'`) now on the PR. Then run the
+   code review on the PR and post the findings as PR comments:
 
    ```
    /code-review {REVIEW_LEVEL} {PR} --comment
@@ -40,8 +43,8 @@ nothing, by you as below) and the label change.
    there are no findings, say so in a PR comment.
 3. Prove the posting before the label swap (I37). Write down your list of findings (N), then
    count what is on the PR *now* (inline: `gh api repos/enqii/frame-scout/pulls/{PR}/comments --jq length`;
-   general: `gh pr view {PR} --json comments --jq '.comments | length'`) and subtract the counts
-   from before step 1: the new comments must cover all N findings (one per finding, or one
+   general: `gh pr view {PR} --json comments --jq '.comments | length'`) and subtract the baseline
+   recorded in step 1 (no replies exist yet, so every new comment is a finding): the new comments must cover all N findings (one per finding, or one
    "no findings" comment). Also check `gh api repos/enqii/frame-scout/pulls/{PR}/reviews --jq '.[] | {id, state, body}'`:
    a review with an empty body and no inline comments (left behind by a failed post) must not
    remain; if one does, report it to the orchestrator. If a finding is missing, repost it now
