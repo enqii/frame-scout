@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from framescout_scoring import (MIN_SCORES, Match, best_scores, photo_scores, rank_photos, rank_similar, score_caption,
+from framescout_scoring import (MIN_SCORES, Match, best_queries, best_scores, photo_scores, rank_photos, rank_similar, score_caption,
                                 spread, text_queries)
 
 
@@ -179,11 +179,39 @@ QUERIES = {'Dog': (unit([1, 0], [0, 1]), None), 'Cat': (unit([1, 1]), unit([1, 0
 
 def test_photo_scores_give_every_profile_its_crop_scores():
     features = unit([1, 0], [0, 1], [1, 1])
-    text, visual = photo_scores(features, ['Full image', 'Person 1', 'Person 2'], QUERIES)
+    text, visual, best = photo_scores(features, ['Full image', 'Person 1', 'Person 2'], QUERIES)
     np.testing.assert_allclose(text['Dog'], [1, 1, np.sqrt(.5)], rtol=1e-6)
     np.testing.assert_allclose(text['Cat'], [np.sqrt(.5), np.sqrt(.5), 1], rtol=1e-6)
     assert list(visual) == ['Cat']
     np.testing.assert_allclose(visual['Cat'], [1, 0, np.sqrt(.5)], atol=1e-6)
+    # the query each crop's text score comes from (F17); an exact tie names the first
+    assert best['Dog'].tolist() == [0, 1, 0] and best['Cat'].tolist() == [0, 0, 0]
+
+
+def test_best_queries_name_the_query_of_the_best_score():
+    crops = unit([1, 0], [0, 1], [1, .9])
+    queries = unit([1, 1], [1, 0], [0, 1])
+    assert best_queries(crops, queries).tolist() == [1, 2, 0]
+    np.testing.assert_allclose(best_scores(crops, queries),
+                               (crops @ queries.T)[np.arange(3), best_queries(crops, queries)], rtol=1e-6)
+
+
+BEST = [np.arange(len(t)) % 2 for t in TEXT]
+
+
+@pytest.mark.parametrize('visual', [None, VISUAL])
+def test_a_match_names_the_best_query_of_its_crop_without_changing_the_ranking(visual):
+    # F17: the query that gave the best crop its text score; scores and crops stay the same
+    _, plain = rank_photos(TEXT, visual, .35)
+    _, named = rank_photos(TEXT, visual, .35, best=BEST)
+    assert [m._replace(query=None) for m in named] == plain
+    assert [m.query for m in named] == [int(BEST[i][m.crop]) for i, m in enumerate(plain)]
+    assert all(m.query is None for m in plain)
+
+
+def test_a_match_without_queries_names_none():
+    assert Match(1.0, 0, .3, None).query is None
+    assert all(m.query is None for m in rank_similar(VISUAL)[1])
 
 
 @pytest.mark.parametrize('features, labels', [
