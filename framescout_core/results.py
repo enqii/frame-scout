@@ -20,6 +20,9 @@ RESULTS_FILE = 'results.json'
 # format 2 lists the photo folders of the search ("photo_folders", A25); format 1 had one
 # ("photo_folder") and is still read. App versions before A25 reject format 2.
 RESULTS_FORMAT = 2
+# the note of an HTML gallery whose cards name their closest search text (F17)
+QUERY_NOTE = ('"Closest search text" names the search text a photo is most similar to, often by a small margin '
+              'over the others.')
 # the app's gallery: cards per page
 GALLERY_PAGE_SIZE = 48
 # names the app joins to the results folder: plain file names only, never a path
@@ -85,6 +88,15 @@ def result_card(rank, path, relative, label, score, text, visual, caption, detai
     return card
 
 
+def closest_query(index, queries):
+    """Return the name of a card's closest search text, or None if there is nothing to tell (F17).
+
+    index: Match.query (None for "Find similar"); queries: query_labels of the profile. A
+    profile with a single text names none: it is always the closest.
+    """
+    return queries[index] if index is not None and len(queries) > 1 else None
+
+
 def query_caption(best_query):
     """Return the line of a gallery card that names its closest search text (F17)."""
     return f'Closest search text: {best_query}'
@@ -103,8 +115,7 @@ def query_summary(entry):
         return None
     counts = ' · '.join(f'{query} {named.count(query)}' for query in queries)
     return (f"Closest search text of these {len(entry['cards'])} photos: {counts}. Each photo counts for the one "
-            'text it is most similar to, often by a small margin: the other texts can be nearly as close, and '
-            'every text adds to the search.')
+            'text it is most similar to, often by a small margin: the other texts can be nearly as close.')
 
 
 def results_document(started, finished, folders, settings, photos, profiles):
