@@ -684,7 +684,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 continue
             stat, labels, features = row
             # a broken row (labels and vectors do not match, scores not finite) is skipped
-            photo_text, photo_visual = photo_scores(features, labels, profile_vectors)
+            photo_text, photo_visual, photo_best = photo_scores(features, labels, profile_vectors)
         except Exception as exc:
             cache_trouble(path, exc)
             print(f'CACHE ERROR {path}: {exc}', flush=True)

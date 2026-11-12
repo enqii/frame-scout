@@ -22,12 +22,15 @@ MIN_SPREAD = 1e-6
 class Match(NamedTuple):
     """Best crop of one photo: combined score, crop index, raw text and visual similarity.
 
-    text is None for "Find similar" (F11), which compares images only.
+    text is None for "Find similar" (F11), which compares images only. query is the index
+    (in text_queries order) of the query the crop's text score comes from, or None if
+    rank_photos was not given the best queries (F17).
     """
     score: float
     crop: int
     text: Optional[float]
     visual: Optional[float]
+    query: Optional[int] = None
 
 
 def _unit(vectors):
@@ -53,22 +56,33 @@ def best_scores(features, queries):
     return (features @ queries.T).max(axis=1)
 
 
+def best_queries(features, queries):
+    """Index of the query each crop (row of features) is most similar to, the one best_scores takes (F17).
+
+    An exact tie names the first of the tied queries.
+    """
+    return (features @ queries.T).argmax(axis=1)
+
+
 def photo_scores(features, labels, profile_vectors):
     """Per-crop text and reference scores of one cached photo for every profile.
 
     features: the photo's normalized crop vectors; labels: its crop labels;
-    profile_vectors: {name: (queries, reference vectors or None)}. Returns (text, visual):
-    {name: scores per crop}, visual only for profiles with reference images. Raises
+    profile_vectors: {name: (queries, reference vectors or None)}. Returns (text, visual,
+    best): {name: scores per crop}, visual only for profiles with reference images, best
+    the index of each crop's best query (best_queries, F17). Raises
     ValueError for a broken cache row (labels and vectors do not match, no crop, scores
     that are not finite); the engine skips such a photo, so it cannot break a search.
     """
     if len(labels) != len(features) or not len(features):
         raise ValueError(f'{len(labels)} crop labels for {len(features)} feature vectors')
-    text = {name: best_scores(features, queries) for name, (queries, _) in profile_vectors.items()}
+    similarity = {name: features @ queries.T for name, (queries, _) in profile_vectors.items()}
+    text = {name: values.max(axis=1) for name, values in similarity.items()}
+    best = {name: values.argmax(axis=1) for name, values in similarity.items()}
     visual = {name: best_scores(features, refs) for name, (_, refs) in profile_vectors.items() if refs is not None}
     if not all(np.isfinite(scores).all() for scores in (*text.values(), *visual.values())):
         raise ValueError('the cached feature vectors give scores that are not finite')
-    return text, visual
+    return text, visual, best
 
 
 def spread(arrays):
@@ -81,11 +95,13 @@ def spread(arrays):
     return (mean, std) if std >= MIN_SPREAD else None
 
 
-def rank_photos(text, visual, weight):
+def rank_photos(text, visual, weight, best=None):
     """Score every photo of a search for one profile.
 
     text: one array per photo with the text score of each crop; visual: the same for the
-    reference images, or None for a profile without them; weight: the reference weight.
+    reference images, or None for a profile without them; weight: the reference weight;
+    best: None or one array per photo with the index of each crop's best query
+    (photo_scores), named by each Match (F17); it does not change the ranking.
     Returns (normalized, matches): matches holds one Match per photo in input order;
     normalized is False if the raw scores had to be used (too few crops, no spread). Only
     a channel that counts (weight above 0) needs a spread: with weight 0 the reference
@@ -103,7 +119,8 @@ def rank_photos(text, visual, weight):
                 combined = combined + share * ((values - stat[0]) / stat[1] if normalized else values)
         crop = int(np.argmax(combined))
         matches.append(Match(float(combined[crop]), crop, float(text[photo][crop]),
-                             None if visual is None else float(visual[photo][crop])))
+                             None if visual is None else float(visual[photo][crop]),
+                             None if best is None else int(best[photo][crop])))
     return normalized, matches
 
 
