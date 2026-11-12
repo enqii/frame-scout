@@ -80,6 +80,14 @@ def search_space_bytes(photos, top, profiles, analyzed=0):
 def analyzed_photos(cache_file, signature, paths, stats=None):
     """Return how many of the photo paths have a current row of signature in the feature cache cache_file.
 
+    See analyzed_paths.
+    """
+    return len(analyzed_paths(cache_file, signature, paths, stats))
+
+
+def analyzed_paths(cache_file, signature, paths, stats=None):
+    """Return the set of the photo paths that have a current row of signature in the feature cache cache_file.
+
     A row is current, as for the engine, if its modification time and size are the photo's
     (A44): a photo edited since its analysis is analyzed again. stats: {path: (mtime_ns,
     size)} as the photo scan saw them (PhotoScan.stats), so that a large collection is not
@@ -94,7 +102,7 @@ def analyzed_photos(cache_file, signature, paths, stats=None):
     cache_file = Path(cache_file)
     try:
         if not cache_file.is_file():
-            return 0
+            return set()
         con = sqlite3.connect(_read_only_uri(cache_file), uri=True, timeout=1)
         try:
             cached = {os.path.normcase(path): (mtime_ns, size) for path, mtime_ns, size in
@@ -102,16 +110,16 @@ def analyzed_photos(cache_file, signature, paths, stats=None):
         finally:
             con.close()
     except (sqlite3.Error, OSError):
-        return 0
-    count = 0
+        return set()
+    found = set()
     for path in paths:
         row = cached.get(os.path.normcase(str(path)))
         if row is None:
             continue
         known = stats.get(path)
         if (known is not None and row == tuple(known)) or row == _file_times(_file_stat(path)):
-            count += 1
-    return count
+            found.add(path)
+    return found
 
 
 def search_space_needs(results, photos, top, profiles, model, hub_cache, detector_weights=None, analyzed=0,

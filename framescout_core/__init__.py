@@ -56,7 +56,7 @@ from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINA
 from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
     DEFAULT_REFERENCE_WEIGHT, AI_SETTINGS, SETTINGS_LOCK_TIMEOUT, LEGACY_PHOTO_FOLDER, default_settings, folder_lines,
     read_settings, save_settings, reconcile_settings, changed_from_defaults, setting_text, engine_command)
-from .quick import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, quick_profile, quick_photos, quick_scope_text,
+from .quick import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, quick_profile, quick_photos, quick_scope, quick_scope_text,
     quick_note, quick_folders_differ, like_profile, like_crop, like_labels_fit, like_scan_path)
 from .results import (RESULTS_FILE, RESULTS_FORMAT, GALLERY_PAGE_SIZE, search_fingerprint,
     profile_fingerprints, profile_state, result_card, results_document, publish_export,
@@ -72,7 +72,7 @@ from .cleanup import (THUMBNAILS_DIR, LEGACY_THUMBNAILS_DIR, GALLERY_MARKER, CLE
     CACHE_CATEGORIES, CLEANUP_DEFAULTS, NEVER_DELETED, CLEANUP_LOCK_TIMEOUT, ROOT_TIMEOUT, FOLDER_TIMEOUT, STALE_TEMP_AGE, scan_cleanup, cleanup_running, clean_up,
     auto_cleanup, project_temp_cleanup, size_text, count_text, cleanup_summary_text)
 from .disk_space import (TORCH_INSTALL_SPACE, OTHER_PACKAGES_SPACE, CACHE_BYTES_PER_PHOTO, THUMBNAIL_BYTES, DETECTOR_DOWNLOAD, SPACE_RESERVE,
-    SPACE_CHECK_TIMEOUT, LowSpace, analyzed_photos, app_search_needs, download_bytes, downloaded_models, eval_run_needs, search_space_bytes, search_space_needs, torch_install_needs, low_space, low_space_lines)
+    SPACE_CHECK_TIMEOUT, LowSpace, analyzed_paths, analyzed_photos, app_search_needs, download_bytes, downloaded_models, eval_run_needs, search_space_bytes, search_space_needs, torch_install_needs, low_space, low_space_lines)
 from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE, torch_threads,
     lower_priority)
 from .estimate import (RATE_WINDOW, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS,

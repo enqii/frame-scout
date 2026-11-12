@@ -8,7 +8,7 @@ import pytest
 
 from framescout_core import disk_space
 from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, OTHER_PACKAGES_SPACE, SPACE_RESERVE, THUMBNAIL_BYTES,
-                             TORCH_INSTALL_SPACE, LowSpace, analyzed_photos, app_search_needs, download_bytes,
+                             TORCH_INSTALL_SPACE, LowSpace, analyzed_paths, analyzed_photos, app_search_needs, download_bytes,
                              downloaded_models, eval_run_needs, low_space, low_space_lines,
                              search_space_bytes, search_space_needs, torch_install_needs)
 
@@ -131,6 +131,18 @@ def test_analyzed_photos_counts_a_photo_analyzed_again_after_the_scan(tmp_path):
     cache = tmp_path / 'cache.sqlite'
     make_cache(cache, [(str(photo), 'abc', stat.st_mtime_ns, stat.st_size)])
     assert analyzed_photos(cache, 'abc', [photo], {photo: (1, 5)}) == 1
+
+
+def test_analyzed_paths_names_the_photos_and_raw_files_with_current_rows(tmp_path):
+    # E61: the app counts a quick search with them as the engine does (quick_scope); a RAW
+    # file is not in the scan's times, so it is looked at
+    jpeg, raw, other = tmp_path / 'a.jpg', tmp_path / 'a.cr3', tmp_path / 'b.jpg'
+    raw.write_bytes(b'raw')
+    stat = raw.stat()
+    cache = tmp_path / 'cache.sqlite'
+    make_cache(cache, [(str(raw), 'abc', stat.st_mtime_ns, stat.st_size), (str(other), 'abc', 1, 2)])
+    assert analyzed_paths(cache, 'abc', [jpeg, other, raw], {jpeg: (1, 2), other: (1, 2)}) == {raw, other}
+    assert analyzed_paths(tmp_path / 'none.sqlite', 'abc', [raw]) == set()
 
 
 def test_search_needs_name_downloads_only_when_missing(tmp_path):

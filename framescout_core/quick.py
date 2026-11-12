@@ -13,6 +13,7 @@ shown on its card) and writes to the same folder.
 import os
 from pathlib import Path
 
+from .photos import raw_fallbacks
 from .profiles import generic_prompts
 from .thumbnails import FULL_IMAGE_LABEL, crop_label
 
@@ -104,31 +105,51 @@ def quick_photos(paths, fallbacks, analyzed, exclude=None):
     partner of the shot has a row (a full search analyzed the RAW file in the partner's place
     only then), once per shot; analyzed(path): whether path has a cache row of the search's
     signature with its current modification time and size (the engine's check, which counts
-    a row it cannot read as none), asked once per photo. A partner of a shot whose other
-    partner is analyzed counts as not analyzed, although a full search would not analyze it
-    either (E61). exclude: the photo of "Find similar" (F11): neither it nor another photo
-    of its shot (its RAW file and every partner of that RAW file, whichever of them it is
-    and whether they have rows of their own, review) is scored or counted as not analyzed.
+    a row it cannot read as none), asked once per photo. A partner without a row whose shot
+    is searched (through another partner or its RAW file) is neither scored nor counted as
+    not analyzed (E61): a full search would not analyze the shot again through it either.
+    Every partner of a shot without any row counts as not analyzed. exclude: the photo of
+    "Find similar" (F11): neither it nor another photo of its shot (its RAW file and every
+    partner of that RAW file, whichever of them it is and whether they have rows of their
+    own, review) is scored or counted as not analyzed.
     """
     shot_raw = exclude if exclude in fallbacks.values() else fallbacks.get(exclude)
     skip = {exclude} | {path for path, raw in fallbacks.items() if shot_raw is not None and raw == shot_raw}
     paths = [path for path in paths if path not in skip]
     rows = {path: analyzed(path) for path in paths}
-    # the RAW files of shots with an analyzed partner: never shown in addition to it (review)
-    used = {fallbacks[path] for path in paths if rows[path] and path in fallbacks}
+    # the shots (by their RAW file) that are searched: those with an analyzed partner, whose
+    # RAW file is never shown in addition to it (review), and those searched through it
+    searched = {fallbacks[path] for path in paths if rows[path] and path in fallbacks}
+    raw_rows = {}  # asked once per shot
     chosen, missing = [], []
     for path in paths:
         if rows[path]:
             chosen.append(path)
             continue
         raw = fallbacks.get(path)
-        if raw is not None and raw not in used:
-            used.add(raw)  # asked once per shot
-            if analyzed(raw):
+        if raw is not None:
+            if raw in searched:
+                continue  # E61
+            if raw not in raw_rows:
+                raw_rows[raw] = analyzed(raw)
+            if raw_rows[raw]:
                 chosen.append(raw)
+                searched.add(raw)
                 continue
         missing.append(path)
     return chosen, missing
+
+
+def quick_scope(scan, analyzed):
+    """Return (photos searched, photos not analyzed) of a quick search over scan, as the engine counts them (E61).
+
+    scan: the PhotoScan of the chosen folders; analyzed: the paths among its photos and RAW
+    files (raw_pairs) that have a current cache row of the search's signature
+    (analyzed_paths). A RAW file analyzed in place of its partner counts as searched, as in
+    the engine (quick_photos).
+    """
+    chosen, missing = quick_photos(scan.paths, raw_fallbacks(scan), analyzed.__contains__)
+    return len(chosen), len(missing)
 
 
 def quick_folders_differ(searched, folders):
@@ -140,23 +161,38 @@ def quick_folders_differ(searched, folders):
     return {str(folder) for folder in searched} != {str(folder) for folder in folders}
 
 
-def quick_scope_text(photos, analyzed):
+def quick_scope_text(photos, searched, not_analyzed):
     """Return what the app says before a quick search: how many photos it searches and how many not.
 
-    photos: the photos counted in the folders; analyzed: those with a current cache row of
-    the current settings (analyzed_photos).
+    photos: the photos counted in the folders; searched, not_analyzed: the counts of
+    quick_scope (E61). The photos neither searched nor not analyzed are partners whose shot
+    is searched through another file of it.
     """
     if photos <= 0:
         return 'No supported photos found in these folders: there is nothing to search.'
-    analyzed = min(max(analyzed, 0), photos)
-    if not analyzed:
+    searched = min(max(searched, 0), photos)
+    not_analyzed = min(max(not_analyzed, 0), photos - searched)
+    partners = photos - searched - not_analyzed
+    if not searched:
         return (f'None of the {photos:,} photos is analyzed with these AI settings yet, so a quick search finds '
                 'nothing. Start a search with your profiles first: it analyzes them.')
-    if analyzed == photos:
+    if searched == photos:
         return f'All {photos:,} photos are analyzed with these AI settings and searched.'
-    others = (f'the other {photos - analyzed:,} are' if photos - analyzed > 1 else 'the other photo is')
-    return (f'{analyzed:,} of {photos:,} photos are analyzed with these AI settings and searched; {others} not '
-            'searched until a search with your profiles analyzes them.')
+    text = f'{searched:,} of {photos:,} photos are analyzed with these AI settings and searched'
+    if not_analyzed:
+        if partners:
+            others = f'{not_analyzed:,} {"is" if not_analyzed == 1 else "are"}'
+        else:
+            others = f'the other {not_analyzed:,} are' if not_analyzed > 1 else 'the other photo is'
+        text += f'; {others} not searched until a search with your profiles analyzes them'
+    if partners:
+        if not_analyzed:
+            lead = '1 other is' if partners == 1 else f'{partners:,} others are'
+        else:
+            lead = 'the other photo is' if partners == 1 else f'the other {partners:,} are'
+        shots = 'its shot' if partners == 1 else 'their shots'
+        text += f'; {lead} not analyzed, but another file of {shots} (the same picture in another format) is searched'
+    return text + '.'
 
 
 def quick_note(searched, not_analyzed, like=False):

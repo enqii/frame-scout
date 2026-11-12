@@ -1,15 +1,17 @@
 """Quick search over the analyzed photos without a profile (F10, framescout_core.quick)."""
 import ast
+import collections
 import os
 from pathlib import Path
 
 import pytest
 
-from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, auto_cleanup,
+from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, PhotoScan, auto_cleanup,
                              engine_command, generic_prompts, like_crop, like_labels_fit, like_profile, like_scan_path,
                              quick_folders_differ,
                              quick_note,
-                             quick_photos, quick_profile, quick_scope_text, read_results, results_document,
+                             quick_photos, quick_profile, quick_scope, quick_scope_text, read_results,
+                             results_document,
                              publish_export, result_card, scan_cleanup)
 
 
@@ -56,20 +58,38 @@ def test_quick_photos_takes_the_analyzed_raw_file_of_a_partner_without_a_row():
     jpeg, heic, raw = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3')
     rows = {raw}
     chosen, missing = quick_photos([jpeg, heic], {jpeg: raw, heic: raw}, rows.__contains__)
-    # one shot, one photo: the second partner does not take the RAW file again
+    # one shot, one photo: the second partner does not take the RAW file again, and it is
+    # not counted as not analyzed either (E61)
     assert chosen == [raw]
-    assert missing == [heic]
+    assert missing == []
 
 
 def test_quick_photos_shows_a_shot_once_if_one_partner_and_its_raw_file_have_rows():
     # review: the RAW file stands in for a partner only if no other partner of the shot is
-    # analyzed, as in a full search (E30); in either order of the partners
+    # analyzed, as in a full search (E30); in either order of the partners. E61: the partner
+    # without a row is not counted as not analyzed, since a full search would not analyze
+    # the shot again through it either
     jpeg, heic, raw = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3')
-    rows = {jpeg, raw}
-    for paths in ([jpeg, heic], [heic, jpeg]):
-        chosen, missing = quick_photos(paths, {jpeg: raw, heic: raw}, rows.__contains__)
-        assert chosen == [jpeg]
-        assert missing == [heic]
+    for rows in ({jpeg, raw}, {jpeg}):
+        for paths in ([jpeg, heic], [heic, jpeg]):
+            chosen, missing = quick_photos(paths, {jpeg: raw, heic: raw}, rows.__contains__)
+            assert chosen == [jpeg]
+            assert missing == []
+
+
+def test_quick_photos_does_not_count_a_partner_whose_shot_is_searched_through_its_raw_file():
+    # E61: the RAW file analyzed in place of one broken partner stands for the whole shot
+    jpeg, heic, raw, other = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3'), Path('other.jpg')
+    chosen, missing = quick_photos([jpeg, heic, other], {jpeg: raw, heic: raw}, {raw}.__contains__)
+    assert chosen == [raw]
+    assert missing == [other]
+
+
+def test_quick_photos_counts_every_partner_of_a_shot_without_any_row():
+    # a full search analyzes each of them: both are not analyzed
+    jpeg, heic, raw = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3')
+    chosen, missing = quick_photos([jpeg, heic], {jpeg: raw, heic: raw}, lambda path: False)
+    assert (chosen, missing) == ([], [jpeg, heic])
 
 
 def test_quick_photos_asks_about_each_photo_once():
@@ -121,18 +141,41 @@ def test_quick_folders_differ_tells_a_search_of_other_folders(tmp_path):
 
 
 def test_quick_scope_text_names_the_photos_that_are_not_searched():
-    assert quick_scope_text(0, 0) == 'No supported photos found in these folders: there is nothing to search.'
-    assert quick_scope_text(10, 0) == ('None of the 10 photos is analyzed with these AI settings yet, so a quick '
-                                       'search finds nothing. Start a search with your profiles first: it analyzes '
-                                       'them.')
-    assert quick_scope_text(1200, 1200) == 'All 1,200 photos are analyzed with these AI settings and searched.'
-    assert quick_scope_text(1200, 1000) == ('1,000 of 1,200 photos are analyzed with these AI settings and searched; '
-                                            'the other 200 are not searched until a search with your profiles '
-                                            'analyzes them.')
-    assert quick_scope_text(13, 12) == ('12 of 13 photos are analyzed with these AI settings and searched; the other '
-                                        'photo is not searched until a search with your profiles analyzes them.')
-    # a cache row count above the photos (e.g. counted at another time) is capped
-    assert quick_scope_text(5, 7) == 'All 5 photos are analyzed with these AI settings and searched.'
+    assert quick_scope_text(0, 0, 0) == 'No supported photos found in these folders: there is nothing to search.'
+    assert quick_scope_text(10, 0, 10) == ('None of the 10 photos is analyzed with these AI settings yet, so a quick '
+                                           'search finds nothing. Start a search with your profiles first: it '
+                                           'analyzes them.')
+    assert quick_scope_text(1200, 1200, 0) == 'All 1,200 photos are analyzed with these AI settings and searched.'
+    assert quick_scope_text(1200, 1000, 200) == ('1,000 of 1,200 photos are analyzed with these AI settings and '
+                                                 'searched; the other 200 are not searched until a search with your '
+                                                 'profiles analyzes them.')
+    assert quick_scope_text(13, 12, 1) == ('12 of 13 photos are analyzed with these AI settings and searched; the '
+                                           'other photo is not searched until a search with your profiles analyzes '
+                                           'them.')
+    # counts above the photos (e.g. counted at another time) are capped
+    assert quick_scope_text(5, 7, 0) == 'All 5 photos are analyzed with these AI settings and searched.'
+
+
+def test_quick_scope_text_names_the_partners_whose_shot_is_searched():
+    # E61: a JPEG/HEIC partner without a row whose shot is searched through another file
+    assert quick_scope_text(10, 8, 0) == ('8 of 10 photos are analyzed with these AI settings and searched; the other '
+                                          '2 are not analyzed, but another file of their shots (the same picture in '
+                                          'another format) is searched.')
+    assert quick_scope_text(10, 6, 3) == ('6 of 10 photos are analyzed with these AI settings and searched; 3 are not '
+                                          'searched until a search with your profiles analyzes them; 1 other is not '
+                                          'analyzed, but another file of its shot (the same picture in another '
+                                          'format) is searched.')
+
+
+def test_quick_scope_counts_as_the_engine_does(tmp_path):
+    # E61: the app counts a quick search with the RAW files of the scan, as the engine does;
+    # a folder whose analyzed photos are all RAW files in place of their broken partner (E30)
+    # has photos to search
+    jpeg, heic, raw, other = (tmp_path / name for name in ('a.jpg', 'a.heic', 'a.cr3', 'b.jpg'))
+    scan = PhotoScan([jpeg, heic, other], [raw], collections.Counter(), 0, 0, {})
+    assert quick_scope(scan, {raw}) == (1, 1)
+    assert quick_scope(scan, {jpeg, other}) == (2, 0)
+    assert quick_scope(scan, set()) == (0, 3)
 
 
 def test_quick_note_says_how_many_photos_were_searched_and_that_scores_differ():
