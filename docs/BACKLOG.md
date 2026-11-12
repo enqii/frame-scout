@@ -169,10 +169,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       the unbound check (E37) is not tested on a legitimately slow folder (e.g. many absent
       names, each confirmed by a `stat` on a slow share); such a folder is not checked (the safe
       side). Measure it on the home PC or NAS and adjust the limit. Split off from E54 (PR #84).
-- [ ] `minor` **E59 – A truncated HEIC/AVIF that is not a RAW partner is analyzed as an all-black
-      image:** pillow-heif swallows its decoding error under `LOAD_TRUNCATED_IMAGES` and leaves
-      the image blank. `open_image` could always decode HEIF strictly, so such a photo fails with
-      an error instead. Found in E53 (PR #84).
 - [ ] `ready` **E60 – The feature cache signature names the detector weights only by the name
       given:** `feature_signature` records `--yolo-model` as given (`yolo11n.pt`), not which file
       `yolo_weights` loaded. Since E41 a `yolo11n.pt` in the working folder of a manual run wins
@@ -185,15 +181,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       for those runs: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched until
       decided). Decided 2026-11-12: only log which file was loaded (roadmap P29); the
       signature variant stays open as a hold point. Review of PR #89, finding 3.
-- [ ] `minor` **E61 – The quick search counts a JPEG/HEIC partner as "not analyzed", and the app's count can differ:**
-      a quick search counts a JPEG/HEIC partner whose other partner of the shot is analyzed as
-      "not analyzed", although a full search would not analyze it either; and the app's count
-      before a quick search (`analyzed_photos`, no RAW fallback, the scan's stats) can differ
-      slightly from the engine's count. In the extreme case of a folder whose analyzed photos
-      are all RAW files analyzed in place of their broken JPEG/HEIC partner (E30), the app
-      counts 0 and disables "Quick search", although the engine would search them (review of
-      PR #90, finding 4). Affected: `framescout_core/quick.py` (`quick_photos`), `app.py`
-      (`cached_analyzed_photos`). Found in F10 (PR #90). Size S.
 
 ### App (`app.py`)
 
