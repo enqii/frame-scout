@@ -1,4 +1,5 @@
 """Quick search over the analyzed photos without a profile (F10, framescout_core.quick)."""
+import ast
 from pathlib import Path
 
 import pytest
@@ -166,3 +167,32 @@ def test_auto_cleanup_of_the_quick_folder_keeps_only_what_its_gallery_links(tmp_
     auto_cleanup(quick)
     assert sorted(p.name for p in (quick / 'thumbnails').iterdir()) == [linked]
     assert read_results(quick / 'results.json')['profiles'][0]['gallery'] == QUICK_GALLERY
+
+
+APP = Path(__file__).resolve().parent.parent / 'app.py'
+
+
+def test_the_app_starts_both_searches_through_engine_command():
+    # F10: the search with profiles and the quick search get the same settings
+    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and getattr(node.func, 'id', None) == 'start_engine']
+    assert sorted(k.arg for call in calls for k in call.keywords) == ['profiles', 'quick_query']
+    assert [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+            and getattr(node.func, 'id', None) == 'engine_command']
+    # no second, hand-built command line
+    assert not [node for node in ast.walk(tree) if isinstance(node, ast.Constant) and node.value == '--profiles']
+
+
+def test_the_app_shows_the_quick_search_from_its_own_folder():
+    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    assigned = {ast.unparse(node.targets[0]): ast.unparse(node.value) for node in tree.body
+                if isinstance(node, ast.Assign) and len(node.targets) == 1}
+    assert assigned['QUICK'] == 'RESULTS / QUICK_DIR'
+    assert assigned['QUICK_JSON'] == 'QUICK / RESULTS_FILE'
+    assert assigned['QUICK_THUMBS'] == "QUICK / 'thumbnails'"
+    [show] = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'show_quick_results']
+    source = ast.unparse(show)
+    # no marks, copying or export: those belong to the profiles (marks.json)
+    for name in ('load_marks', 'set_mark', 'show_copy', 'show_export', 'THUMBS /'):
+        assert name not in source.replace('QUICK_THUMBS /', '')
