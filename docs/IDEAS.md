@@ -319,6 +319,7 @@ unreviewed, OneDrive, cloud, placeholder, offline, port, 8501, instance, shortcu
 desktop, Start menu). Closest existing items are named where they touch an idea.
 
 ### 1. Show which search text matched a result
+Disposition: take over → F17; roadmap P25 (B) (2026-11-12)
 - **Problem:** a profile with the generated templates and several custom search texts
   ranks a photo high, but the card only shows the raw text and image similarity. Users
   cannot tell which of their texts did the work, so they keep texts that never help or
@@ -341,6 +342,7 @@ desktop, Start menu). Closest existing items are named where they touch an idea.
   (check the format-version rule of A25).
 
 ### 2. Analyze photos ahead of time, without a search
+Disposition: take over → F18; roadmap P26 (2026-11-12)
 - **Problem:** the slow part of a first search is the analysis (hours on a CPU for a big
   folder), and it only starts once the profiles are ready. Users would like to let the
   PC prepare a new folder overnight and write their profiles later; F10 (quick search)
@@ -362,6 +364,7 @@ desktop, Start menu). Closest existing items are named where they touch an idea.
 - **Hold point:** CLI option is additive (not breaking); no schema or cache change.
 
 ### 3. One-photo review mode with a large preview
+Disposition: take over → F19; tag decision, after F24 (2026-11-12)
 - **Problem:** marking matches (A17) happens on small gallery thumbnails. For subtle
   motifs or group photos the user opens each original with "Open" to decide, which is
   slow for a few hundred results.
@@ -382,6 +385,7 @@ desktop, Start menu). Closest existing items are named where they touch an idea.
   keyboard component would be a new dependency.
 
 ### 4. Review progress per profile and "jump to the first unmarked photo"
+Disposition: take over → F20; roadmap P25 (A) (2026-11-12)
 - **Problem:** after marking part of a long result list, users lose their place: the
   gallery always opens on page 1 and does not say how much of the list has been reviewed.
 - **Solution sketch:** a caption per profile in the results view: "Top 150: 32 match,
@@ -395,6 +399,7 @@ desktop, Start menu). Closest existing items are named where they touch an idea.
 - **Hold point:** no.
 
 ### 5. Warn about cloud-only photos before a search
+Disposition: take over → F21; parked: default open, needs real OneDrive (2026-11-12)
 - **Problem:** a photo folder inside OneDrive (or another sync client with files on
   demand) can hold thousands of online-only placeholders. Reading them for the analysis
   makes Windows download every file: the search is slow, uses the internet connection,
@@ -418,6 +423,7 @@ desktop, Start menu). Closest existing items are named where they touch an idea.
   or skip) is a product decision; real-world behavior needs the user's hardware.
 
 ### 6. Start: handle a busy port and an already running app
+Disposition: take over → F22; roadmap P27 (2026-11-12)
 - **Problem:** `Start-FrameScout.bat` always uses port 8501. If another program uses it,
   or FrameScout already runs in a forgotten window, Streamlit stops with "Port 8501 is
   already in use" and users do not know what to do; a second instance of the same folder
@@ -438,6 +444,7 @@ desktop, Start menu). Closest existing items are named where they touch an idea.
 - **Hold point:** no (no new dependency, no schema change).
 
 ### 7. Optional desktop and Start menu shortcut, removed by the uninstaller
+Disposition: take over → F23; parked: first file outside the project folder (2026-11-12)
 - **Problem:** users start FrameScout by finding the project folder and double-clicking
   a `.bat` file, which is easy to lose and looks unlike a normal Windows application.
 - **Solution sketch:** at the end of `Install-FrameScout.bat`, ask "Create a desktop
@@ -461,6 +468,7 @@ desktop, Start menu). Closest existing items are named where they touch an idea.
 Single idea added by hand (no brainstorming run); not checked against the earlier ideas.
 
 ### 1. UI/UX overall review
+Disposition: take over → F24; roadmap P28 (2026-11-12)
 - **Problem:** the results page has become overloaded and hard to navigate through new
   features (marks, quick search, "Find similar", several views). The application should
   be simple and well navigable.

@@ -161,3 +161,23 @@ decision in PR #14):
 
 ### P17 – Repository layout (added 2026-11-03)
 - [x] Scoring module outside the package (I30) (done 2026-11-05 in PR #79)
+
+### P18 – Repository layout, step 2 (added 2026-11-06)
+- [x] Group the loose root files into `requirements/`, `assets/` and `docs/`, update every
+      path in installer, CI, tests, skills and docs (I31; kind `code-risky`)
+
+### P19 – Hygiene (`minor` items bundled per area, added 2026-11-06)
+- [x] (A) Engine: E53, E54, E56, E57
+- [x] (B) App: A44, F16
+- [x] (C) Installer: I34, I35, I36 (kind `code-risky`)
+
+### P20 – Cache variables (added 2026-11-06)
+- [x] The app and the CLI honour cache variables the user set; the engine sets its defaults
+      in `main()`, not on import; a `yolo11n.pt` in the working folder wins (E41, E42, A36;
+      kind `code-risky`)
+
+### P21 – Quick search (added 2026-11-06)
+- [x] Quick search over the analyzed photos without a profile, result in `results/quick/` (F10)
+
+### P22 – Find similar (added 2026-11-06)
+- [x] "Find similar" from a result card, builds on P21 (F11)

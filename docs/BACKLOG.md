@@ -173,7 +173,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       image:** pillow-heif swallows its decoding error under `LOAD_TRUNCATED_IMAGES` and leaves
       the image blank. `open_image` could always decode HEIF strictly, so such a photo fails with
       an error instead. Found in E53 (PR #84).
-- [ ] `decision` **E60 – The feature cache signature names the detector weights only by the name
+- [ ] `ready` **E60 – The feature cache signature names the detector weights only by the name
       given:** `feature_signature` records `--yolo-model` as given (`yolo11n.pt`), not which file
       `yolo_weights` loaded. Since E41 a `yolo11n.pt` in the working folder of a manual run wins
       over the cached official weights, so a run with fine-tuned weights of the same name reuses
@@ -183,7 +183,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       has the same problem. Question: log which file was loaded (cheap, no cache change), or put
       the resolved path or a hash of non-cache weights into the signature (cache invalidation
       for those runs: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched until
-      decided). Review of PR #89, finding 3.
+      decided). Decided 2026-11-12: only log which file was loaded (roadmap P29); the
+      signature variant stays open as a hold point. Review of PR #89, finding 3.
 - [ ] `minor` **E61 – The quick search counts a JPEG/HEIC partner as "not analyzed", and the app's count can differ:**
       a quick search counts a JPEG/HEIC partner whose other partner of the shot is analyzed as
       "not analyzed", although a full search would not analyze it either; and the app's count
@@ -430,3 +431,68 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
       may show people (say so in the guide). **Question:** the contents of the new bundle format
       (no `profiles.json` schema change). Size M.
+- [ ] `ready` **F17 – Show which search text matched a result:** a card shows only the raw text
+      and image similarity, so users cannot tell which of their texts did the work. Sketch:
+      `framescout_scoring` already computes the best cosine per query; also return the index of
+      the winning query. The card caption names it ("best text: '…'"), and the results view gets
+      a per-profile summary of how many top photos each text won. No ranking change. Affected:
+      `framescout_scoring`, `framescout_engine.py`, `framescout_core` (optional `best_query` in
+      `results.json`, check the format-version rule of A25), `app.py`, HTML gallery, user guide,
+      `docs/ARCHITECTURE.md`. Risks: a text can win by a tiny margin, so the wording must not
+      suggest the other texts "failed"; older results show nothing. Size S–M. Roadmap P25 (B).
+- [ ] `ready` **F18 – Analyze photos ahead of time, without a search:** the analysis is the slow
+      part; users would like to prepare a folder overnight (and F10 only searches analyzed
+      photos). Sketch: an "Analyze photos now" button and an engine option `--analyze-only`
+      that scans and analyzes with the current model and detection setting, fills the cache
+      and stops before scoring and export; normal run lock, status file, stop button, F4.
+      Affected: `framescout_engine.py`, `framescout_core`, `app.py`, user guide,
+      `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`. Risks: a run without `results.json` must
+      not look like a failed search; the analysis only helps for the model and detection setting
+      chosen then. Additive CLI option. Size S–M. Roadmap P26.
+- [ ] `decision` **F19 – One-photo review mode with a large preview:** marking (A17) happens on
+      small thumbnails. Sketch: a "Review" toggle shows one result at a time with a large preview
+      (decoded downscaled in memory), the best crop outlined if the result has the data, score
+      lines and buttons "Match", "No match", "Skip", saving through `save_marks`. Keyboard keys
+      only without a new dependency. Affected: `app.py`, `framescout_images.py`,
+      `framescout_core`, user guide. Risks: decoding large RAW/HEIC on every rerun is slow
+      (cache the preview per path and mtime). **Question:** where the mode lives, keyboard
+      support; decide after the UI/UX review (F24). Size M.
+- [ ] `ready` **F20 – Review progress per profile and "jump to the first open photo":** after
+      marking part of a long list users lose their place. Sketch: a caption per profile ("Top
+      150: 32 match, 41 no match, 77 open; first open photo at rank 74") and a button that opens
+      the page holding that rank; read-only over `results.json` and `marks.json`. Affected:
+      `framescout_core` (count and first-open helper), `app.py`, user guide. Risks: "Hide photos
+      marked as no match" (A24) changes which page holds a rank; use the gallery's page
+      computation. Size S. Roadmap P25 (A).
+- [ ] `parked` **F21 – Warn about cloud-only photos before a search:** photos in OneDrive-style
+      folders with files on demand are downloaded when read. Sketch: flag files with
+      `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`/`FILE_ATTRIBUTE_OFFLINE` during the scan, show a
+      count in the photo source tab and offer "Skip cloud-only photos" (`--skip-cloud-only`).
+      Affected: `framescout_core`, `framescout_engine.py`, `app.py`, `settings.json`, user
+      guide. Parked 2026-11-12: the default (warn or skip) is open and the behavior needs a
+      real OneDrive folder. Size S–M.
+- [ ] `ready` **F22 – Start: handle a busy port and an already running app:** the start script
+      always uses port 8501; a busy port or a forgotten second window gives a bare Streamlit
+      error. Sketch: before starting, a standard-library check; if this folder's FrameScout
+      answers (e.g. `results/app-instance.json` with PID and port, stale files ignored), open
+      the browser on it; if another program holds the port, use the next free one of
+      8502–8510; only ever `127.0.0.1`. Affected: `Start-FrameScout.bat`, a small tested
+      helper, `app.py`, `framescout_core.NEVER_DELETED`/cleanup patterns, user guide,
+      `docs/ARCHITECTURE.md`. Risks: PID reuse on Windows (also compare the process start
+      time or the port). Size S–M. Roadmap P27.
+- [ ] `parked` **F23 – Optional desktop and Start menu shortcut, removed by the uninstaller:**
+      the installer would ask and create a `.lnk` to `Start-FrameScout.bat` (PowerShell
+      `WScript.Shell`), record its path, and `framescout_uninstall.py` removes exactly that
+      one; `framescout_check.py` reports a broken one. Affected: `Install-FrameScout.bat`,
+      `framescout_uninstall.py`, `framescout_check.py`, `assets/`, README, user guide,
+      `docs/ARCHITECTURE.md`. Parked 2026-11-12: it would be the first file written outside
+      the project folder. Risks: redirected desktops need
+      `[Environment]::GetFolderPath('Desktop')`. Size S.
+- [ ] `ready` **F24 – UI/UX overall review:** the results page is overloaded by marks, quick
+      search, "Find similar" and several views. Task: assess the whole interface once (information
+      hierarchy, actions per card, tabs or sections, consistency of the app and the HTML
+      gallery; check for design skills, e.g. via `find-skills`) and write the findings into
+      `docs/` as a proposal; no rebuild. Rebuild PRs and F19 are decided afterwards. Affected:
+      a new document under `docs/`, backlog items for the follow-ups. Risks: a later redesign
+      touches many screens; keep the settings/state keys and general-purpose wording working.
+      Size S (`docs`). Roadmap P28.
