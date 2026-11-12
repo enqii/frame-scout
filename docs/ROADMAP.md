@@ -34,7 +34,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       kind `code-risky`)
 
 ### P21 – Quick search (added 2026-11-06)
-- [ ] Quick search over the analyzed photos without a profile, result in `results/quick/` (F10)
+- [x] Quick search over the analyzed photos without a profile, result in `results/quick/` (F10)
 
 ### P22 – Find similar (added 2026-11-06)
 - [ ] "Find similar" from a result card, builds on P21 (F11)
