@@ -57,7 +57,7 @@ from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
     DEFAULT_REFERENCE_WEIGHT, AI_SETTINGS, SETTINGS_LOCK_TIMEOUT, LEGACY_PHOTO_FOLDER, default_settings, folder_lines,
     read_settings, save_settings, reconcile_settings, changed_from_defaults, setting_text, engine_command)
 from .quick import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, quick_profile, quick_photos, quick_scope_text,
-    quick_note, quick_folders_differ, like_profile, like_crop, like_labels_fit)
+    quick_note, quick_folders_differ, like_profile, like_crop, like_labels_fit, like_scan_path)
 from .results import (RESULTS_FILE, RESULTS_FORMAT, GALLERY_PAGE_SIZE, search_fingerprint,
     profile_fingerprints, profile_state, result_card, results_document, publish_export,
     read_results, page_count, page_cards, openable_photo, open_command, reveal_command)

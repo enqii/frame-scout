@@ -41,7 +41,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
                              store_group, supported_extensions, write_scores, lower_priority, torch_threads,
                              QUICK_DIR, QUICK_GALLERY, RESULTS_FILE, quick_note, quick_photos, quick_profile,
-                             like_crop, like_labels_fit, like_profile)
+                             like_crop, like_labels_fit, like_profile, like_scan_path)
 
 # torch reads the cache variables only when it uses them; huggingface_hub and Ultralytics,
 # which read them on import, are imported in main() after default_cache_env (E42)
@@ -286,7 +286,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
         if like and args.scores_file:
             # its scores are image similarities, not the text scores the evaluation reads
             parser.error('--scores-file is not available with --like.')
-        like_photo = Path(os.path.abspath(args.like)) if like else None  # as the scan names it, links not resolved
+        like_photo = Path(os.path.abspath(args.like)) if like else None  # mapped to the scan's path below
         like_part = FULL_IMAGE_LABEL if args.like_part is None else args.like_part
         if like and not like_photo.is_file():
             parser.error(f'Photo not found: {like_photo}')
@@ -312,6 +312,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
     paths = scan.paths
     # the RAW file of a JPEG/HEIC partner that cannot be decoded is analyzed instead (E30)
     raw_fallback = RawFallback(scan)
+    if like:
+        # the cache row and the shot of "Find similar"'s photo are found by the path the scan
+        # names it by, also if it was given by another one to the same file (review)
+        like_photo = like_scan_path(like_photo, [*paths, *scan.raw_pairs])
+        profiles = [like_profile(like_photo, like_part)]
     # files that are not analyzed are named, not skipped without a note (E25); a missing
     # decoder is named only if the folder has files of it (review)
     for line in skipped_lines(scan, DECODERS):
