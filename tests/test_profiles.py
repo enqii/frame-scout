@@ -51,6 +51,16 @@ def test_query_labels_name_the_queries_in_scoring_order(tmp_path):
     assert query_labels(like_profile('/photos/a.jpg', 'Full image')) == []
 
 
+def test_query_labels_show_custom_texts_without_stray_white_space(tmp_path):
+    # review: a custom text is used as written, but its name on a card has no line break
+    # or padding inside the quotes
+    path = write_profiles(tmp_path, {'profiles': [{
+        'name': 'Red car', 'prompts': ['  a red\n sports   car \n', 'a car in the snow']}]})
+    [profile] = load_profiles(path, [])
+    assert profile['prompts'][-2] == '  a red\n sports   car \n'
+    assert query_labels(profile) == ['motif "Red car"', '"a red sports car"', '"a car in the snow"']
+
+
 def test_name_is_stripped(tmp_path):
     path = write_profiles(tmp_path, {'profiles': [{'name': '  Red car  ', 'franchise': '  '}]})
     [profile] = load_profiles(path, [])
