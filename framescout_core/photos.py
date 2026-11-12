@@ -30,8 +30,8 @@ SKIPPED_EXTENSIONS_SHOWN = 5
 # link, searched once (A37; both 0 by default); stats: {path: (mtime_ns, size)} of the paths
 # and raw_pairs as the scan saw them, which the app compares with the cache rows (A44, E61
 # review; empty by default: a photo without one is looked at when needed). The default is a
-# plain dict, so that a scan
-# can be pickled and copied (review); it is shared, so the stats of a scan are never changed
+# plain dict, so that a scan can be pickled and copied (review); it is shared, so the stats
+# of a scan are never changed
 PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported found_again folders_again stats',
                                    defaults=(0, 0, {}))
 
