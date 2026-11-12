@@ -72,7 +72,7 @@ Check the rows top to bottom; the first match decides.
 | PR labeled `fs:in-progress`, otherwise | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
 | PR labeled `fs:needs-review` | Spawn a fresh **reviewer**. If its report says "not posted" / "nothing posted", or the label is still `fs:needs-review` after it ended, apply "Review posting check" below; never spawn a second reviewer. |
 | PR labeled `fs:review-done` | First check that the findings are on the PR ("Review posting check" below). Then spawn a **fresh** implementer (mode `address-review`) for all unanswered review comments; never continue the previous implementer with `SendMessage` (I17). Afterwards the PR goes to `fs:ready`: there is **no second review round**. |
-| PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>` for the head commit `headRefOid`, open risks) and **wait for explicit merge approval**. Base the report on the implementer's final report and `gh pr view <n> --json title,body,headRefOid`; do not read the diff or comment threads yourself. |
+| PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>` for the head commit `headRefOid`, open risks) and **wait for explicit merge approval**. Base the report on the implementer's final report and `gh pr view <n> --json title,body,headRefOid`; do not read the diff or comment threads yourself. Before reporting, run the worktree cleanup (section 4) so that no agent worktree holds the PR branch, and end the report with the commands for the user's manual test in the main checkout: `git fetch origin`, `git switch <branch>`, and `git switch main` again before the merge (I38). |
 
 An open PR without any `fs:*` label is not a roadmap PR; mention it but do not act on it.
 
@@ -168,6 +168,10 @@ For every worktree under `.claude/worktrees/` (`git worktree list`):
 2. Then delete leftover `worktree-agent-*` branches without a worktree with
    `git branch -d <branch>` when `git log --oneline origin/main..<branch>` is empty.
 3. Uncommitted or unpushed work is never removed: first row of the state machine (report).
+
+If `git worktree remove` refuses only because of ignored files (`.tmp/` smoke data), check
+that `git -C <path> status --porcelain --ignored` lists nothing but `.tmp/`; then delete that
+folder and remove the worktree without `--force`. Any other ignored or untracked file: report.
 
 `git worktree unlock/remove/prune`, `git branch -d` and `git branch -D` (not on `main`) are
 pre-approved in `.claude/settings.json` (I27); forced removals (`-f`/`--force`) still ask.

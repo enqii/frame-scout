@@ -38,7 +38,17 @@ nothing, by you as below) and the label change.
    `Finding <n> – <file>:<line>` (`gh pr comment {PR} --body-file <file>`).
    Never run `/code-review` or `claude -p` a second time for the PR (one review round). If
    there are no findings, say so in a PR comment.
-3. Only after the findings (or the "no findings" comment) are on the PR, swap the state label:
+3. Prove the posting before the label swap (I37). Write down your list of findings (N), then
+   count what is on the PR *now* (inline: `gh api repos/enqii/frame-scout/pulls/{PR}/comments --jq length`;
+   general: `gh pr view {PR} --json comments --jq '.comments | length'`) and subtract the counts
+   from before step 1: the new comments must cover all N findings (one per finding, or one
+   "no findings" comment). Also check `gh api repos/enqii/frame-scout/pulls/{PR}/reviews --jq '.[] | {id, state, body}'`:
+   a review with an empty body and no inline comments (left behind by a failed post) must not
+   remain; if one does, report it to the orchestrator. If a finding is missing, repost it now
+   (a refused inline post is reposted at once as a general `Finding <n> – <file>:<line>`
+   comment, see step 2) and count again. Never swap the label while the count does not match,
+   and never report a finding as posted that you did not see on the PR.
+   Then swap the state label:
    `gh pr edit {PR} --remove-label fs:needs-review --add-label fs:review-done`
    (if `gh` is not on `PATH`, use the path given in `CLAUDE.md` → "Git and commits").
 4. Return a short summary to the orchestrator: number of findings by severity, one line

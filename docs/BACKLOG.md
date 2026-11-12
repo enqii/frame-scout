@@ -283,29 +283,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (kept outside the repo; not in CI).
       Open: tests for cache signature/reuse and scoring; tests of `app.py` itself (e.g.
       Streamlit's `AppTest`, which needs Streamlit in CI); a smoke test with real models.)
-- [ ] `ready` **I37 – The reviewer must verify that its findings are on the PR before swapping the label:**
-      in PR #86 the reviewer reported its medium finding as posted, but it was missing from
-      the PR; the label had already been swapped to `fs:review-done` and an empty-bodied
-      review had been left behind. An inline post failed with HTTP 422 and was not retried
-      as a general comment. Proposed change in `.claude/skills/roadmap/reviewer-brief.md`:
-      the reviewer sets `fs:review-done` only after the number of comments on the PR
-      (inline + general) provably matches its list of findings; an inline post that fails
-      with HTTP 422 is reposted immediately as a general `Finding <n> – <file>:<line>`
-      comment; an empty-bodied review must not be left behind (check
-      `gh api repos/enqii/frame-scout/pulls/<n>/reviews`). Effort S. Found in the retro of
-      PR #86.
-- [ ] `ready` **I38 – Agent worktrees block the user's manual test and need forced removal (workflow):**
-      observed in the roadmap run of PR #91 (2026-11-12): (1) while an implementer's
-      worktree holds the PR branch, the user cannot `git switch` to it in the main checkout
-      ("already used by worktree") to test manually; (2) removing a finished agent's
-      worktree sometimes needs `--force` (which asks for approval), presumably because
-      gitignored smoke data under `.tmp/` is left in it (guess, not verified). Sketch: the
-      implementer deletes its own `.tmp/` smoke data before returning; the `/roadmap` skill
-      removes the agent's worktree (section 4 cleanup) before the PR reaches `fs:ready` and
-      its report to the user names the commands to check the branch out in the main
-      checkout (`git fetch origin`, `git switch <branch>`, back with `git switch main`
-      before the merge). Affected: `.claude/skills/roadmap/SKILL.md`,
-      `.claude/skills/roadmap/implementer-brief.md`. Effort S.
 - [ ] `decision` **I9 – CI action pins are updated by hand only:** `.github/workflows/tests.yml`
       pins `actions/checkout` and `actions/setup-python` to commit SHAs (with a version
       comment). That avoids moved tags, but security and runtime updates
