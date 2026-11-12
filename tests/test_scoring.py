@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from framescout_scoring import (MIN_SCORES, Match, best_queries, best_scores, photo_scores, rank_photos, rank_similar, score_caption,
+from framescout_scoring import (MIN_SCORES, Match, best_matches, best_scores, photo_scores, rank_photos, rank_similar, score_caption,
                                 spread, text_queries)
 
 
@@ -188,12 +188,17 @@ def test_photo_scores_give_every_profile_its_crop_scores():
     assert best['Dog'].tolist() == [0, 1, 0] and best['Cat'].tolist() == [0, 0, 0]
 
 
-def test_best_queries_name_the_query_of_the_best_score():
+def test_best_matches_name_the_query_of_the_best_score():
     crops = unit([1, 0], [0, 1], [1, .9])
     queries = unit([1, 1], [1, 0], [0, 1])
-    assert best_queries(crops, queries).tolist() == [1, 2, 0]
-    np.testing.assert_allclose(best_scores(crops, queries),
-                               (crops @ queries.T)[np.arange(3), best_queries(crops, queries)], rtol=1e-6)
+    scores, indices = best_matches(crops, queries)
+    assert indices.tolist() == [1, 2, 0]
+    np.testing.assert_allclose(scores, (crops @ queries.T)[np.arange(3), indices], rtol=1e-6)
+    np.testing.assert_allclose(best_scores(crops, queries), scores, rtol=1e-6)
+    # the text scores and best queries of photo_scores are the same (review: one source)
+    text, _, best = photo_scores(crops, ['Full image', 'Person 1', 'Person 2'], {'P': (queries, None)})
+    np.testing.assert_allclose(text['P'], scores, rtol=1e-6)
+    assert best['P'].tolist() == indices.tolist()
 
 
 BEST = [np.arange(len(t)) % 2 for t in TEXT]

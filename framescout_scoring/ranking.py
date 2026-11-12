@@ -51,17 +51,19 @@ def text_queries(prompt_vectors, generated):
     return np.concatenate([ensemble, vectors[generated:]])
 
 
+def best_matches(features, queries):
+    """Best cosine similarity of each crop (row of features) with one of the queries, and that query's index (F17).
+
+    Returns (scores, indices), both from one similarity matrix; an exact tie names the
+    first of the tied queries.
+    """
+    similarity = features @ queries.T
+    return similarity.max(axis=1), similarity.argmax(axis=1)
+
+
 def best_scores(features, queries):
     """Best cosine similarity of each crop (row of features) with one of the queries."""
-    return (features @ queries.T).max(axis=1)
-
-
-def best_queries(features, queries):
-    """Index of the query each crop (row of features) is most similar to, the one best_scores takes (F17).
-
-    An exact tie names the first of the tied queries.
-    """
-    return (features @ queries.T).argmax(axis=1)
+    return best_matches(features, queries)[0]
 
 
 def photo_scores(features, labels, profile_vectors):
@@ -70,15 +72,15 @@ def photo_scores(features, labels, profile_vectors):
     features: the photo's normalized crop vectors; labels: its crop labels;
     profile_vectors: {name: (queries, reference vectors or None)}. Returns (text, visual,
     best): {name: scores per crop}, visual only for profiles with reference images, best
-    the index of each crop's best query (best_queries, F17). Raises
+    the index of each crop's best query (best_matches, F17). Raises
     ValueError for a broken cache row (labels and vectors do not match, no crop, scores
     that are not finite); the engine skips such a photo, so it cannot break a search.
     """
     if len(labels) != len(features) or not len(features):
         raise ValueError(f'{len(labels)} crop labels for {len(features)} feature vectors')
-    similarity = {name: features @ queries.T for name, (queries, _) in profile_vectors.items()}
-    text = {name: values.max(axis=1) for name, values in similarity.items()}
-    best = {name: values.argmax(axis=1) for name, values in similarity.items()}
+    text, best = {}, {}
+    for name, (queries, _) in profile_vectors.items():
+        text[name], best[name] = best_matches(features, queries)
     visual = {name: best_scores(features, refs) for name, (_, refs) in profile_vectors.items() if refs is not None}
     if not all(np.isfinite(scores).all() for scores in (*text.values(), *visual.values())):
         raise ValueError('the cached feature vectors give scores that are not finite')
