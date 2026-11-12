@@ -71,23 +71,23 @@ def quick_photos(paths, fallbacks, analyzed, exclude=None):
     a row it cannot read as none), asked once per photo. A partner of a shot whose other
     partner is analyzed counts as not analyzed, although a full search would not analyze it
     either (E61). exclude: the photo of "Find similar" (F11): neither it nor another photo
-    of its shot is scored or counted as not analyzed.
+    of its shot (its RAW file and every partner of that RAW file, whichever of them it is
+    and whether they have rows of their own, review) is scored or counted as not analyzed.
     """
+    shot_raw = exclude if exclude in fallbacks.values() else fallbacks.get(exclude)
+    skip = {exclude} | {path for path, raw in fallbacks.items() if shot_raw is not None and raw == shot_raw}
+    paths = [path for path in paths if path not in skip]
     rows = {path: analyzed(path) for path in paths}
     # the RAW files of shots with an analyzed partner: never shown in addition to it (review)
-    used = {fallbacks[path] for path in paths if (rows[path] or path == exclude) and path in fallbacks}
+    used = {fallbacks[path] for path in paths if rows[path] and path in fallbacks}
     chosen, missing = [], []
     for path in paths:
-        if path == exclude:
-            continue
         if rows[path]:
             chosen.append(path)
             continue
         raw = fallbacks.get(path)
         if raw is not None and raw not in used:
             used.add(raw)  # asked once per shot
-            if raw == exclude:
-                continue  # its shot is the photo of "Find similar"
             if analyzed(raw):
                 chosen.append(raw)
                 continue
