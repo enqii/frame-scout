@@ -28,7 +28,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       partners and the app's count consistently (E59, E61; done 2026-11-12, PR #96)
 
 ### P25 – Results view (added 2026-11-12)
-- [ ] (A) Review progress per profile and "jump to the first open photo" (F20)
+- [x] (A) Review progress per profile and "jump to the first open photo" (F20; done
+      2026-11-12, PR #98)
 - [ ] (B) Show which search text matched a result (F17; kind `code-risky`)
 
 ### P26 – Analyze ahead (added 2026-11-12)

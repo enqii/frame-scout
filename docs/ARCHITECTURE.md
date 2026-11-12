@@ -299,7 +299,7 @@ the module of its area and to the re-exports in `__init__.py`.
   (the result file of a search and the app's gallery: validation of the file (plain
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12).
-- `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`marks_restore_offer`/`hide_no_match`/`hidden_text`/`mark_style`
+- `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`marks_restore_offer`/`hide_no_match`/`hidden_text`/`mark_style`/`ReviewProgress`/`review_progress`/`progress_text`
   (the user's marks, A17; every change goes through `_common._update_locked(..., backup=True)`
   (private `_update_marks`), which first copies the previous, validly read file byte for byte to
   `marks.json.bak` (F1); `marks_backup(path)` names the backup, `restore_marks` keeps a damaged
@@ -313,7 +313,12 @@ the module of its area and to the re-exports in `__init__.py`.
   `hide_no_match(cards, marks)` returns the cards not marked as no match and how many it
   left out, applied to the cards of one gallery page, and `hidden_text` the caption of that
   count; `mark_style(states)` the `<style>` block of the gallery's mark colors `MARK_COLORS`,
-  checked against Streamlit `MARK_STYLE_STREAMLIT`; A24).
+  checked against Streamlit `MARK_STYLE_STREAMLIT`; A24;
+  `review_progress(cards, marks, size)` returns a `ReviewProgress` (`matches`, `no_matches`,
+  `open`, `first_open_rank`, `first_open_page`) over the whole ranked list: states other than
+  match/no match count as open, the list order (not the rank numbers) decides which photo is
+  first, `size` is the page size; `progress_text(progress, paged)` is the caption and names the
+  page only when `paged`; F20).
 - `copying.py`:
   `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`/`forget_copy_folder`
   (copying marked matches and their saved target folders in `settings.json`, A17;
@@ -1395,7 +1400,12 @@ card is an `st.segmented_control` whose session state is set from the file befor
 drawn on every run of the gallery fragment (no `default=`), so the file is the truth also
 for other tabs; its `on_change` saves. The gallery paginates the whole ranked list and
 "Hide photos marked as no match" (`hide_no_match`) then hides the rejects within the shown
-page only, so ranks and pages stay stable (A24; a page of only rejects says so). The
+page only, so ranks and pages stay stable (A24; a page of only rejects says so). F20: above the
+page box (only where `can_mark`: `marks.json` readable and the profile still a search profile) a
+caption from `progress_text(review_progress(...))` shows the counts and the first undecided photo,
+and with more than one page the button "Go to the first undecided photo" sets the page box through
+the callback `go_to_page` (disabled while that page is shown); read-only, and the page follows
+`page_cards` (an undecided photo is never hidden by `hide_no_match`). The
 selected option is colored by state (green match, red no match) by one `<style>` block per
 page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]`
 with `!important`; this relies on Streamlit internals (the key class and the button kind,
@@ -1895,7 +1905,7 @@ listed folder, repeated file ids, link loops without file ids and an unreadable 
 A29, `test_photos.py`), the counts of photos and folders found again (A37), the backup rewrite under the lock (A32, `test_reference_move.py`, `test_profile_file.py` with `profiles_changed_notice`, A31) and `downloaded_models` (A39, `test_disk_space.py`, `test_models.py`; the app side of A31/A39 was not run), the installation self-test (F15, `test_install_check.py`: environment cases from `pyvenv.cfg`, pins and requirements with fake metadata, the torch probe with a fake subprocess (CPU, CUDA without a GPU, timeout, crash), writability and disk space with fake folders and usage, the combined result and its "not checked" cases; not run: the CUDA branch on a real GPU and `Check-FrameScout.bat` by double-click), the time estimate (F12: `AnalysisRate` window and thresholds, `duration_text` rounding, `remaining_text` (also its stale-status cut-off), throughput records with `run_throughput` (a short run keeps a longer run's record) and `start_summary` (also without photos) in `test_estimate.py`; the carry-over of `throughput` between status files in `test_run_status.py`; the run tab summary was checked with Streamlit `AppTest` only, the engine side and the live "time left" are not runtime-tested),
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
-hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the
+hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the review progress `review_progress`/`progress_text` (F20; the app side was run with `AppTest` only), the
 CSS of `mark_style` and its Streamlit pin, `marks_restore_offer`, `remove_marks(unless_profile_of=)`, `test_marks.py`; the cleanup categories `marks_profiles` and `broken_files`, `test_cleanup.py`; `unlisted_paths`, `test_export.py`) and the AI settings reset
 (`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
 `test_settings.py`; A24, A26; the buttons and the mark colors were run with `AppTest`/the
