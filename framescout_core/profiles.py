@@ -50,10 +50,11 @@ def query_labels(profile):
 
     profile: a profile of load_profiles (or quick_profile). The generated texts are
     averaged into one query (E4), named after the search motif ('motif "Red car"'); each
-    custom text is a query of its own, named in quotes. [] for a profile without texts
-    ("Find similar", F11).
+    custom text is a query of its own, named in quotes with its white space joined to single
+    spaces (the query itself uses the text as written, review). [] for a profile without
+    texts ("Find similar", F11).
     """
-    custom = [f'"{prompt}"' for prompt in profile['prompts'][profile['generated']:]]
+    custom = [f'"{" ".join(prompt.split())}"' for prompt in profile['prompts'][profile['generated']:]]
     return ([f'motif "{profile["name"]}"'] if profile['generated'] else []) + custom
 
 
