@@ -44,7 +44,8 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              remembered_scans, save_profiles, save_settings, scan_cleanup,
                              size_text, skipped_lines, stage_reference_move, started_in_time, status_fraction,
                              status_text, stopped_status, supported_extensions, undo_reference_move,
-                             update_backup_references, write_new_file, write_status)
+                             update_backup_references, write_new_file, write_status,
+                             QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, engine_command, quick_note, quick_scope_text)
 
 BASE = Path(__file__).resolve().parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -59,6 +60,11 @@ STATUS = RESULTS / RUN_STATUS
 # what the galleries of the last search show (A12) and their thumbnails
 RESULTS_JSON = RESULTS / RESULTS_FILE
 THUMBS = RESULTS / 'thumbnails'
+# the last quick search (F10): its own gallery, result file and thumbnails, apart from the
+# profiles' galleries and marks
+QUICK = RESULTS / QUICK_DIR
+QUICK_JSON = QUICK / RESULTS_FILE
+QUICK_THUMBS = QUICK / 'thumbnails'
 # the user's marks of gallery photos (A17): user data, never deleted by FrameScout
 MARKS = RESULTS / MARKS_FILE
 # exported result lists (F5): user data, never deleted by FrameScout
@@ -397,6 +403,13 @@ def open_gallery(name):
 def open_results_folder():
     gallery_action(open_path, RESULTS if RESULTS.is_dir() else None, f'The results folder {RESULTS}')
 
+def open_quick_gallery():
+    page = QUICK / QUICK_GALLERY
+    gallery_action(open_path, page if page.is_file() else None, f'The gallery {page}')
+
+def open_quick_folder():
+    gallery_action(open_path, QUICK if QUICK.is_dir() else None, f'The quick search folder {QUICK}')
+
 @functools.lru_cache(maxsize=1)
 def pictures_folder():
     """Return the user's Pictures folder (also when Windows has moved it, e.g. to OneDrive)."""
@@ -689,7 +702,7 @@ def forget_profile(name, named):
         add_notice(f'The profile was deleted, but {problems} could not be removed: they still belong to the name '
                    f'"{name}" and would pass to a new profile of that name.')
 
-@st.cache_data(show_spinner=False, max_entries=2)
+@st.cache_data(show_spinner=False, max_entries=4)  # the profiles' and the quick search's (F10)
 def cached_results(path, mtime_ns, size):
     """read_results, read again only when the file changes (mtime_ns and size are the cache key)."""
     return read_results(Path(path))
@@ -709,11 +722,11 @@ def file_key(path):
     stat = Path(path).stat()
     return str(path), stat.st_mtime_ns, stat.st_size
 
-def load_results():
-    """Return (results of the last search or None, error or None) (A12)."""
+def load_results(path=RESULTS_JSON):
+    """Return (results of the last search or None, error or None) (A12); path: QUICK_JSON for the quick search (F10)."""
     try:
-        stat = RESULTS_JSON.stat()
-        return cached_results(str(RESULTS_JSON), stat.st_mtime_ns, stat.st_size), None
+        stat = path.stat()
+        return cached_results(str(path), stat.st_mtime_ns, stat.st_size), None
     except FileNotFoundError:
         return None, None
     except (OSError, ValueError) as exc:
@@ -862,6 +875,63 @@ def show_results(results, photo_folders):
                                          label_visibility='collapsed')
     show_copy(name, entry, marks, photo_folders, states[name] != 'missing')
     show_export(name, entry, marks, marks_error)
+
+@st.fragment
+def show_quick_results(results):
+    """The gallery of the last quick search (F10) as a grid of thumbnails; no marks, copying or export.
+
+    Its buttons rerun only this part, as in show_results.
+    """
+    entries = results['profiles']
+    if not entries:
+        st.caption('The last quick search wrote no gallery.')
+        return
+    entry = entries[0]
+    run_settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
+    model_key = results_model(run_settings)
+    result_model = MODELS.get(model_key) if model_key else None
+    st.caption(f"Quick search for \"{plain(entry['name'])}\" from {run_date(results)} · "
+               + (f'search model {plain(result_model.label)} · ' if result_model else '') +
+               f"{len(entry['cards']):,} photos (at most {run_settings.get('top', '?')}), best first. "
+               'A ranking by similarity, not a guaranteed identification.')
+    quick = results.get('quick') if isinstance(results.get('quick'), dict) else {}
+    searched, not_analyzed = quick.get('searched'), quick.get('not_analyzed')
+    if all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in (searched, not_analyzed)):
+        st.caption(quick_note(searched, not_analyzed))
+    if model_key != settings['model']:
+        made_with = f'the search model {plain(result_model.label)}' if result_model else 'another search model'
+        st.info(f'This quick search was made with {made_with}; the AI settings now choose '
+                f"{plain(MODELS[settings['model']].label)}.")
+    c1, c2 = st.columns(2)
+    c1.button('Open gallery in browser', on_click=open_quick_gallery, width='stretch', key='quick_open_gallery',
+              help=f'Opens {QUICK_GALLERY} from the folder {QUICK_DIR} in the results folder in your web browser.')
+    c2.button('Open quick search folder', on_click=open_quick_folder, width='stretch', key='quick_open_folder')
+    if st.session_state.get('gallery_notice'):
+        st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
+    pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
+    page = 1
+    if pages > 1:
+        if st.session_state.get('quick_page', 1) not in range(1, pages + 1):
+            st.session_state.pop('quick_page', None)  # a page of a longer list of an earlier quick search
+        page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key='quick_page')
+    shown = page_cards(entry['cards'], page, GALLERY_PAGE_SIZE)
+    # a new container for every page and card count, as in show_results
+    with st.container(key=f'quick_gallery_{page}_{len(shown)}'):
+        for start in range(0, len(shown), GALLERY_COLUMNS):
+            for column, card in zip(st.columns(GALLERY_COLUMNS), shown[start:start + GALLERY_COLUMNS]):
+                with column:
+                    thumb = QUICK_THUMBS / card['thumbnail']  # a plain file name, checked by read_results
+                    if thumb.is_file():
+                        st.image(str(thumb))
+                    else:
+                        st.caption('No thumbnail')
+                    st.markdown(f"**#{card['rank']}** · {plain(card['caption'])} · {plain(card['label'])}")
+                    st.caption(f"{plain(card['detail'])}  \n{plain(card['relative'])}")
+                    b1, b2 = st.columns(2)
+                    b1.button('Open', key=f"quick_open_{card['rank']}", on_click=open_photo, args=(card['path'],),
+                              width='stretch', help='Opens the photo in your image viewer.')
+                    b2.button('Folder', key=f"quick_reveal_{card['rank']}", on_click=show_photo,
+                              args=(card['path'],), width='stretch', help='Shows the photo in its folder.')
 
 def show_copy(name, entry, marks, photo_folders, profile_exists):
     """Copying the photos of profile name marked as match to a folder, below its gallery (A17).
@@ -1631,23 +1701,17 @@ with run_tab:
     with c2:
         # a cleanup holding the run lock is no search to stop (review)
         stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), width='stretch')
-    if start and settings_taken_over:
-        # the page showed other values until this click: never start with settings the
-        # user has not seen (review)
-        st.session_state.run_notice = ('The search was not started: another tab or window changed these settings '
-                                       'meanwhile: ' + ', '.join(settings_taken_over) + '. Check the settings '
-                                       'shown now and start again.')
-        st.rerun()
-    if start:
-        cmd = [sys.executable, '-u', str(BASE/'framescout_engine.py'), *map(str, search_folders),
-            '--profiles',str(PROFILES),'--output',str(RESULTS),'--device',st.session_state[setting_key('device')],
-            '--batch-size',str(settings['batch_size']),'--top',str(settings['top']),
-            '--max-persons',str(settings['max_persons']),'--person-confidence',str(settings['person_confidence']),
-            '--reference-weight',str(settings['reference_weight']),'--model',settings['model']]
-        if not settings['person_detection']:
-            cmd.append('--no-person-detection')
-        if settings['low_priority']:
-            cmd.append('--low-priority')  # the engine lowers its own priority (F4)
+    def start_engine(**search):
+        """Start the engine with the current settings: search is profiles=... or quick_query=... (F10)."""
+        if settings_taken_over:
+            # the page showed other values until this click: never start with settings the
+            # user has not seen (review)
+            st.session_state.run_notice = ('The search was not started: another tab or window changed these settings '
+                                           'meanwhile: ' + ', '.join(settings_taken_over) + '. Check the settings '
+                                           'shown now and start again.')
+            st.rerun()
+        cmd = engine_command(sys.executable, BASE / 'framescout_engine.py', search_folders, RESULTS, settings,
+                             st.session_state[setting_key('device')], **search)
         st.session_state.pop('cleanup_scan', None)  # the search changes what a cleanup finds (E7)
         st.session_state.pop('cache_check', None)  # and the cache a check looked at (F1)
         try:
@@ -1657,6 +1721,8 @@ with run_tab:
         # kept for the next page run: the state may have changed, which reruns the page
         st.session_state.run_notice = problem
         st.rerun()
+    if start:
+        start_engine(profiles=PROFILES)
     if stop:
         try:
             st.session_state.run_notice = stop_run()
@@ -1667,6 +1733,7 @@ with run_tab:
         st.warning(st.session_state.pop('run_notice'))
     if model_missing and not active:
         st.warning(model_missing)  # why Start is not available
+    analyzed = None  # the photos analyzed with these settings: counted only while no search runs
     if folder_scans and not active:
         try:
             cache_key = file_key(RESULTS / CACHE_FILE)
@@ -1740,6 +1807,37 @@ with run_tab:
             with st.expander('Live log', expanded=now_active):
                 st.code('\n'.join(lines[-35:]) or 'No output yet', language='text')
     show_status()
+    st.divider()
+    # F10: one search text over the photos already analyzed, without a profile and without
+    # analyzing; its result goes to results/quick/, the profiles' results and marks stay
+    st.subheader('Quick search')
+    st.caption('Try a search text without creating a search profile. Only the photos already analyzed with the '
+               'current AI settings are searched; nothing new is analyzed, so it is fast. Its result replaces the '
+               f'previous quick search (folder {QUICK_DIR} in the results folder); the results and marks of your '
+               'search profiles stay as they are. Search texts are in English.')
+    with st.form('quick_search', border=False):
+        c1, c2 = st.columns([4, 1], vertical_alignment='bottom')
+        c1.text_input('Search text (in English)', key='quick_query', max_chars=QUICK_QUERY_MAX, disabled=active,
+                      placeholder='e.g. a red car in the snow')
+        quick_start = c2.form_submit_button('Quick search', width='stretch',
+                                            disabled=active or not folder_scans or bool(model_missing)
+                                            or analyzed == 0)
+    if analyzed is not None:
+        st.caption(quick_scope_text(len(photo_scan.paths), analyzed))
+    if quick_start:
+        query = ' '.join(str(st.session_state.get('quick_query') or '').split())
+        if query:
+            start_engine(quick_query=query)
+        else:
+            st.warning('Type a search text first.')
+    quick_results, quick_error = load_results(QUICK_JSON)
+    if quick_error:
+        st.warning(f'The result file of the last quick search ({QUICK_DIR}/{RESULTS_FILE}) cannot be read, so its '
+                   f'results are not shown here. The next quick search writes it anew.\n\n'
+                   f'Details: {plain(str(quick_error))}')
+    if quick_results:
+        with st.expander('Results of the last quick search', expanded=True):
+            show_quick_results(quick_results)
     st.divider()
     st.subheader('Results')
     # the galleries of the last complete search, as the engine wrote them (A12)
