@@ -397,15 +397,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (`export_csv`), `app.py` (`show_export`), user guide, `tests/test_export.py`.
       **Question:** whether a second format is wanted at all, and which. Found in the review of
       F5 (PR #67). Size S.
-- [ ] `ready` **F11 – "Find similar" from a result card:** no way to ask for "more like this
-      one" short of copying the photo into a profile's references. Sketch: a button per card; the
-      engine ranks all cached photos by cosine similarity to that photo's cached embedding (full
-      image or the shown crop), no text, no new analysis, result like F10 (size S if F10 exists).
-      Closest item: A20 (changes profile scoring; this is a one-off query). Affected:
-      `framescout_engine.py` (`--like <path>`), `framescout_scoring.py` (rank by one vector),
-      `app.py`, user guide, `docs/ARCHITECTURE.md`. Risks: a photo with a cache row of another
-      signature has no usable vector (say so, never analyze silently); burst shots dominate the
-      top (see F7). **Question:** gallery UX; the CLI option is additive. Size M. **Decided 2026-11-06 (triage):** after F10, ROADMAP P22, kind `code`.
 - [ ] `decision` **F13 – Keep the previous search results:** every search replaces `results.json`
       and the galleries, so a worse result cannot be compared with the earlier ranking. Sketch:
       before `publish_export` replaces them, move the previous `results.json` and galleries to

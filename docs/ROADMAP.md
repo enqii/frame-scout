@@ -37,7 +37,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] Quick search over the analyzed photos without a profile, result in `results/quick/` (F10)
 
 ### P22 – Find similar (added 2026-11-06)
-- [ ] "Find similar" from a result card, builds on P21 (F11)
+- [x] "Find similar" from a result card, builds on P21 (F11)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
