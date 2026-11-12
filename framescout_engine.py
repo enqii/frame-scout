@@ -39,7 +39,8 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              prepare_cache, profile_slugs, progress_due, publish_export,
                              progress_line, result_card, results_document,
                              scan_folders, scores_document, search_fingerprint, size_text, skipped_lines,
-                             store_group, supported_extensions, write_scores, lower_priority, torch_threads)
+                             store_group, supported_extensions, write_scores, lower_priority, torch_threads,
+                             QUICK_DIR, QUICK_GALLERY, RESULTS_FILE, quick_note, quick_photos, quick_profile)
 
 # torch reads the cache variables only when it uses them; huggingface_hub and Ultralytics,
 # which read them on import, are imported in main() after default_cache_env (E42)
@@ -165,6 +166,12 @@ def main():
     parser.add_argument('--scores-file', type=Path, default=None, metavar='JSON',
                         help='also write the raw text and reference similarity of every part of every photo '
                              'to this JSON file (for the evaluation tool framescout_eval.py)')
+    # F10: the app's "Quick search"; instead of --profiles and --character
+    parser.add_argument('--quick-query', default=None, metavar='TEXT',
+                        help='quick search for this English text without a search profile: only the photos already '
+                             'analyzed with these settings are searched (nothing new is analyzed); the gallery and '
+                             f'its {RESULTS_FILE} go to the folder "{QUICK_DIR}" in the output folder, the results '
+                             'of the profiles stay as they are')
     # the folders may come before, between or after the options, as one folder could (review)
     args = parser.parse_intermixed_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):
@@ -248,10 +255,20 @@ def search(args, parser, roots, dropped, output, status, warnings):
     for root in missing:
         print(f'Photo folder not found, searched without it (e.g. a disconnected drive): {root}', flush=True)
     roots = [root for root in roots if root not in missing]
-    try:
-        profiles = load_profiles(args.profiles.resolve() if args.profiles else None, args.character)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
-        parser.error(str(exc))
+    # a quick search (F10) scores the photos already analyzed for one text, without profiles
+    quick = args.quick_query is not None
+    if quick:
+        if args.profiles or args.character:
+            parser.error('--quick-query searches without profiles: leave out --profiles and --character.')
+        try:
+            profiles = [quick_profile(args.quick_query)]
+        except ValueError as exc:
+            parser.error(str(exc))
+    else:
+        try:
+            profiles = load_profiles(args.profiles.resolve() if args.profiles else None, args.character)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            parser.error(str(exc))
     for p in profiles:
         for ref in p['refs']:
             if not ref.is_file():
@@ -286,7 +303,8 @@ def search(args, parser, roots, dropped, output, status, warnings):
         signature = prepare_cache(con, person_detection, args.max_persons, args.person_confidence,
                                   args.yolo_model, model=args.model)
         status.update('loading')
-        print(f'{len(paths)} photos; {len(profiles)} search profiles; search model: {search_model.label} '
+        what = f'quick search for "{profiles[0]["name"]}"' if quick else f'{len(profiles)} search profiles'
+        print(f'{len(paths)} photos; {what}; search model: {search_model.label} '
               f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
               f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
         print('Model weights are downloaded the first time a model is used.', flush=True)
@@ -486,75 +504,93 @@ def search(args, parser, roots, dropped, output, status, warnings):
     def store_failed(item, exc):
         failed(item[0], exc)
 
-    # thumbnails: what the galleries render at most, for the app's time left (F16)
-    status.update('analyzing', total=len(paths), thumbnails=gallery_thumbnails(len(paths), args.top, len(profiles)))
-    try:
-        todo = to_analyze(paths)
-        # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
-        # crops of several photos are embedded together, batch_size at a time (E2).
-        threads = DETECTION_DECODE_THREADS if person_detection else DECODE_THREADS
-        # enough photos ahead for the next group while CLIP embeds the current one (a group
-        # holds at most batch_size photos); finished photos wait as small preprocessed
-        # tensors, so memory grows with the batch size, not with the photo size (review)
-        ahead = max(2 * threads, args.batch_size + threads)
-        pool = ThreadPoolExecutor(threads)
-
-        def analyze(todo):
-            if not todo:
-                return
-            # loaded in this thread, before the decoding threads use it
-            loaded = detector.get()
-            for group in group_batches(prepared(todo, pool, ahead, loaded), args.batch_size,
-                                       size=lambda item: len(item[2])):
-                # after a failure the photos are stored one by one, so only a broken one fails;
-                # an error of the cache file itself stops the search at once: no photo could
-                # be stored (E50, review)
-                finished(new=store_group(group, store, store_failed, fatal=cache_error))
-
+    if quick:
+        # nothing is analyzed (F10): only the photos with a current cache row are scored, a
+        # partner without one through the RAW file a full search analyzed in its place (E30)
+        analyzed, not_analyzed = quick_photos(paths, raw_fallback.fallbacks, cached, cache_trouble)
+        print(f'Quick search: {len(analyzed)} of {len(paths)} photos are analyzed with these settings and searched'
+              + (f'; {len(not_analyzed)} are not analyzed and not searched (a search with profiles analyzes them).'
+                 if not_analyzed else '.'), flush=True)
+        if not analyzed:
+            con.close()
+            if unreadable:  # the cache file itself is damaged (E50)
+                raise next(iter(unreadable.values()))
+            parser.error('None of these photos is analyzed with these settings yet, so the quick search has nothing '
+                         'to search. Start a search with profiles first: it analyzes them.')
+    else:
+        # thumbnails: what the galleries render at most, for the app's time left (F16)
+        status.update('analyzing', total=len(paths), thumbnails=gallery_thumbnails(len(paths), args.top, len(profiles)))
         try:
-            analyze(todo)
-            # a JPEG/HEIC that failed is replaced by the RAW file of its shot, unless another
-            # photo of the shot was analyzed; the RAW file comes from the cache or is decoded
-            # in the decoding threads like any photo, and counts for the shot (E30, review)
-            chosen, lost = raw_fallback.choose(analyzed)
-            for _ in lost:
-                finished(failed=1)
-            for partner, raw in chosen.items():
-                print(f'{partner} could not be analyzed; analyzing its RAW file instead: {raw}', flush=True)
-            analyze(to_analyze(list(chosen.values())))
-            for partner, raw in chosen.items():
-                if analyzed(raw):
-                    raw_fallback.use(partner, raw)
-            # a truncated JPEG whose RAW file failed too is analyzed as far as its data goes,
-            # as any truncated photo is; it counts for the shot (E46). One that waited for the
-            # RAW file another partner of its shot got stays a failure if that was analyzed (E53)
-            retry, lost = raw_fallback.retry()
-            for _ in lost:
-                finished(failed=1)
-            for partner in retry:
-                print(f'The RAW file of {partner} could not be analyzed either; analyzing the readable part of the '
-                      'photo instead.', flush=True)
-            analyze(to_analyze(retry))
-            if not detector.created:
-                # no photo needed an analysis, e.g. all came from the cache (F2)
-                print(f'{NOTHING_NEW}.', flush=True)
-                status.update(message=NOTHING_NEW, force=True)
-        finally:
-            pool.shutdown(cancel_futures=True)  # on an interruption: no new decoding
-    except KeyboardInterrupt:
-        print('\nInterrupted: images analyzed so far are in the cache. Start again to resume.')
-        con.close()
-        return 130
+            todo = to_analyze(paths)
+            # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
+            # crops of several photos are embedded together, batch_size at a time (E2).
+            threads = DETECTION_DECODE_THREADS if person_detection else DECODE_THREADS
+            # enough photos ahead for the next group while CLIP embeds the current one (a group
+            # holds at most batch_size photos); finished photos wait as small preprocessed
+            # tensors, so memory grows with the batch size, not with the photo size (review)
+            ahead = max(2 * threads, args.batch_size + threads)
+            pool = ThreadPoolExecutor(threads)
+
+            def analyze(todo):
+                if not todo:
+                    return
+                # loaded in this thread, before the decoding threads use it
+                loaded = detector.get()
+                for group in group_batches(prepared(todo, pool, ahead, loaded), args.batch_size,
+                                           size=lambda item: len(item[2])):
+                    # after a failure the photos are stored one by one, so only a broken one fails;
+                    # an error of the cache file itself stops the search at once: no photo could
+                    # be stored (E50, review)
+                    finished(new=store_group(group, store, store_failed, fatal=cache_error))
+
+            try:
+                analyze(todo)
+                # a JPEG/HEIC that failed is replaced by the RAW file of its shot, unless another
+                # photo of the shot was analyzed; the RAW file comes from the cache or is decoded
+                # in the decoding threads like any photo, and counts for the shot (E30, review)
+                chosen, lost = raw_fallback.choose(analyzed)
+                for _ in lost:
+                    finished(failed=1)
+                for partner, raw in chosen.items():
+                    print(f'{partner} could not be analyzed; analyzing its RAW file instead: {raw}', flush=True)
+                analyze(to_analyze(list(chosen.values())))
+                for partner, raw in chosen.items():
+                    if analyzed(raw):
+                        raw_fallback.use(partner, raw)
+                # a truncated JPEG whose RAW file failed too is analyzed as far as its data goes,
+                # as any truncated photo is; it counts for the shot (E46). One that waited for the
+                # RAW file another partner of its shot got stays a failure if that was analyzed (E53)
+                retry, lost = raw_fallback.retry()
+                for _ in lost:
+                    finished(failed=1)
+                for partner in retry:
+                    print(f'The RAW file of {partner} could not be analyzed either; analyzing the readable part of the '
+                          'photo instead.', flush=True)
+                analyze(to_analyze(retry))
+                if not detector.created:
+                    # no photo needed an analysis, e.g. all came from the cache (F2)
+                    print(f'{NOTHING_NEW}.', flush=True)
+                    status.update(message=NOTHING_NEW, force=True)
+            finally:
+                pool.shutdown(cancel_futures=True)  # on an interruption: no new decoding
+        except KeyboardInterrupt:
+            print('\nInterrupted: images analyzed so far are in the cache. Start again to resume.')
+            con.close()
+            return 130
 
     print('Scoring the photos for each search profile ...', flush=True)
-    status.update('scoring', total=len(paths))
+    if quick:
+        # the photos it scores; thumbnails, as for an analysis, for the app's time left (F16)
+        status.update('scoring', total=len(analyzed), thumbnails=gallery_thumbnails(len(analyzed), args.top, 1))
+    else:
+        status.update('scoring', total=len(paths))
+        # a RAW file analyzed for its broken partner is scored and shown in its place (E30)
+        analyzed = raw_fallback.photos(paths)
     # first the per-crop text and reference scores of every photo, then per profile the
     # normalization over all crops of this search and the combination (E4, E5)
     scored, crop_labels, mtimes = [], [], []
     text_scores = {p['name']: [] for p in profiles}
     visual_scores = {p['name']: [] for p in profiles}
-    # a RAW file analyzed for its broken partner is scored and shown in its place (E30)
-    analyzed = raw_fallback.photos(paths)
     scoring_started = time.monotonic()
     for number, path in enumerate(analyzed, 1):
         status.update(done=number, force=number == len(analyzed))
@@ -609,22 +645,27 @@ def search(args, parser, roots, dropped, output, status, warnings):
                   'the gallery shows the raw similarity.', flush=True)
         scores[name] = [(m, path, labels[m.crop]) for m, path, labels in zip(matches, scored, crop_labels)]
 
-    thumbs = output / 'thumbnails'; thumbs.mkdir(exist_ok=True)
+    # a quick search writes into its own folder with its own thumbnails, so the galleries,
+    # results.json and marks of the profiles stay as they are (F10)
+    target = output / QUICK_DIR if quick else output
+    thumbs = target / 'thumbnails'; thumbs.mkdir(parents=True, exist_ok=True)
     # thumbnail folder of older versions: thumbnails are copied from it instead of being
     # rendered again; it is never written (old galleries link it), and the cleanup removes
-    # its files once no gallery links them (E7)
-    legacy_thumbs = output / 'vorschaubilder'
+    # its files once no gallery links them (E7). A quick search copies those of the profile
+    # galleries (F10)
+    legacy_thumbs = output / ('thumbnails' if quick else 'vorschaubilder')
 
     def log(message):
         print(message, flush=True)
 
     names = [p['name'] for p in profiles]
-    slugs = dict(zip(names, profile_slugs(names)))
+    galleries = {names[0]: QUICK_GALLERY} if quick else {name: slug + '.html'
+                                                         for name, slug in zip(names, profile_slugs(names))}
     # with several photo folders, a card names the photo's folder before its path in it (A25)
     labels = folder_labels(roots)
     # the folder the reference paths of profiles.json are relative to, as for the app (review)
     profiles_base = args.profiles.resolve().parent if args.profiles else Path.cwd()
-    nav = '<nav>' + ' · '.join(f'<a href="{quote(slugs[p["name"]] + ".html")}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
+    nav = '<nav>' + ' · '.join(f'<a href="{quote(galleries[p["name"]])}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
     style = '''body{font:16px system-ui;background:#181818;color:#eee;margin:24px}a{color:#a9d2ff}
     main{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:16px}
     article{background:#292929;padding:12px;border-radius:10px;overflow-wrap:anywhere}
@@ -673,10 +714,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
         page = ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                 f'<title>FrameScout – {html.escape(name)}</title><style>{style}</style>' + nav +
                 f'<h1>{html.escape(name)} – Top {len(cards)}</h1><p>Automatically generated ranking, not a guaranteed identification. '
+                + (html.escape(quick_note(len(scored), len(not_analyzed))) + ' ' if quick else '')
                 + (SCORE_NOTE if normalized[name] else RAW_NOTE) +
                 ' "Full image" or "Person" names the best-scoring part of the photo. Click a photo to open the original. '
                 f'Search model: {html.escape(search_model.label)}.</p><main>' + ''.join(cards) + '</main></html>')
-        gallery = slugs[name] + '.html'
+        gallery = galleries[name]
         pages.append((gallery, page))
         results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': gallery,
                         'normalized': normalized[name], 'cards': entries})
@@ -691,16 +733,20 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 'person_detection': not args.no_person_detection, 'max_persons': args.max_persons,
                 'person_confidence': args.person_confidence, 'reference_weight': args.reference_weight,
                 'model': args.model}
-    publish_export(output, pages, results_document(status.state['started'],
-                   datetime.now().astimezone().isoformat(timespec='seconds'), roots, settings, len(paths), results))
+    document = results_document(status.state['started'], datetime.now().astimezone().isoformat(timespec='seconds'),
+                                roots, settings, len(paths), results)
+    if quick:
+        # what the app shows above the quick search's results (F10)
+        document['quick'] = {'query': names[0], 'searched': len(scored), 'not_analyzed': len(not_analyzed)}
+    publish_export(target, pages, document)
     for (gallery, _), p in zip(pages, profiles):
-        print(f"{p['name']}: {output / gallery}", flush=True)
+        print(f"{p['name']}: {target / gallery}", flush=True)
     # the harmless part of the cleanup (E7, E13, E26): temporary thumbnails and other
     # temporary files of a stopped run, and thumbnails neither results.json nor any HTML file
-    # in the output folder links; the run lock is still held, so no other search writes
-    # thumbnails meanwhile
+    # in the output folder links (of a quick search: in its folder); the run lock is still
+    # held, so no other search writes thumbnails meanwhile
     try:
-        cleaned = auto_cleanup(output)
+        cleaned = auto_cleanup(target)
     except Exception as exc:  # never fails a finished search
         print(f'Cleanup of the thumbnails skipped: {exc}', flush=True)
     else:
@@ -713,7 +759,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
         warning = cache_read_warning(output / CACHE_FILE, next(iter(unreadable.values())), len(unreadable))
         print(warning, flush=True)
         warnings.append(warning)
-    print(f'Done. New photo analyses: {fresh}, from cache: {reused}. Further search profiles can reuse the existing cache.')
+    if quick:
+        print(f'Done. Quick search over {len(scored)} analyzed photos.', flush=True)
+    else:
+        print(f'Done. New photo analyses: {fresh}, from cache: {reused}. Further search profiles can reuse the '
+              'existing cache.')
     return 0
 
 

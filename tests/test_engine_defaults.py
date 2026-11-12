@@ -143,7 +143,7 @@ def test_the_engine_can_write_the_raw_scores_for_the_evaluation():
     # written from the scores the galleries rank, before the (slower) gallery export
     [search] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'search']
     source = ast.unparse(search)
-    assert source.index('write_scores(') < source.index("thumbs = output / 'thumbnails'")
+    assert source.index('write_scores(') < source.index("thumbs = target / 'thumbnails'")
 
 
 def test_the_engine_imports_open_clip_only_through_import_open_clip():
@@ -261,3 +261,41 @@ def test_the_engine_closes_the_cache_if_the_model_or_a_reference_fails_to_load()
             guarded.append({call.func.id for part in node.body for call in ast.walk(part)
                             if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)})
     assert any({'prepare_cache', 'load_with_hub_fallback', 'open_image'} <= calls for calls in guarded)
+
+
+def search_source():
+    tree = ast.parse(ENGINE.read_text(encoding='utf-8'))
+    [search] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'search']
+    return ast.unparse(search)
+
+
+def test_the_engine_offers_a_quick_search_without_profiles():
+    # F10: the option is additive and off by default; the text is taken as one argument
+    default = option_default_node('--quick-query')
+    assert default is None or (isinstance(default, ast.Constant) and default.value is None)
+    keywords = {k.arg: ast.unparse(k.value) for k in add_argument_call('--quick-query').keywords}
+    assert 'nargs' not in keywords and 'action' not in keywords
+    source = search_source()
+    # the profile of the text, never together with --profiles or --character
+    assert 'profiles = [quick_profile(args.quick_query)]' in source
+    assert "parser.error('--quick-query searches without profiles" in source
+
+
+def test_a_quick_search_analyzes_nothing_and_scores_only_cached_photos():
+    source = search_source()
+    branch = source[source.index('if quick:\n        analyzed, not_analyzed = quick_photos('):]
+    branch = branch[:branch.index('\n    else:')]
+    # no detector, no analysis: only the cache check of quick_photos
+    for name in ('to_analyze(', 'analyze(', 'detector.get()', 'store_group('):
+        assert name not in branch
+    assert 'quick_photos(paths, raw_fallback.fallbacks, cached, cache_trouble)' in branch
+
+
+def test_a_quick_search_writes_into_its_own_folder():
+    # F10: the galleries, results.json and marks.json of the profiles stay untouched, and the
+    # cleanup after it looks only at the quick folder
+    source = search_source()
+    assert 'target = output / QUICK_DIR if quick else output' in source
+    assert 'publish_export(target, pages, document)' in source
+    assert 'auto_cleanup(target)' in source
+    assert 'publish_export(output' not in source and 'auto_cleanup(output)' not in source
