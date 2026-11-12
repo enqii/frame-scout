@@ -1,9 +1,11 @@
 """Profile loading, validation and prompt generation (framescout_core.load_profiles)."""
 import json
 
+import numpy as np
 import pytest
 
 from framescout_core import like_profile, load_profiles, query_labels, quick_profile
+from framescout_scoring import text_queries
 
 GENERIC = ['A photograph of {t}.', 'An image showing {t}.', 'A detailed photo of {t}.',
            'A scene featuring {t}.']
@@ -49,6 +51,26 @@ def test_query_labels_name_the_queries_in_scoring_order(tmp_path):
     assert query_labels(quick_profile('a dog')) == ['motif "a dog"']
     # "Find similar" (F11) has no text
     assert query_labels(like_profile('/photos/a.jpg', 'Full image')) == []
+
+
+def test_query_labels_follow_the_queries_of_the_scoring(tmp_path):
+    # review: Match.query indexes framescout_scoring.text_queries and the cards name it by
+    # query_labels, two modules kept in step only by this test. A one-hot vector per prompt
+    # shows which prompts each query is made of.
+    path = write_profiles(tmp_path, {'profiles': [
+        {'name': 'Red car', 'features': 'four wheels', 'prompts': ['a red sports car', 'a car in the snow']},
+        {'name': 'Dog'}]})
+    for profile in [*load_profiles(path, []), quick_profile('a dog'), like_profile('/photos/a.jpg', 'Full image')]:
+        prompts, generated = profile['prompts'], profile['generated']
+        queries = text_queries(np.eye(len(prompts), max(len(prompts), 1)), generated)
+        labels = query_labels(profile)
+        assert len(labels) == len(queries)
+        made_of = [np.flatnonzero(q).tolist() for q in queries]
+        if generated:
+            # the motif first: the average of the generated prompts
+            assert labels[0] == f'motif "{profile["name"]}"' and made_of[0] == list(range(generated))
+        for label, parts in list(zip(labels, made_of))[1 if generated else 0:]:
+            assert len(parts) == 1 and label == f'"{prompts[parts[0]]}"'
 
 
 def test_query_labels_show_custom_texts_without_stray_white_space(tmp_path):
