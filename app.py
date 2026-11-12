@@ -1252,18 +1252,20 @@ def cache_env():
 
 @st.cache_data(show_spinner=False, max_entries=2)
 def cached_analyzed_photos(cache_key, signature, scan_key, _scan):
-    """(how many photos of the photo scan _scan are analyzed, quick_scope of _scan), counted again
-    only when the cache file (cache_key: file_key, or None without one), the settings or the
-    photo count (scan_key) change (F3 review).
+    """quick_scope of the photo scan _scan: (photos analyzed, not analyzed, partners searched
+    through another file of their shot), counted again only when the cache file (cache_key:
+    file_key, or None without one), the settings or the photo count (scan_key) change (F3
+    review).
 
     The quick search is counted as the engine counts it, with the RAW files analyzed in place
-    of their partner (E61). The photos' modification times and sizes are the scan's (A44), so
-    a photo edited after the count counts as analyzed until "Recount", as an added photo is
-    missing until then (A27).
+    of their partner (E61); its first count is also the photos with a row of their own, which
+    the search's disk space estimate needs. The modification times and sizes are the scan's
+    (A44), so a photo edited after the count counts as analyzed until "Recount", as an added
+    photo is missing until then (A27).
     """
     done = (analyzed_paths(cache_key[0], signature, [*_scan.paths, *_scan.raw_pairs], _scan.stats)
             if cache_key else set())
-    return sum(path in done for path in _scan.paths), quick_scope(_scan, done)
+    return quick_scope(_scan, done)
 
 # seconds the free disk space check of the run tab is reused: not asked again on every click (review)
 LOW_SPACE_TTL = 30
@@ -1783,7 +1785,7 @@ with run_tab:
     if model_missing and not active:
         st.warning(model_missing)  # why Start is not available
     analyzed = None  # the photos analyzed with these settings: counted only while no search runs
-    quick_counts = None  # (photos searched, photos not analyzed) of a quick search, as the engine counts (E61)
+    quick_counts = None  # quick_scope: (analyzed, not analyzed, partners) of a quick search, as the engine counts (E61)
     if folder_scans and not active:
         try:
             cache_key = file_key(RESULTS / CACHE_FILE)
@@ -1791,8 +1793,9 @@ with run_tab:
             cache_key = None
         # photos analyzed with these settings need no new cache rows (review: else a large,
         # analyzed collection kept the warning for good)
-        analyzed, quick_counts = cached_analyzed_photos(cache_key, cleanup_signature(),
-                                                        (tuple(map(str, existing)), counted_at), photo_scan)
+        quick_counts = cached_analyzed_photos(cache_key, cleanup_signature(),
+                                              (tuple(map(str, existing)), counted_at), photo_scan)
+        analyzed = quick_counts[0]
         # what the search will do and, if an earlier search with these settings measured its
         # speed on this device, roughly how long its analysis takes (F12). "auto" picks CUDA
         # if PyTorch can use it; without the system details any device's record counts
@@ -1872,7 +1875,7 @@ with run_tab:
                       placeholder='e.g. a red car in the snow')
         quick_start = c2.form_submit_button('Quick search', width='stretch',
                                             disabled=active or not folder_scans or bool(model_missing)
-                                            or (quick_counts is not None and quick_counts[0] == 0))
+                                            or (quick_counts is not None and not (quick_counts[0] or quick_counts[2])))
     if quick_counts is not None:
         st.caption(quick_scope_text(len(photo_scan.paths), *quick_counts))
     if quick_start:
