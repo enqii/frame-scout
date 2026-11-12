@@ -232,7 +232,7 @@ thumbnails.
 **Quick search** (between the search status and **Results**) tries a motif without creating a
 profile: type a search text in English (up to 300 characters) and press "Quick search". It
 searches only the photos already analyzed with the current AI settings (the caption says
-"N of M photos analyzed and searched"), so it is fast and loads no person detector or analysis;
+"N of M photos analyzed and searched"; a photo whose same picture in another format, such as the RAW file, is searched is not counted as missing), so it is fast and loads no person detector or analysis;
 it is not available while no photo is analyzed, while a search runs or without photo folders.
 The result goes to `results/quick/` and appears under "Results of the last quick search"
 (thumbnails, 48 per page, "Open"/"Folder" per photo, the gallery and the folder), with the
@@ -320,7 +320,7 @@ ARW, ORF, RW2, RAF, PEF, SRW).
   1024 pixels long, otherwise it decodes the RAW data at half size. Colors are the
   camera's, not your own RAW development.
 - If a JPEG or HEIC of the same name is next to a RAW file ("RAW+JPEG" mode), only the
-  JPEG/HEIC is searched. If that JPEG cannot be read, or is cut off or damaged in the middle, the RAW file is analyzed instead. A JPEG that lacks only its end marker is searched itself.
+  JPEG/HEIC is searched. If that JPEG cannot be read, or is cut off or damaged in the middle, the RAW file is analyzed instead. A JPEG that lacks only its end marker is searched itself. A HEIC that is cut off fails (it is counted as a failed photo) instead of being searched as a black image.
 - The search log and the "Photo source" tab name skipped files and why.
 - Browsers cannot show HEIC or RAW files: in the HTML gallery the thumbnail works, but a
   click downloads the file. "Open" in the app uses the program Windows has for it.

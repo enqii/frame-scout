@@ -518,6 +518,21 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       and whether a note or an opt-out is needed for users who keep models elsewhere. Review of
       PR #42, findings 8 and 9. **Decided 2026-11-06 (triage):** a variable the user set wins; move the call out of the import (ROADMAP P20 with E41, A36).
       (done 2026-11-11 in PR #89: `default_cache_env(os.environ, <engine folder>)` is the first statement of `main()` in `framescout_engine.py`, no longer module level, so importing the engine sets nothing. torch reads `TORCH_HOME`/`XDG_CACHE_HOME` per call and huggingface_hub/Ultralytics are imported later (`import_open_clip`, `import_detector_class`). A variable the user set wins, so no separate opt-out is needed. `test_engine_defaults.py` pins the call as the first statement of `main()`. Not runtime-tested: no search with real models.)
+- [x] `minor` **E59 – A truncated HEIC/AVIF that is not a RAW partner is analyzed as an all-black
+      image:** pillow-heif swallows its decoding error under `LOAD_TRUNCATED_IMAGES` and leaves
+      the image blank. `open_image` could always decode HEIF strictly, so such a photo fails with
+      an error instead. Found in E53 (PR #84).
+      (done 2026-11-12 in PR #96: `framescout_images._open` always loads a HEIF/AVIF image strictly (`_STRICT_FORMATS`, `_strict()`), so a truncated HEIC/HEIF that is not a RAW partner fails as a counted failed photo instead of becoming an all-black image; Pillow's own AVIF reader already rejected a truncated AVIF (pinned in `tests/test_images.py`). Consequences: a truncated HEIC reference image stops the engine at start ("Reference image cannot be read"), and the evaluation tool's `pool` cannot thumbnail such a file (the labelling page shows the original). Rows cached earlier as black images for a truncated HEIC stay valid (same modification time and size) until the file changes or "Clean up storage". Tested with unit tests only (`tests/test_images.py`); not run with a real truncated HEIC photo through the engine.)
+- [x] `minor` **E61 – The quick search counts a JPEG/HEIC partner as "not analyzed", and the app's count can differ:**
+      a quick search counts a JPEG/HEIC partner whose other partner of the shot is analyzed as
+      "not analyzed", although a full search would not analyze it either; and the app's count
+      before a quick search (`analyzed_photos`, no RAW fallback, the scan's stats) can differ
+      slightly from the engine's count. In the extreme case of a folder whose analyzed photos
+      are all RAW files analyzed in place of their broken JPEG/HEIC partner (E30), the app
+      counts 0 and disables "Quick search", although the engine would search them (review of
+      PR #90, finding 4). Affected: `framescout_core/quick.py` (`quick_photos`), `app.py`
+      (`cached_analyzed_photos`). Found in F10 (PR #90). Size S.
+      (done 2026-11-12 in PR #96: `quick_photos` neither scores nor counts as not analyzed a partner without a row whose shot is searched through another partner or its RAW file; every partner of a shot without any row still counts as not analyzed. New `framescout_core.quick_scope(scan, analyzed)` returns (searched, not analyzed) and `analyzed_paths` (a set; `analyzed_photos` is its length). `app.cached_analyzed_photos` returns `(analyzed, quick_scope)` over the scan's photos and `raw_pairs`, so "Quick search" is disabled only if the quick count of searched photos is 0, and `quick_scope_text(photos, searched, not_analyzed)` names the partners whose shot is searched. Unit-tested (`tests/test_quick.py`, `tests/test_disk_space.py`, 1464 passed, 2 skipped); not run: a real Streamlit session, an engine smoke run.)
 
 ### App (`app.py`)
 

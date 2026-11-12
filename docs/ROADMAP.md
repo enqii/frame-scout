@@ -24,8 +24,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       longer block the user's manual test (I37, I38; kind `docs`)
 
 ### P24 – Hygiene: engine and core (added 2026-11-12)
-- [ ] A truncated HEIC/AVIF fails instead of becoming a black image; the quick search counts
-      partners and the app's count consistently (E59, E61)
+- [x] A truncated HEIC/AVIF fails instead of becoming a black image; the quick search counts
+      partners and the app's count consistently (E59, E61; done 2026-11-12, PR #96)
 
 ### P25 – Results view (added 2026-11-12)
 - [ ] (A) Review progress per profile and "jump to the first open photo" (F20)
