@@ -68,16 +68,43 @@ def profile_state(entry, fingerprints):
     return 'current' if current == entry['fingerprint'] else 'changed'
 
 
-def result_card(rank, path, relative, label, score, text, visual, caption, detail, thumbnail):
+def result_card(rank, path, relative, label, score, text, visual, caption, detail, thumbnail, best_query=None):
     """Return the result file's entry of one gallery card.
 
     path: the photo; relative: its name as the HTML gallery shows it, its path in its photo
     folder, after the folder's label if the search had several (photo_name; computed once
-    by the engine for both, review).
+    by the engine for both, review); best_query: the name (query_labels) of the search
+    text the photo's best part is most similar to, only for a profile with several texts
+    (F17); the card has the key "best_query" only then.
     """
-    return {'rank': rank, 'path': str(path), 'relative': relative, 'label': label,
+    card = {'rank': rank, 'path': str(path), 'relative': relative, 'label': label,
             'score': score, 'text': text, 'visual': visual, 'caption': caption, 'detail': detail,
             'thumbnail': thumbnail}
+    if best_query is not None:
+        card['best_query'] = best_query
+    return card
+
+
+def query_caption(best_query):
+    """Return the line of a gallery card that names its closest search text (F17)."""
+    return f'Closest search text: {best_query}'
+
+
+def query_summary(entry):
+    """Return how many photos of a gallery each search text was closest to, or None (F17).
+
+    entry: a profile of the result file. None for a search before F17, a profile with a
+    single text (nothing to compare) or a gallery whose cards name no text. Every text is
+    listed in the profile's order, also one that no photo was closest to.
+    """
+    queries = entry.get('queries') or []
+    named = [card['best_query'] for card in entry['cards'] if card.get('best_query') is not None]
+    if len(queries) < 2 or not named:
+        return None
+    counts = ' · '.join(f'{query} {named.count(query)}' for query in queries)
+    return (f"Closest search text of these {len(entry['cards'])} photos: {counts}. Each photo counts for the one "
+            'text it is most similar to, often by a small margin: the other texts can be nearly as close, and '
+            'every text adds to the search.')
 
 
 def results_document(started, finished, folders, settings, photos, profiles):
@@ -86,7 +113,8 @@ def results_document(started, finished, folders, settings, photos, profiles):
     started/finished: ISO timestamps of the run; folders: the photo folders searched;
     settings: the search options; photos: how many photos were found; profiles: per profile
     a dict with name, fingerprint (search_fingerprint), gallery (HTML file name),
-    normalized and cards (result_card, in gallery order).
+    normalized, cards (result_card, in gallery order) and, for a search with texts, queries
+    (query_labels, F17).
     """
     return {'format': RESULTS_FORMAT, 'started': started, 'finished': finished,
             'photo_folders': [str(f) for f in folders], 'settings': settings, 'photos': photos,
@@ -126,7 +154,8 @@ def _check_card(card):
     strings = ('path', 'relative', 'label', 'caption', 'detail', 'thumbnail')
     if (not isinstance(card, dict) or not isinstance(card.get('rank'), int) or isinstance(card['rank'], bool)
             or any(not isinstance(card.get(k), str) for k in strings) or not _is_number(card.get('score'))
-            or any(card.get(k) is not None and not _is_number(card[k]) for k in ('text', 'visual'))):
+            or any(card.get(k) is not None and not _is_number(card[k]) for k in ('text', 'visual'))
+            or card.get('best_query') is not None and not isinstance(card['best_query'], str)):
         raise ValueError(f'invalid gallery card: {card!r}'[:300])
     if not _THUMBNAIL_NAME.fullmatch(card['thumbnail']):
         raise ValueError(f"invalid thumbnail name: {card['thumbnail']!r}")
@@ -160,7 +189,9 @@ def read_results(path):
     for entry in profiles:
         if (not isinstance(entry, dict) or not isinstance(entry.get('name'), str) or not entry['name']
                 or not isinstance(entry.get('fingerprint'), str) or not isinstance(entry.get('gallery'), str)
-                or not isinstance(entry.get('cards'), list)):
+                or not isinstance(entry.get('cards'), list)
+                or 'queries' in entry and not (isinstance(entry['queries'], list)
+                                               and all(isinstance(q, str) for q in entry['queries']))):
             raise ValueError(f'invalid profile entry: {entry!r}'[:300])
         if not _GALLERY_NAME.fullmatch(entry['gallery']):
             raise ValueError(f"invalid gallery file name: {entry['gallery']!r}")

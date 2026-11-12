@@ -45,6 +45,18 @@ def generic_prompts(name, context='', features=''):
     return prompts
 
 
+def query_labels(profile):
+    """Return the names of a profile's text queries, in the order framescout_scoring.text_queries builds them (F17).
+
+    profile: a profile of load_profiles (or quick_profile). The generated texts are
+    averaged into one query (E4), named after the search motif ('motif "Red car"'); each
+    custom text is a query of its own, named in quotes. [] for a profile without texts
+    ("Find similar", F11).
+    """
+    custom = [f'"{prompt}"' for prompt in profile['prompts'][profile['generated']:]]
+    return ([f'motif "{profile["name"]}"'] if profile['generated'] else []) + custom
+
+
 def load_profiles(filename, inline):
     """Load and validate search profiles.
 

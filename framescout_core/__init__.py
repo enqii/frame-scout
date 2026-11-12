@@ -30,7 +30,7 @@ from .locks import (RunLock, lock_held)
 from .references import (reference_folder, stage_reference_move, finish_reference_move,
     undo_reference_move, update_backup_references, write_new_file)
 from .profiles import (PROFILES_LOCK_TIMEOUT, ProfilesChangedError, UnknownProfileError, create_from_example,
-    generic_prompts, load_profiles, profiles_changed_notice, read_profiles, read_profiles_versioned, require_profile, save_profiles)
+    generic_prompts, load_profiles, query_labels, profiles_changed_notice, read_profiles, read_profiles_versioned, require_profile, save_profiles)
 from .models import (SearchModel, MODELS, DEFAULT_MODEL, MODEL_KEYS, model_label, missing_packages,
     model_problem, results_model)
 from .signature import (ENGINE_TEMPLATE, engine_id, ENGINE, MODEL_ENGINES,
@@ -59,7 +59,7 @@ from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
 from .quick import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, quick_profile, quick_photos, quick_scope, quick_scope_text,
     quick_note, quick_folders_differ, like_profile, like_crop, like_labels_fit, like_scan_path)
 from .results import (RESULTS_FILE, RESULTS_FORMAT, GALLERY_PAGE_SIZE, search_fingerprint,
-    profile_fingerprints, profile_state, result_card, results_document, publish_export,
+    profile_fingerprints, profile_state, result_card, query_caption, query_summary, results_document, publish_export,
     read_results, page_count, page_cards, openable_photo, open_command, reveal_command)
 from .marks import (MARKS_FILE, MARKS_BACKUP, MARKS_FORMAT, MARK_OPEN, MARK_MATCH, MARK_NO_MATCH, MARK_STATES,
     MARKS_LOCK_TIMEOUT, marks_backup, read_marks, save_marks, rename_marks, delete_marks, remove_marks,

@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from framescout_core import load_profiles
+from framescout_core import like_profile, load_profiles, query_labels, quick_profile
 
 GENERIC = ['A photograph of {t}.', 'An image showing {t}.', 'A detailed photo of {t}.',
            'A scene featuring {t}.']
@@ -37,6 +37,18 @@ def test_context_features_and_custom_prompts_are_combined_in_order(tmp_path):
         'a red sports car']
     # the six generated prompts form the template ensemble, the custom one stays apart (E4)
     assert profile['generated'] == 6
+
+
+def test_query_labels_name_the_queries_in_scoring_order(tmp_path):
+    # F17: the averaged generated texts first, named by the motif, then each custom text
+    path = write_profiles(tmp_path, {'profiles': [{
+        'name': 'Red car', 'franchise': 'Vehicles', 'features': 'four wheels',
+        'prompts': ['a red sports car', 'a car in the snow']}]})
+    [profile] = load_profiles(path, [])
+    assert query_labels(profile) == ['motif "Red car"', '"a red sports car"', '"a car in the snow"']
+    assert query_labels(quick_profile('a dog')) == ['motif "a dog"']
+    # "Find similar" (F11) has no text
+    assert query_labels(like_profile('/photos/a.jpg', 'Full image')) == []
 
 
 def test_name_is_stripped(tmp_path):
