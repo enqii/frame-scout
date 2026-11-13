@@ -312,8 +312,12 @@ def start_summary(photos, analyzed, per_minute, finishing=None, analysis_only=Fa
     todo = photos - analyzed
     finishing = None if analysis_only or finishing is None or finishing < 0 else finishing
     if not todo and analysis_only:
-        return ('The photo is analyzed with these settings already.' if photos == 1 else
-                f'All {photos:,} photos are analyzed with these settings already.')
+        # photos is the count remembered for the browser session (A27): the analysis reads the
+        # folders again, so it stays available for photos added since (review)
+        return (('The photo is analyzed with these settings already.' if photos == 1 else
+                 f'All {photos:,} photos are analyzed with these settings already.')
+                + ' Photos added to the folders since they were counted are counted after "Recount"; the analysis '
+                  'finds them either way.')
     if not todo:
         text = (f'{_photos(photos)} found, all already analyzed with these settings: the search only ranks them '
                 'and writes the galleries')
