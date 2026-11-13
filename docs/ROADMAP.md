@@ -34,7 +34,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       2026-11-12, PR #99)
 
 ### P26 – Analyze ahead (added 2026-11-12)
-- [ ] "Analyze photos now" and `--analyze-only` without a search (F18)
+- [x] "Analyze photos now" and `--analyze-only` without a search (F18; done 2026-11-13, PR #100)
 
 ### P27 – Start (added 2026-11-12)
 - [ ] Start handles a busy port and an already running app (F22)

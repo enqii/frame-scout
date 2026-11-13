@@ -1914,3 +1914,31 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       listed once in the summary; custom texts are named without stray white space; the engine
       keeps the indexes only for profiles with two or more texts; a test ties `query_labels` to
       `text_queries`. The summary counts per card like the run caption and F20.)
+- [x] **F18 – Analyze photos ahead of time, without a search:** the analysis is the slow
+      part; users would like to prepare a folder overnight (and F10 only searches analyzed
+      photos). Sketch: an "Analyze photos now" button and an engine option `--analyze-only`
+      that scans and analyzes with the current model and detection setting, fills the cache
+      and stops before scoring and export; normal run lock, status file, stop button, F4.
+      Affected: `framescout_engine.py`, `framescout_core`, `app.py`, user guide,
+      `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`. Risks: a run without `results.json` must
+      not look like a failed search; the analysis only helps for the model and detection setting
+      chosen then. Additive CLI option. Size S–M. Roadmap P26.
+      (done 2026-11-13 in PR #100: the "Photo source" tab ends with "Analyze ahead" and the button
+      "Analyze photos now"; the engine has `--analyze-only` (scan and analysis with the given model
+      and person detection settings, cache reuse, RAW fallback, lazy detector, `--low-priority`, run
+      lock and status file; returns 0 before scoring and export, so `results.json`, galleries,
+      thumbnails and the quick folder stay as they are). It refuses `--profiles`, `--character`,
+      `--quick-query`, `--like` and `--scores-file`; `--top` and `--reference-weight` are ignored.
+      All photos from the cache: message `ALL_ANALYZED`. Status file: additive `"analyze_only": true`
+      (`STATUS_FORMAT` stays 1); `framescout_core`: `analysis_only`, `run_name`,
+      `analysis_result_text`, `analysis_summary`, `engine_command(analyze_only=True)`,
+      `remaining_text` of an analysis = the analysis alone; the run tab words the analysis as such
+      ("Analysis running", "The last analysis finished successfully"). Compatibility: additive CLI
+      option and status field, no change to `profiles.json`, `settings.json`, `results.json`, the
+      cache signature or dependencies; an older app shows a finished analysis as a finished search
+      run. Tests: new cases in `test_engine_defaults.py` (syntax tree, plus a subprocess test that
+      needs torch and is skipped in CI), `test_quick.py`, `test_run_status.py`, `test_estimate.py`;
+      a CPU engine smoke run with `--analyze-only` and a headless `AppTest` render of the section
+      and the enabled button passed. Not tested: a click on the button in the running app, an
+      analysis with person detection (YOLO weights not cached locally), CUDA. Follow-up: E63; the
+      split of start (Photo source) and progress/stop (Search & results) is for the review F24.)

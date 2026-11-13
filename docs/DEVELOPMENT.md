@@ -21,6 +21,9 @@ After `Install-FrameScout.bat`:
 # Find similar: the analyzed photos most like one photo (or one of its parts, e.g. "Person 1"); no text, no model load, result in .\results\quick\
 .\.venv\Scripts\python.exe framescout_engine.py .\photos --like .\photos\a.jpg --like-part "Full image" --output .\results --device cpu
 
+# Analyze only (F18): fill the cache for the given model and person detection settings; no search, no galleries
+.\.venv\Scripts\python.exe framescout_engine.py .\photos --analyze-only --output .\results --device cpu
+
 # All engine options
 .\.venv\Scripts\python.exe framescout_engine.py --help
 
@@ -30,6 +33,11 @@ After `Install-FrameScout.bat`:
 
 `--like` excludes `--profiles`, `--character`, `--quick-query` and `--scores-file`; `--like-part`
 (default `Full image`) needs `--like`. A photo not analyzed with the current settings exits with code 2.
+
+`--analyze-only` (F18) analyzes the photos like the analysis of a search and returns 0 before scoring
+and export, so `results.json`, galleries, thumbnails and the quick folder stay as they are. It refuses
+`--profiles`, `--character`, `--quick-query`, `--like` and `--scores-file` (usage error); `--top` and
+`--reference-weight` are accepted and ignored. Its status file carries `"analyze_only": true`.
 
 `framescout_check.py` (F15) prints one line per check and a "Fix:" line per problem. Exit
 code 0: no problem found, 2: at least one problem; 1 (Python's code for an uncaught

@@ -155,6 +155,18 @@ search downloads them again there (about 600 MB for the default model). The unin
 script lists such folders outside the project but does not delete them. A `yolo11n.pt` in
 the folder of a manual run is used instead of the cached copy.
 
+**Analyze ahead** (end of the tab) analyzes the photos without a search, for example overnight, so
+that a later search only has to rank them. The section shows the current search model and
+person detection setting, how many photos are analyzed with them already and, if an earlier
+search measured a speed, a rough duration. Press **Analyze photos now** to start; the button is
+disabled while a search, an analysis or a cleanup runs, without photos, when the model package
+is missing or when all photos are analyzed with these settings. Analyses only help a search with
+the same search model and person detection settings: after a change of these, the photos are
+analyzed again. An analysis changes no results: the galleries, `results.json`, marks and the
+last quick search stay as they are. Progress, "time left" and **Stop** are in "Search & results";
+"Keep the PC responsive" applies as for a search. A photo edited after its analysis counts as
+not analyzed.
+
 ### AI settings
 
 - **Search model:** the default, OpenAI CLIP ViT-B/32, is the fastest and the one the
@@ -200,6 +212,12 @@ stays open), and opening the page again lets you stop it. Only one search runs a
 A repeat search on a folder that is already analyzed (e.g. after changing only a search
 text or the reference weight) skips loading the person detector and shows "Nothing new to
 analyze – ranking only"; the detector is loaded only when a photo has to be analyzed.
+
+An analysis started in "Photo source" (see "Analyze ahead") is shown here too: "Analysis running
+…" with its progress and **Stop**, "about N min left" for the analysis alone (there is no scoring
+or gallery step) and afterwards "The last analysis finished successfully" with the number of
+newly analyzed photos and those already in the cache. An interrupted or failed analysis is
+described as such, not as a search run. Only one search or analysis runs at a time.
 
 Before a search the run tab summarizes what it will do: how many photos were found, how many
 are already analyzed with the current settings and how many remain to analyze. If an earlier

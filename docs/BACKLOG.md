@@ -192,6 +192,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       analyze those photos again, or invalidate HEIF rows only
       (cache invalidation: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched
       until decided). Review of PR #96, finding 2.
+- [ ] `minor` **E63 – `cache_read_warning` says "this search" after an analysis without a search:**
+      the warning for unreadable cache rows (E50) says the photos were "left out of this
+      search"; after `--analyze-only` (F18) the run is an analysis. Wording only:
+      `cache_read_warning` could take the run's noun (`run_name` of the status). Found in PR #100.
 
 ### App (`app.py`)
 
@@ -508,15 +512,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
       may show people (say so in the guide). **Question:** the contents of the new bundle format
       (no `profiles.json` schema change). Size M.
-- [ ] `ready` **F18 – Analyze photos ahead of time, without a search:** the analysis is the slow
-      part; users would like to prepare a folder overnight (and F10 only searches analyzed
-      photos). Sketch: an "Analyze photos now" button and an engine option `--analyze-only`
-      that scans and analyzes with the current model and detection setting, fills the cache
-      and stops before scoring and export; normal run lock, status file, stop button, F4.
-      Affected: `framescout_engine.py`, `framescout_core`, `app.py`, user guide,
-      `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`. Risks: a run without `results.json` must
-      not look like a failed search; the analysis only helps for the model and detection setting
-      chosen then. Additive CLI option. Size S–M. Roadmap P26.
 - [ ] `decision` **F19 – One-photo review mode with a large preview:** marking (A17) happens on
       small thumbnails. Sketch: a "Review" toggle shows one result at a time with a large preview
       (decoded downscaled in memory), the best crop outlined if the result has the data, score
