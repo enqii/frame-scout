@@ -430,6 +430,19 @@ def test_the_app_starts_both_searches_through_engine_command():
                 and node.value in ('--profiles', '--analyze-only')]
 
 
+def test_the_app_counts_partners_as_analyzed_for_an_analysis():
+    # F18 review: a partner searched through another file of its shot never gets a row of its
+    # own, so "Analyze photos now" must not keep calling it "to analyze"
+    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    [summary] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                 and getattr(node.func, 'id', None) == 'start_summary'
+                 and any(k.arg == 'analysis_only' for k in node.keywords)]
+    done = ast.unparse(summary.args[1])
+    [assigned] = [node for node in ast.walk(tree) if isinstance(node, ast.Assign)
+                  and any(isinstance(t, ast.Name) and t.id == done for t in node.targets)]
+    assert ast.unparse(assigned.value) == 'analyzed + quick_counts[2]'
+
+
 def test_every_result_card_of_the_app_offers_find_similar():
     # F11: on the cards of the profile results and of the quick search; the click passes the
     # card's photo and the part it names, and the page run (not the fragment) starts it
