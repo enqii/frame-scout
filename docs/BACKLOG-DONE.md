@@ -939,7 +939,19 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       CSS. P35 rebuilds the card, so keep the fix small. Affected: `framescout_core/marks.py`,
       `tests/`, `docs/ARCHITECTURE.md`. Found in the browser pass of 2026-11-13
       (`docs/UI-REVIEW.md`). Size S. Roadmap P30.
-      (done 2026-11-13 in PR #105: `mark_style` now targets `.st-key-mark_<id> button[data-variant="segmented_control"][data-selected]`; colors and `MARK_STYLE_STREAMLIT = '1.66.1'` unchanged. The test failed before the fix and passes now; full suite `1564 passed, 2 skipped`. Checked in a browser (headless Edge over the DevTools protocol, real mouse clicks, synthetic results with 2 pages, light and dark theme): after mark clicks, a page change, switching back and a reload the selected buttons were green (Match) and red (No match) with the theme text color; "Undecided" keeps Streamlit's look. Left over: "Undecided" and "No match" are close in hue, which P35 (F30) covers with a visible mark state. No change to `marks.json`, `results.json`, profiles, CLI or cache.)
+      (done 2026-11-13 in PR #105: `mark_style` now targets
+      `.st-key-mark_<id> button[data-variant="segmented_control"][data-selected]`; colors and
+      `MARK_STYLE_STREAMLIT = '1.66.1'` unchanged. The test failed before the fix and passes
+      now; a new test looks for the selector names in the installed Streamlit frontend bundle
+      (skipped without Streamlit, so not in CI), so a pin raise that renames them fails
+      locally. Checked in a browser (headless Edge over the DevTools protocol, real mouse
+      clicks, synthetic results with 2 pages, light and dark theme; the one-off script is kept
+      outside the repo like the earlier ones, I2): after mark clicks, a page change, switching
+      back and a reload the selected buttons were green (Match) and red (No match) with the
+      theme text color; "Undecided" keeps Streamlit's look. A disabled control (profile no
+      longer searched) keeps its saved mark's color on purpose. Left over: "Undecided" and
+      "No match" are close in hue, which P35 (F30) covers with a visible mark state. No change
+      to `marks.json`, `results.json`, profiles, CLI or cache.)
 
 ### Installation / project
 
