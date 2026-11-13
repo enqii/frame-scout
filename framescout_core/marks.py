@@ -371,7 +371,8 @@ def mark_style(states):
     """
     rules = []
     for state, (background, border) in MARK_COLORS.items():
-        # the class Streamlit gives the element of a widget with a key
+        # the class Streamlit gives the element of a widget with a key; a disabled control
+        # (its profile is no longer searched) keeps the color of its saved mark on purpose
         selectors = ', '.join(f'.st-key-{re.sub(r"[^a-zA-Z0-9_-]", "-", key.strip())} '
                               'button[data-variant="segmented_control"][data-selected]'
                               for key, saved in states.items() if saved == state)
