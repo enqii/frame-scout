@@ -1845,7 +1845,11 @@ with run_tab:
                                       gallery_thumbnails(len(photo_scan.paths), settings['top'], len(profiles)))
         per_minute = known_throughput(run_status, cleanup_signature(), chosen_device)
         st.info(start_summary(len(photo_scan.paths), analyzed, per_minute, finishing))
-        analysis_text = start_summary(len(photo_scan.paths), analyzed, per_minute, analysis_only=True)
+        # a JPEG/HEIC searched through another file of its shot (its RAW file, E30, or another
+        # partner) never gets a row of its own, however often it is analyzed: done for the
+        # analysis, as for the quick search (review)
+        analysis_done = analyzed + quick_counts[2]
+        analysis_text = start_summary(len(photo_scan.paths), analysis_done, per_minute, analysis_only=True)
         space_warning = low_space_warning(len(photo_scan.paths), settings['top'], len(profiles), settings['model'],
                                           settings['person_detection'], analyzed)
         if space_warning:
