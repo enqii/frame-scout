@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core import (ALL_ANALYZED, FINAL_PHASES, LOADING_DETECTOR, NOTHING_NEW, analysis_only,
-                             analysis_result_text, run_name,RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
+                             analysis_result_text, run_name, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
                              read_status, run_active, started_in_time, status_fraction, status_text,
                              stopped_status, write_status)
 
