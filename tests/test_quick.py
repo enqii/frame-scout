@@ -419,11 +419,15 @@ def test_the_app_starts_both_searches_through_engine_command():
     tree = ast.parse(APP.read_text(encoding='utf-8'))
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
              and getattr(node.func, 'id', None) == 'start_engine']
-    assert sorted(k.arg for call in calls for k in call.keywords) == ['like', 'like_part', 'profiles', 'quick_query']
+    # and "Analyze photos now" (F18), whose note goes next to its button
+    assert sorted(k.arg for call in calls for k in call.keywords) == [
+        'analyze_only', 'like', 'like_part', 'notice', 'profiles', 'quick_query']
+    assert "start_engine(notice='analyze_notice', analyze_only=True)" in [ast.unparse(call) for call in calls]
     assert [node for node in ast.walk(tree) if isinstance(node, ast.Call)
             and getattr(node.func, 'id', None) == 'engine_command']
     # no second, hand-built command line
-    assert not [node for node in ast.walk(tree) if isinstance(node, ast.Constant) and node.value == '--profiles']
+    assert not [node for node in ast.walk(tree) if isinstance(node, ast.Constant)
+                and node.value in ('--profiles', '--analyze-only')]
 
 
 def test_every_result_card_of_the_app_offers_find_similar():

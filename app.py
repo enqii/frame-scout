@@ -33,6 +33,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
                              analyzed_paths, app_search_needs, downloaded_models, low_space, low_space_lines,
                              finishing_minutes, gallery_thumbnails, known_throughput, remaining_text, start_summary,
+                             analysis_only, analysis_result_text, analysis_summary, run_name,
                              check_installation,
                              hidden_text, hide_no_match, mark_style, progress_text, review_progress, windows_path,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
@@ -244,12 +245,13 @@ def run_state():
     status = read_status(STATUS)
     return run_active(status, lock_held(LOCK), lambda pid: engine_alive(pid, status)), status
 
-def start_run(cmd):
+def start_run(cmd, analyze_only=False):
     """Start the engine with cmd unless a search is running; return None, or why it was not started.
 
     The app holds the engine's run lock while it starts it, so two tabs or sessions cannot
     start at the same time; the status "starting" shows the run until the engine takes the
-    lock over (A4).
+    lock over (A4). analyze_only: cmd is an analysis without a search, which its status
+    says from "starting" on (F18).
     """
     RESULTS.mkdir(parents=True, exist_ok=True)
     lock = RunLock(LOCK)
@@ -263,7 +265,7 @@ def start_run(cmd):
         with LOG.open('w', encoding='utf-8', buffering=1) as log_handle:
             proc = subprocess.Popen(cmd, cwd=str(BASE), env=cache_env(), stdout=log_handle, stderr=subprocess.STDOUT)
         st.session_state.process = proc
-        if not StatusReporter(STATUS, proc.pid).update('starting'):
+        if not StatusReporter(STATUS, proc.pid).update('starting', **({'analyze_only': True} if analyze_only else {})):
             # without "starting", other tabs would see no run until the engine takes the
             # lock and could start a second one (review)
             end_processes([proc.pid])
@@ -1636,6 +1638,9 @@ with f_tab:
     st.caption('Supports JPG, PNG, WebP, BMP, TIFF, AVIF, HEIC/HEIF and camera RAW (DNG, CR2, CR3, NEF, ARW, ORF, '
                'RW2, RAF, PEF, SRW; a RAW file next to a JPEG or HEIC of the same name is skipped). '
                'FrameScout searches local files and does not download images from online services.')
+    # F18: "Analyze photos now", filled in the run tab's code below, which knows the AI
+    # settings, the analyzed photos and how to start the engine
+    analyze_area = st.container()
 
 with settings_tab:
     st.subheader('AI processing')
@@ -1768,26 +1773,33 @@ with run_tab:
                           disabled=active or not profiles or not folder_scans or bool(model_missing))
     with c2:
         # a cleanup holding the run lock is no search to stop (review)
-        stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), width='stretch')
-    def start_engine(**search):
-        """Start the engine with the current settings: search is profiles=..., quick_query=... (F10) or like=... (F11)."""
+        stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), width='stretch',
+                         help='Stops the running search, also an analysis started with "Analyze photos now" in the '
+                              'tab "Photo source". Photos analyzed so far are kept in the cache.')
+    def start_engine(notice='run_notice', **search):
+        """Start the engine with the current settings: search is profiles=..., quick_query=... (F10), like=... (F11)
+        or analyze_only=True (F18).
+
+        notice: the session key of the note shown where the click was, if the start failed.
+        """
+        what = 'analysis' if search.get('analyze_only') else 'search'
         if settings_taken_over:
             # the page showed other values until this click: never start with settings the
             # user has not seen (review)
-            st.session_state.run_notice = ('The search was not started: another tab or window changed these settings '
-                                           'meanwhile: ' + ', '.join(settings_taken_over) + '. Check the settings '
-                                           'shown now and start again.')
+            st.session_state[notice] = (f'The {what} was not started: another tab or window changed these settings '
+                                        'meanwhile: ' + ', '.join(settings_taken_over) + '. Check the settings '
+                                        'shown now and start again.')
             st.rerun()
         cmd = engine_command(sys.executable, BASE / 'framescout_engine.py', search_folders, RESULTS, settings,
                              st.session_state[setting_key('device')], **search)
         st.session_state.pop('cleanup_scan', None)  # the search changes what a cleanup finds (E7)
         st.session_state.pop('cache_check', None)  # and the cache a check looked at (F1)
         try:
-            problem = start_run(cmd)
+            problem = start_run(cmd, analyze_only=bool(search.get('analyze_only')))
         except Exception as exc:
             problem = f'Start failed: {exc}'
         # kept for the next page run: the state may have changed, which reruns the page
-        st.session_state.run_notice = problem
+        st.session_state[notice] = problem
         st.rerun()
     if start:
         start_engine(profiles=PROFILES)
@@ -1811,6 +1823,7 @@ with run_tab:
         st.warning(model_missing)  # why Start is not available
     analyzed = None  # the photos analyzed with these settings: counted only while no search runs
     quick_counts = None  # quick_scope: (analyzed, not analyzed, partners) of a quick search, as the engine counts (E61)
+    analysis_text = None  # what "Analyze photos now" would do (F18)
     if folder_scans and not active:
         try:
             cache_key = file_key(RESULTS / CACHE_FILE)
@@ -1830,12 +1843,40 @@ with run_tab:
         # and scoring and the gallery thumbnails at the speeds of earlier searches (F16)
         finishing = finishing_minutes((run_status or {}).get('finishing'), len(photo_scan.paths),
                                       gallery_thumbnails(len(photo_scan.paths), settings['top'], len(profiles)))
-        st.info(start_summary(len(photo_scan.paths), analyzed,
-                              known_throughput(run_status, cleanup_signature(), chosen_device), finishing))
+        per_minute = known_throughput(run_status, cleanup_signature(), chosen_device)
+        st.info(start_summary(len(photo_scan.paths), analyzed, per_minute, finishing))
+        analysis_text = analysis_summary(len(photo_scan.paths), analyzed, per_minute)
         space_warning = low_space_warning(len(photo_scan.paths), settings['top'], len(profiles), settings['model'],
                                           settings['person_detection'], analyzed)
         if space_warning:
             st.warning(space_warning)
+    with analyze_area:
+        # F18: the analysis of a search without the search, e.g. overnight before the profiles
+        # are written; it runs like a search (run lock, status, stop button, low priority)
+        st.subheader('Analyze ahead')
+        st.caption('Analyzing the photos is the slow part of a first search. "Analyze photos now" analyzes the photos '
+                   'of the listed folders with the current AI settings and keeps the analyses in the cache, without '
+                   'searching: no search profile is needed, and the results of the last search stay as they are. '
+                   'A later search with the same search model and person detection settings only ranks these photos, '
+                   'and the quick search can search them; after a change of these settings, the photos are analyzed '
+                   'again. Its progress and the button to stop it are in the tab "Search & results"; "Keep the PC '
+                   'responsive" applies to it as to a search.')
+        st.caption(f"Current settings: search model {MODELS[settings['model']].label} · person detection "
+                   f"{'on' if settings['person_detection'] else 'off'}.")
+        if st.session_state.get('analyze_notice'):
+            st.warning(st.session_state.pop('analyze_notice'))
+        all_analyzed = analyzed is not None and analyzed >= len(photo_scan.paths)
+        analyze_now = st.button('Analyze photos now', disabled=active or not folder_scans or not photo_scan.paths
+                                or bool(model_missing) or all_analyzed)
+        if active:
+            st.info('Not available while a search or an analysis runs (its progress is shown in the tab "Search & '
+                    'results") or the storage is being cleaned up.')
+        elif analysis_text:
+            st.info(analysis_text)
+        if model_missing and not active:
+            st.warning(model_missing)  # why the button is not available
+    if analyze_now:
+        start_engine(notice='analyze_notice', analyze_only=True)
     @st.fragment(run_every='2s')
     def show_status():
         # the state of this page run, read once at its top; fragment-only reruns read it again (review)
@@ -1848,24 +1889,29 @@ with run_tab:
             st.info('The storage is being cleaned up or the cache checked in another tab or window. You can start '
                     'a search again when it is done.')
         elif now_active:
-            st.info('Search running. You can reload this page or close the tab: the search continues and '
-                    'is shown again when you come back. Photos that are already analyzed are kept in the cache.')
+            # an analysis without a search (F18) is named as such: it writes no results
+            what = 'analysis' if analysis_only(status) else 'search'
+            st.info(f'{what.capitalize()} running. You can reload this page or close the tab: the {what} continues '
+                    'and is shown again when you come back. Photos that are already analyzed are kept in the cache.'
+                    + (' The results below stay as they are.' if what == 'analysis' else ''))
         elif status:
             phase = status.get('phase')
             message = status.get('message')
+            name = run_name(status)  # "search run" or "analysis" (F18)
             if phase == 'finished':
                 finished_at = str(status.get('updated', '')).replace('T', ' ')[:19]
-                st.success(f'The last search run finished successfully ({finished_at}).')
+                st.success(f'The last {name} finished successfully ({finished_at}).'
+                           + (' ' + analysis_result_text(status) if analysis_only(status) else ''))
                 if message:  # e.g. photos the cache could not be read for (E50, review)
                     st.warning(message)
             elif phase == 'interrupted':
-                st.warning(f"The last search run was interrupted{': ' + message if message else '.'} "
+                st.warning(f"The last {name} was interrupted{': ' + message if message else '.'} "
                            'Photos analyzed so far are in the cache; start again to resume.')
             elif phase in FINAL_PHASES:
-                st.warning(f"The last search run failed (exit code {status.get('exit_code')})"
+                st.warning(f"The last {name} failed (exit code {status.get('exit_code')})"
                            f"{': ' + message if message else ''}. See the log for details.")
             else:
-                st.warning(f"The last search run ended during the phase \"{PHASE_LABELS.get(phase, phase)}\" "
+                st.warning(f"The last {name} ended during the phase \"{PHASE_LABELS.get(phase, phase)}\" "
                            'without finishing (stopped or crashed). Photos analyzed so far are in the cache; '
                            'see the log for details.')
         if status and status.get('phase') != 'finished':
