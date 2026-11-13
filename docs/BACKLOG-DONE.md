@@ -1971,7 +1971,7 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `docs/ARCHITECTURE.md`. Risks: PID reuse on Windows (also compare the process start
       time or the port). Size S–M. Roadmap P27.
       Done 2026-11-13 (PR #101): `Start-FrameScout.bat` runs the new entry point
-      `framescout_start.py`, which runs Streamlit in its own process and uses
+      `framescout_start.py`, which runs Streamlit in its own process (no child process) and uses
       `framescout_core.app_instance` (`launch`, `RunLock` on `.tmp/app-instance.lock`, port in
       `.tmp/app-instance.json`, liveness from the OS lock, never a PID). A second start of the
       same folder opens the browser on the running app (waits up to 30 s for it, else a message
@@ -1980,5 +1980,11 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       or cache; new files only under `.tmp/`. Tests: `tests/test_app_instance.py`, `ENTRY_POINTS`
       in `tests/test_layout.py`, full pytest suite; a launcher smoke run with a trivial app
       (8501 held by a test socket gave 8502, a second start opened the browser and exited 0).
-      Not tested: a real double-click of the `.bat` with the real app and browser. Out of scope:
-      an app started by hand or by an older version holds no lock (F26).
+      Out of scope: an app started by hand or by an older version holds no lock (F26).
+      Review: a claim deletes a killed app's JSON and waits 0.5 s for the lock (another
+      start's probe), an unopenable or stuck lock names `.tmp\app-instance.lock` as the way
+      out, Ctrl+C ends with 0. A smoke run of the real `app.py` through `framescout_start.py`
+      (copy under `.tmp`, logged browser, headless Edge) rendered the app on 8502 with 8501
+      held, a second start opened 8502, a start after a hard kill ignored the stale JSON and
+      SIGINT stopped it with 0. Not tested: a real double-click of the `.bat` with Ctrl+C in
+      its console window.

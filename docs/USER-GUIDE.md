@@ -106,8 +106,10 @@ If another program already uses port 8501, FrameScout takes the next free port u
 and prints a note; the address in the start window is the one to use. If FrameScout of this
 folder already runs (for example in a forgotten window), a second start opens the browser on
 that app instead of starting another one. If that app does not answer within 30 seconds, the
-start window asks you to close the other window and start again. Close the start window to
-stop the app.
+start window asks you to close the other window and start again. If no FrameScout window of
+this folder is open and the start still says so, delete the file `.tmp\app-instance.lock` in
+the FrameScout folder and start again (Windows does not let you delete it while the app
+runs). Close the start window or press Ctrl+C in it to stop the app.
 
 ### Search profiles
 
