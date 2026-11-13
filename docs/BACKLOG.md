@@ -310,6 +310,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       the browser frontend and missed the jumping-back controls, with a script that
       drives the real frontend in headless Microsoft Edge over the DevTools protocol
       (kept outside the repo; not in CI).
+      2026-11-13 (A49): the mark colors were checked with such a script too (outside the
+      repo); their selector names are checked against the installed Streamlit bundle where
+      Streamlit is installed. A repeatable, committed browser check (script or a tool such
+      as Playwright, a new dependency) is still open.
       Open: tests for cache signature/reuse and scoring; tests of `app.py` itself (e.g.
       Streamlit's `AppTest`, which needs Streamlit in CI); a smoke test with real models.)
 - [ ] `decision` **I9 – CI action pins are updated by hand only:** `.github/workflows/tests.yml`
