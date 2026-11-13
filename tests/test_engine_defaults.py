@@ -446,8 +446,14 @@ def test_the_engine_offers_an_analysis_without_a_search():
         ast.unparse(n) for n in ast.walk(refused.test)}
     # no profile: no search text is encoded and no reference image read
     assert any(ast.unparse(node) == 'profiles = []' for node in branch.body)
-    # the analysis itself is the one of a search: quick is false
-    assert not any(analyze_test(node) for node in ast.walk(search) if quick_test(node, negated=True))
+    # the analysis itself is the one of a search: quick is false, and the analysis branch
+    # ("if not quick:") does not branch on analyze_only (review: the old check could not fail)
+    [quick] = [node for node in ast.walk(search) if isinstance(node, ast.Assign)
+               and any(isinstance(t, ast.Name) and t.id == 'quick' for t in node.targets)]
+    assert 'analyze_only' not in ast.unparse(quick.value)
+    analysis = [node for node in ast.walk(search) if quick_test(node, negated=True)]
+    assert analysis
+    assert not any(analyze_test(inner) for node in analysis for inner in ast.walk(node))
 
 
 def test_an_analysis_stops_before_scoring_and_export():
