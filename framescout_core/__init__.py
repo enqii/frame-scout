@@ -51,8 +51,8 @@ from .thumbnails import (FULL_IMAGE_LABEL, crop_label, thumbnail_name, ensure_th
 from .pipeline import (progress_line, progress_due, DRAFT_REDUCING_GAP, DRAFT_DECODING, draft_size,
     group_batches, store_group, prefetch, Lazy)
 from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINAL_PHASES, NOTHING_NEW, LOADING_DETECTOR,
-    ALL_ANALYZED, StatusReporter, write_status, stopped_status, started_in_time, final_status, read_status,
-    run_active, status_fraction, status_text, analysis_only, run_name, analysis_result_text)
+    ALL_ANALYZED, NONE_ANALYZED, StatusReporter, write_status, stopped_status, started_in_time, final_status, read_status,
+    run_active, status_fraction, status_text, analysis_only, nothing_new_message, run_name, analysis_result_text)
 from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
     DEFAULT_REFERENCE_WEIGHT, AI_SETTINGS, SETTINGS_LOCK_TIMEOUT, LEGACY_PHOTO_FOLDER, default_settings, folder_lines,
     read_settings, save_settings, reconcile_settings, changed_from_defaults, setting_text, engine_command)

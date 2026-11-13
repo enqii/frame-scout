@@ -456,6 +456,13 @@ def test_the_engine_offers_an_analysis_without_a_search():
     assert not any(analyze_test(inner) for node in analysis for inner in ast.walk(node))
 
 
+def test_an_analysis_with_errors_does_not_say_all_photos_are_analyzed():
+    # review: the message without new analyses depends on the failed photos too
+    [call] = [node for node in ast.walk(search_node()) if isinstance(node, ast.Call)
+              and getattr(node.func, 'id', None) == 'nothing_new_message']
+    assert [ast.unparse(arg) for arg in call.args] == ['analyze_only', 'errors']
+
+
 def test_an_analysis_stops_before_scoring_and_export():
     # F18: results.json, the galleries, the marks and the scores file stay as they are
     search = search_node()
