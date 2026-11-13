@@ -118,15 +118,18 @@ def detector_weights_line(weights, cwd):
 
     weights is what yolo_weights returned: the cache signature records --yolo-model only as
     given, so a copy of the same name in the working folder (E41) or a relative path from
-    another working folder is told apart only by this line. A relative path is shown as the
-    absolute one in cwd; a URL as given; a file that is not there yet gets a note that it is
-    downloaded on first use.
+    another working folder is told apart only by this line. It is printed before the load, so
+    a load that fails still names the file tried. A relative path is shown as the absolute one
+    in cwd (the path Ultralytics opens; it expands no "~", review); a URL as given. A file
+    that is not there gets a note without promising a download: Ultralytics downloads only
+    the names of its own releases, any other missing file fails to load (review).
     """
     if '://' in weights:
-        return f'Person detector weights: {weights}'
+        return f'Loading person detector weights: {weights}'
     path = Path(os.path.abspath(Path(cwd) / weights))
-    note = '' if path.is_file() else ' (not there yet, downloaded on first use)'
-    return f'Person detector weights: {path}{note}'
+    note = '' if path.is_file() else (' (not found: Ultralytics downloads it if it is one of its'
+                                      ' official weights files, otherwise the load fails)')
+    return f'Loading person detector weights: {path}{note}'
 
 
 def find_yolo_weights(name, base, cwd, environ):
