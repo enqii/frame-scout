@@ -274,3 +274,24 @@ def test_the_message_of_an_app_that_never_answers_names_the_lock_file(tmp_path):
             start.lines
     finally:
         other.release()
+
+
+def test_ctrl_c_in_the_start_window_ends_without_an_error(monkeypatch):
+    import framescout_start
+
+    def interrupted(*args, **kwargs):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(framescout_start, 'launch', interrupted)
+    assert framescout_start.main() == 0
+
+
+def test_ctrl_c_while_the_app_runs_gives_the_lock_back(tmp_path):
+    start = Launch(tmp_path)
+
+    def interrupted(port):
+        raise KeyboardInterrupt
+    start.run_app = interrupted
+    with pytest.raises(KeyboardInterrupt):
+        start()
+    assert not core.lock_held(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
+    assert not (tmp_path / INSTANCE_DIR / INSTANCE_FILE).exists()
