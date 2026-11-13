@@ -755,10 +755,55 @@ both); the marker (I35) lets `framescout_uninstall.py` run next to them. Opt-in 
 
 ### `Start-FrameScout.bat`
 
-`Start-FrameScout.bat`: runs `framescout_start.py` (F22; an entry point with the I35 marker, in `ENTRY_POINTS`) with that venv. The script runs Streamlit in its own process through `streamlit.web.cli.main` with `framescout_core.streamlit_args` (`127.0.0.1`, headless off, no usage stats) and `framescout_core.launch` (`framescout_core/app_instance.py`): `launch` takes an OS lock (`RunLock`) on `.tmp/app-instance.lock` and writes `.tmp/app-instance.json` (`{"port": N}`) while the app runs, removed on a clean exit. Liveness comes from the lock, never a PID, so a stale JSON of a killed app is ignored and PID reuse cannot fake a running app. A second start of the same folder waits up to `INSTANCE_WAIT` (30 s) for that port to answer, opens the browser on `http://127.0.0.1:<port>` and exits 0; if it never answers it prints "close that window ..." and exits 1 (the `.bat` pauses). If another program holds 8501, the next free port of `APP_PORTS` (8501-8510) is used with a printed note; all busy: message, exit 1 (`port_free`: nothing answers on `127.0.0.1` and it can be bound). Known gap: an app started by hand (`streamlit run app.py`) or by an older version holds no lock, so a later start opens a second app (F26). Both files live under `.tmp` (deleted by the uninstaller; no cleanup category touches `.tmp`, so no `NEVER_DELETED` entry). Tests: `tests/test_app_instance.py` (ports, lock, JSON, launch paths with fakes; no Streamlit). Not runtime-verified: a real double-click with the real app and browser (a launcher smoke run with a trivial app under `.tmp` passed: busy 8501 gave 8502, a second start opened the browser on 8502). Right after the `cd` it
-deletes `framescout_core.py` when `framescout_core\__init__.py` exists (I16, same lines and
-message as in the installer, including the skipped folder and the stop when the file stays), and
-the same for `framescout_scoring.py` (I36).
+`Start-FrameScout.bat` runs these steps in order:
+
+1. `cd` to its own folder.
+2. Deletes `framescout_core.py` when `framescout_core\__init__.py` exists (I16, same lines and
+   message as in the installer, including the skipped folder and the stop when the file
+   stays), and the same for `framescout_scoring.py` (I36).
+3. Sets the cache variables (A36), `TMP`/`TEMP` to `.tmp` and creates `.tmp`; stops if the
+   venv is missing.
+4. Runs `framescout_start.py` with that venv (F22; an entry point with the I35 marker, in
+   `ENTRY_POINTS`) and pauses if it exits non-zero.
+
+`framescout_start.py` calls `framescout_core.launch` (`framescout_core/app_instance.py`) and
+runs Streamlit **in its own process** (no child process) through `streamlit.web.cli.main` with
+`framescout_core.streamlit_args` (`127.0.0.1`, headless off, no usage stats). One process
+keeps the lock exactly as long as the app runs: a child process would outlive a killed
+launcher without the lock (review). Ctrl+C stops Streamlit's server cleanly (exit 0); a
+`KeyboardInterrupt` outside it (e.g. while waiting for another app) also ends with 0, so the
+`.bat` does not pause.
+
+`launch`:
+
+- takes an OS lock (`RunLock`, trying for `_CLAIM_WAIT` = 0.5 s, because `running()` of a
+  waiting start probes the lock for a moment) on `.tmp/app-instance.lock`, deletes a
+  `.tmp/app-instance.json` left by a killed app right away (so no start reads its port), and
+  writes `.tmp/app-instance.json` (`{"port": N}`) while the app runs, removed on a clean exit.
+  Liveness comes from the lock, never a PID, so PID reuse cannot fake a running app.
+- A second start of the same folder waits up to `INSTANCE_WAIT` (30 s) for that port to
+  answer, opens the browser on `http://127.0.0.1:<port>` and exits 0; if it never answers it
+  prints "close that window ..." and exits 1 (the `.bat` pauses).
+- If the lock file cannot be opened (e.g. kept open by a virus scanner), or the lock looks
+  held without an answering app, the message names `.tmp\app-instance.lock` and says to
+  delete it if no FrameScout window of the folder is open (Windows refuses to delete it while
+  an app holds it). `lock_held` keeps counting an unopenable file as held (the safe side).
+- If another program holds 8501, the next free port of `APP_PORTS` (8501-8510) is used with
+  a printed note; all busy: message, exit 1. `port_free`: nothing answers on `127.0.0.1` and
+  a plain bind of `127.0.0.1` succeeds, the same bind Streamlit makes (no `SO_REUSEADDR` on
+  Windows), so a listener on `0.0.0.0` or dual-stack `::` counts as busy and one on `::1`
+  only does not conflict.
+
+Known gap: an app started by hand (`streamlit run app.py`) or by an older version holds no
+lock, so a later start opens a second app (F26). Both files live under `.tmp` (deleted by the
+uninstaller; no cleanup category touches `.tmp`, so no `NEVER_DELETED` entry). Tests:
+`tests/test_app_instance.py` (ports, lock, JSON, launch paths with fakes, Ctrl+C; no
+Streamlit). Runtime check (review): the real `app.py` of a copy under `.tmp`, started through
+`framescout_start.py` with a logged instead of a real browser, rendered in headless Edge with
+8501 held (port 8502); a second start opened the browser on 8502 and exited 0; after a
+hard kill the next start ignored the stale JSON, and SIGINT stopped it with exit 0 and no
+JSON left. **Not runtime-tested:** a real double-click of the `.bat` with Ctrl+C in its
+console window.
 `Check-FrameScout.bat` stays read-only: in such a folder it prints the `Program files` problem
 line (I34) and exits with 2.
 
