@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 windows_only = pytest.mark.skipif(sys.platform != 'win32', reason='runs a .bat file')
 # the scripts that are run (they set the marker) and the modules only imported by them
 ENTRY_POINTS = ('app.py', 'framescout_engine.py', 'framescout_eval.py', 'install_torch.py', 'framescout_check.py',
-                'framescout_uninstall.py')
+                'framescout_uninstall.py', 'framescout_start.py')
 # added after I15 (E49), so no version with the single file framescout_core.py has it; the
 # versions with the single file framescout_scoring.py (before I30) since E49 do (review)
 LIBRARY_MODULES = ('framescout_images.py',)

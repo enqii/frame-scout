@@ -47,5 +47,7 @@ if not exist ".venv\Scripts\python.exe" (
  pause
  exit /b 1
 )
-".venv\Scripts\python.exe" -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --server.headless false --browser.gatherUsageStats false
+rem F22: framescout_start.py runs the app on 127.0.0.1, port 8501 or the next free one up to
+rem 8510, or opens the browser on the app of this folder if it runs already.
+".venv\Scripts\python.exe" framescout_start.py
 if errorlevel 1 pause
