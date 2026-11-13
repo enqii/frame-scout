@@ -968,8 +968,9 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       global of the page run (`active`, `folder_scans`, `settings`, `profiles_shown`), it gets
       the value as an argument, since module globals are shared by all browser sessions. The
       `setting_<name>` and all other session-state and widget keys are unchanged.
-      `DECODERS`/`SUPPORTED`/`UPLOAD_TYPES` are computed once at the first import. New
-      `tests/app_source.py` (syntax tree of `app.py` plus `framescout_ui/*.py`) and
+      The readable formats are evaluated in every page run, as before (review). New
+      `tests/app_source.py` (syntax tree of `app.py` plus `framescout_ui/*.py`; `page_tree()`:
+      `app.py` alone, for order checks) and
       `tests/test_app_source.py` (every global name defined or imported, imported names exist,
       only `app.py` imports `framescout_ui`); source-reading tests use the combined tree. The
       uninstall lists `framescout_ui/__pycache__`. 1599 passed, 2 skipped. An `AppTest`
