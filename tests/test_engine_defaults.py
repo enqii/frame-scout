@@ -10,8 +10,9 @@ import pytest
 
 from framescout_core import RUN_STATUS, cache_paths, default_cache_env, engine_cache_env, read_status
 
+from app_source import app_tree
+
 ENGINE = Path(__file__).resolve().parent.parent / 'framescout_engine.py'
-APP = ENGINE.with_name('app.py')
 
 
 def option_default_node(option):
@@ -94,8 +95,8 @@ def test_the_engine_output_never_fails_on_a_character_of_another_code_page():
 
 def test_the_app_starts_the_engine_with_utf8_output():
     # E22 review: the app writes the engine's output to run.log and reads it as UTF-8
-    tree = ast.parse(APP.read_text(encoding='utf-8'))
-    [cache_env] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'cache_env']
+    [cache_env] = [node for node in ast.walk(app_tree()) if isinstance(node, ast.FunctionDef)
+                   and node.name == 'cache_env']
     assigned = {ast.unparse(node.targets[0]): ast.unparse(node.value) for node in ast.walk(cache_env)
                 if isinstance(node, ast.Assign) and len(node.targets) == 1}
     assert assigned.get("env['PYTHONIOENCODING']") == "'utf-8'"
@@ -104,8 +105,8 @@ def test_the_app_starts_the_engine_with_utf8_output():
 def test_the_app_keeps_the_cache_variables_a_user_set(tmp_path):
     # A36: the engine the app starts gets them as a manual run does (engine_cache_env), not
     # all of cache_paths over the user's values
-    tree = ast.parse(APP.read_text(encoding='utf-8'))
-    [cache_env] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'cache_env']
+    [cache_env] = [node for node in ast.walk(app_tree()) if isinstance(node, ast.FunctionDef)
+                   and node.name == 'cache_env']
     stored = {ast.unparse(node.slice) for node in ast.walk(cache_env)
               if isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store)}
     assert stored == {"'TMP'", "'TEMP'", "'PYTHONIOENCODING'"}
@@ -115,7 +116,7 @@ def test_the_app_keeps_the_cache_variables_a_user_set(tmp_path):
     environ = {'PATH': 'x', 'HF_HOME': str(own)}
     namespace = {'os': SimpleNamespace(environ=environ), 'BASE': tmp_path, 'cache_paths': cache_paths,
                  'default_cache_env': default_cache_env}
-    exec(compile(ast.Module(body=[cache_env], type_ignores=[]), str(APP), 'exec'), namespace)
+    exec(compile(ast.Module(body=[cache_env], type_ignores=[]), 'cache_env', 'exec'), namespace)
     env = namespace['cache_env']()
     temp = str(tmp_path / '.tmp')
     assert env == {**engine_cache_env(environ, tmp_path), 'TMP': temp, 'TEMP': temp, 'PYTHONIOENCODING': 'utf-8'}

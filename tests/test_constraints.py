@@ -15,6 +15,8 @@ import pytest
 
 from framescout_core import CONSTRAINTS_FILE, REQUIREMENTS_DIR, REQUIREMENTS_FILE, windows_path
 
+from app_source import app_tree
+
 ROOT = Path(__file__).resolve().parent.parent
 # the requirement files are in requirements/ since I31: the folder the code names (review)
 FOLDER = ROOT / REQUIREMENTS_DIR
@@ -168,13 +170,12 @@ def test_the_requirement_files_the_installer_and_ci_name_exist():
 
 
 def test_streamlit_floor_allows_the_width_parameter():
-    # app.py sizes its buttons with width="stretch", which st.button and st.download_button
+    # the app sizes its buttons with width="stretch", which st.button and st.download_button
     # accept since Streamlit 1.48.0 (A10)
     specifiers = requirements('requirements.txt')['streamlit']
     floors = [wanted for op, wanted in specifiers if op == '>=']
     assert floors and all(version_key(wanted) >= version_key('1.48') for wanted in floors)
     # only call keywords count, so a comment or string that names the old parameter does not
     # fail the test (A10, review)
-    tree = ast.parse((ROOT / 'app.py').read_text(encoding='utf-8'))
-    keywords = {node.arg for node in ast.walk(tree) if isinstance(node, ast.keyword)}
+    keywords = {node.arg for node in ast.walk(app_tree()) if isinstance(node, ast.keyword)}
     assert 'use_container_width' not in keywords, 'use width="stretch" instead (A10)'

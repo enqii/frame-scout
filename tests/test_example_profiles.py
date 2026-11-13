@@ -7,6 +7,8 @@ import pytest
 import framescout_core
 from framescout_core import EXAMPLE_PROFILES_FILE, create_from_example, load_profiles
 
+from app_source import app_tree
+
 REPO = Path(__file__).resolve().parent.parent
 EXAMPLE = REPO / EXAMPLE_PROFILES_FILE
 
@@ -117,10 +119,10 @@ def test_the_shipped_example_loads_and_is_general_purpose():
 
 
 def test_the_app_creates_profiles_json_from_the_shipped_example():
-    # app.py imports streamlit, so its path constant is read from the source; compared as a
-    # syntax tree, so line breaks and spacing do not matter (review)
-    tree = ast.parse((REPO / 'app.py').read_text(encoding='utf-8'))
-    [value] = [node.value for node in tree.body if isinstance(node, ast.Assign)
+    # the app imports streamlit, so its path constant is read from the source (app.py or a
+    # module of framescout_ui, A46); compared as a syntax tree, so line breaks and spacing do
+    # not matter (review)
+    [value] = [node.value for node in app_tree().body if isinstance(node, ast.Assign)
                and any(isinstance(t, ast.Name) and t.id == 'EXAMPLE_PROFILES' for t in node.targets)]
     assert ast.dump(value) == ast.dump(ast.parse('BASE / EXAMPLE_PROFILES_FILE', mode='eval').body)
     # in assets/ since I31
