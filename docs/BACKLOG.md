@@ -250,21 +250,27 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       them, and (user decision) neither category is selected by default any more. Idea:
       record the volume serial number (or mount) per root, which changes the cache or a
       side file (hold point). Found in the PR of E8.
-- [ ] `minor` **A45 – The mark colors in the gallery caption are not checked in a browser:** since
-      A38 (PR #77) the `<style>` block of `mark_style` is prepended to the caption above the
-      cards (`st.caption(..., unsafe_allow_html=True)`) instead of an own `st.markdown`
-      element. Only Streamlit's `AppTest` checked it, which cannot see layout or CSS. Check in
-      a real browser, light and dark theme: the mark colors still apply after mark clicks and
-      page changes (fragment reruns), the caption shows no stray text, and no gap is left above
-      the cards. If not, try `st.html` (A38). Review of PR #77, finding 1.
-- [ ] **A46 – Split `app.py` into modules (simplification):** `app.py` has about 1,900 lines
+- [ ] `ready` **A49 – The mark colors do not apply (replaces A45):** in a real browser with the
+      pinned Streamlit 1.66.1 the selected option of every mark control ("Undecided", "Match",
+      "No match") has Streamlit's default red, so the three states look the same. `mark_style`
+      (`framescout_core/marks.py`) targets `button[kind="segmented_controlActive"]`, but the
+      buttons carry no `kind` attribute any more; the selected one has `data-selected="true"`
+      and `aria-checked="true"` (`role="radio"`, `data-variant="segmented_control"`). Fix the
+      selector, keep `MARK_STYLE_STREAMLIT` and its test in step, and check in a browser (light
+      and dark theme, after mark clicks and page changes) as A45 asked; `AppTest` cannot see
+      CSS. P35 rebuilds the card, so keep the fix small. Affected: `framescout_core/marks.py`,
+      `tests/`, `docs/ARCHITECTURE.md`. Found in the browser pass of 2026-11-13
+      (`docs/UI-REVIEW.md`). Size S. Roadmap P30.
+- [ ] `ready` **A46 – Split `app.py` into modules (simplification):** `app.py` has about 1,900 lines
       and holds process control (start/stop of the engine), marks, copying, export, storage
       cleanup, cache check, settings widgets and the result views in one file. Move the areas
       into modules (e.g. `ui/results.py`, `ui/cleanup.py`, `ui/settings.py`, `ui/run.py`) or
       Streamlit pages, without changing behavior; `app.py` keeps the page layout. Check first
       how Streamlit's `AppTest` tests and the `setting_<name>` session-state keys are affected.
       Found on 2026-11-12 in a simplification review of the whole project.
-- [ ] **A47 – Decide the frontend framework before distribution (simplification):** a large
+      Triage 2026-11-13: runs before the UI rebuild (P32–P37 all touch these areas), with a
+      browser check that nothing changed. Size M. Roadmap P31.
+- [ ] `decision` **A47 – Decide the frontend framework before distribution (simplification):** a large
       part of `app.py` works around Streamlit's rerun model (session-state keys for every
       widget, fragments, `cached_*` functions keyed by mtime/size, notices carried over
       reruns). Before P5 (distribution) decide once whether Streamlit stays or a small local
@@ -272,6 +278,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       for the decision: size and start time of the bundle, the effort of a rewrite against the
       code that would go away, and what the tests can check then. Product decision and new
       dependency (hold point). Found on 2026-11-12 in a simplification review.
+      Triage 2026-11-13: decided separately and later; the UI rebuild P32–P37 stays within
+      Streamlit. **Question:** Streamlit or a local server with an HTML frontend.
 - [ ] `minor` **A48 – The summary before a search counts photos that never get a cache row as "to analyze":**
       `start_summary` of a search takes the photos with a cache row of their own
       (`quick_scope`'s first count). A JPEG/HEIC searched through its RAW file or another
@@ -283,6 +291,19 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       as analyzed for the search's summary too (the disk space estimate then follows), and
       name failed photos of the last run, e.g. from its status counts. Found in the review of
       PR #100, finding 6.
+- [ ] `minor` **A50 – The profile tab is long:** "New search profile" sits below the list, and
+      every profile opens to a full form (four text fields, an uploader, a checkbox, two
+      buttons). Sketch: the new-profile form first or behind a button, compact profile rows.
+      Affected: `app.py`, user guide. `docs/UI-REVIEW.md` §3. Size S.
+- [ ] `minor` **A51 – Long explanatory captions:** "Analyze ahead" (about 100 words), the quick
+      search and the AI settings explain everything in one grey block. Sketch: one short
+      sentence, the rest behind a help tooltip or a "More" expander; the required English-only
+      hint (E3) stays. Affected: `app.py`, user guide. `docs/UI-REVIEW.md` §4. Size S.
+- [ ] `ready` **A52 – Second browser pass for the parts not looked at:** the pass of 2026-11-13
+      did not cover the dark theme, narrow windows, "Find similar", the contents of "Clean up
+      storage", profiles with reference images and real photos (person crops, long runs). Do it
+      after P35, when the cards have changed, and add the findings as backlog items. Kind
+      `docs`. Size S.
 
 ### Installation / project
 
@@ -519,14 +540,16 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
       may show people (say so in the guide). **Question:** the contents of the new bundle format
       (no `profiles.json` schema change). Size M.
-- [ ] `decision` **F19 – One-photo review mode with a large preview:** marking (A17) happens on
-      small thumbnails. Sketch: a "Review" toggle shows one result at a time with a large preview
-      (decoded downscaled in memory), the best crop outlined if the result has the data, score
-      lines and buttons "Match", "No match", "Skip", saving through `save_marks`. Keyboard keys
-      only without a new dependency. Affected: `app.py`, `framescout_images.py`,
+- [ ] `ready` **F19 – One-photo review in a dialog with a large preview:** marking (A17) happens
+      on small thumbnails. Decided 2026-11-13 (replaces F31): a dialog (`st.dialog`) opened by
+      "Review one by one" in the results toolbar and by a click on a card's photo. It shows one
+      result with a large preview (decoded downscaled in memory), the best crop outlined if the
+      result has the data, rank, score and path, and the buttons "Match", "No match" and "Skip";
+      each choice saves through `save_marks` and shows the next undecided photo; "Previous",
+      "Next", "Open photo" and "Find similar" below. Keyboard keys only without a new
+      dependency. Affected: `app.py` (its modules after A46), `framescout_images.py`,
       `framescout_core`, user guide. Risks: decoding large RAW/HEIC on every rerun is slow
-      (cache the preview per path and mtime). **Question:** where the mode lives, keyboard
-      support; decide after the UI/UX review (F24). Size M.
+      (cache the preview per path and mtime). Builds on F30 and F29. Size M. Roadmap P37.
 - [ ] `parked` **F21 – Warn about cloud-only photos before a search:** photos in OneDrive-style
       folders with files on demand are downloaded when read. Sketch: flag files with
       `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`/`FILE_ATTRIBUTE_OFFLINE` during the scan, show a
@@ -556,32 +579,68 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       why; Start can be disabled for reasons shown in another tab. Sketch: a one-line state under
       the title ("Search running – progress in Search & results") and a "Start is not available
       because ..." line under the Start button. Affected: `app.py`, user guide. Found in the F24
-      review (`docs/UI-REVIEW.md` §4). Size S.
-- [ ] `decision` **F28 – Split "Search & results":** the tab holds start/stop, status, quick search
-      and its gallery, the profile results, copy, export and storage maintenance.
-      **Options:** (a) five tabs (profiles, source, settings, search, results; storage into
-      settings); (b) four tabs, quick search in an expander and storage into settings; (c) leave.
-      Affected: `app.py` (do it with or after A46), user guide, screenshots if any. Risks: widget
-      keys and fragments must keep working; `setting_<name>` keys unchanged. F24 review §1. Size M.
-- [ ] `decision` **F29 – Compact results header and bottom actions:** the first photo sits below a
-      profile selector, captions, info boxes, buttons, a checkbox and a pager; copy and export
-      are below the 48 cards; no pager below the grid. **Options:** (a) one-row toolbar, notes
-      collapsed unless an exceptional state, copy/export in an expander above the grid, pager
-      also below; (b) only the pager and the collapsed notes. Affected: `app.py`, user guide.
-      F24 review §1. Size M.
-- [ ] `minor` **F30 – One function draws a result card for profile and quick results:**
-      `show_results` and `show_quick_results` repeat the card code with small differences.
-      Affected: `app.py`. F24 review §5; fits A46. Size S.
-- [ ] `decision` **F31 – Where the large preview of F19 lives:** **Options:** (a) a "Review" toggle
-      on the results tab; (b) a dialog (`st.dialog`) opened from a card; (c) fewer, larger
-      columns as a cheap substitute, also for clicking the thumbnail to open the photo. Decide
-      together with F29. Affected: `app.py`, F19. F24 review §2. Size S–M.
+      review (`docs/UI-REVIEW.md` §4). Decided 2026-11-13: the state line sits next to the title on every
+      tab (idle: last search and photo count; running: progress and a pointer to the search
+      tab), and the start area lists what a search needs (profiles, photos, model) with what
+      is missing. Size S. Roadmap P32.
+- [ ] `ready` **F28 – Five tabs instead of "Search & results":** the tab holds start/stop,
+      status, quick search and its gallery, the profile results, copy, export and storage
+      maintenance. Decided 2026-11-13: five tabs (Search profiles, Photo source, Settings,
+      Search, Results); "Clean up storage" and the cache check move to Settings; "Analyze
+      ahead" moves from Photo source to the Search tab, next to Start, so that start, progress
+      and Stop are in one place. Affected: `app.py` (its modules after A46), user guide. Risks:
+      widget keys and fragments must keep working; `setting_<name>` keys unchanged.
+      `docs/UI-REVIEW.md` §1. Size M. Roadmap P33 (A).
+- [ ] `ready` **F29 – One-row results toolbar and a pager below the grid:** the first photo
+      starts 520 px below the "Results" heading (profile selector, captions, info boxes,
+      buttons, a checkbox, a pager); copy and export are below the 48 cards; no pager below the
+      grid. Decided 2026-11-13: one toolbar row (profile selector, the counts of match, no
+      match and undecided, "Hide no match", pager, "Review one by one" once F19 exists, and a
+      popover "Export and copy" with copy, list export, gallery and results folder); the notes
+      for exceptional states (other model, changed profile, missing profile) only when they
+      apply; a second pager and "Go to first undecided" below the grid. Affected: `app.py`
+      (its modules after A46), user guide. `docs/UI-REVIEW.md` §1. Size M. Roadmap P36.
+- [ ] `ready` **F30 – A new result card, drawn by one function:** `show_results` and
+      `show_quick_results` repeat the card code; cards of portrait and landscape photos have
+      different heights, so the rows are ragged; five equal buttons per card; a marked card
+      looks like an unmarked one; the page is limited to 1,300 px, which leaves a third of a
+      1920 px window empty and the thumbnails 253 px wide. Decided 2026-11-13: one function
+      for both views; cells of one size (the photo fitted into a square, as in the HTML
+      gallery; by padded thumbnails or CSS, without changing the cache signature); the two
+      main buttons "Match" and "No" (neither pressed = undecided, a second click takes the mark
+      back); "Open photo", "Show in folder" and "Find similar" in a popover; the card shows its
+      state (match: blue frame, no match: photo dimmed; blue and orange, told apart without
+      red/green); the grid uses the window width with a fixed cell size of about 250 px.
+      Affected: `app.py` (its modules after A46), `framescout_core/marks.py` (`mark_style`),
+      user guide. Risks: CSS on Streamlit internals, see A49; `marks.json` unchanged.
+      `docs/UI-REVIEW.md` §2 and §5. Size M. Roadmap P35.
 - [ ] `ready` **F32 – Group the AI settings:** ten widgets in one list. Sketch: everyday settings
       first (model, device, batch size, priority, number of results), person detection and
       reference weight in an expander, the person sub-settings disabled while detection is off.
-      Affected: `app.py`, user guide. Keys `setting_<name>` unchanged. F24 review §3. Size S.
+      Affected: `app.py`, user guide. Keys `setting_<name>` unchanged. F24 review §3. Size S. Roadmap P33 (B).
 - [ ] `decision` **F33 – HTML gallery parity with the app:** the gallery has a fixed dark theme,
       no marks, no paging and no way back to the navigation. **Options:** (a) light/dark by
       `prefers-color-scheme`, file name first, link to the top; (b) also show marks (baked in at
       export, stale afterwards); (c) leave it a plain export. Affected:
       `framescout_engine.py`, user guide. F24 review §5. Size S–M.
+      Triage 2026-11-13: not decided; assess again after F30, because in the browser pass the
+      gallery (seven equal columns over the full width) was easier to scan than the app.
+- [ ] `ready` **F34 – The quick search result is an entry of the results selector:** after one
+      quick search the page grows from about 9,300 px to 16,700 px and the profile results
+      start 8,400 px down, because the quick result gallery sits above them; the search text
+      field is empty afterwards. Decided 2026-11-13: the result of a quick search or "Find
+      similar" opens in the results view as its own entry next to the profiles (replacing the
+      previous quick result, without marks, as today), and the text stays in the field.
+      Affected: `app.py` (its modules after A46), user guide; `results/quick/` unchanged.
+      Builds on F28. Size M. Roadmap P34.
+- [ ] `parked` **F35 – Thumbnail size as a setting:** F30 fixes the cell size at about 250 px.
+      A setting (e.g. small, medium, large) would let the user trade overview for detail.
+      Parked 2026-11-13 by the user: a feature for later. Affected: `app.py`, `settings.json`
+      (a new key with a default), user guide. Size S.
+- [ ] `decision` **F36 – A folder dialog for the photo source:** the photo folders are a text
+      area; the path has to be typed or pasted. Streamlit has no folder dialog. Sketch: a
+      "Choose folder" button that opens the system dialog on the PC the app runs on.
+      **Question:** how, without a new dependency (e.g. `tkinter`, if the private Python of
+      the installer ships it; check first) and whether a dialog opened by the server process
+      is acceptable. Affected: `app.py`, user guide. Found in the browser pass of 2026-11-13.
+      Size S.

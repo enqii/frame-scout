@@ -192,3 +192,49 @@ then F28 and F29 together (the largest gain), then the rest.
 3. F19 first as a toggle or a dialog? (F31, depends on F29: a toolbar that is already compact
    leaves room for a mode switch.)
 4. A47 (frontend framework) before any larger rebuild, or after?
+
+## Browser pass and decisions (2026-11-13)
+
+After the review above, the app was run in a browser on an isolated copy with 146 synthetic
+test photos and the six example profiles (CPU, window content 1920 × 889 px, light theme):
+all four tabs, one full search, marking, a quick search and one HTML gallery. Not looked at:
+dark theme, narrow windows, "Find similar", the contents of "Clean up storage", profiles with
+reference images, real photos (A52).
+
+Measured, confirming §1 and §2:
+
+- The first photo starts 1,489 px down the "Search & results" tab (1.7 screens); 520 px of
+  controls lie between the "Results" heading and it.
+- One page of 48 cards makes the tab 9,268 px long with 503 buttons; after one quick search
+  it is 16,674 px with 552 buttons, and the profile results start at 8,376 px.
+- While a search runs, "AI settings" is greyed out without a reason.
+
+Corrections and new findings:
+
+- **The mark colors do not apply** (§2 said "it works"): all three selected states show
+  Streamlit's default red, because the selector of `mark_style` no longer matches (A49).
+- A marked card looks like an unmarked one apart from the small control.
+- The page is not full width: it is limited to 1,300 px, so the thumbnails are 253 px wide
+  (not about 300 px) and a third of a 1920 px window stays empty.
+- Cards have different heights (portrait and landscape photos), so the rows are ragged and
+  the buttons of neighbouring cards do not line up.
+- The HTML gallery scans better than the app: seven equal columns over the full width,
+  about 14 photos per screen against 8.
+- The photo folders are a text area without a folder dialog (F36); the quick search field
+  is empty after a search (F34).
+
+Decisions of the user (triage of 2026-11-13), answering the open questions above:
+
+1. Restructure, within Streamlit: five tabs (F28), a state line and a start checklist (F27),
+   grouped settings (F32).
+2. A new result card (F30): equal cells, "Match" and "No" as the main buttons with undecided
+   as "neither pressed", the other actions in a popover, a visible state on the card, blue
+   for match and orange for no match, a fixed cell size of about 250 px (a size setting is
+   parked as F35).
+3. A one-row toolbar and a pager below the grid (F29); the quick search result as an entry
+   of the results selector (F34).
+4. The large preview is a dialog (F19; F31 is closed by this).
+5. The HTML gallery (F33) is assessed again after F30. The frontend framework (A47) is
+   decided separately; `app.py` is split first (A46).
+
+Order of work: `docs/ROADMAP.md`, P30–P37.
