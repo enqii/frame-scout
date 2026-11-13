@@ -479,6 +479,21 @@ def test_an_analysis_run_is_named_as_such():
     assert run_name({'phase': 'failed'}) == 'search run'
 
 
+def test_the_reporter_of_an_analysis_marks_every_write(tmp_path):
+    # review: the run kind is given once, not by every update (the app's "starting", the
+    # engine's phases and its final status)
+    path = tmp_path / RUN_STATUS
+    reporter = StatusReporter(path, 1, analyze_only=True)
+    reporter.update('starting')
+    assert analysis_only(read_status(path))
+    reporter.update('analyzing', done=1)
+    reporter.finish('failed', 2, 'Bad option.')
+    assert analysis_only(read_status(path))
+    # a search's status has no such field, as before F18
+    StatusReporter(path, 1).update('scanning')
+    assert 'analyze_only' not in read_status(path)
+
+
 def test_the_status_of_an_analysis_starts_as_an_analysis():
     assert status_text({'phase': 'starting', 'analyze_only': True}) == 'Starting the analysis'
     assert status_text({'phase': 'starting'}) == 'Starting the search'
