@@ -405,6 +405,10 @@ def test_analysis_summary_with_everything_analyzed_or_no_photos():
     text = analysis_summary(5000, 5000, 20.0)
     assert 'All 5,000 photos are analyzed with these settings already' in text
     assert 'to analyze' not in text and 'about' not in text
+    # review: the count is the one remembered for the browser session; photos added since are
+    # counted after "Recount", and the analysis finds them anyway
+    assert '"Recount"' in text and 'finds them' in text
     assert analysis_summary(1, 1, None).startswith('The photo is analyzed with these settings already')
+    assert '"Recount"' in analysis_summary(1, 1, None)
     assert 'No supported photos found' in analysis_summary(0, 0, 20.0)
     assert 'the analysis has nothing to analyze' in analysis_summary(0, 0, 20.0)

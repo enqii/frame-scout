@@ -1865,9 +1865,9 @@ with run_tab:
                    f"{'on' if settings['person_detection'] else 'off'}.")
         if st.session_state.get('analyze_notice'):
             st.warning(st.session_state.pop('analyze_notice'))
-        all_analyzed = analyzed is not None and analyzed >= len(photo_scan.paths)
-        analyze_now = st.button('Analyze photos now', disabled=active or not folder_scans or not photo_scan.paths
-                                or bool(model_missing) or all_analyzed)
+        # not gated on the photo count: it is the one remembered for the browser session (A27),
+        # while the engine reads the folders again, e.g. for photos added since (review)
+        analyze_now = st.button('Analyze photos now', disabled=active or not folder_scans or bool(model_missing))
         if active:
             st.info('Not available while a search or an analysis runs (its progress is shown in the tab "Search & '
                     'results") or the storage is being cleaned up.')
