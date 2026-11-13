@@ -534,15 +534,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       Affected: `framescout_core`, `framescout_engine.py`, `app.py`, `settings.json`, user
       guide. Parked 2026-11-12: the default (warn or skip) is open and the behavior needs a
       real OneDrive folder. Size S–M.
-- [ ] `ready` **F22 – Start: handle a busy port and an already running app:** the start script
-      always uses port 8501; a busy port or a forgotten second window gives a bare Streamlit
-      error. Sketch: before starting, a standard-library check; if this folder's FrameScout
-      answers (e.g. `results/app-instance.json` with PID and port, stale files ignored), open
-      the browser on it; if another program holds the port, use the next free one of
-      8502–8510; only ever `127.0.0.1`. Affected: `Start-FrameScout.bat`, a small tested
-      helper, `app.py`, `framescout_core.NEVER_DELETED`/cleanup patterns, user guide,
-      `docs/ARCHITECTURE.md`. Risks: PID reuse on Windows (also compare the process start
-      time or the port). Size S–M. Roadmap P27.
 - [ ] `parked` **F23 – Optional desktop and Start menu shortcut, removed by the uninstaller:**
       the installer would ask and create a `.lnk` to `Start-FrameScout.bat` (PowerShell
       `WScript.Shell`), record its path, and `framescout_uninstall.py` removes exactly that
@@ -563,3 +554,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (`EXPORT_COLUMNS`) has no column for the closest search text of F17 (`best_query` of a card).
       Add an optional `closest_text` column, empty for a single text or older results. Affected:
       `framescout_core` export, `app.py`, user guide. Found in F17. Size S.
+- [ ] `minor` **F26 – The app itself takes the instance lock of F22:** an app started with the
+      manual Streamlit command or by an older version holds no lock, so a later
+      `Start-FrameScout.bat` starts a second app of the same folder on the next free port. The app
+      could take the lock itself (e.g. via `st.cache_resource`). Affected: `app.py`,
+      `framescout_core/app_instance.py`, `docs/ARCHITECTURE.md`. Found in F22. Size S.

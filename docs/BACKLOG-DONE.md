@@ -1961,3 +1961,24 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       analyzed in the section's summary (follow-up for the search's summary: A48);
       `analysis_summary` merged into `start_summary(analysis_only=True)`;
       `StatusReporter(analyze_only=True)` marks every write instead of a field per update.)
+- [x] **F22 – Start: handle a busy port and an already running app:** the start script
+      always uses port 8501; a busy port or a forgotten second window gives a bare Streamlit
+      error. Sketch: before starting, a standard-library check; if this folder's FrameScout
+      answers (e.g. `results/app-instance.json` with PID and port, stale files ignored), open
+      the browser on it; if another program holds the port, use the next free one of
+      8502–8510; only ever `127.0.0.1`. Affected: `Start-FrameScout.bat`, a small tested
+      helper, `app.py`, `framescout_core.NEVER_DELETED`/cleanup patterns, user guide,
+      `docs/ARCHITECTURE.md`. Risks: PID reuse on Windows (also compare the process start
+      time or the port). Size S–M. Roadmap P27.
+      Done 2026-11-13 (PR #101): `Start-FrameScout.bat` runs the new entry point
+      `framescout_start.py`, which runs Streamlit in its own process and uses
+      `framescout_core.app_instance` (`launch`, `RunLock` on `.tmp/app-instance.lock`, port in
+      `.tmp/app-instance.json`, liveness from the OS lock, never a PID). A second start of the
+      same folder opens the browser on the running app (waits up to 30 s for it, else a message
+      and exit 1); a port held by another program moves the app to the next free one of
+      8501-8510, all busy: message, exit 1. Compatibility: no change to user data, schemas, CLI
+      or cache; new files only under `.tmp/`. Tests: `tests/test_app_instance.py`, `ENTRY_POINTS`
+      in `tests/test_layout.py`, full pytest suite; a launcher smoke run with a trivial app
+      (8501 held by a test socket gave 8502, a second start opened the browser and exited 0).
+      Not tested: a real double-click of the `.bat` with the real app and browser. Out of scope:
+      an app started by hand or by an older version holds no lock (F26).

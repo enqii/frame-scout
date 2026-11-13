@@ -102,6 +102,13 @@ GPU and offers "cuda" only then.
 Start `Start-FrameScout.bat`; the browser opens <http://127.0.0.1:8501>. The app has one
 tab per step.
 
+If another program already uses port 8501, FrameScout takes the next free port up to 8510
+and prints a note; the address in the start window is the one to use. If FrameScout of this
+folder already runs (for example in a forgotten window), a second start opens the browser on
+that app instead of starting another one. If that app does not answer within 30 seconds, the
+start window asks you to close the other window and start again. Close the start window to
+stop the app.
+
 ### Search profiles
 
 A profile describes one motif: a name, optional context, distinctive features, custom

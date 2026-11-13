@@ -9,7 +9,11 @@ app itself is described in the [user guide](USER-GUIDE.md).
 After `Install-FrameScout.bat`:
 
 ```powershell
-# User interface
+# User interface (what Start-FrameScout.bat runs: framescout_start.py, which picks a free port
+# 8501-8510 and reuses an app of this folder that already runs, F22)
+.\.venv\Scripts\python.exe framescout_start.py
+
+# User interface by hand (bypasses the busy-port and running-app check)
 .\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 
 # Engine directly (CLI)
