@@ -37,7 +37,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] "Analyze photos now" and `--analyze-only` without a search (F18; done 2026-11-13, PR #100)
 
 ### P27 – Start (added 2026-11-12)
-- [ ] Start handles a busy port and an already running app (F22)
+- [x] Start handles a busy port and an already running app (F22; done 2026-11-13, PR #101)
 
 ### P28 – UI/UX review (added 2026-11-12)
 - [ ] Assess the whole user interface and write the findings down, no rebuild; follow-up PRs

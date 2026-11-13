@@ -42,7 +42,7 @@ Details, GPU support and updating: [user guide](docs/USER-GUIDE.md#installation-
 
 ## Quick start
 
-1. Double-click `Start-FrameScout.bat`. Your browser opens <http://127.0.0.1:8501>.
+1. Double-click `Start-FrameScout.bat`. Your browser opens <http://127.0.0.1:8501> (or the next free port).
 2. **Search profiles:** describe each motif in English (name, optional context, features,
    custom search texts) and optionally add reference images. Example profiles are
    included.
