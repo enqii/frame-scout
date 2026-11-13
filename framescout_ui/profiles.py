@@ -8,7 +8,7 @@ from framescout_core import (MARKS_FILE, MARK_MATCH, ProfilesChangedError, count
                              rename_copy_folder, rename_marks, save_profiles, stage_reference_move,
                              undo_reference_move, update_backup_references, write_new_file)
 
-from .common import BASE, MARKS, PROFILES, REFS, RESULTS, SETTINGS, SUPPORTED, UPLOAD_TYPES, plain, version_key
+from .common import BASE, MARKS, PROFILES, REFS, RESULTS, SETTINGS, plain, supported, upload_types, version_key
 from .marks import load_marks
 from .copy_export import cached_copy_folders
 
@@ -44,9 +44,10 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False, *, profile
                 # old and new names both exist until the save succeeded (crash safety)
                 refs, staged = stage_reference_move(refs, folder, REFS, BASE, others)
             # write_new_file never overwrites leftover files in the folder
+            readable = supported()
             for f in uploads:
                 suffix = Path(f.name).suffix.lower()
-                if suffix in SUPPORTED:
+                if suffix in readable:
                     written.append(write_new_file(folder, 'reference', suffix, f.getvalue()))
         # keeps the previous file as profiles.json.bak (A2); never overwrites a change made in
         # another tab, session or by hand since the page showed the edited profiles (A13).
@@ -237,7 +238,7 @@ def show_profiles(profiles, profiles_version, profiles_shown, active):
                 features = st.text_area(LABEL_FEATURES, value=p.get('features', ''))
                 prompts = st.text_area(LABEL_PROMPTS, value='\n'.join(p.get('prompts', [])))
                 st.caption('Existing reference images: ' + (', '.join(p.get('reference_images', [])) or 'none'))
-                refs_new = st.file_uploader('Add reference images', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'edit_refs_{index}_{saves}')
+                refs_new = st.file_uploader('Add reference images', type=upload_types(), accept_multiple_files=True, key=f'edit_refs_{index}_{saves}')
                 clear_refs = st.checkbox('Remove the existing reference images from this profile')
                 c1,c2 = st.columns(2)
                 update = c1.form_submit_button('Save changes', disabled=active)
@@ -296,7 +297,7 @@ def show_profiles(profiles, profiles_version, profiles_shown, active):
         franchise = st.text_input(LABEL_CONTEXT, placeholder='e.g. vehicles, pets, nature', key=f'new_context_{form_id}')
         features = st.text_area(LABEL_FEATURES, placeholder='red bodywork, black roof, parked on a street', key=f'new_features_{form_id}')
         prompts = st.text_area(LABEL_PROMPTS, key=f'new_prompts_{form_id}')
-        uploads = st.file_uploader('Reference images (optional)', type=UPLOAD_TYPES, accept_multiple_files=True, key=f'new_refs_{form_id}')
+        uploads = st.file_uploader('Reference images (optional)', type=upload_types(), accept_multiple_files=True, key=f'new_refs_{form_id}')
         create = st.form_submit_button('Add profile', disabled=active)
     if create:
         name = name.strip()

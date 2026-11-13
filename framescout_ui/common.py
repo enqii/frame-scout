@@ -50,11 +50,16 @@ def decoders():
     return available_decoders()
 
 
-# computed once, when app.py first imports this module in a page run (before A46: in every
-# page run, from the same cached Decoders)
-DECODERS = decoders()
-SUPPORTED = supported_extensions(DECODERS)
-UPLOAD_TYPES = sorted(x.lstrip('.') for x in SUPPORTED)
+# called in every page run, not once at import: clearing the cache of decoders() then
+# refreshes the readable formats, as before A46 (review)
+def supported():
+    """The file extensions the app reads and counts, from the cached Decoders."""
+    return supported_extensions(decoders())
+
+
+def upload_types():
+    """The file types the reference image uploads accept (the extensions without the dot)."""
+    return sorted(x.lstrip('.') for x in supported())
 
 
 def open_path(path):

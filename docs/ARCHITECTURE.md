@@ -78,7 +78,7 @@ browser sessions): `active`, `folder_scans`, `settings`, `profiles_shown`. The s
 
 | Module | Area |
 |---|---|
-| `common.py` | project paths (`BASE`, `PROFILES`, `RESULTS`, `QUICK`, `MARKS`, ...), `DECODERS`/`SUPPORTED`/`UPLOAD_TYPES` (computed once at the first import), `open_path`/`reveal_path`/`gallery_action`, `widget_id`, `plain` (Markdown escaping), `clean_project_folder` (E44), `LOW_SPACE_TTL` |
+| `common.py` | project paths (`BASE`, `PROFILES`, `RESULTS`, `QUICK`, `MARKS`, ...), `decoders()`/`supported()`/`upload_types()` (the readable formats, evaluated in every page run), `open_path`/`reveal_path`/`gallery_action`, `widget_id`, `plain` (Markdown escaping), `clean_project_folder` (E44), `LOW_SPACE_TTL` |
 | `settings.py` | settings widgets (`setting_key`, `setting_of_widget`, `widget_of_setting`), `sync_settings()` (A8), `show_ai_settings(settings, seen, shown, active)` with "Check installation" |
 | `run.py` | `run_state`, `start_run`, `stop_run`, `end_processes`, `cache_env`, `cached_analyzed_photos`, `low_space_warning`, `show_status(active)` |
 | `marks.py` | `load_marks`, `set_mark`, `marks_backup_offer`, `restore_marks_backup` |
