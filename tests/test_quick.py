@@ -14,7 +14,7 @@ from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_Q
                              results_document,
                              publish_export, result_card, scan_cleanup)
 
-from app_source import APP, app_tree
+from app_source import app_tree, page_tree
 
 
 def test_quick_results_go_to_their_own_folder_and_gallery():
@@ -413,8 +413,6 @@ def test_auto_cleanup_of_the_quick_folder_keeps_only_what_its_gallery_links(tmp_
     assert read_results(quick / 'results.json')['profiles'][0]['gallery'] == QUICK_GALLERY
 
 
-
-
 def test_the_app_starts_both_searches_through_engine_command():
     # F10: the search with profiles and the quick search get the same settings
     tree = app_tree()
@@ -474,7 +472,7 @@ def test_every_result_card_of_the_app_offers_find_similar():
     # review: the request is taken from the session state first thing in the page run (before
     # any st.stop), and one that cannot start while a search runs gets a notice
     # (in app.py, whose page run it is: compared by its line numbers, A46)
-    page = ast.parse(APP.read_text(encoding='utf-8'))
+    page = page_tree()
     pops = [node for node in tree.body if isinstance(node, ast.Assign) and 'find_similar' in ast.unparse(node)]
     assert [ast.unparse(node) for node in pops] == ["find_similar_request = st.session_state.pop('find_similar', None)"]
     pops = [node for node in page.body if isinstance(node, ast.Assign) and 'find_similar' in ast.unparse(node)]
