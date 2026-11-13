@@ -481,6 +481,10 @@ def test_the_status_of_an_analysis_says_so_from_its_first_phase():
     [reporter] = [node for node in ast.walk(main) if isinstance(node, ast.Call)
                   and getattr(node.func, 'id', None) == 'StatusReporter']
     assert {k.arg: ast.unparse(k.value) for k in reporter.keywords}.get('analyze_only') == 'args.analyze_only'
+    # and its failure message names the analysis, not a search (review)
+    [final] = [node for node in ast.walk(main) if isinstance(node, ast.Call)
+               and getattr(node.func, 'id', None) == 'final_status']
+    assert ast.unparse(final.args[2]) == "'analysis' if args.analyze_only else 'search'"
 
 
 @pytest.mark.parametrize('extra', [['--profiles', 'p.json'], ['--character', 'Red car'], ['--quick-query=dog'],

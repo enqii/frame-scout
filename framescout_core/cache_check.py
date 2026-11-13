@@ -90,15 +90,16 @@ def cache_error_message(cache, exc):
     return None
 
 
-def cache_read_warning(cache, exc, count):
+def cache_read_warning(cache, exc, count, run='search'):
     """The warning of a search that finished although count photos could not be read from the cache (E50, review).
 
     exc: the first such error, an error of the cache file itself (cache_error). A damaged
     page can hit only a few rows: the search leaves out those photos instead of stopping,
-    and its end points to "Check cache" (cache_error_message).
+    and its end points to "Check cache" (cache_error_message). run: what the warning calls
+    the run, "search" or "analysis" (without a search, F18, E63).
     """
     left_out = f'{count} photo was' if count == 1 else f'{count} photos were'
-    return (f'{left_out} left out of this search because the feature cache could not be read for them. '
+    return (f'{left_out} left out of this {run} because the feature cache could not be read for them. '
             f'{cache_error_message(cache, exc)}')
 
 

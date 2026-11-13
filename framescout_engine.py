@@ -246,7 +246,7 @@ def main():
         raise
     else:
         # 0 finished, 130 interrupted, any other code failed (review)
-        phase, message = final_status(code, warnings)
+        phase, message = final_status(code, warnings, 'analysis' if args.analyze_only else 'search')
         status.finish(phase, code, message)
         return code
     finally:
@@ -689,7 +689,8 @@ def search(args, parser, roots, dropped, output, status, warnings):
             if not fresh and not reused:
                 # not a single row could be read: fail as a search does (E50)
                 raise next(iter(unreadable.values()))
-            warning = cache_read_warning(output / CACHE_FILE, next(iter(unreadable.values())), len(unreadable))
+            warning = cache_read_warning(output / CACHE_FILE, next(iter(unreadable.values())), len(unreadable),
+                                         'analysis')
             print(warning, flush=True)
             warnings.append(warning)
         print(f'Done. Analysis only, no search: new photo analyses: {fresh}, from cache: {reused}, errors: {errors}. '

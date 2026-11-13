@@ -452,6 +452,13 @@ def test_a_finished_run_carries_its_warnings():
     assert final_status(130, ['x']) == ('interrupted', 'Interrupted (Ctrl+C).')
 
 
+def test_a_failed_analysis_is_not_called_a_search():
+    # review of F18: the app shows the engine's message after "The last analysis failed"
+    assert final_status(1, run='analysis') == ('failed', 'The analysis ended with exit code 1.')
+    assert final_status(1) == ('failed', 'The search ended with exit code 1.')
+    assert final_status(0, ['Rows left out.'], run='analysis') == ('finished', 'Rows left out.')
+
+
 # --- lock_held when the lock file cannot be opened (review) ---
 
 def test_a_lock_file_that_cannot_be_opened_counts_as_held(tmp_path, monkeypatch):
