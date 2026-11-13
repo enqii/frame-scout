@@ -9,7 +9,8 @@ from pathlib import Path, PureWindowsPath
 import pytest
 
 from framescout_core import (DEFAULT_MODEL, DEFAULT_YOLO_MODEL, MODELS, cache_folder_paths, cache_paths,
-                             default_cache_env, engine_cache_env, find_yolo_weights, hub_cache_dir,
+                             default_cache_env, detector_weights_line, engine_cache_env, find_yolo_weights,
+                             hub_cache_dir,
                              open_clip_cache_dir, yolo_weights, XDG_DERIVED)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -257,6 +258,33 @@ def test_yolo_weights_paths_and_urls_are_used_as_given(tmp_path):
         names.append(r'models\w.pt')
     for name in names:
         assert yolo_weights(name, tmp_path, tmp_path, {}) == name
+
+
+def test_the_detector_weights_line_names_the_file_that_is_loaded(tmp_path):
+    # E60: the cache signature keeps --yolo-model as given, so run.log names the file loaded
+    cwd = tmp_path / 'run'
+    cwd.mkdir()
+    (cwd / DEFAULT_YOLO_MODEL).write_bytes(b'own')
+    # the working folder's copy, which yolo_weights returns by its bare name
+    assert detector_weights_line(DEFAULT_YOLO_MODEL, cwd) == (
+        f'Person detector weights: {cwd / DEFAULT_YOLO_MODEL}')
+    cached = tmp_path / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
+    cached.parent.mkdir(parents=True)
+    cached.write_bytes(b'official')
+    assert detector_weights_line(str(cached), cwd) == f'Person detector weights: {cached}'
+    # a relative path is told by its folder in the working folder
+    (cwd / 'models').mkdir()
+    (cwd / 'models' / 'w.pt').write_bytes(b'tuned')
+    assert detector_weights_line(str(Path('models') / 'w.pt'), cwd) == (
+        f'Person detector weights: {cwd / "models" / "w.pt"}')
+
+
+def test_the_detector_weights_line_tells_a_download(tmp_path):
+    cached = tmp_path / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
+    assert detector_weights_line(str(cached), tmp_path) == (
+        f'Person detector weights: {cached} (not there yet, downloaded on first use)')
+    url = 'https://example.org/w.pt'
+    assert detector_weights_line(url, tmp_path) == f'Person detector weights: {url}'
 
 
 def test_open_clip_downloads_from_a_url_into_the_project_cache(tmp_path):

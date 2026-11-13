@@ -27,7 +27,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              DEVICES, EXAMPLE_PROFILES_FILE, FULL_IMAGE_LABEL, MODEL_KEYS, MODELS, RUN_LOCK,
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, cache_error, cache_error_message,
                              cache_read_warning, crop_label,
-                             cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
+                             cuda_hint, default_cache_env, detection_options, detector_weights_line, distinct_folders, draft_size,
                              AnalysisRate, Lazy, LOADING_DETECTOR, StepSpeed, gallery_thumbnails,
                              remember_finishing, run_throughput,
                              final_status, nothing_new_message, yolo_weights,
@@ -532,9 +532,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
         # without Ultralytics' usage analytics and run-time pip installs (E27, E28)
         YOLO = import_detector_class(os.environ, importlib.import_module, Image)
         # downloaded into .cache on first use, not into the working folder (E9); the cache
-        # signature keeps the name as given
-        loaded = YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), os.environ,
-                                   lambda text: print(text, flush=True)))
+        # signature keeps the name as given, so the run log names the file loaded (E60)
+        weights = yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), os.environ,
+                               lambda text: print(text, flush=True))
+        print(detector_weights_line(weights, Path.cwd()), flush=True)
+        loaded = YOLO(weights)
         status.update(message=None, force=True)
         return loaded
 
