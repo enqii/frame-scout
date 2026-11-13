@@ -542,14 +542,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `docs/ARCHITECTURE.md`. Parked 2026-11-12: it would be the first file written outside
       the project folder. Risks: redirected desktops need
       `[Environment]::GetFolderPath('Desktop')`. Size S.
-- [ ] `ready` **F24 – UI/UX overall review:** the results page is overloaded by marks, quick
-      search, "Find similar" and several views. Task: assess the whole interface once (information
-      hierarchy, actions per card, tabs or sections, consistency of the app and the HTML
-      gallery; check for design skills, e.g. via `find-skills`) and write the findings into
-      `docs/` as a proposal; no rebuild. Rebuild PRs and F19 are decided afterwards. Affected:
-      a new document under `docs/`, backlog items for the follow-ups. Risks: a later redesign
-      touches many screens; keep the settings/state keys and general-purpose wording working.
-      Size S (`docs`). Roadmap P28.
 - [ ] `minor` **F25 – Closest search text in the result list export:** the CSV of F5
       (`EXPORT_COLUMNS`) has no column for the closest search text of F17 (`best_query` of a card).
       Add an optional `closest_text` column, empty for a single text or older results. Affected:
@@ -559,3 +551,37 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `Start-FrameScout.bat` starts a second app of the same folder on the next free port. The app
       could take the lock itself (e.g. via `st.cache_resource`). Affected: `app.py`,
       `framescout_core/app_instance.py`, `docs/ARCHITECTURE.md`. Found in F22. Size S.
+- [ ] `ready` **F27 – A global run state and reasons for disabled controls:** while a search or
+      analysis runs, almost every widget in every tab is disabled, but only "Search & results" says
+      why; Start can be disabled for reasons shown in another tab. Sketch: a one-line state under
+      the title ("Search running – progress in Search & results") and a "Start is not available
+      because ..." line under the Start button. Affected: `app.py`, user guide. Found in the F24
+      review (`docs/UI-REVIEW.md` §4). Size S.
+- [ ] `decision` **F28 – Split "Search & results":** the tab holds start/stop, status, quick search
+      and its gallery, the profile results, copy, export and storage maintenance.
+      **Options:** (a) five tabs (profiles, source, settings, search, results; storage into
+      settings); (b) four tabs, quick search in an expander and storage into settings; (c) leave.
+      Affected: `app.py` (do it with or after A46), user guide, screenshots if any. Risks: widget
+      keys and fragments must keep working; `setting_<name>` keys unchanged. F24 review §1. Size M.
+- [ ] `decision` **F29 – Compact results header and bottom actions:** the first photo sits below a
+      profile selector, captions, info boxes, buttons, a checkbox and a pager; copy and export
+      are below the 48 cards; no pager below the grid. **Options:** (a) one-row toolbar, notes
+      collapsed unless an exceptional state, copy/export in an expander above the grid, pager
+      also below; (b) only the pager and the collapsed notes. Affected: `app.py`, user guide.
+      F24 review §1. Size M.
+- [ ] `minor` **F30 – One function draws a result card for profile and quick results:**
+      `show_results` and `show_quick_results` repeat the card code with small differences.
+      Affected: `app.py`. F24 review §5; fits A46. Size S.
+- [ ] `decision` **F31 – Where the large preview of F19 lives:** **Options:** (a) a "Review" toggle
+      on the results tab; (b) a dialog (`st.dialog`) opened from a card; (c) fewer, larger
+      columns as a cheap substitute, also for clicking the thumbnail to open the photo. Decide
+      together with F29. Affected: `app.py`, F19. F24 review §2. Size S–M.
+- [ ] `ready` **F32 – Group the AI settings:** ten widgets in one list. Sketch: everyday settings
+      first (model, device, batch size, priority, number of results), person detection and
+      reference weight in an expander, the person sub-settings disabled while detection is off.
+      Affected: `app.py`, user guide. Keys `setting_<name>` unchanged. F24 review §3. Size S.
+- [ ] `decision` **F33 – HTML gallery parity with the app:** the gallery has a fixed dark theme,
+      no marks, no paging and no way back to the navigation. **Options:** (a) light/dark by
+      `prefers-color-scheme`, file name first, link to the top; (b) also show marks (baked in at
+      export, stale afterwards); (c) leave it a plain export. Affected:
+      `framescout_engine.py`, user guide. F24 review §5. Size S–M.

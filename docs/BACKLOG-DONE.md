@@ -1988,3 +1988,15 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       held, a second start opened 8502, a start after a hard kill ignored the stale JSON and
       SIGINT stopped it with 0. Not tested: a real double-click of the `.bat` with Ctrl+C in
       its console window.
+- [x] **F24 – UI/UX overall review:** the results page is overloaded by marks, quick
+      search, "Find similar" and several views. Task: assess the whole interface once and write
+      the findings into `docs/` as a proposal; no rebuild.
+      (done 2026-11-13: `docs/UI-REVIEW.md` assesses information hierarchy, actions per card,
+      tabs, guidance and the app against the HTML gallery, from the code only (no browser or
+      user test), and lists what to keep. Main findings: "Search & results" holds seven jobs;
+      the results header pushes the first photo down; disabled controls do not say why; the
+      gallery differs from the app. Design skills checked with `npx skills find`, none
+      installed (new dependency): `streamlit/agent-skills@improving-streamlit-design` (3
+      installs) and `arjenschwarz/agentic-coding@ui-ux-reviewer` (405). Follow-ups with options:
+      F27–F33; F19 stays open and is decided with F31/F29. No code, schema or dependency
+      change.)
