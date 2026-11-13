@@ -68,6 +68,9 @@ def test_photos_in_the_cache_need_no_cache_rows(tmp_path):
     model = MODELS['vit-b-32-openai']
     assert search_space_needs(results, 1000, 150, 2, model, tmp_path, analyzed=1000)[0] == (
         results, 150 * 2 * THUMBNAIL_BYTES)
+    # an analysis without a search (F18 review) has no profile: cache rows only, no thumbnails
+    assert search_space_needs(results, 1000, 150, 0, model, tmp_path, analyzed=400)[0] == (
+        results, 600 * CACHE_BYTES_PER_PHOTO)
 
 
 def make_cache(path, rows):

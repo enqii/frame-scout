@@ -443,6 +443,19 @@ def test_the_app_counts_partners_as_analyzed_for_an_analysis():
     assert ast.unparse(assigned.value) == 'analyzed + quick_counts[2]'
 
 
+def test_the_app_warns_of_low_disk_space_next_to_analyze_photos_now():
+    # F18 review: the analysis writes the cache rows, but the search's warning is in another tab
+    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    [call] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+              and getattr(node.func, 'id', None) == 'low_space_warning'
+              and any(k.arg == 'analysis' for k in node.keywords)]
+    assert ast.unparse(call.args[2]) == '0'  # no profile: no gallery thumbnails
+    assert ast.unparse(call.args[5]) == 'analysis_done'
+    [area] = [node for node in ast.walk(tree) if isinstance(node, ast.With)
+              and ast.unparse(node.items[0].context_expr) == 'analyze_area']
+    assert 'st.warning(analysis_space)' in ast.unparse(area)
+
+
 def test_every_result_card_of_the_app_offers_find_similar():
     # F11: on the cards of the profile results and of the quick search; the click passes the
     # card's photo and the part it names, and the page run (not the fragment) starts it

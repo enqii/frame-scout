@@ -1298,7 +1298,7 @@ def cached_analyzed_photos(cache_key, signature, scan_key, _scan):
 LOW_SPACE_TTL = 30
 
 @st.cache_data(show_spinner=False, max_entries=4, ttl=LOW_SPACE_TTL)
-def low_space_warning(photos, top, profile_count, model, person_detection, analyzed=0):
+def low_space_warning(photos, top, profile_count, model, person_detection, analyzed=0, analysis=False):
     """Return a warning if a search with these settings may leave little free disk space (F3), else None.
 
     Counts cache rows for the photos not analyzed yet (analyzed: those with cache rows of
@@ -1306,6 +1306,8 @@ def low_space_warning(photos, top, profile_count, model, person_detection, analy
     weights not in the cache folders the engine uses yet (engine_cache_env: .cache/ or a
     folder of the user's cache variables, A36), on the drives they are on (app_search_needs). A drive that does not answer within SPACE_CHECK_TIMEOUT is left out. An
     estimate: a warning, never a block; a check that fails (OSError, ValueError) gives none.
+    analysis: the warning of "Analyze photos now" (F18 review), which writes no gallery
+    thumbnails (profile_count 0).
     """
     try:
         low = low_space(app_search_needs(BASE, RESULTS, os.environ, photos, top, profile_count, MODELS[model],
@@ -1314,12 +1316,14 @@ def low_space_warning(photos, top, profile_count, model, person_detection, analy
         return None
     if not low:
         return None
-    return ('Little free disk space. This search writes about this much on the drive of\n\n'
+    run = 'analysis' if analysis else 'search'
+    return (f'Little free disk space. This {run} writes about this much on the drive of\n\n'
             + '\n'.join(f'- {plain(line)}' for line in low_space_lines(low))
-            + '\n\nIt stores the analyses of new photos in the feature cache and the gallery thumbnails, and '
-            'downloads a search model or the person detector the first time it is used. A full disk can make the '
-            'search fail or leave a model download or the cache incomplete. Free some disk space or lower "'
-            + AI_LABELS['top'] + '". You can still start the search.')
+            + '\n\nIt stores the analyses of new photos in the feature cache'
+            + ('' if analysis else ' and the gallery thumbnails') + ', and '
+            f'downloads a search model or the person detector the first time it is used. A full disk can make the '
+            f'{run} fail or leave a model download or the cache incomplete. Free some disk space'
+            + ('' if analysis else ' or lower "' + AI_LABELS['top'] + '"') + f'. You can still start the {run}.')
 
 @st.cache_data(show_spinner=False, max_entries=1, ttl=LOW_SPACE_TTL)
 def models_downloaded():
@@ -1824,6 +1828,7 @@ with run_tab:
     analyzed = None  # the photos analyzed with these settings: counted only while no search runs
     quick_counts = None  # quick_scope: (analyzed, not analyzed, partners) of a quick search, as the engine counts (E61)
     analysis_text = None  # what "Analyze photos now" would do (F18)
+    analysis_space = None  # and its low disk space warning (review)
     if folder_scans and not active:
         try:
             cache_key = file_key(RESULTS / CACHE_FILE)
@@ -1854,6 +1859,10 @@ with run_tab:
                                           settings['person_detection'], analyzed)
         if space_warning:
             st.warning(space_warning)
+        # the analysis writes the cache rows without gallery thumbnails (no profile), and is
+        # started from the tab "Photo source", where the warning above is not shown (review)
+        analysis_space = low_space_warning(len(photo_scan.paths), settings['top'], 0, settings['model'],
+                                           settings['person_detection'], analysis_done, analysis=True)
     with analyze_area:
         # F18: the analysis of a search without the search, e.g. overnight before the profiles
         # are written; it runs like a search (run lock, status, stop button, low priority)
@@ -1877,6 +1886,8 @@ with run_tab:
                     'results") or the storage is being cleaned up.')
         elif analysis_text:
             st.info(analysis_text)
+        if analysis_space and not active:
+            st.warning(analysis_space)
         if model_missing and not active:
             st.warning(model_missing)  # why the button is not available
     if analyze_now:
