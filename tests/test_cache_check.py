@@ -329,6 +329,9 @@ def test_unreadable_rows_of_a_finished_search_point_to_check_cache(tmp_path, cou
     warning = cache_read_warning(tmp_path / CACHE_FILE, error, count)
     assert warning.startswith(text) and 'malformed' in warning and '"Check cache"' in warning
     assert str(tmp_path / CACHE_FILE) in warning
+    # an analysis without a search names itself (E63, F18 review)
+    analysis = cache_read_warning(tmp_path / CACHE_FILE, error, count, run='analysis')
+    assert analysis.startswith(f'{text} of this analysis') and 'search' not in analysis.split('.')[0]
 
 
 def test_a_healthy_cache_gives_the_engine_no_error(tmp_path):
