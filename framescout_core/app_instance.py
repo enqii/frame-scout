@@ -84,9 +84,20 @@ class AppInstance:
         self.file = folder / INSTANCE_FILE
 
     def claim(self):
-        """Take the lock without waiting; return False if the app of this folder runs already."""
+        """Take the lock without waiting; return False if the app of this folder runs already.
+
+        With the lock taken, an instance file left by a killed app is removed at once, so
+        another start never reads that app's port before publish() names the new one (review).
+        """
         self.file.parent.mkdir(parents=True, exist_ok=True)
-        return self.lock.acquire()
+        if not self.lock.acquire():
+            return False
+        try:
+            # a waiting start may be reading it, which Windows lets no one delete then
+            _retry(partial(self.file.unlink, missing_ok=True), attempts=10, retry_delay=0.1)
+        except OSError:
+            pass  # publish() replaces it before the app runs
+        return True
 
     def running(self):
         """Return True if an app holds the lock of this folder (this object's own claim included)."""
