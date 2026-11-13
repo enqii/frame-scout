@@ -158,7 +158,18 @@ def launch(folder, run_app, open_browser, out=print, ports=APP_PORTS, free=port_
     or if the folder's running app does not answer within wait seconds, nothing starts (1).
     """
     instance = AppInstance(folder)
-    while not instance.claim(clock, sleep):
+    # a lock that only looks held (e.g. a file a virus scanner keeps open) has a way out (review);
+    # a lock a running app holds cannot be deleted on Windows, so the advice is safe
+    lock_name = Path(INSTANCE_DIR) / INSTANCE_LOCK
+    way_out = (f'If no FrameScout window of this folder is open, delete the file {lock_name} in the '
+               'FrameScout folder, then run Start-FrameScout.bat again.')
+    while True:
+        try:
+            if instance.claim(clock, sleep):
+                break
+        except OSError as exc:
+            out(f'FrameScout cannot open its start lock {lock_name} ({exc}). {way_out}')
+            return 1
         port = _wait_for_running(instance, answers, wait, clock, sleep)
         if port is not None:
             url = app_url(port)
@@ -167,7 +178,7 @@ def launch(folder, run_app, open_browser, out=print, ports=APP_PORTS, free=port_
             return 0
         if instance.running():
             out('FrameScout already runs from this folder in another window, but does not answer. '
-                'Close that window (or wait until it has started), then run Start-FrameScout.bat again.')
+                f'Close that window (or wait until it has started), then run Start-FrameScout.bat again. {way_out}')
             return 1
         # the other app ended meanwhile: this start takes over
     try:
