@@ -1,4 +1,5 @@
 """Marks of gallery photos in results/marks.json (framescout_core, A17)."""
+import importlib.util
 import json
 import os
 import re
@@ -469,6 +470,26 @@ def test_mark_style_was_checked_with_the_pinned_streamlit():
     constraints = (Path(__file__).resolve().parent.parent / CONSTRAINTS_FILE).read_text(encoding='utf-8')
     pinned = re.search(r'^streamlit==(\S+)$', constraints, re.MULTILINE)
     assert pinned and pinned.group(1) == MARK_STYLE_STREAMLIT
+
+
+def test_mark_style_selectors_exist_in_the_installed_streamlit_frontend():
+    # the string tests above cannot see the page: the installed frontend bundle shows whether
+    # the names mark_style relies on still exist, so a pin raise that renames them fails here
+    # (review of A49). find_spec does not import Streamlit; CI has none, the test is skipped there
+    spec = importlib.util.find_spec('streamlit')
+    if spec is None or not spec.submodule_search_locations:
+        pytest.skip('Streamlit is not installed')
+    scripts = sorted((Path(next(iter(spec.submodule_search_locations))) / 'static' / 'static' / 'js').glob('*.js'))
+    if not scripts:
+        pytest.skip('the installed Streamlit has no frontend bundle')
+    bundle = [script.read_text(encoding='utf-8', errors='replace') for script in scripts]
+    # the class of a keyed element: trimmed key, every other character replaced by "-"
+    key_class = re.compile(r'`st-key-`\+\w+\.trim\(\)\.replaceAll\(/\[\^a-zA-Z0-9_-\]/g,`-`\)')
+    assert any(key_class.search(text) for text in bundle)
+    # the buttons of a segmented control carry data-variant="segmented_control"
+    assert any('"data-variant":' in text and '`segmented_control`' in text for text in bundle)
+    # the selected button is styled by its data-selected attribute
+    assert any('&[data-selected]' in text for text in bundle)
 
 
 # --- backup and restore (F1) ----------------------------------------------------------------
