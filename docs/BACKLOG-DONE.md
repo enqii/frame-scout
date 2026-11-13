@@ -533,6 +533,16 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       PR #90, finding 4). Affected: `framescout_core/quick.py` (`quick_photos`), `app.py`
       (`cached_analyzed_photos`). Found in F10 (PR #90). Size S.
       (done 2026-11-12 in PR #96: `quick_photos` neither scores nor counts as not analyzed a partner without a row whose shot is searched through another partner or its RAW file; every partner of a shot without any row still counts as not analyzed. New `framescout_core.quick_scope(scan, analyzed)` returns (searched, not analyzed, partners), all counts of the scan's photos (partners counted explicitly, review) and `analyzed_paths` (a set; `analyzed_photos` is its length). `PhotoScan.stats` also holds the RAW files' times, so the count needs no `os.stat` per RAW file (review). `app.cached_analyzed_photos` returns `quick_scope` over the scan's photos and `raw_pairs` (its first count is the analyzed count of the disk space estimate), so "Quick search" is disabled only if neither a photo nor a partner is searched, and `quick_scope_text(photos, searched, not_analyzed, partners)` names the partners whose shot is searched, also when only RAW files are. Unit-tested (`tests/test_quick.py`, `tests/test_disk_space.py`, 1464 passed, 2 skipped); not run: a real Streamlit session, an engine smoke run.)
+- [x] `minor` **E63 – `cache_read_warning` says "this search" after an analysis without a search:**
+      the warning for unreadable cache rows (E50) says the photos were "left out of this
+      search"; after `--analyze-only` (F18) the run is an analysis. Wording only:
+      `cache_read_warning` could take the run's noun (`run_name` of the status). Found in PR #100.
+      (done 2026-11-13 in PR #100, review finding 4: `cache_read_warning(cache, exc, count, run)`
+      and `final_status(code, warnings, run)` take the run's noun; the engine passes `'analysis'`
+      for `--analyze-only`, so a failed analysis says "The analysis ended with exit code N." and
+      its unreadable rows are "left out of this analysis". Unit-tested (`tests/test_cache_check.py`,
+      `tests/test_run_status.py`, the engine's call in `tests/test_engine_defaults.py`); not run
+      with a damaged cache through the engine.)
 
 ### App (`app.py`)
 
@@ -1931,7 +1941,7 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `--quick-query`, `--like` and `--scores-file`; `--top` and `--reference-weight` are ignored.
       All photos from the cache: message `ALL_ANALYZED`. Status file: additive `"analyze_only": true`
       (`STATUS_FORMAT` stays 1); `framescout_core`: `analysis_only`, `run_name`,
-      `analysis_result_text`, `analysis_summary`, `engine_command(analyze_only=True)`,
+      `analysis_result_text`, `start_summary(analysis_only=True)`, `engine_command(analyze_only=True)`,
       `remaining_text` of an analysis = the analysis alone; the run tab words the analysis as such
       ("Analysis running", "The last analysis finished successfully"). Compatibility: additive CLI
       option and status field, no change to `profiles.json`, `settings.json`, `results.json`, the
@@ -1940,5 +1950,14 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       needs torch and is skipped in CI), `test_quick.py`, `test_run_status.py`, `test_estimate.py`;
       a CPU engine smoke run with `--analyze-only` and a headless `AppTest` render of the section
       and the enabled button passed. Not tested: a click on the button in the running app, an
-      analysis with person detection (YOLO weights not cached locally), CUDA. Follow-up: E63; the
-      split of start (Photo source) and progress/stop (Search & results) is for the review F24.)
+      analysis with person detection (YOLO weights not cached locally), CUDA. The split of start
+      (Photo source) and progress/stop (Search & results) is for the review F24.
+      Review (8 findings, all addressed): the button is no longer disabled by the remembered
+      photo count (photos added since the count; the all-analyzed text points to "Recount");
+      the section shows its own low disk space warning (no thumbnails); `NONE_ANALYZED` instead
+      of `ALL_ANALYZED` when no photo was analyzed but some failed (`nothing_new_message`);
+      `final_status` and `cache_read_warning` name the analysis (E63); a vacuous syntax-tree
+      assertion was replaced; partners searched through another file of their shot count as
+      analyzed in the section's summary (follow-up for the search's summary: A48);
+      `analysis_summary` merged into `start_summary(analysis_only=True)`;
+      `StatusReporter(analyze_only=True)` marks every write instead of a field per update.)

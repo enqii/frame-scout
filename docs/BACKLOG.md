@@ -192,10 +192,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       analyze those photos again, or invalidate HEIF rows only
       (cache invalidation: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched
       until decided). Review of PR #96, finding 2.
-- [ ] `minor` **E63 – `cache_read_warning` says "this search" after an analysis without a search:**
-      the warning for unreadable cache rows (E50) says the photos were "left out of this
-      search"; after `--analyze-only` (F18) the run is an analysis. Wording only:
-      `cache_read_warning` could take the run's noun (`run_name` of the status). Found in PR #100.
 
 ### App (`app.py`)
 
@@ -276,6 +272,17 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       for the decision: size and start time of the bundle, the effort of a rewrite against the
       code that would go away, and what the tests can check then. Product decision and new
       dependency (hold point). Found on 2026-11-12 in a simplification review.
+- [ ] `minor` **A48 – The summary before a search counts photos that never get a cache row as "to analyze":**
+      `start_summary` of a search takes the photos with a cache row of their own
+      (`quick_scope`'s first count). A JPEG/HEIC searched through its RAW file or another
+      partner of its shot (E30, E53) never gets a row of its own, so "N to analyze" (and its
+      duration) stays above zero after every search; the summary of "Analyze photos now"
+      counts these partners as analyzed since the review of PR #100. A photo that fails to
+      decode every time has no row either and is counted as "to analyze" in both summaries;
+      the app cannot know that without a record of failed photos. Options: count the partners
+      as analyzed for the search's summary too (the disk space estimate then follows), and
+      name failed photos of the last run, e.g. from its status counts. Found in the review of
+      PR #100, finding 6.
 
 ### Installation / project
 

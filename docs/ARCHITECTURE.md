@@ -71,9 +71,12 @@ download and the fallback after an incomplete cache are **not runtime-tested** (
 
 `app.py`: Streamlit frontend. Tabs: Search profiles, Photo source, AI settings, Search &
 results. F18: the "Photo source" tab ends with the section "Analyze ahead" (an `st.container` created there and filled from the run
-tab's code, which knows the run state): explanation, the current search model and person detection, `analysis_summary` and the
-button "Analyze photos now" (disabled while a run or cleanup is active, without photos, with a missing model package or when all
-photos are analyzed with these settings); the run tab shows the analysis with `run_name` texts and `analysis_result_text`. Handles profile CRUD, reference uploads, settings saved in `settings.json` (A8),
+tab's code, which knows the run state): explanation, the current search model and person detection,
+`start_summary(..., analysis_only=True)`, its own low disk space warning (`low_space_warning(..., analysis=True)`: no profile, so
+no gallery thumbnails) and the button "Analyze photos now" (disabled like "Start search" while a run or cleanup is active, without
+an existing folder or with a missing model package; not by the photo count, which is the one remembered for the browser session
+(A27) while the engine reads the folders again, review). Its counts treat the JPEG/HEIC partners searched through another file of
+their shot (`quick_scope`'s third count) as analyzed, since they never get a cache row of their own (review); the run tab shows the analysis with `run_name` texts and `analysis_result_text`. Handles profile CRUD, reference uploads, settings saved in `settings.json` (A8),
 hardware display, analysis process, progress/log UI, and the result gallery of the last
 search from `results/results.json` (P4 (A), A12: thumbnail grid, 48 per page,
 "Open"/"Folder" per photo, "Open gallery in browser", "Open results folder", HTML
@@ -133,8 +136,9 @@ detector, run lock and status file as for a search), then closes the cache conne
 `--profiles`/`--character`/`--quick-query`/`--like`/`--scores-file` (usage errors, status `failed`; `profiles` is `[]`, so
 nothing is encoded or read); `--top` and `--reference-weight` are accepted and ignored. Log line `N photos; analysis only, no
 search; ...`, final line `Done. Analysis only, no search: new photo analyses: N, from cache: N, errors: N. ...`. Unreadable
-cache rows give the warning of E50 (`cache_read_warning`, still worded "left out of this search"); none readable and nothing
-analyzed fails like a search. The throughput record (F12) is written as for a search.
+cache rows give the warning of E50 (`cache_read_warning(..., run='analysis')`: "left out of this analysis", E63); none
+readable and nothing analyzed fails like a search; a failed analysis says `The analysis ended with exit code N.`
+(`final_status(code, warnings, run)`). The throughput record (F12) is written as for a search.
 
 `--like PHOTO` with `--like-part PART` (default `Full image`; needs `--like`) (F11) is a quick search by the cached
 vector of one photo's part: it excludes `--profiles`/`--character`/`--quick-query` and `--scores-file` (usage
@@ -225,7 +229,7 @@ the module of its area and to the re-exports in `__init__.py`.
 - `locks.py`: `RunLock`/`lock_held` (the operating-system file lock of a search run, A4,
   also used around the read-merge-write of `settings.json` and `marks.json`).
 - `run_status.py`:
-  `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`/`LOADING_DETECTOR`/`ALL_ANALYZED`/`analysis_only`/`run_name`/`analysis_result_text`
+  `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`/`LOADING_DETECTOR`/`ALL_ANALYZED`/`NONE_ANALYZED`/`nothing_new_message`/`analysis_only`/`run_name`/`analysis_result_text`
   (F18: see "Run state"; one search per output folder, its phase and progress, A4/A5).
 - `estimate.py` (F12): the time estimate of a search, standard library only.
   `AnalysisRate` (the engine's measure of the analysis speed: `add(fresh, now)` per stored
@@ -391,8 +395,8 @@ the module of its area and to the re-exports in `__init__.py`.
   E50: `cache_error(exc)` is `'damaged'` for exactly `sqlite3.DatabaseError`, `'unreadable'` for a
   disk I/O error, else `None` (as `_quick_check` tells them apart); `cache_error_message(cache, exc)`
   names the file and points to "Clean up storage" -> "Check cache" (for a disk I/O error to the drive first);
-  `cache_read_warning(cache, exc, count)` is the warning of a search that finished although
-  `count` photos could not be read from the cache (review).
+  `cache_read_warning(cache, exc, count, run='search')` is the warning of a search that finished although
+  `count` photos could not be read from the cache (review); `run='analysis'` names an analysis without a search (F18, E63).
   `CACHE_SIDE_FILES` (the `-journal`/`-wal`/`-shm` suffixes) lives in `signature.py` since A40 (the cleanup needs it too) and is
   re-exported by `framescout_core`.
   `_common._broken_names` builds the `<name>.broken-<YYYYMMDD-HHMMSS>[-n]` names.
@@ -1148,8 +1152,10 @@ status phase stays `analyzing` with its progress and counts, and the status mess
 count follow the person-detection setting, not the detector object. If no photo needed an
 analysis (all from the cache, or only cache-scan errors), the log prints `Nothing new to
 analyze – ranking only.` and the status message is `NOTHING_NEW` during scoring and export.
-With `--analyze-only` (F18) the pipeline ends after this phase: the message is `ALL_ANALYZED` (log `All photos are analyzed
-already – nothing new to analyze.`), and the engine returns 0 before "Scoring the photos" (an early return after the analysis and
+With `--analyze-only` (F18) the pipeline ends after this phase: the message (`nothing_new_message(analyze_only, errors)`) is
+`ALL_ANALYZED` (log `All photos are analyzed already – nothing new to analyze.`) if no photo failed, else `NONE_ANALYZED`
+(`No photo newly analyzed – some could not be analyzed, see the log`; review: a photo whose cache row or file could not be
+read is neither in the cache nor analyzed), and the engine returns 0 before "Scoring the photos" (an early return after the analysis and
 the check of unreadable cache rows), so nothing is scored or written besides the cache.
 
 ### Scoring
@@ -1634,7 +1640,8 @@ search holds it, it exits with code 3 (`EXIT_BUSY`). Photo folders none of which
 are an error before the lock only if the output folder does not exist yet (no folder is
 created for a mistyped call); otherwise it is reported in the status file. A missing
 folder of several is left out with a log line (A25). The final phase comes from
-the exit code (`final_status`: 0 finished, 130 interrupted, others failed; a finished run's
+the exit code (`final_status(code, warnings, run)`: 0 finished, 130 interrupted, others failed with `The search ended with
+exit code N.`, `run` naming an analysis without a search, F18 review; a finished run's
 message is its warnings, e.g. `cache_read_warning` of E50, which the app shows under the success
 note). The `message`
 is also set during a run: `LOADING_DETECTOR` ("Loading the person detector", F2) while the
@@ -1644,11 +1651,12 @@ phase, e.g. `Scoring photos: 3/10 · Nothing new to analyze – ranking only`, w
 message of a final phase is shown by the app in its own line. A successful finish clears it.
 
 Analysis without a search (F18, additive, `STATUS_FORMAT` stays 1): the status file of `--analyze-only` carries `"analyze_only": true`,
-written by the engine from its first update (`scanning`) and by the app's `starting` status. `analysis_only(status)` tests it,
+written on every update by a `StatusReporter(..., analyze_only=True)`: the engine's (from `scanning` on, also its final
+status) and the app's `starting` status (review: the run kind is given once; a search's status has no such field). `analysis_only(status)` tests it,
 `run_name(status)` is `"analysis"` or `"search run"` (the app's texts), `analysis_result_text(status)` is the success note
 (counts of new and cached photos, errors, "the results of the last search stay as they are", a search with the same settings
 uses the analyses). `status_text` shows `Starting the analysis` for the `starting` phase; `ALL_ANALYZED` is the message when all
-photos came from the cache. Older apps ignore the field and show a finished analysis as a finished search run.
+photos came from the cache, `NONE_ANALYZED` when no photo was analyzed but some failed (`nothing_new_message`). Older apps ignore the field and show a finished analysis as a finished search run.
 
 Time estimate (F12, additive, `STATUS_FORMAT` stays 1): the status file has two more fields (F16 adds `thumbnails`, the gallery thumbnails the run renders at most, written at the start of "analyzing", `null` before, and `finishing` `{'scoring': photos/min, 'thumbnails': new thumbnails/min}`, kept from the previous file like `throughput` and validated by `stored_finishing`; the engine stores a speed after the scoring loop and the export, timing only newly rendered thumbnails, at least 16 items; older apps ignore both).
 `rate` is the photos per minute of this run's analysis (`AnalysisRate.per_minute()`, `null`
@@ -1737,8 +1745,10 @@ device's record of the signature counts. The text is "N photos found · A alread
 these settings · T to analyze." plus the rough duration of the analysis from the throughput
 record (`duration_text`) or "The search shows how long it takes after its first minutes."; with
 nothing to analyze it says that the search only ranks and writes the galleries, and with no
-photo found that the search has nothing to analyze (review). For an analysis without a search (F18) `analysis_summary(photos, analyzed, per_minute)` is the summary next to the button
-(`start_summary` without scoring and galleries, same record of earlier speeds) and `remaining_text` of an `analyze_only` status is
+photo found that the search has nothing to analyze (review). For an analysis without a search (F18) `start_summary(photos, analyzed, per_minute, analysis_only=True)` is the summary next to
+the button (one function for both, review: no scoring and galleries, `finishing` ignored, same record of earlier speeds; "The
+analysis shows how long ..."; with all photos analyzed it says so and that photos added since are counted after "Recount", the
+analysis finds them either way; the app passes the partners as analyzed) and `remaining_text` of an `analyze_only` status is
 the analysis alone ("about N min left"; no scoring or thumbnails; `None` outside `analyzing`, once all photos are done or without
 a rate). In the progress
 line of a running search (`show_status`), `remaining_text(status)` is appended after
@@ -1885,7 +1895,7 @@ files (each downloads at least 605 MB; unit tests only, E38).
 
 ### Test coverage
 
-F18: `test_quick.py` (`engine_command` with `analyze_only` and its exclusive combinations, the app's button and start call from the syntax tree), `test_run_status.py` (`analysis_only`, `run_name`, `analysis_result_text`, `Starting the analysis`), `test_estimate.py` (`analysis_summary`, `remaining_text` of an analysis) and `test_engine_defaults.py` (`--analyze-only` from the engine's syntax tree: early return before scoring, no search objects, the status field; a subprocess test of the refused combinations that needs torch and Pillow and is skipped in CI); AppTest rendered the section and the enabled button, but no click, no run with person detection on and no CUDA run was made.
+F18: `test_quick.py` (`engine_command` with `analyze_only` and its exclusive combinations, the app's button and start call, the partners counted as analyzed and the low disk space warning of the section from the syntax tree), `test_run_status.py` (`analysis_only`, `run_name`, `analysis_result_text`, `Starting the analysis`, `StatusReporter(analyze_only=True)`, `nothing_new_message`, `final_status(..., run='analysis')`), `test_cache_check.py` (`cache_read_warning(..., run='analysis')`), `test_disk_space.py` (the space of an analysis: no thumbnails), `test_estimate.py` (`start_summary(..., analysis_only=True)`, `remaining_text` of an analysis) and `test_engine_defaults.py` (`--analyze-only` from the engine's syntax tree: early return before scoring, no search objects, `quick` independent of it and no `if analyze_only:` in the analysis branch, the reporter's run kind, `final_status`'s run, `nothing_new_message(analyze_only, errors)`; a subprocess test of the refused combinations that needs torch and Pillow and is skipped in CI); AppTest rendered the section, the enabled button and (with a forced reserve) both low disk space warnings, but no click, no run with person detection on and no CUDA run was made.
 
 Add focused tests without requiring full model downloads. Profile loading, reading/saving
 the app's `profiles.json` and `settings.json`, reference folders, prompt generation, slug
