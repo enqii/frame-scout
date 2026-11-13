@@ -1486,11 +1486,11 @@ the key); the named text is the closest one of the card's best-scoring part, the
 the combined score (with reference images another crop can be closer to another text, so the wording, also
 of `QUERY_NOTE`, names the part, not the whole photo); the quick search is unchanged. The
 selected option is colored by state (green match, red no match) by one `<style>` block per
-page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[kind="segmented_controlActive"]`
-with `!important`; this relies on Streamlit internals (the key class and the button kind,
-read from the 1.66.1 frontend bundle), so `test_marks.py` fails once `requirements/constraints.txt` pins
+page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[data-variant="segmented_control"][data-selected]`
+with `!important`; this relies on Streamlit internals (the key class and the button attributes;
+the old `kind="segmented_controlActive"` no longer exists in the 1.66.1 frontend, A49), so `test_marks.py` fails once `requirements/constraints.txt` pins
 another Streamlit than `MARK_STYLE_STREAMLIT`: check the selectors against the new version,
-then raise that constant (not verified in a real browser or the dark theme). A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The result is **not verified in a browser** (light/dark theme, mark colors, gap; follow-up A45). A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
+then raise that constant. A49 checked the colors in a real browser (headless Edge, light and dark theme, after mark clicks, a page change and a reload); `AppTest` cannot see CSS. A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The result is **not verified in a browser** (light/dark theme, mark colors, gap; follow-up A45). A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
 that are no longer search profiles cannot be marked and their "Copy to folder" field is
 disabled. A gallery drawn before its profile was renamed or deleted (another tab) still

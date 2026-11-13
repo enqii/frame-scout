@@ -928,6 +928,18 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (closed 2026-11-13 in the triage, no code change: the browser pass of that day did the
       check and found that the colors do not apply with Streamlit 1.66.1; the fix and the
       remaining checks (dark theme, page changes) are A49.)
+- [x] **A49 – The mark colors do not apply (replaces A45):** in a real browser with the
+      pinned Streamlit 1.66.1 the selected option of every mark control ("Undecided", "Match",
+      "No match") has Streamlit's default red, so the three states look the same. `mark_style`
+      (`framescout_core/marks.py`) targets `button[kind="segmented_controlActive"]`, but the
+      buttons carry no `kind` attribute any more; the selected one has `data-selected="true"`
+      and `aria-checked="true"` (`role="radio"`, `data-variant="segmented_control"`). Fix the
+      selector, keep `MARK_STYLE_STREAMLIT` and its test in step, and check in a browser (light
+      and dark theme, after mark clicks and page changes) as A45 asked; `AppTest` cannot see
+      CSS. P35 rebuilds the card, so keep the fix small. Affected: `framescout_core/marks.py`,
+      `tests/`, `docs/ARCHITECTURE.md`. Found in the browser pass of 2026-11-13
+      (`docs/UI-REVIEW.md`). Size S. Roadmap P30.
+      (done 2026-11-13 in PR #105: `mark_style` now targets `.st-key-mark_<id> button[data-variant="segmented_control"][data-selected]`; colors and `MARK_STYLE_STREAMLIT = '1.66.1'` unchanged. The test failed before the fix and passes now; full suite `1564 passed, 2 skipped`. Checked in a browser (headless Edge over the DevTools protocol, real mouse clicks, synthetic results with 2 pages, light and dark theme): after mark clicks, a page change, switching back and a reload the selected buttons were green (Match) and red (No match) with the theme text color; "Undecided" keeps Streamlit's look. Left over: "Undecided" and "No match" are close in hue, which P35 (F30) covers with a visible mark state. No change to `marks.json`, `results.json`, profiles, CLI or cache.)
 
 ### Installation / project
 
