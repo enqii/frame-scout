@@ -36,7 +36,12 @@ def run_app(port):
 
 
 def main():
-    return launch(ROOT, run_app, open_browser=webbrowser.open)
+    try:
+        return launch(ROOT, run_app, open_browser=webbrowser.open)
+    except KeyboardInterrupt:
+        # Ctrl+C in the start window is a normal stop: no traceback, and no pause of the .bat (review);
+        # launch has given the lock back on the way out
+        return 0
 
 
 if __name__ == '__main__':
