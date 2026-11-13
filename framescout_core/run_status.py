@@ -52,10 +52,13 @@ class StatusReporter:
     costs nothing. The file is replaced atomically (never half-written). Writing is best
     effort: on Windows replacing a file fails while another process has it open (the app
     reads it every two seconds); a failed update is retried with the next one and never
-    stops the search. finish() writes the final phase, trying harder.
+    stops the search. finish() writes the final phase, trying harder. analyze_only: the run
+    is an analysis without a search (F18); every write carries "analyze_only": true, a
+    search's status has no such field.
     """
 
-    def __init__(self, path, pid, interval=1.0, clock=time.monotonic, retries=20, retry_delay=0.05):
+    def __init__(self, path, pid, interval=1.0, clock=time.monotonic, retries=20, retry_delay=0.05,
+                 analyze_only=False):
         self.path = Path(path)
         self.interval, self.clock, self.retries, self.retry_delay = interval, clock, retries, retry_delay
         started = _timestamp()
@@ -69,6 +72,8 @@ class StatusReporter:
                       'exit_code': None, 'message': None, 'rate': None,
                       'throughput': stored_throughput(previous.get('throughput')), 'thumbnails': None,
                       'finishing': stored_finishing(previous.get('finishing'))}
+        if analyze_only:
+            self.state['analyze_only'] = True
         self._written = None  # clock() of the last successful write
 
     def update(self, phase=None, force=False, **fields):

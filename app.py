@@ -265,7 +265,7 @@ def start_run(cmd, analyze_only=False):
         with LOG.open('w', encoding='utf-8', buffering=1) as log_handle:
             proc = subprocess.Popen(cmd, cwd=str(BASE), env=cache_env(), stdout=log_handle, stderr=subprocess.STDOUT)
         st.session_state.process = proc
-        if not StatusReporter(STATUS, proc.pid).update('starting', **({'analyze_only': True} if analyze_only else {})):
+        if not StatusReporter(STATUS, proc.pid, analyze_only=analyze_only).update('starting'):
             # without "starting", other tabs would see no run until the engine takes the
             # lock and could start a second one (review)
             end_processes([proc.pid])

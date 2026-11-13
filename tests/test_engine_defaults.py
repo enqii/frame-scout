@@ -477,9 +477,10 @@ def test_the_status_of_an_analysis_says_so_from_its_first_phase():
     # F18: the app names it an analysis, not a search (framescout_core.analysis_only)
     main = next(node for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
                 if isinstance(node, ast.FunctionDef) and node.name == 'main')
-    [scanning] = [node for node in ast.walk(main) if isinstance(node, ast.Call)
-                  and ast.unparse(node).startswith("status.update('scanning'")]
-    assert "'analyze_only': True" in ast.unparse(scanning) and 'args.analyze_only' in ast.unparse(scanning)
+    # the reporter is told the run kind once, so every write carries it (review)
+    [reporter] = [node for node in ast.walk(main) if isinstance(node, ast.Call)
+                  and getattr(node.func, 'id', None) == 'StatusReporter']
+    assert {k.arg: ast.unparse(k.value) for k in reporter.keywords}.get('analyze_only') == 'args.analyze_only'
 
 
 @pytest.mark.parametrize('extra', [['--profiles', 'p.json'], ['--character', 'Red car'], ['--quick-query=dog'],

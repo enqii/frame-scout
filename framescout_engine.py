@@ -221,11 +221,11 @@ def main():
         print(f'Another FrameScout search is already running with the output folder {output}. '
               'Wait until it has finished or stop it, then start again.', file=sys.stderr, flush=True)
         return EXIT_BUSY
-    status = StatusReporter(output / RUN_STATUS, os.getpid())
+    # an analysis without a search says so from its first phase on, for the app (F18)
+    status = StatusReporter(output / RUN_STATUS, os.getpid(), analyze_only=args.analyze_only)
     warnings = []  # of a search that finished, for its final status (E50, review)
     try:
-        # an analysis without a search says so from its first phase on, for the app (F18)
-        status.update('scanning', **({'analyze_only': True} if args.analyze_only else {}))
+        status.update('scanning')
         code = search(args, parser, roots, dropped, output, status, warnings)
     except SystemExit as exc:  # parser.error
         status.finish('failed', exc.code if isinstance(exc.code, int) else 1, parser.error_message)
