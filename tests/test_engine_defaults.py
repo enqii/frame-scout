@@ -188,8 +188,13 @@ def test_the_engine_loads_the_detector_weights_from_the_cache():
     # E9: YOLO('yolo11n.pt') downloads into the working folder; the cache signature keeps the name
     nodes = list(ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8'))))
     [detector] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'YOLO']
-    assert ast.unparse(detector) == ('YOLO(yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), '
-                                     'os.environ, lambda text: print(text, flush=True)))')
+    assert ast.unparse(detector) == 'YOLO(weights)'
+    [lookup] = [node for node in nodes if isinstance(node, ast.Assign) and ast.unparse(node.targets[0]) == 'weights']
+    assert ast.unparse(lookup.value) == ('yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), '
+                                         'os.environ, lambda text: print(text, flush=True))')
+    # E60: the signature keeps the name, so the run log names the file that is loaded
+    assert any(isinstance(node, ast.Call) and ast.unparse(node) == (
+        'print(detector_weights_line(weights, Path.cwd()), flush=True)') for node in nodes)
     [prepare] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'prepare_cache']
     assert 'args.yolo_model' in [ast.unparse(arg) for arg in prepare.args]
 

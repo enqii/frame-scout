@@ -113,6 +113,22 @@ def yolo_weights(name, base, cwd, environ, log=None, replace=os.replace):
     return name  # the file in the working folder
 
 
+def detector_weights_line(weights, cwd):
+    """The run log line that names the weights file the detector loads (E60).
+
+    weights is what yolo_weights returned: the cache signature records --yolo-model only as
+    given, so a copy of the same name in the working folder (E41) or a relative path from
+    another working folder is told apart only by this line. A relative path is shown as the
+    absolute one in cwd; a URL as given; a file that is not there yet gets a note that it is
+    downloaded on first use.
+    """
+    if '://' in weights:
+        return f'Person detector weights: {weights}'
+    path = Path(os.path.abspath(Path(cwd) / weights))
+    note = '' if path.is_file() else ' (not there yet, downloaded on first use)'
+    return f'Person detector weights: {path}{note}'
+
+
 def find_yolo_weights(name, base, cwd, environ):
     """Return (found, cached) for the bare weights file name, without moving or downloading anything.
 
