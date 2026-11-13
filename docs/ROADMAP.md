@@ -26,8 +26,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] The mark colors apply again with the pinned Streamlit, checked in a browser (A49)
 
 ### P31 – Split `app.py` (added 2026-11-13)
-- [ ] Move the areas of `app.py` into modules without changing behavior, before the UI
-      rebuild (A46)
+- [x] Move the areas of `app.py` into modules without changing behavior, before the UI
+      rebuild (A46) (2026-11-13)
 
 ### P32 – Run state (added 2026-11-13)
 - [ ] A state line next to the title and what a search still needs at the Start button (F27)
