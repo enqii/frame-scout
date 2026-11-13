@@ -14,6 +14,8 @@ from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_Q
                              results_document,
                              publish_export, result_card, scan_cleanup)
 
+from app_source import APP, app_tree
+
 
 def test_quick_results_go_to_their_own_folder_and_gallery():
     # the profile galleries, results.json and marks.json of results/ stay untouched (F10)
@@ -411,12 +413,11 @@ def test_auto_cleanup_of_the_quick_folder_keeps_only_what_its_gallery_links(tmp_
     assert read_results(quick / 'results.json')['profiles'][0]['gallery'] == QUICK_GALLERY
 
 
-APP = Path(__file__).resolve().parent.parent / 'app.py'
 
 
 def test_the_app_starts_both_searches_through_engine_command():
     # F10: the search with profiles and the quick search get the same settings
-    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    tree = app_tree()
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
              and getattr(node.func, 'id', None) == 'start_engine']
     # and "Analyze photos now" (F18), whose note goes next to its button
@@ -433,7 +434,7 @@ def test_the_app_starts_both_searches_through_engine_command():
 def test_the_app_counts_partners_as_analyzed_for_an_analysis():
     # F18 review: a partner searched through another file of its shot never gets a row of its
     # own, so "Analyze photos now" must not keep calling it "to analyze"
-    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    tree = app_tree()
     [summary] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
                  and getattr(node.func, 'id', None) == 'start_summary'
                  and any(k.arg == 'analysis_only' for k in node.keywords)]
@@ -445,7 +446,7 @@ def test_the_app_counts_partners_as_analyzed_for_an_analysis():
 
 def test_the_app_warns_of_low_disk_space_next_to_analyze_photos_now():
     # F18 review: the analysis writes the cache rows, but the search's warning is in another tab
-    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    tree = app_tree()
     [call] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
               and getattr(node.func, 'id', None) == 'low_space_warning'
               and any(k.arg == 'analysis' for k in node.keywords)]
@@ -459,7 +460,7 @@ def test_the_app_warns_of_low_disk_space_next_to_analyze_photos_now():
 def test_every_result_card_of_the_app_offers_find_similar():
     # F11: on the cards of the profile results and of the quick search; the click passes the
     # card's photo and the part it names, and the page run (not the fragment) starts it
-    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    tree = app_tree()
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
     for name in ('show_results', 'show_quick_results'):
         assert 'find_similar_button' in [getattr(call.func, 'id', None) for call in ast.walk(functions[name])
@@ -472,9 +473,12 @@ def test_every_result_card_of_the_app_offers_find_similar():
     assert ast.unparse(start) == 'start_engine(like=find_similar_request[0], like_part=find_similar_request[1])'
     # review: the request is taken from the session state first thing in the page run (before
     # any st.stop), and one that cannot start while a search runs gets a notice
+    # (in app.py, whose page run it is: compared by its line numbers, A46)
+    page = ast.parse(APP.read_text(encoding='utf-8'))
     pops = [node for node in tree.body if isinstance(node, ast.Assign) and 'find_similar' in ast.unparse(node)]
     assert [ast.unparse(node) for node in pops] == ["find_similar_request = st.session_state.pop('find_similar', None)"]
-    stops = [node.lineno for node in ast.walk(tree) if isinstance(node, ast.Call)
+    pops = [node for node in page.body if isinstance(node, ast.Assign) and 'find_similar' in ast.unparse(node)]
+    stops = [node.lineno for node in ast.walk(page) if isinstance(node, ast.Call)
              and ast.unparse(node.func) == 'st.stop']
     assert stops and pops[0].lineno < min(stops)
     [handled] = [node for node in ast.walk(tree) if isinstance(node, ast.If)
@@ -488,7 +492,7 @@ def test_every_result_card_of_the_app_offers_find_similar():
 
 
 def test_the_app_shows_the_quick_search_from_its_own_folder():
-    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    tree = app_tree()
     assigned = {ast.unparse(node.targets[0]): ast.unparse(node.value) for node in tree.body
                 if isinstance(node, ast.Assign) and len(node.targets) == 1}
     assert assigned['QUICK'] == 'RESULTS / QUICK_DIR'

@@ -34,6 +34,7 @@ UNINSTALL_ITEMS = (
     ('__pycache__', 'compiled Python files'),
     ('framescout_core/__pycache__', 'compiled Python files'),
     ('framescout_scoring/__pycache__', 'compiled Python files'),
+    ('framescout_ui/__pycache__', 'compiled Python files'),
     ('tests/__pycache__', 'compiled Python files'),
     ('.pytest_cache', 'test cache'),
 )

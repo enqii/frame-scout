@@ -29,6 +29,9 @@ ENTRY_POINTS = ('app.py', 'framescout_engine.py', 'framescout_eval.py', 'install
 # added after I15 (E49), so no version with the single file framescout_core.py has it; the
 # versions with the single file framescout_scoring.py (before I30) since E49 do (review)
 LIBRARY_MODULES = ('framescout_images.py',)
+# packages added after I15 that only one entry point imports: the areas of app.py (A46). No
+# version with a single file framescout_core.py had them, and an older app.py never imports them
+APP_PACKAGES = {'app.py': {'framescout_ui'}}
 OBSOLETE_SCORING_FILE = f'{SCORING_PACKAGE}.py'
 
 
@@ -227,7 +230,17 @@ def test_the_entry_points_import_no_module_an_older_version_has_as_a_single_file
     # with its guard) and modules no version before I15 had. An older version's module
     # (e.g. the engine) would be the older one's.
     framescout = {module for module in module_names(ROOT / name) if module.startswith('framescout')}
-    assert framescout <= set(REPLACED_PACKAGES) | {Path(module).stem for module in LIBRARY_MODULES}, name
+    assert framescout <= (set(REPLACED_PACKAGES) | {Path(module).stem for module in LIBRARY_MODULES}
+                          | APP_PACKAGES.get(name, set())), name
+
+
+def test_the_app_packages_import_only_this_versions_modules():
+    # imported through app.py, so the rule above holds for them too
+    for packages in APP_PACKAGES.values():
+        for package in packages:
+            for path in (ROOT / package).glob('*.py'):
+                framescout = {module for module in module_names(path) if module.startswith('framescout')}
+                assert framescout <= set(REPLACED_PACKAGES) | {Path(module).stem for module in LIBRARY_MODULES}, path
 
 
 # --- framescout_scoring next to framescout_scoring.py (I36) ---
