@@ -40,8 +40,9 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] Start handles a busy port and an already running app (F22; done 2026-11-13, PR #101)
 
 ### P28 – UI/UX review (added 2026-11-12)
-- [ ] Assess the whole user interface and write the findings down, no rebuild; follow-up PRs
-      are decided afterwards (F24; kind `docs`)
+- [x] Assess the whole user interface and write the findings down, no rebuild; follow-up PRs
+      are decided afterwards (F24; kind `docs`; done 2026-11-13, findings in
+      [UI-REVIEW.md](UI-REVIEW.md), follow-ups F27–F33)
 
 ### P29 – Detector weights (added 2026-11-12)
 - [ ] Log which detector weights file was loaded (E60)

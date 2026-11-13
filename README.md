@@ -80,6 +80,7 @@ Then delete the project folder yourself. Details:
 - [Development](docs/DEVELOPMENT.md): command line, tests, model evaluation, project
   structure
 - [Architecture](docs/ARCHITECTURE.md): internals for contributors
+- [UI review](docs/UI-REVIEW.md): proposal for improving the interface (not implemented)
 - [Security policy](SECURITY.md)
 
 ## License
