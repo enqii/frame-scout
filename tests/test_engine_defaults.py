@@ -187,14 +187,34 @@ def test_the_engine_sets_the_cache_folders_in_main_not_on_import():
 def test_the_engine_loads_the_detector_weights_from_the_cache():
     # E9: YOLO('yolo11n.pt') downloads into the working folder; the cache signature keeps the name
     nodes = list(ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8'))))
-    [detector] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'YOLO']
-    assert ast.unparse(detector) == 'YOLO(weights)'
-    [lookup] = [node for node in nodes if isinstance(node, ast.Assign) and ast.unparse(node.targets[0]) == 'weights']
-    assert ast.unparse(lookup.value) == ('yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), '
-                                         'os.environ, lambda text: print(text, flush=True))')
-    # E60: the signature keeps the name, so the run log names the file that is loaded
-    assert any(isinstance(node, ast.Call) and ast.unparse(node) == (
-        'print(detector_weights_line(weights, Path.cwd()), flush=True)') for node in nodes)
+    [loader] = [node for node in nodes if isinstance(node, ast.FunctionDef) and node.name == 'load_detector']
+
+    def call_of(statement, name):
+        """The call of name that is statement itself, its value or (for print) its first argument."""
+        value = getattr(statement, 'value', None)
+        if isinstance(value, ast.Call) and getattr(value.func, 'id', None) == 'print' and value.args:
+            value = value.args[0]
+        if isinstance(value, ast.Call) and getattr(value.func, 'id', None) == name:
+            return value
+        return None
+
+    def step(name):
+        """The index of the one statement of load_detector's own body that calls name, and that call."""
+        [found] = [(index, call) for index, statement in enumerate(loader.body)
+                   if (call := call_of(statement, name)) is not None]
+        return found
+
+    # statements of the function body itself, so they run whenever the detector loads
+    lookup_at, lookup = step('yolo_weights')
+    line_at, line = step('detector_weights_line')
+    load_at, load = step('YOLO')
+    [target] = loader.body[lookup_at].targets
+    assert [ast.unparse(arg) for arg in lookup.args[:4]] == [
+        'args.yolo_model', 'Path(__file__).resolve().parent', 'Path.cwd()', 'os.environ']
+    # E60: the signature keeps the name, so the run log names the file before it is loaded
+    # (a load that fails still shows the file tried, review)
+    assert lookup_at < line_at < load_at
+    assert ast.unparse(line.args[0]) == ast.unparse(load.args[0]) == ast.unparse(target)
     [prepare] = [node for node in nodes if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'prepare_cache']
     assert 'args.yolo_model' in [ast.unparse(arg) for arg in prepare.args]
 
