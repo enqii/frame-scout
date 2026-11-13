@@ -16,7 +16,7 @@ Current baseline: **v1.1, prototype**, with a Streamlit frontend and a separate 
 - **`docs/ARCHITECTURE.md`** holds the details: every file's responsibilities and the `framescout_core` functions, the search pipeline, cache signature, scoring, profiles schema, settings sync, run lock/status, start/stop, test coverage and known quirks. Read the sections relevant to the files you touch before changing code; search it instead of reading it whole.
 
 ## Gotchas (rules that are easy to break without reading the details)
-- Settings widgets in `app.py` get their values through `st.session_state` with keys `setting_<name>`; never pass them `value=`/`index=` (PR #10 review).
+- Settings widgets (`framescout_ui/settings.py`; the photo folders in `app.py`) get their values through `st.session_state` with keys `setting_<name>`; never pass them `value=`/`index=` (PR #10 review).
 - Change `framescout_core.ENGINE_TEMPLATE` whenever cached embeddings become incompatible for all models (preprocessing, crops); another model or weights is a new `framescout_core.MODELS` entry with its own `engine_id`; signature golden values for every model are pinned in `tests/test_signature.py`; cache rows of other signatures are never deleted automatically, only by the user's "Clean up storage" (E7/E11), which must never delete `framescout_core.NEVER_DELETED` files (e.g. `marks.json`).
 - Search terms are **English only** (E3): hint text only, no language check, warning or translation without a new user decision.
 - `torch`/`torchvision` pins in `requirements/requirements.txt` and `requirements/constraints.txt` must equal `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION` (a test checks both).
