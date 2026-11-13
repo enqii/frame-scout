@@ -1366,9 +1366,11 @@ def test_the_app_cleans_its_project_folder_once_per_start():
     # E44: in a function Streamlit runs once per server process, called before the page
     # reads profiles.json
     import ast
-    from app_source import APP, app_tree
-    # the function may be in a module of framescout_ui (A46); the call and the read are app.py's
-    tree = ast.parse(APP.read_text(encoding='utf-8'))
+    from app_source import app_tree, page_tree
+    # two trees (A46, review): the function is searched in all app files, as it may be in a
+    # module of framescout_ui; its call and the read of profiles.json are compared by their
+    # line numbers, which is only meaningful within one file: app.py, whose page run it is
+    tree = page_tree()
     [function] = [node for node in app_tree().body if isinstance(node, ast.FunctionDef)
                   and any(isinstance(call, ast.Call) and getattr(call.func, 'id', None) == 'project_temp_cleanup'
                           for call in ast.walk(node))]
