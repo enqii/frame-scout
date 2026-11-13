@@ -439,15 +439,17 @@ def test_mark_style_colors_the_selected_option_of_each_marked_control():
     match_background, match_border = MARK_COLORS[MARK_MATCH]
     reject_background, reject_border = MARK_COLORS[MARK_NO_MATCH]
     # one rule per state listing the selected button of each control in that state, named as
-    # Streamlit 1.66 does: the key class of the element and the kind of the selected button
-    assert ('.st-key-mark_a1 button[kind="segmented_controlActive"], '
-            '.st-key-mark_d4 button[kind="segmented_controlActive"]'
+    # Streamlit 1.66.1 does: the key class of the element, the variant of its buttons and the
+    # data-selected attribute of the selected one (no kind attribute any more, A49)
+    assert ('.st-key-mark_a1 button[data-variant="segmented_control"][data-selected], '
+            '.st-key-mark_d4 button[data-variant="segmented_control"][data-selected]'
             f'{{background-color:{match_background}!important;border-color:{match_border}!important;'
             'color:inherit!important}') in style
-    assert ('.st-key-mark_b2 button[kind="segmented_controlActive"]'
+    assert ('.st-key-mark_b2 button[data-variant="segmented_control"][data-selected]'
             f'{{background-color:{reject_background}!important;border-color:{reject_border}!important;'
             'color:inherit!important}') in style
     assert 'mark_c3' not in style  # undecided keeps Streamlit's look
+    assert 'kind=' not in style  # the 1.66.1 buttons carry no kind attribute (A49)
 
 
 def test_mark_style_is_empty_without_a_decided_mark():
