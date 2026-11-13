@@ -171,9 +171,9 @@ For every worktree under `.claude/worktrees/` (`git worktree list`):
 
 Order of the checks: first steps 1 and 3 (clean `status --porcelain`, fully pushed). Only if
 both hold and `git worktree remove` refuses just because of ignored files (`.tmp/` smoke
-data), check that `git -C <path> status --porcelain --ignored` lists nothing but `.tmp/`;
-then delete that folder and remove the worktree without `--force`. Any other ignored file:
-report instead.
+data), check that `git -C <path> status --porcelain --ignored` lists nothing but `.tmp/` and
+regenerable `__pycache__/` / `.pytest_cache/` folders (I48); then delete those folders and
+remove the worktree without `--force`. Any other ignored file: report instead.
 
 `git worktree unlock/remove/prune`, `git branch -d` and `git branch -D` (not on `main`) are
 pre-approved in `.claude/settings.json` (I27); forced removals (`-f`/`--force`) still ask.
