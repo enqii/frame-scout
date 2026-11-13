@@ -286,7 +286,7 @@ the module of its area and to the re-exports in `__init__.py`.
   tokenizer from; `''` = built-in tokenizer; tested against open_clip's config).
 - `cache_dirs.py` (E9/I10): `CACHE_DIR`/`cache_paths`/`cache_folder_paths` (I25: the four
   cache variables under a cache folder itself; `cache_paths(base)` and the evaluation tool's
-  `engine_env` use it)/`default_cache_env`/`engine_cache_env`/`yolo_weights`/`find_yolo_weights`
+  `engine_env` use it)/`default_cache_env`/`engine_cache_env`/`yolo_weights`/`find_yolo_weights`/`detector_weights_line` (E60: the `run.log` line naming the loaded weights)
   (the project's `.cache/` folders and the engine's defaults for them; A36:
   `engine_cache_env(environ, base)` is a copy of the environment plus `default_cache_env`
   (which leaves `TORCH_HOME`/`HF_HOME` to a user's `XDG_CACHE_HOME`, `XDG_DERIVED`, review),
@@ -1161,7 +1161,7 @@ would stat a file another search may be moving and is unreliable on volumes with
 file index, review) is treated as an older version's download: a cached copy wins, otherwise it is moved into the
 cache folder once (used in place with a `run.log` line if the move fails; with a copy
 already there it stays for the uninstall); otherwise the cache path,
-where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged.
+where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged (open: E64). E60: `load_detector` prints `Person detector weights: <path>` (`framescout_core.detector_weights_line`; a URL as given, ` (not there yet, downloaded on first use)` for a missing file) before `YOLO(weights)`.
 
 The detector is created lazily (F2): the engine wraps the creation in `framescout_core.Lazy`
 and calls `get()` in `analyze()` on the first non-empty list of photos to analyze (main pass
@@ -1985,7 +1985,7 @@ galleries with `results.json` (E24, `test_results.py`: publishes; a failed write
 nothing; all files complete before the first rename and `results.json` last; retry on an
 open file; a rename that fails every try restores the files renamed before it, a failed
 restore is skipped), the cache folders and the `yolo11n.pt`
-location (E9/I10: `test_cache_dirs.py`, also that importing `framescout_core` loads no
+location (E9/I10: `test_cache_dirs.py`, also the detector weights line, E60, and also that importing `framescout_core` loads no
 third-party module; E41: the working folder wins; A36: `engine_cache_env`, `cache_env` and
 the cache lines of both `.bat` files, run by cmd.exe, keep a user's value and leave
 `TORCH_HOME`/`HF_HOME` to a user's `XDG_CACHE_HOME`, as `default_cache_env` does; the

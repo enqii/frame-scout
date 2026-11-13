@@ -20,7 +20,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
 ### P29 – Detector weights (added 2026-11-12)
-- [ ] Log which detector weights file was loaded (E60)
+- [x] Log which detector weights file was loaded (E60)
 
 ### P30 – Mark colors (added 2026-11-13)
 - [ ] The mark colors apply again with the pinned Streamlit, checked in a browser (A49)
