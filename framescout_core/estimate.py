@@ -145,6 +145,10 @@ def remaining_text(status, now=None):
     if _stalled(status, now or datetime.now().astimezone()):
         return None
     left = max(0, total - done)
+    if status.get('analyze_only') is True:
+        # an analysis without a search (F18): nothing is scored or rendered after it
+        rate = _positive(status.get('rate'))
+        return None if phase != 'analyzing' or not left or rate is None else f'{duration_text(left / rate)} left'
     thumbnails = _count(status, 'thumbnails')
     finishing = status.get('finishing')
     if phase == 'analyzing':
@@ -319,3 +323,23 @@ def start_summary(photos, analyzed, per_minute, finishing=None):
     if finishing is not None:
         text += f', scoring and writing the galleries up to {duration_text(finishing)} more'
     return text + ' (a rough estimate: it depends on the photos and on what else the PC does).'
+
+
+def analysis_summary(photos, analyzed, per_minute):
+    """Return the summary next to "Analyze photos now" (F18): start_summary without scoring and galleries.
+
+    photos, analyzed, per_minute as for start_summary.
+    """
+    if photos <= 0:
+        return 'No supported photos found in these folders: there is nothing to analyze.'
+    analyzed = min(analyzed, photos)
+    todo = photos - analyzed
+    if not todo:
+        return ('The photo is analyzed with these settings already.' if photos == 1 else
+                f'All {photos:,} photos are analyzed with these settings already.')
+    text = f'{_photos(photos)} found · {analyzed:,} already analyzed with these settings · {todo:,} to analyze.'
+    per_minute = _positive(per_minute)
+    if per_minute is None:
+        return text + ' The analysis shows how long it takes after its first minutes.'
+    return text + (f' At the speed of an earlier search with these settings, it takes {duration_text(todo / per_minute)} '
+                   '(a rough estimate: it depends on the photos and on what else the PC does).')

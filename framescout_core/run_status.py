@@ -33,6 +33,11 @@ NOTHING_NEW = 'Nothing new to analyze – ranking only'
 # the message while the person detector loads on the first photo the cache does not have:
 # the phase stays "analyzing" with its progress (F2, review)
 LOADING_DETECTOR = 'Loading the person detector'
+# An analysis without a search (F18, the engine's --analyze-only, the app's "Analyze photos
+# now"): its status carries "analyze_only": true; it runs the phases up to "analyzing" and
+# then finishes without scoring or export, so results.json and the galleries stay as they are.
+# The message of one whose photos all come from the cache:
+ALL_ANALYZED = 'All photos are analyzed already – nothing new to analyze'
 
 
 def _timestamp():
@@ -194,7 +199,29 @@ def status_text(status):
     return text
 
 
+def analysis_only(status):
+    """Return True if status is the one of an analysis without a search (F18)."""
+    return isinstance(status, dict) and status.get('analyze_only') is True
+
+
+def run_name(status):
+    """Return what the app calls the run of status: "analysis" (F18) or "search run"."""
+    return 'analysis' if analysis_only(status) else 'search run'
+
+
+def analysis_result_text(status):
+    """Return what the app says about a finished analysis without a search (F18): its counts and what it changed."""
+    new, cached, errors = (_count(status, k) or 0 for k in ('new', 'cached', 'errors'))
+    text = (f"{new:,} photo{'' if new == 1 else 's'} newly analyzed, {cached:,} already in the cache"
+            + (f', {errors:,} could not be analyzed (see the log).' if errors else '.'))
+    return text + (' The results of the last search stay as they are. A search with the same search model and person '
+                   'detection settings uses these analyses and only ranks the photos; after a change of these '
+                   'settings, the photos are analyzed again.')
+
+
 def _phase_text(status, phase):
+    if phase == 'starting' and analysis_only(status):
+        return 'Starting the analysis'
     label = PHASE_LABELS.get(phase, str(phase))
     done, total = _count(status, 'done'), _count(status, 'total')
     if not total or done is None:
