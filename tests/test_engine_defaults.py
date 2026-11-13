@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from framescout_core import cache_paths, default_cache_env, engine_cache_env
+from framescout_core import RUN_STATUS, cache_paths, default_cache_env, engine_cache_env, read_status
 
 ENGINE = Path(__file__).resolve().parent.parent / 'framescout_engine.py'
 APP = ENGINE.with_name('app.py')
@@ -425,3 +425,72 @@ def test_the_engine_keeps_the_closest_texts_only_where_a_card_names_them():
     [append] = [node for node in ast.walk(search_node()) if isinstance(node, ast.If)
                 and any('best_queries[name].append' in ast.unparse(part) for part in node.body)]
     assert ast.unparse(append.test) == 'name in best_queries'
+
+
+def analyze_test(node):
+    """Whether node is "if analyze_only:"."""
+    return isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == 'analyze_only'
+
+
+def test_the_engine_offers_an_analysis_without_a_search():
+    # F18: an additive switch, off by default, never together with a search
+    keywords = {k.arg: ast.unparse(k.value) for k in add_argument_call('--analyze-only').keywords}
+    assert keywords.get('action') == "'store_true'"
+    search = search_node()
+    assigned = [ast.unparse(node.value) for node in ast.walk(search) if isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == 'analyze_only' for t in node.targets)]
+    assert assigned == ['args.analyze_only']
+    [branch] = [node for node in ast.walk(search) if analyze_test(node) and 'error' in called(node)]
+    [refused] = [node for node in branch.body if isinstance(node, ast.If) and 'error' in called(node)]
+    assert {'args.profiles', 'args.character', 'args.quick_query', 'like', 'args.scores_file'} <= {
+        ast.unparse(n) for n in ast.walk(refused.test)}
+    # no profile: no search text is encoded and no reference image read
+    assert any(ast.unparse(node) == 'profiles = []' for node in branch.body)
+    # the analysis itself is the one of a search: quick is false
+    assert not any(analyze_test(node) for node in ast.walk(search) if quick_test(node, negated=True))
+
+
+def test_an_analysis_stops_before_scoring_and_export():
+    # F18: results.json, the galleries, the marks and the scores file stay as they are
+    search = search_node()
+    stops = [node for node in ast.walk(search) if analyze_test(node)
+             and any(isinstance(part, ast.Return) for part in node.body)]
+    assert len(stops) == 1
+    [stop] = stops
+    assert 'close' in called(stop)  # the cache file is not left open
+    # cached_features of "Find similar" is read before the analysis, in the quick branch
+    quick = {id(node) for branch in ast.walk(search) if quick_test(branch) for part in branch.body
+             for node in ast.walk(part)}
+    later = [node.lineno for node in ast.walk(search) if isinstance(node, ast.Call) and id(node) not in quick
+             and (getattr(node.func, 'id', '') in ('cached_features', 'write_scores', 'publish_export', 'auto_cleanup')
+                  or ast.unparse(node).startswith("status.update('scoring'"))]
+    assert len(later) >= 5 and stop.lineno < min(later)
+
+
+def test_the_status_of_an_analysis_says_so_from_its_first_phase():
+    # F18: the app names it an analysis, not a search (framescout_core.analysis_only)
+    main = next(node for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
+                if isinstance(node, ast.FunctionDef) and node.name == 'main')
+    [scanning] = [node for node in ast.walk(main) if isinstance(node, ast.Call)
+                  and ast.unparse(node).startswith("status.update('scanning'")]
+    assert "'analyze_only': True" in ast.unparse(scanning) and 'args.analyze_only' in ast.unparse(scanning)
+
+
+@pytest.mark.parametrize('extra', [['--profiles', 'p.json'], ['--character', 'Red car'], ['--quick-query=dog'],
+                                   ['--scores-file', 'scores.json']])
+def test_an_analysis_refuses_a_search_and_says_so_in_its_status(tmp_path, extra):
+    # F18: runs the engine up to its argument check (no model load); needs the engine's own
+    # imports (torch, Pillow), so it is skipped in CI
+    pytest.importorskip('torch')
+    pytest.importorskip('PIL')
+    photos, output = tmp_path / 'photos', tmp_path / 'results'
+    photos.mkdir()
+    env = engine_cache_env(dict(os.environ), ENGINE.parent)
+    result = subprocess.run([sys.executable, str(ENGINE), str(photos), '--analyze-only', *extra, '--output', str(output)],
+                            cwd=tmp_path, capture_output=True, text=True, timeout=300, env=env)
+    assert result.returncode == 2, result.stderr
+    assert '--analyze-only analyzes the photos without a search' in result.stderr
+    status = read_status(output / RUN_STATUS)
+    assert status['phase'] == 'failed' and status['analyze_only'] is True
+    assert status['message'].startswith('--analyze-only')
+    assert not (output / 'results.json').exists()

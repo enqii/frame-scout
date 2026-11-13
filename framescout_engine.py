@@ -31,7 +31,7 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, StepSpeed, gallery_thumbnails,
                              remember_finishing, run_throughput,
                              final_status, yolo_weights,
-                             RawFallback, SkippedPhotos, TruncatedImageError, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
+                             ALL_ANALYZED, RawFallback, SkippedPhotos, TruncatedImageError, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
                              load_profiles, missing_folders_message, model_problem, open_clip_cache_dir,
                              output_folder_problem, photo_name,
@@ -190,6 +190,12 @@ def main():
     parser.add_argument('--like-part', default=None, metavar='PART',
                         help=f'with --like: the part of the photo to compare, as a gallery card names it, e.g. '
                              f'"Person 2" (default: "{FULL_IMAGE_LABEL}")')
+    # F18: the app's "Analyze photos now"; instead of --profiles and --character
+    parser.add_argument('--analyze-only', action='store_true',
+                        help='only analyze the photos with the search model and person detection settings given, '
+                             f'so that a later search with the same settings only ranks them: fills {CACHE_FILE} '
+                             'in the output folder and stops without a search (no profiles; the galleries and '
+                             f'{RESULTS_FILE} stay as they are)')
     # the folders may come before, between or after the options, as one folder could (review)
     args = parser.parse_intermixed_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):
@@ -218,7 +224,8 @@ def main():
     status = StatusReporter(output / RUN_STATUS, os.getpid())
     warnings = []  # of a search that finished, for its final status (E50, review)
     try:
-        status.update('scanning')
+        # an analysis without a search says so from its first phase on, for the app (F18)
+        status.update('scanning', **({'analyze_only': True} if args.analyze_only else {}))
         code = search(args, parser, roots, dropped, output, status, warnings)
     except SystemExit as exc:  # parser.error
         status.finish('failed', exc.code if isinstance(exc.code, int) else 1, parser.error_message)
@@ -277,9 +284,17 @@ def search(args, parser, roots, dropped, output, status, warnings):
     # "Find similar" (F11) is one by the cached vector of one photo instead of a text
     like = args.like is not None
     quick = args.quick_query is not None or like
+    # an analysis without a search (F18) fills the cache like the analysis of a search, then
+    # stops before scoring and export
+    analyze_only = args.analyze_only
     if args.like_part is not None and not like:
         parser.error('--like-part needs --like.')
-    if quick:
+    if analyze_only:
+        if args.profiles or args.character or args.quick_query is not None or like or args.scores_file:
+            parser.error('--analyze-only analyzes the photos without a search: leave out --profiles, --character, '
+                         '--quick-query, --like and --scores-file.')
+        profiles = []  # no search text to encode, no reference image to read
+    elif quick:
         if args.profiles or args.character:
             parser.error('--quick-query and --like search without profiles: leave out --profiles and --character.')
         if like and args.quick_query is not None:
@@ -420,7 +435,8 @@ def search(args, parser, roots, dropped, output, status, warnings):
                   f'compared analyses: {search_model.label}', flush=True)
         else:
             status.update('loading')
-            what = f'quick search for "{profiles[0]["name"]}"' if quick else f'{len(profiles)} search profiles'
+            what = (f'quick search for "{profiles[0]["name"]}"' if quick else
+                    'analysis only, no search' if analyze_only else f'{len(profiles)} search profiles')
             print(f'{len(paths)} photos; {what}; search model: {search_model.label} '
                   f'({search_model.name}/{search_model.pretrained}); CLIP: {device}; '
                   f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
@@ -653,15 +669,33 @@ def search(args, parser, roots, dropped, output, status, warnings):
                           'photo instead.', flush=True)
                 analyze(to_analyze(retry))
                 if not detector.created:
-                    # no photo needed an analysis, e.g. all came from the cache (F2)
-                    print(f'{NOTHING_NEW}.', flush=True)
-                    status.update(message=NOTHING_NEW, force=True)
+                    # no photo needed an analysis, e.g. all came from the cache (F2); an analysis
+                    # without a search ranks nothing either (F18)
+                    nothing_new = ALL_ANALYZED if analyze_only else NOTHING_NEW
+                    print(f'{nothing_new}.', flush=True)
+                    status.update(message=nothing_new, force=True)
             finally:
                 pool.shutdown(cancel_futures=True)  # on an interruption: no new decoding
         except KeyboardInterrupt:
             print('\nInterrupted: images analyzed so far are in the cache. Start again to resume.')
             con.close()
             return 130
+
+    if analyze_only:
+        # the analyses are in the cache; nothing is scored or exported, so results.json, the
+        # galleries, the marks and the quick search stay as they are (F18)
+        con.close()
+        if unreadable:
+            if not fresh and not reused:
+                # not a single row could be read: fail as a search does (E50)
+                raise next(iter(unreadable.values()))
+            warning = cache_read_warning(output / CACHE_FILE, next(iter(unreadable.values())), len(unreadable))
+            print(warning, flush=True)
+            warnings.append(warning)
+        print(f'Done. Analysis only, no search: new photo analyses: {fresh}, from cache: {reused}, errors: {errors}. '
+              f'A search with the search model {search_model.label} and these person detection settings uses them; '
+              'the results of the last search stay as they are.', flush=True)
+        return 0
 
     print('Scoring the photos for each search profile ...', flush=True)
     if quick:
