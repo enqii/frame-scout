@@ -158,9 +158,13 @@ the folder of a manual run is used instead of the cached copy.
 **Analyze ahead** (end of the tab) analyzes the photos without a search, for example overnight, so
 that a later search only has to rank them. The section shows the current search model and
 person detection setting, how many photos are analyzed with them already and, if an earlier
-search measured a speed, a rough duration. Press **Analyze photos now** to start; the button is
-disabled while a search, an analysis or a cleanup runs, without photos, when the model package
-is missing or when all photos are analyzed with these settings. Analyses only help a search with
+search measured a speed, a rough duration. A JPEG or HEIC whose shot is analyzed through its RAW
+file (or another file of the shot) counts as analyzed. Press **Analyze photos now** to start; the
+button is disabled while a search, an analysis or a cleanup runs and when the model package is
+missing. It stays available when the count says all photos are analyzed: the count is the one
+from the last "Recount", while the analysis reads the folders again and also finds photos added
+since. If the drive of the results may run short of space, a warning is shown here too.
+Analyses only help a search with
 the same search model and person detection settings: after a change of these, the photos are
 analyzed again. An analysis changes no results: the galleries, `results.json`, marks and the
 last quick search stay as they are. Progress, "time left" and **Stop** are in "Search & results";
@@ -217,7 +221,9 @@ An analysis started in "Photo source" (see "Analyze ahead") is shown here too: "
 …" with its progress and **Stop**, "about N min left" for the analysis alone (there is no scoring
 or gallery step) and afterwards "The last analysis finished successfully" with the number of
 newly analyzed photos and those already in the cache. An interrupted or failed analysis is
-described as such, not as a search run. Only one search or analysis runs at a time.
+described as such, not as a search run. If no photo needed a new analysis, the progress line says
+"All photos are analyzed already", or, if some photos could not be read, "No photo newly analyzed –
+some could not be analyzed, see the log". Only one search or analysis runs at a time.
 
 Before a search the run tab summarizes what it will do: how many photos were found, how many
 are already analyzed with the current settings and how many remain to analyze. If an earlier
