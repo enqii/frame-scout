@@ -14,6 +14,7 @@ from framescout_core import (EXAMPLE_PROFILES_FILE, EXPORTS_DIR, MARKS_FILE, QUI
                              RUN_LOCK, RUN_STATUS, SETTINGS_FILE, available_decoders, open_command, openable_photo,
                              project_temp_cleanup, reveal_command, supported_extensions)
 
+
 # the project folder: app.py's folder, one above this package
 BASE = Path(__file__).resolve().parent.parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
@@ -63,10 +64,12 @@ def open_path(path):
     else:
         start_launcher(open_command(path, platform.system()))
 
+
 def start_launcher(cmd):
     """Start cmd (open, xdg-open) without waiting; a thread reaps it, so no zombie stays (review)."""
     process = subprocess.Popen(cmd)
     threading.Thread(target=process.wait, daemon=True).start()
+
 
 def reveal_path(path):
     """Show the file path in the file manager of the computer the app runs on, selected if possible."""
@@ -99,6 +102,7 @@ def reveal_path(path):
     if result < 0:  # FAILED(); a success code such as S_FALSE is no error (review)
         raise OSError(f'Explorer reported error {result & 0xFFFFFFFF:#010x}')
 
+
 def gallery_action(action, path, what):
     """Run action(path) for a gallery button; a failure becomes a note above the gallery."""
     if path is None:
@@ -109,26 +113,33 @@ def gallery_action(action, path, what):
     except OSError as exc:
         st.session_state.gallery_notice = f'{what} could not be opened: {exc}'
 
+
 def open_photo(path):
     # only an existing image file: never start a program named in results.json
     gallery_action(open_path, openable_photo(path), f'The photo {path}')
 
+
 def show_photo(path):
     gallery_action(reveal_path, openable_photo(path), f'The photo {path}')
+
 
 def open_gallery(name):
     page = RESULTS / name  # a plain file name, checked by read_results
     gallery_action(open_path, page if page.is_file() else None, f'The gallery {page}')
 
+
 def open_results_folder():
     gallery_action(open_path, RESULTS if RESULTS.is_dir() else None, f'The results folder {RESULTS}')
+
 
 def open_quick_gallery():
     page = QUICK / QUICK_GALLERY
     gallery_action(open_path, page if page.is_file() else None, f'The gallery {page}')
 
+
 def open_quick_folder():
     gallery_action(open_path, QUICK if QUICK.is_dir() else None, f'The quick search folder {QUICK}')
+
 
 @functools.lru_cache(maxsize=1)
 def pictures_folder():
@@ -156,9 +167,11 @@ def pictures_folder():
             ctypes.windll.ole32.CoTaskMemFree(found)  # also on failure (documented), None is allowed
     return Path.home() / 'Pictures'
 
+
 def widget_id(*parts):
     """A short stable key part for widgets of a profile or photo (names and paths may hold any character)."""
     return hashlib.sha256('\0'.join(parts).encode('utf-8')).hexdigest()[:16]
+
 
 def version_key(path):
     """(path, mtime_ns, size, file id) of path: the cache key of the files saved by replacing them.
@@ -188,3 +201,8 @@ def clean_project_folder():
         return project_temp_cleanup(BASE)
     except OSError:  # e.g. a read-only project folder: never stops the app
         return None
+
+
+# seconds the free disk space check of the run tab and the downloaded models of the AI settings are
+# reused: not asked again on every click (review)
+LOW_SPACE_TTL = 30
