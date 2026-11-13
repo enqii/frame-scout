@@ -245,17 +245,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       them, and (user decision) neither category is selected by default any more. Idea:
       record the volume serial number (or mount) per root, which changes the cache or a
       side file (hold point). Found in the PR of E8.
-- [ ] `ready` **A49 – The mark colors do not apply (replaces A45):** in a real browser with the
-      pinned Streamlit 1.66.1 the selected option of every mark control ("Undecided", "Match",
-      "No match") has Streamlit's default red, so the three states look the same. `mark_style`
-      (`framescout_core/marks.py`) targets `button[kind="segmented_controlActive"]`, but the
-      buttons carry no `kind` attribute any more; the selected one has `data-selected="true"`
-      and `aria-checked="true"` (`role="radio"`, `data-variant="segmented_control"`). Fix the
-      selector, keep `MARK_STYLE_STREAMLIT` and its test in step, and check in a browser (light
-      and dark theme, after mark clicks and page changes) as A45 asked; `AppTest` cannot see
-      CSS. P35 rebuilds the card, so keep the fix small. Affected: `framescout_core/marks.py`,
-      `tests/`, `docs/ARCHITECTURE.md`. Found in the browser pass of 2026-11-13
-      (`docs/UI-REVIEW.md`). Size S. Roadmap P30.
 - [ ] `ready` **A46 – Split `app.py` into modules (simplification):** `app.py` has about 1,900 lines
       and holds process control (start/stop of the engine), marks, copying, export, storage
       cleanup, cache check, settings widgets and the result views in one file. Move the areas

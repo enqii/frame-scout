@@ -23,7 +23,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] Log which detector weights file was loaded (E60)
 
 ### P30 – Mark colors (added 2026-11-13)
-- [ ] The mark colors apply again with the pinned Streamlit, checked in a browser (A49)
+- [x] The mark colors apply again with the pinned Streamlit, checked in a browser (A49)
 
 ### P31 – Split `app.py` (added 2026-11-13)
 - [ ] Move the areas of `app.py` into modules without changing behavior, before the UI

@@ -212,7 +212,7 @@ Measured, confirming §1 and §2:
 Corrections and new findings:
 
 - **The mark colors do not apply** (§2 said "it works"): all three selected states show
-  Streamlit's default red, because the selector of `mark_style` no longer matches (A49).
+  Streamlit's default red, because the selector of `mark_style` no longer matched (fixed in A49).
 - A marked card looks like an unmarked one apart from the small control.
 - The page is not full width: it is limited to 1,300 px, so the thumbnails are 253 px wide
   (not about 300 px) and a third of a 1920 px window stays empty.
