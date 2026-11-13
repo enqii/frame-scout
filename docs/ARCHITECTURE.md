@@ -1161,7 +1161,7 @@ would stat a file another search may be moving and is unreliable on volumes with
 file index, review) is treated as an older version's download: a cached copy wins, otherwise it is moved into the
 cache folder once (used in place with a `run.log` line if the move fails; with a copy
 already there it stays for the uninstall); otherwise the cache path,
-where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged (open: E64). E60: `load_detector` prints `Person detector weights: <path>` (`framescout_core.detector_weights_line`; a URL as given, ` (not there yet, downloaded on first use)` for a missing file) before `YOLO(weights)`.
+where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged (open: E64). E60: `load_detector` prints `Loading person detector weights: <absolute path>` (`framescout_core.detector_weights_line`; a URL as given) before `YOLO(weights)`, so a failed load still names the file tried; a missing file gets a note that Ultralytics downloads only its official weights names and any other file fails to load (review).
 
 The detector is created lazily (F2): the engine wraps the creation in `framescout_core.Lazy`
 and calls `get()` in `analyze()` on the first non-empty list of photos to analyze (main pass
@@ -1992,7 +1992,7 @@ the cache lines of both `.bat` files, run by cmd.exe, keep a user's value and le
 project folder is told by its path, not `samefile`; `cache_env` itself run on `tmp_path`
 in `test_engine_defaults.py`; the engine's defaults call
 as the first statement of `main()` (E42) and its `yolo_weights`
-use from its syntax tree plus a subprocess import, skipped without torch, in
+use, with the E60 line printed before the load, from its syntax tree plus a subprocess import, skipped without torch, in
 `test_engine_defaults.py`; no run with real models, no app session with a user-set variable) and the photo scan
 with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
 the RAW fallback's mapping, its agreement with the scan's pairs across mixed-case names

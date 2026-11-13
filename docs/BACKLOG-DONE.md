@@ -2024,8 +2024,9 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       for those runs: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched until
       decided). Decided 2026-11-12: only log which file was loaded (roadmap P29); the
       signature variant stays open (E64). Review of PR #89, finding 3.
-      (done 2026-11-13 in PR #104: when the person detector loads, the engine prints
-      `Person detector weights: <absolute path>` (a URL as given; ` (not there yet, downloaded on
-      first use)` if the file does not exist yet), via `framescout_core.detector_weights_line`
-      in `cache_dirs.py`. Tests: `test_cache_dirs.py`, `test_engine_defaults.py`. No cache,
+      (done 2026-11-13 in PR #104: before the person detector loads, the engine prints
+      `Loading person detector weights: <absolute path>` (a URL as given; a missing file gets a
+      note that only official Ultralytics weights are downloaded, otherwise the load fails;
+      review), via `framescout_core.detector_weights_line` in `cache_dirs.py`. Tests:
+      `test_cache_dirs.py`, `test_engine_defaults.py` (the line comes before the load). No cache,
       signature or CLI change. Not tested: a run with a real detector. Left over: E64.)
