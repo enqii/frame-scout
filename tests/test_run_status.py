@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (FINAL_PHASES, LOADING_DETECTOR, NOTHING_NEW, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
+from framescout_core import (ALL_ANALYZED, FINAL_PHASES, LOADING_DETECTOR, NOTHING_NEW, analysis_only,
+                             analysis_result_text, run_name,RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
                              read_status, run_active, started_in_time, status_fraction, status_text,
                              stopped_status, write_status)
 
@@ -464,3 +465,38 @@ def test_a_lock_file_that_cannot_be_opened_counts_as_held(tmp_path, monkeypatch)
 
     monkeypatch.setattr(os, 'open', refuse)
     assert lock_held(path)
+
+
+# --- an analysis without a search (F18) ---
+
+def test_an_analysis_run_is_named_as_such():
+    assert analysis_only({'phase': 'finished', 'analyze_only': True})
+    # a search run, an older status or a field that is not exactly True: a search
+    for status in ({'phase': 'finished'}, {'analyze_only': False}, {'analyze_only': 1}, {'analyze_only': 'yes'},
+                   None, []):
+        assert not analysis_only(status)
+    assert run_name({'analyze_only': True}) == 'analysis'
+    assert run_name({'phase': 'failed'}) == 'search run'
+
+
+def test_the_status_of_an_analysis_starts_as_an_analysis():
+    assert status_text({'phase': 'starting', 'analyze_only': True}) == 'Starting the analysis'
+    assert status_text({'phase': 'starting'}) == 'Starting the search'
+    # the other phases read the same as a search's
+    status = {'phase': 'analyzing', 'done': 25, 'total': 50, 'new': 20, 'cached': 4, 'errors': 1, 'analyze_only': True}
+    assert status_text(status) == 'Analyzing photos: 25/50 · 20 new · 4 from cache · 1 errors'
+    assert status_text({'phase': 'analyzing', 'analyze_only': True, 'message': ALL_ANALYZED}) == \
+        f'Analyzing photos · {ALL_ANALYZED}'
+
+
+def test_a_finished_analysis_names_its_counts_and_leaves_the_results():
+    text = analysis_result_text({'phase': 'finished', 'analyze_only': True, 'new': 1200, 'cached': 3, 'errors': 0})
+    assert text.startswith('1,200 photos newly analyzed, 3 already in the cache.')
+    # the risk of F18: a run without results.json must not look like a failed search
+    assert 'results of the last search stay as they are' in text
+    # the analyses help only a search with the same settings
+    assert 'search model' in text and 'person detection' in text
+    one = analysis_result_text({'new': 1, 'cached': 1, 'errors': 1})
+    assert one.startswith('1 photo newly analyzed, 1 already in the cache, 1 could not be analyzed (see the log).')
+    # counts that are missing or no numbers count as none
+    assert analysis_result_text({'new': 'x'}).startswith('0 photos newly analyzed, 0 already in the cache.')

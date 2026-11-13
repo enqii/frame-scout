@@ -4,7 +4,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from framescout_core import (FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, RATE_MIN_PHOTOS, RATE_MIN_SECONDS,
-                             RATE_STALE, RATE_WINDOW, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS, AnalysisRate, StepSpeed, duration_text,
+                             RATE_STALE, RATE_WINDOW, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS, AnalysisRate, StepSpeed,
+                             analysis_summary, duration_text,
                              finishing_minutes,
                              gallery_thumbnails, known_throughput, remaining_text, remember_finishing,
                              remember_throughput, run_throughput, start_summary, stored_finishing, stored_throughput)
@@ -365,3 +366,36 @@ def test_start_summary_without_photos_does_not_call_them_analyzed():
     text = start_summary(0, 0, 20.0)
     assert 'No supported photos found' in text
     assert 'analyzed' not in text and 'about' not in text
+
+
+# --- an analysis without a search (F18) ---
+
+def test_remaining_text_of_an_analysis_is_the_analysis_alone():
+    # nothing is scored or rendered after it: no "for the analysis", no time for galleries
+    assert remaining_text(analyzing(analyze_only=True), NOW) == 'about 25 min left'
+    status = analyzing(analyze_only=True, finishing=FINISHING, thumbnails=300)
+    assert remaining_text(status, NOW) == 'about 25 min left'
+    # once every photo is analyzed there is nothing left to estimate
+    assert remaining_text(analyzing(analyze_only=True, done=1100, finishing=FINISHING), NOW) is None
+    assert remaining_text(analyzing(analyze_only=True, rate=None), NOW) is None
+
+
+def test_analysis_summary_with_a_known_speed():
+    text = analysis_summary(5000, 3200, 20.0)
+    assert '5,000 photos found' in text and '3,200 already analyzed' in text and '1,800 to analyze' in text
+    assert 'about 1 h 30 min' in text and 'rough' in text
+    # nothing about rankings or galleries: the analysis writes none
+    assert 'galler' not in text and 'scor' not in text
+
+
+def test_analysis_summary_without_a_known_speed():
+    text = analysis_summary(5000, 0, None)
+    assert '5,000 to analyze' in text and 'about' not in text
+
+
+def test_analysis_summary_with_everything_analyzed_or_no_photos():
+    text = analysis_summary(5000, 5000, 20.0)
+    assert 'All 5,000 photos are analyzed with these settings already' in text
+    assert 'to analyze' not in text and 'about' not in text
+    assert analysis_summary(1, 1, None).startswith('The photo is analyzed with these settings already')
+    assert 'No supported photos found' in analysis_summary(0, 0, 20.0)

@@ -51,8 +51,8 @@ from .thumbnails import (FULL_IMAGE_LABEL, crop_label, thumbnail_name, ensure_th
 from .pipeline import (progress_line, progress_due, DRAFT_REDUCING_GAP, DRAFT_DECODING, draft_size,
     group_batches, store_group, prefetch, Lazy)
 from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINAL_PHASES, NOTHING_NEW, LOADING_DETECTOR,
-    StatusReporter, write_status, stopped_status, started_in_time, final_status, read_status,
-    run_active, status_fraction, status_text)
+    ALL_ANALYZED, StatusReporter, write_status, stopped_status, started_in_time, final_status, read_status,
+    run_active, status_fraction, status_text, analysis_only, run_name, analysis_result_text)
 from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
     DEFAULT_REFERENCE_WEIGHT, AI_SETTINGS, SETTINGS_LOCK_TIMEOUT, LEGACY_PHOTO_FOLDER, default_settings, folder_lines,
     read_settings, save_settings, reconcile_settings, changed_from_defaults, setting_text, engine_command)
@@ -77,7 +77,7 @@ from .disk_space import (TORCH_INSTALL_SPACE, OTHER_PACKAGES_SPACE, CACHE_BYTES_
 from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE, torch_threads,
     lower_priority)
 from .estimate import (RATE_WINDOW, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS,
-    FINISHING_STEPS, FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, AnalysisRate, StepSpeed, duration_text, finishing_minutes, gallery_thumbnails,
+    FINISHING_STEPS, FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, AnalysisRate, StepSpeed, analysis_summary, duration_text, finishing_minutes, gallery_thumbnails,
     known_throughput, remaining_text, remember_finishing, remember_throughput, run_throughput, start_summary,
     stored_finishing, stored_throughput)
 from .install_check import (VENV_DIR, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTALL,
