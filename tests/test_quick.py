@@ -353,6 +353,24 @@ def test_engine_command_needs_profiles_or_a_quick_query():
         command(profiles=Path('p.json'), like_part='Person 1')
 
 
+def test_engine_command_of_an_analysis_without_a_search():
+    # F18: "Analyze photos now" analyzes with the current settings, without profiles
+    cmd = command(analyze_only=True)
+    assert cmd[5] == '--analyze-only'
+    assert '--profiles' not in cmd
+    assert not any(arg.startswith(('--quick-query', '--like')) for arg in cmd)
+    # the same settings, so a later search with them finds the analyses in the cache
+    assert cmd[6:] == command(profiles=Path('p.json'))[7:]
+    with pytest.raises(ValueError):
+        command(analyze_only=True, profiles=Path('p.json'))
+    with pytest.raises(ValueError):
+        command(analyze_only=True, quick_query='dog')
+    with pytest.raises(ValueError):
+        command(analyze_only=True, like_part='Person 1')
+    # False is no analysis: still exactly one search is needed
+    assert command(analyze_only=False, profiles=Path('p.json')) == command(profiles=Path('p.json'))
+
+
 def quick_export(folder, thumbnail, query='dog'):
     folder.mkdir(parents=True, exist_ok=True)
     card = result_card(1, Path('x.jpg'), 'x.jpg', 'Full image', 1.0, 0.3, None, 'Score 1.00', 'detail', thumbnail)

@@ -235,8 +235,9 @@ def setting_text(name, value):
 
 
 def engine_command(python, engine, folders, output, settings, device, *, profiles=None, quick_query=None, like=None,
-                   like_part=None):
-    """Return the command line the app starts the engine with: a search with profiles, a quick search or "Find similar".
+                   like_part=None, analyze_only=False):
+    """Return the command line the app starts the engine with: a search with profiles, a quick search, "Find similar"
+    or an analysis without a search.
 
     python, engine: the interpreter and framescout_engine.py; folders: the photo folders;
     output: the results folder; settings: the app's settings (batch_size, top, max_persons,
@@ -244,13 +245,17 @@ def engine_command(python, engine, folders, output, settings, device, *, profile
     --device choice. Exactly one of profiles (the profiles file), quick_query (the search
     text of a quick search, F10, passed as "--quick-query=<text>", so a text that starts with
     "-" is no option) and like (the photo of "Find similar", F11, passed as "--like=<path>";
-    like_part, the part shown on its card, as "--like-part=<part>") is given, else
-    ValueError; like_part only with like. A quick search and "Find similar" get the same
-    settings, so they use the cache rows of the current settings.
+    like_part, the part shown on its card, as "--like-part=<part>") and analyze_only (True:
+    "Analyze photos now", F18, "--analyze-only") is given, else ValueError; like_part only
+    with like. A quick search, "Find similar" and the analysis get the same settings, so they
+    use (or fill) the cache rows of the current settings.
     """
-    if sum(value is not None for value in (profiles, quick_query, like)) != 1 or (like_part is not None and like is None):
-        raise ValueError('engine_command needs exactly one of profiles, quick_query and like')
-    if profiles is not None:
+    if (sum(value is not None for value in (profiles, quick_query, like)) + bool(analyze_only) != 1
+            or (like_part is not None and like is None)):
+        raise ValueError('engine_command needs exactly one of profiles, quick_query, like and analyze_only')
+    if analyze_only:
+        search = ['--analyze-only']
+    elif profiles is not None:
         search = ['--profiles', str(profiles)]
     elif quick_query is not None:
         search = [f'--quick-query={quick_query}']
