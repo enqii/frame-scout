@@ -27,6 +27,8 @@ from .photos import (RAW_PARTNER_EXT, RAW_PREVIEW_MIN_EDGE, RAW_FLIP_TRANSPOSE, 
     join_scans, raw_fallbacks, RawFallback,
     skipped_lines, raw_preview_usable, raw_preview_transpose)
 from .locks import (RunLock, lock_held)
+from .app_instance import (APP_HOST, APP_PORTS, INSTANCE_DIR, INSTANCE_FILE, INSTANCE_LOCK, INSTANCE_WAIT, AppInstance,
+    app_url, streamlit_args, port_answers, port_free, free_port, launch)
 from .references import (reference_folder, stage_reference_move, finish_reference_move,
     undo_reference_move, update_backup_references, write_new_file)
 from .profiles import (PROFILES_LOCK_TIMEOUT, ProfilesChangedError, UnknownProfileError, create_from_example,
