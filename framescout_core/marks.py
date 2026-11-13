@@ -29,7 +29,8 @@ MARKS_LOCK_TIMEOUT = 5.0
 MARK_COLORS = {MARK_MATCH: ('rgba(33, 195, 84, 0.25)', 'rgb(33, 195, 84)'),
                MARK_NO_MATCH: ('rgba(255, 75, 75, 0.25)', 'rgb(255, 75, 75)')}
 # the Streamlit version whose internals mark_style was checked against (its frontend bundle:
-# the key class st-key-<key> and the kind "segmented_controlActive" of the selected button);
+# the key class st-key-<key>, data-variant="segmented_control" on the buttons and the
+# data-selected attribute of the selected one; the old kind attribute is gone, A49);
 # a test fails once constraints.txt pins another version (review)
 MARK_STYLE_STREAMLIT = '1.66.1'
 
@@ -372,11 +373,11 @@ def mark_style(states):
     for state, (background, border) in MARK_COLORS.items():
         # the class Streamlit gives the element of a widget with a key
         selectors = ', '.join(f'.st-key-{re.sub(r"[^a-zA-Z0-9_-]", "-", key.strip())} '
-                              'button[kind="segmented_controlActive"]'
+                              'button[data-variant="segmented_control"][data-selected]'
                               for key, saved in states.items() if saved == state)
         if selectors:
-            # !important: Streamlit's own rule for the selected button ([kind=…]:not(:disabled)
-            # on its class) is more specific than this selector
+            # !important: Streamlit's own rules for the selected button (its class with
+            # [data-selected]:not([data-disabled]), plus hover and focus states) must not win
             rules.append(f'{selectors}{{background-color:{background}!important;border-color:{border}!important;'
                          'color:inherit!important}')
     return f'<style>{"".join(rules)}</style>' if rules else ''
