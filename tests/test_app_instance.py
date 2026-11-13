@@ -220,3 +220,15 @@ def test_start_bat_starts_through_the_launcher():
     assert commands == ['".venv\\Scripts\\python.exe" framescout_start.py']
     # the port is the launcher's choice now
     assert not [line for line in text.splitlines() if '8501' in line and not line.startswith('rem ')]
+
+
+def test_a_claim_removes_the_instance_file_of_a_killed_app(tmp_path):
+    # between claim() and publish() another start must not read the dead app's port (review)
+    (tmp_path / INSTANCE_DIR).mkdir()
+    (tmp_path / INSTANCE_DIR / INSTANCE_FILE).write_text('{"port": 8507}', encoding='utf-8')
+    mine = AppInstance(tmp_path)
+    assert mine.claim()
+    try:
+        assert AppInstance(tmp_path).running_port() is None
+    finally:
+        mine.release()
