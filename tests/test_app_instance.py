@@ -251,3 +251,26 @@ def test_a_claim_waits_briefly_for_a_lock_that_is_only_probed(tmp_path):
     finally:
         mine.release()
         probe.release()
+
+
+def test_a_lock_file_that_cannot_be_opened_stops_with_its_name(tmp_path, monkeypatch):
+    # e.g. a virus scanner keeps it open: a message with a way out, no traceback (review)
+    def refuse(self, *args, **kwargs):
+        raise PermissionError(13, 'Permission denied')
+    monkeypatch.setattr(RunLock, 'acquire', refuse)
+    start = Launch(tmp_path)
+    assert start() == 1
+    assert start.ran == [] and start.opened == []
+    assert any(str(Path(INSTANCE_DIR) / INSTANCE_LOCK) in line and 'delete' in line for line in start.lines), \
+        start.lines
+
+
+def test_the_message_of_an_app_that_never_answers_names_the_lock_file(tmp_path):
+    other = hold_instance(tmp_path, None)
+    try:
+        start = Launch(tmp_path, answers=lambda port: False)
+        assert start(wait=1) == 1
+        assert any(str(Path(INSTANCE_DIR) / INSTANCE_LOCK) in line and 'delete' in line for line in start.lines), \
+            start.lines
+    finally:
+        other.release()
