@@ -267,24 +267,32 @@ def test_the_detector_weights_line_names_the_file_that_is_loaded(tmp_path):
     (cwd / DEFAULT_YOLO_MODEL).write_bytes(b'own')
     # the working folder's copy, which yolo_weights returns by its bare name
     assert detector_weights_line(DEFAULT_YOLO_MODEL, cwd) == (
-        f'Person detector weights: {cwd / DEFAULT_YOLO_MODEL}')
+        f'Loading person detector weights: {cwd / DEFAULT_YOLO_MODEL}')
     cached = tmp_path / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
     cached.parent.mkdir(parents=True)
     cached.write_bytes(b'official')
-    assert detector_weights_line(str(cached), cwd) == f'Person detector weights: {cached}'
+    assert detector_weights_line(str(cached), cwd) == f'Loading person detector weights: {cached}'
     # a relative path is told by its folder in the working folder
     (cwd / 'models').mkdir()
     (cwd / 'models' / 'w.pt').write_bytes(b'tuned')
     assert detector_weights_line(str(Path('models') / 'w.pt'), cwd) == (
-        f'Person detector weights: {cwd / "models" / "w.pt"}')
+        f'Loading person detector weights: {cwd / "models" / "w.pt"}')
 
 
-def test_the_detector_weights_line_tells_a_download(tmp_path):
-    cached = tmp_path / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
-    assert detector_weights_line(str(cached), tmp_path) == (
-        f'Person detector weights: {cached} (not there yet, downloaded on first use)')
+MISSING = ' (not found: Ultralytics downloads it if it is one of its official weights files, otherwise the load fails)'
+
+
+@pytest.mark.parametrize('name', [DEFAULT_YOLO_MODEL, 'models/typo.pt'])
+def test_the_detector_weights_line_promises_no_download_for_a_missing_file(tmp_path, name):
+    # review: a missing file other than an official name (e.g. a typo) is not downloaded,
+    # so the note says when the load fails instead of promising a download
+    assert detector_weights_line(name, tmp_path) == (
+        f'Loading person detector weights: {tmp_path / name}{MISSING}')
+
+
+def test_the_detector_weights_line_shows_a_url_as_given(tmp_path):
     url = 'https://example.org/w.pt'
-    assert detector_weights_line(url, tmp_path) == f'Person detector weights: {url}'
+    assert detector_weights_line(url, tmp_path) == f'Loading person detector weights: {url}'
 
 
 def test_open_clip_downloads_from_a_url_into_the_project_cache(tmp_path):
