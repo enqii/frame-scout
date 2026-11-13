@@ -29,6 +29,8 @@ INSTANCE_LOCK = 'app-instance.lock'
 # seconds a start waits for the running app of the folder to answer (it may be starting)
 INSTANCE_WAIT = 30.0
 _POLL = 0.5
+# seconds a start tries to take the lock: longer than another start's probe of it (lock_held)
+_CLAIM_WAIT = 0.5
 # seconds a connection to a port may take: a local port answers at once or refuses
 _CONNECT_TIMEOUT = 0.5
 
@@ -83,14 +85,15 @@ class AppInstance:
         self.lock = RunLock(folder / INSTANCE_LOCK)
         self.file = folder / INSTANCE_FILE
 
-    def claim(self):
-        """Take the lock without waiting; return False if the app of this folder runs already.
+    def claim(self, clock=time.monotonic, sleep=time.sleep):
+        """Take the lock; return False if the app of this folder runs already.
 
-        With the lock taken, an instance file left by a killed app is removed at once, so
+        It tries for _CLAIM_WAIT seconds: running() of a waiting start takes the lock for a
+        moment (lock_held), which must not look like a running app (review). With the lock taken, an instance file left by a killed app is removed at once, so
         another start never reads that app's port before publish() names the new one (review).
         """
         self.file.parent.mkdir(parents=True, exist_ok=True)
-        if not self.lock.acquire():
+        if not self.lock.acquire(timeout=_CLAIM_WAIT, clock=clock, sleep=sleep):
             return False
         try:
             # a waiting start may be reading it, which Windows lets no one delete then
@@ -155,7 +158,7 @@ def launch(folder, run_app, open_browser, out=print, ports=APP_PORTS, free=port_
     or if the folder's running app does not answer within wait seconds, nothing starts (1).
     """
     instance = AppInstance(folder)
-    while not instance.claim():
+    while not instance.claim(clock, sleep):
         port = _wait_for_running(instance, answers, wait, clock, sleep)
         if port is not None:
             url = app_url(port)

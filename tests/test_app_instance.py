@@ -232,3 +232,22 @@ def test_a_claim_removes_the_instance_file_of_a_killed_app(tmp_path):
         assert AppInstance(tmp_path).running_port() is None
     finally:
         mine.release()
+
+
+def test_a_claim_waits_briefly_for_a_lock_that_is_only_probed(tmp_path):
+    # running() of a waiting start takes the lock for a moment; a claim at that moment
+    # must not fail (review)
+    (tmp_path / INSTANCE_DIR).mkdir()
+    probe = RunLock(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
+    assert probe.acquire()
+    now = [0.0]
+
+    def sleep(seconds):
+        now[0] += seconds
+        probe.release()
+    mine = AppInstance(tmp_path)
+    try:
+        assert mine.claim(clock=lambda: now[0], sleep=sleep)
+    finally:
+        mine.release()
+        probe.release()
