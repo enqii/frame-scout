@@ -245,15 +245,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       them, and (user decision) neither category is selected by default any more. Idea:
       record the volume serial number (or mount) per root, which changes the cache or a
       side file (hold point). Found in the PR of E8.
-- [ ] `ready` **A46 – Split `app.py` into modules (simplification):** `app.py` has about 1,900 lines
-      and holds process control (start/stop of the engine), marks, copying, export, storage
-      cleanup, cache check, settings widgets and the result views in one file. Move the areas
-      into modules (e.g. `ui/results.py`, `ui/cleanup.py`, `ui/settings.py`, `ui/run.py`) or
-      Streamlit pages, without changing behavior; `app.py` keeps the page layout. Check first
-      how Streamlit's `AppTest` tests and the `setting_<name>` session-state keys are affected.
-      Found on 2026-11-12 in a simplification review of the whole project.
-      Triage 2026-11-13: runs before the UI rebuild (P32–P37 all touch these areas), with a
-      browser check that nothing changed. Size M. Roadmap P31.
 - [ ] `decision` **A47 – Decide the frontend framework before distribution (simplification):** a large
       part of `app.py` works around Streamlit's rerun model (session-state keys for every
       widget, fragments, `cached_*` functions keyed by mtime/size, notices carried over

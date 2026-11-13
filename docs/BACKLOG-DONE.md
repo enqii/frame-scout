@@ -952,6 +952,33 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       longer searched) keeps its saved mark's color on purpose. Left over: "Undecided" and
       "No match" are close in hue, which P35 (F30) covers with a visible mark state. No change
       to `marks.json`, `results.json`, profiles, CLI or cache.)
+- [x] **A46 – Split `app.py` into modules (simplification):** `app.py` has about 1,900 lines
+      and holds process control (start/stop of the engine), marks, copying, export, storage
+      cleanup, cache check, settings widgets and the result views in one file. Move the areas
+      into modules (e.g. `ui/results.py`, `ui/cleanup.py`, `ui/settings.py`, `ui/run.py`) or
+      Streamlit pages, without changing behavior; `app.py` keeps the page layout. Check first
+      how Streamlit's `AppTest` tests and the `setting_<name>` session-state keys are affected.
+      Found on 2026-11-12 in a simplification review of the whole project.
+      Triage 2026-11-13: runs before the UI rebuild (P32–P37 all touch these areas), with a
+      browser check that nothing changed. Size M. Roadmap P31.
+      (done 2026-11-13 in PR #106: `app.py` keeps the page layout (startup checks, tabs,
+      photo source tab, search tab, `start_engine`); the areas moved verbatim into the package
+      `framescout_ui/` (`common`, `settings`, `run`, `marks`, `copy_export`, `results`,
+      `cleanup`, `profiles`; table in `docs/ARCHITECTURE.md`). Where a moved function read a
+      global of the page run (`active`, `folder_scans`, `settings`, `profiles_shown`), it gets
+      the value as an argument, since module globals are shared by all browser sessions. The
+      `setting_<name>` and all other session-state and widget keys are unchanged.
+      `DECODERS`/`SUPPORTED`/`UPLOAD_TYPES` are computed once at the first import. New
+      `tests/app_source.py` (syntax tree of `app.py` plus `framescout_ui/*.py`) and
+      `tests/test_app_source.py` (every global name defined or imported, imported names exist,
+      only `app.py` imports `framescout_ui`); source-reading tests use the combined tree. The
+      uninstall lists `framescout_ui/__pycache__`. 1599 passed, 2 skipped. An `AppTest`
+      comparison of the original and the split app (initial page, scan, cache check, recount,
+      profile delete/cancel/edit/add/rename) gave identical element trees, session-state keys,
+      `profiles.json` and `marks.json`. Not run: the clicks that start the engine or programs,
+      and a real browser session, so the browser check that the triage asked for was not done
+      (fragment reruns, `run_every`). No change to user data, `profiles.json`, `settings.json`,
+      CLI, cache or results.)
 
 ### Installation / project
 

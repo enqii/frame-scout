@@ -67,7 +67,28 @@ download and the fallback after an incomplete cache are **not runtime-tested** (
 
 ## Files and responsibilities
 
-### `app.py`
+### `app.py` and `framescout_ui/`
+
+A46: `app.py` keeps the page layout (startup checks, the tabs, the "Photo source" tab, the search tab and
+`start_engine`); the areas live in the package `framescout_ui/` (imports streamlit; imported only by `app.py`, never by
+another module; no module imports `app`; `tests/test_app_source.py` checks both). Code was moved verbatim. Where a moved
+function used to read a global of the page run, it gets the value as an argument (module globals would be shared by all
+browser sessions): `active`, `folder_scans`, `settings`, `profiles_shown`. The session-state and widget keys
+(`setting_<name>` etc.) are unchanged. Modules:
+
+| Module | Area |
+|---|---|
+| `common.py` | project paths (`BASE`, `PROFILES`, `RESULTS`, `QUICK`, `MARKS`, ...), `DECODERS`/`SUPPORTED`/`UPLOAD_TYPES` (computed once at the first import), `open_path`/`reveal_path`/`gallery_action`, `widget_id`, `plain` (Markdown escaping), `clean_project_folder` (E44), `LOW_SPACE_TTL` |
+| `settings.py` | settings widgets (`setting_key`, `setting_of_widget`, `widget_of_setting`), `sync_settings()` (A8), `show_ai_settings(settings, seen, shown, active)` with "Check installation" |
+| `run.py` | `run_state`, `start_run`, `stop_run`, `end_processes`, `cache_env`, `cached_analyzed_photos`, `low_space_warning`, `show_status(active)` |
+| `marks.py` | `load_marks`, `set_mark`, `marks_backup_offer`, `restore_marks_backup` |
+| `copy_export.py` | `copy_matches`, `export_list`, `show_copy`, `show_export` |
+| `results.py` | `load_results`, `show_results`, `show_quick_results`, `find_similar_button` |
+| `cleanup.py` | `show_cleanup` (E7), `scan_storage`, `delete_storage`, `show_cache_check` (F1) |
+| `profiles.py` | `show_profiles`, `store` (A13), `forget_profile`, `deletion_consequences` |
+
+The text below describes the behavior of the whole frontend; function names that it gives are found in the modules above
+(`start_engine` and the page layout stay in `app.py`).
 
 `app.py`: Streamlit frontend. Tabs: Search profiles, Photo source, AI settings, Search &
 results. F18: the "Photo source" tab ends with the section "Analyze ahead" (an `st.container` created there and filled from the run
@@ -387,7 +408,7 @@ the module of its area and to the re-exports in `__init__.py`.
   pattern `_PROJECT_TEMP_FILE`) at least `STALE_TEMP_AGE` old by the folder's clock
   (`_file_system_now(folder, name)`, read only if such a file exists, so a normal start writes
   no probe file; `_stale_temp_files(results, now, pattern)`); `app.py` calls it
-  once per app start (`clean_project_folder`, `st.cache_resource`) before `create_from_example`; errors
+  once per app start (`framescout_ui.common.clean_project_folder`, `st.cache_resource`) before `create_from_example`; errors
   never stop the app, lock files and `profiles.json.bak` itself are never touched;
   `_holding_run_lock` (the run lock shared with `cache_check`) and `_sqlite_uri` (F1)).
 - `cache_check.py` (F1): `CACHE_CHECK_LINES`/`check_cache`/`cache_check_current`/`set_cache_aside`
@@ -581,7 +602,7 @@ or above it, and a copy under `requirements/` would need `-c` on every call and 
 `test_doc_links.py` checks that every relative Markdown link (inline and reference definitions) in
 the Markdown files of every folder resolves, skipping only local gitignored folders and agent worktrees;
 `test_example_profiles.py` that the app creates `profiles.json` from `assets/profiles.example.json`
-(`app.py`'s `EXAMPLE_PROFILES` compared as a syntax tree with `BASE / EXAMPLE_PROFILES_FILE`);
+(`framescout_ui.common`'s `EXAMPLE_PROFILES` compared as a syntax tree with `BASE / EXAMPLE_PROFILES_FILE`);
 `test_eval_tool.py` that the labelling page is shipped in `assets/`; `test_constraints.py` that the
 requirement files named by the installer and CI exist.
 `test_models.py` (E22) tests the registry, and its checks of every model's open_clip
@@ -1022,7 +1043,7 @@ no longer used (A21).
 
 The app: the "Photo source" tab has a text area (`setting_photo_folders`, one folder per
 line). `settings.json` stores the list `photo_folders`; `setting_of_widget` /
-`widget_of_setting` in `app.py` convert between the text and the list (`folder_lines`:
+`widget_of_setting` in `framescout_ui.settings` convert between the text and the list (`folder_lines`:
 the non-empty lines, stripped), so `reconcile_settings` and `save_settings` work on
 lists. The tab shows the count per existing folder (one `scan_each_folder` call over the distinct folders, so a link into another
 listed folder is not counted twice). The scan is remembered per browser session via
@@ -1974,7 +1995,7 @@ and the missing mount point notes, also next to another mounted drive, and a fol
 mounted drive (E54, simulated) in `test_cleanup.py`, the cache opened before the model load and
 closed if the load fails (E56, source checks) in `test_engine_defaults.py`, and the installer's
 check, question, stop exit code (with the `.bat` line) and the check for the other packages in
-`test_torch_install.py` (F3; `app.py` itself is not imported by the tests), unreachable roots
+`test_torch_install.py` (F3; `app.py` and `framescout_ui` are not imported by the tests, only read as a syntax tree through `tests/app_source.py`), unreachable roots
 simulated by patching
 `_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
 `test_cache_signatures.py`, with real SQLite files), the stale temporary files of
@@ -2090,7 +2111,7 @@ absolute photo path, a renamed or moved photo counts as new (A21 closed as won't
 file that another session changed in between is refused and has to be made again (A13);
 the engine still takes an empty folder
 argument as its working directory (the app no longer passes one, A16); result file downloads do not contain thumbnails (ZIP export: P4
-(C), A18); `app.py` itself has no automated tests (A4/A5 were checked once with
+(C), A18); `app.py` and `framescout_ui` themselves have no behavior tests (A46: `tests/test_app_source.py` checks that every name of the app files is defined or imported and the import rules; tests that read the app's source use `tests/app_source.py`, the syntax tree of `app.py` plus `framescout_ui/*.py`) (A4/A5 were checked once with
 Streamlit's `AppTest` and real engine runs, and manually in a browser: start, reload,
 second tab, Stop – successful, user report 2026-10-21; closing the `Start-FrameScout.bat`
 window during a run is still not tested; A8's settings widgets were checked with `AppTest`
