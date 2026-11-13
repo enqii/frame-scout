@@ -1475,6 +1475,14 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       before the merge). Affected: `.claude/skills/roadmap/SKILL.md`,
       `.claude/skills/roadmap/implementer-brief.md`. Effort S. (Done 2026-11-12 in this PR: the implementer brief makes every agent delete its own `.tmp/` data before returning; `SKILL.md` section 4 allows removing a worktree whose only ignored content is `.tmp/` without `--force`, and the `fs:ready` report runs the worktree cleanup first and names `git fetch origin`, `git switch <branch>`, `git switch main`. The `--force` cause was a guess and is not verified. Docs only.)
 
+- [x] **I48 – Python caches in finished agent worktrees block `git worktree remove` (workflow):**
+      found in the retro of PR #106: finished agents' worktrees contain regenerable
+      `__pycache__/` and `.pytest_cache/` folders (root, `framescout_core/`,
+      `framescout_scoring/`, `framescout_ui/`, `tests/`), so `git worktree remove` without
+      `--force` refuses and the orchestrator deleted them by hand. Affected:
+      `.claude/skills/roadmap/SKILL.md`, `.claude/skills/roadmap/implementer-brief.md`.
+      Effort S. (Done 2026-11-14 in this PR: the implementer brief also asks agents to delete the Python caches they created and to check `git status --porcelain --ignored` is empty; `SKILL.md` section 4 allows deleting ignored `__pycache__/` and `.pytest_cache/` besides `.tmp/` before `git worktree remove` (still without `--force`), every other ignored file is still reported. Docs only.)
+
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
 - [x] **F1 – Backup of `marks.json` and a cache health check:** `results/marks.json`

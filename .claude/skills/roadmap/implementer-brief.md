@@ -118,7 +118,8 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   label `fs:in-progress` and return; the orchestrator spawns the `docs-update` agent.
 - Before you return (every mode), delete your own smoke and scratch data under the
   worktree's `.tmp/` (gitignored leftovers make the orchestrator's worktree removal need
-  `--force`, I38) and check `git status --porcelain --ignored` shows nothing you created.
+  `--force`, I38) and the Python caches you created (`__pycache__/`, `.pytest_cache/`,
+  I48), and check `git status --porcelain --ignored` is empty.
 - Wait for CI quietly: `gh pr checks {PR} --watch --interval 60 > /dev/null 2>&1; gh pr checks {PR}`
   (Git Bash; `--watch` reprints the whole table on every poll, so discard it and print
   only the final state). Run it in the background (`run_in_background`) and wait for the
