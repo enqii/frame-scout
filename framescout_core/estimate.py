@@ -293,7 +293,7 @@ def _photos(count):
     return f'{count:,} photo' + ('' if count == 1 else 's')
 
 
-def start_summary(photos, analyzed, per_minute, finishing=None):
+def start_summary(photos, analyzed, per_minute, finishing=None, analysis_only=False):
     """Return the summary the run tab shows before a search starts.
 
     photos: the photos counted in the folders; analyzed: those with a current cache row of
@@ -301,13 +301,19 @@ def start_summary(photos, analyzed, per_minute, finishing=None):
     or None; finishing: finishing_minutes of scoring all photos and rendering the gallery
     thumbnails (F16), or None if unknown. It is named as an upper bound ("up to"): thumbnails
     of earlier searches are reused. Without the speed of the analysis no duration is named.
+    analysis_only: the summary next to "Analyze photos now" (F18), which neither scores nor
+    writes galleries, so finishing is left out.
     """
+    run = 'analysis' if analysis_only else 'search'
     if photos <= 0:
         # not "all already analyzed": there is nothing to analyze or rank (review)
-        return 'No supported photos found in these folders: the search has nothing to analyze.'
+        return f'No supported photos found in these folders: the {run} has nothing to analyze.'
     analyzed = min(analyzed, photos)
     todo = photos - analyzed
-    finishing = None if finishing is None or finishing < 0 else finishing
+    finishing = None if analysis_only or finishing is None or finishing < 0 else finishing
+    if not todo and analysis_only:
+        return ('The photo is analyzed with these settings already.' if photos == 1 else
+                f'All {photos:,} photos are analyzed with these settings already.')
     if not todo:
         text = (f'{_photos(photos)} found, all already analyzed with these settings: the search only ranks them '
                 'and writes the galleries')
@@ -317,29 +323,9 @@ def start_summary(photos, analyzed, per_minute, finishing=None):
     text = f'{_photos(photos)} found · {analyzed:,} already analyzed with these settings · {todo:,} to analyze.'
     per_minute = _positive(per_minute)
     if per_minute is None:
-        return text + ' The search shows how long it takes after its first minutes.'
+        return text + f' The {run} shows how long it takes after its first minutes.'
     text += (f' At the speed of an earlier search with these settings, the analysis takes '
              f'{duration_text(todo / per_minute)}')
     if finishing is not None:
         text += f', scoring and writing the galleries up to {duration_text(finishing)} more'
     return text + ' (a rough estimate: it depends on the photos and on what else the PC does).'
-
-
-def analysis_summary(photos, analyzed, per_minute):
-    """Return the summary next to "Analyze photos now" (F18): start_summary without scoring and galleries.
-
-    photos, analyzed, per_minute as for start_summary.
-    """
-    if photos <= 0:
-        return 'No supported photos found in these folders: there is nothing to analyze.'
-    analyzed = min(analyzed, photos)
-    todo = photos - analyzed
-    if not todo:
-        return ('The photo is analyzed with these settings already.' if photos == 1 else
-                f'All {photos:,} photos are analyzed with these settings already.')
-    text = f'{_photos(photos)} found · {analyzed:,} already analyzed with these settings · {todo:,} to analyze.'
-    per_minute = _positive(per_minute)
-    if per_minute is None:
-        return text + ' The analysis shows how long it takes after its first minutes.'
-    return text + (f' At the speed of an earlier search with these settings, it takes {duration_text(todo / per_minute)} '
-                   '(a rough estimate: it depends on the photos and on what else the PC does).')

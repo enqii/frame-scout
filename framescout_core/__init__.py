@@ -77,7 +77,7 @@ from .disk_space import (TORCH_INSTALL_SPACE, OTHER_PACKAGES_SPACE, CACHE_BYTES_
 from .priority import (MAX_TORCH_THREADS, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE, torch_threads,
     lower_priority)
 from .estimate import (RATE_WINDOW, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STALE, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS,
-    FINISHING_STEPS, FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, AnalysisRate, StepSpeed, analysis_summary, duration_text, finishing_minutes, gallery_thumbnails,
+    FINISHING_STEPS, FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, AnalysisRate, StepSpeed, duration_text, finishing_minutes, gallery_thumbnails,
     known_throughput, remaining_text, remember_finishing, remember_throughput, run_throughput, start_summary,
     stored_finishing, stored_throughput)
 from .install_check import (VENV_DIR, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTALL,

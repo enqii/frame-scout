@@ -33,7 +33,7 @@ from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, D
                              feature_signature, finish_reference_move, forget_copy_folder, lock_held, open_command, openable_photo, page_cards, page_count,
                              analyzed_paths, app_search_needs, downloaded_models, low_space, low_space_lines,
                              finishing_minutes, gallery_thumbnails, known_throughput, remaining_text, start_summary,
-                             analysis_only, analysis_result_text, analysis_summary, run_name,
+                             analysis_only, analysis_result_text, run_name,
                              check_installation,
                              hidden_text, hide_no_match, mark_style, progress_text, review_progress, windows_path,
                              profile_fingerprints, profile_state, profiles_changed_notice, ProfilesChangedError, UnknownProfileError,
@@ -1845,7 +1845,7 @@ with run_tab:
                                       gallery_thumbnails(len(photo_scan.paths), settings['top'], len(profiles)))
         per_minute = known_throughput(run_status, cleanup_signature(), chosen_device)
         st.info(start_summary(len(photo_scan.paths), analyzed, per_minute, finishing))
-        analysis_text = analysis_summary(len(photo_scan.paths), analyzed, per_minute)
+        analysis_text = start_summary(len(photo_scan.paths), analyzed, per_minute, analysis_only=True)
         space_warning = low_space_warning(len(photo_scan.paths), settings['top'], len(profiles), settings['model'],
                                           settings['person_detection'], analyzed)
         if space_warning:
