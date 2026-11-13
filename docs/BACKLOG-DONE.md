@@ -921,6 +921,13 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (the app keeps the install self-contained), but undecided and undocumented; decide and
       document, or use `default_cache_env` in the app too. Review of PR #42, finding 12. **Decided 2026-11-06 (triage):** the app behaves like the CLI, a variable the user set wins (ROADMAP P20 with E41, E42).
       (done 2026-11-11 in PR #89: new `framescout_core.engine_cache_env(environ, base)` (copy plus `default_cache_env`); `app.cache_env` uses it, so a variable the user set wins in the app as in the CLI, and creates only the project's own `.cache` subfolders it sets, plus `.tmp`. `Start-FrameScout.bat` and `Install-FrameScout.bat` set `TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR` and `XDG_CACHE_HOME` only `if not defined` (`TMP`/`TEMP`/`PIP_CACHE_DIR` stay unconditional); the user approved this extension of the scope. `disk_space` (`app_search_needs`, `downloaded_models`) and `install_check` keep a user's value too (review: through `engine_cache_env` itself, computed once per check). Compatibility: with such a Windows variable the models are downloaded there on the first search (about 600 MB for the default model) even if `.cache/` already holds them. `framescout_eval.py engine_env` is unchanged. Tests: `test_cache_dirs.py` (including the `.bat` lines run by cmd.exe), `test_disk_space.py`, `test_install_check.py`. Not tested: a full app session with a user-set variable. Review: a user's `XDG_CACHE_HOME` alone leaves `TORCH_HOME`/`HF_HOME` unset in `default_cache_env` and the `.bat` lines, so torch and huggingface_hub derive them from it instead of the project's `.cache`; `cache_env` creates the folders of the names `default_cache_env` returns.)
+- [x] `minor` **A45 – The mark colors in the gallery caption are not checked in a browser:** since
+      A38 (PR #77) the `<style>` block of `mark_style` is prepended to the caption above the
+      cards instead of an own `st.markdown` element; only `AppTest` checked it, which cannot
+      see layout or CSS.
+      (closed 2026-11-13 in the triage, no code change: the browser pass of that day did the
+      check and found that the colors do not apply with Streamlit 1.66.1; the fix and the
+      remaining checks (dark theme, page changes) are A49.)
 
 ### Installation / project
 
@@ -2000,3 +2007,8 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       installs) and `arjenschwarz/agentic-coding@ui-ux-reviewer` (405). Follow-ups with options:
       F27–F33; F19 stays open and is decided with F31/F29. No code, schema or dependency
       change.)
+- [x] `decision` **F31 – Where the large preview of F19 lives:** options were a "Review" toggle
+      on the results tab, a dialog opened from a card, or fewer and larger columns.
+      (closed 2026-11-13 in the triage, no code change: the user chose the dialog, opened by
+      "Review one by one" and by a click on a card's photo; the decision is part of F19, the
+      card with its clickable photo is F30.)
