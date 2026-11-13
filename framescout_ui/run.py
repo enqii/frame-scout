@@ -11,7 +11,6 @@ from framescout_core import (FINAL_PHASES, MODELS, PHASE_LABELS, RunLock, Status
                              remaining_text, run_active, run_name, started_in_time, status_fraction, status_text,
                              stopped_status, write_status)
 
-
 from .common import BASE, LOCK, LOG, LOW_SPACE_TTL, RESULTS, STATUS, plain
 from .settings import AI_LABELS
 
