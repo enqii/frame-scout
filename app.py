@@ -19,12 +19,16 @@ from framescout_core import (CACHE_FILE, EXAMPLE_PROFILES_FILE, MODELS, QUICK_DI
                              finishing_minutes, gallery_thumbnails, join_scans, known_throughput, quick_scope_text,
                              read_profiles_versioned, remembered_scans, skipped_lines, start_summary, windows_path)
 from framescout_ui.cleanup import cleanup_signature, show_cache_check, show_cleanup
-from framescout_ui.common import (BASE, DECODERS, EXAMPLE_PROFILES, PROFILES, QUICK_JSON, RESULTS, SUPPORTED,
-                                  clean_project_folder, file_key, open_results_folder, plain)
+from framescout_ui.common import (BASE, EXAMPLE_PROFILES, PROFILES, QUICK_JSON, RESULTS, clean_project_folder,
+                                  decoders, file_key, open_results_folder, plain, supported)
 from framescout_ui.profiles import show_profiles
 from framescout_ui.results import load_results, show_quick_results, show_results
 from framescout_ui.run import cached_analyzed_photos, low_space_warning, run_state, show_status, start_run, stop_run
 from framescout_ui.settings import setting_key, show_ai_settings, sync_settings
+
+# the readable formats, in every page run: clearing the cache of decoders() refreshes them (review)
+DECODERS = decoders()
+SUPPORTED = supported()
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
