@@ -28,10 +28,10 @@ from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT
                              RUN_STATUS, RunLock, StatusReporter, auto_cleanup, cache_error, cache_error_message,
                              cache_read_warning, crop_label,
                              cuda_hint, default_cache_env, detection_options, distinct_folders, draft_size,
-                             AnalysisRate, Lazy, LOADING_DETECTOR, NOTHING_NEW, StepSpeed, gallery_thumbnails,
+                             AnalysisRate, Lazy, LOADING_DETECTOR, StepSpeed, gallery_thumbnails,
                              remember_finishing, run_throughput,
-                             final_status, yolo_weights,
-                             ALL_ANALYZED, RawFallback, SkippedPhotos, TruncatedImageError, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
+                             final_status, nothing_new_message, yolo_weights,
+                             RawFallback, SkippedPhotos, TruncatedImageError, folder_labels, gallery_cards, group_batches, hub_go_online, import_detector_class,
                              import_open_clip, load_with_hub_fallback,
                              load_profiles, missing_folders_message, model_problem, open_clip_cache_dir,
                              output_folder_problem, photo_name,
@@ -670,8 +670,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 analyze(to_analyze(retry))
                 if not detector.created:
                     # no photo needed an analysis, e.g. all came from the cache (F2); an analysis
-                    # without a search ranks nothing either (F18)
-                    nothing_new = ALL_ANALYZED if analyze_only else NOTHING_NEW
+                    # without a search ranks nothing either (F18), and says "all analyzed" only
+                    # if no photo failed (review)
+                    nothing_new = nothing_new_message(analyze_only, errors)
                     print(f'{nothing_new}.', flush=True)
                     status.update(message=nothing_new, force=True)
             finally:

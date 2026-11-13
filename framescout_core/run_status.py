@@ -38,6 +38,8 @@ LOADING_DETECTOR = 'Loading the person detector'
 # then finishes without scoring or export, so results.json and the galleries stay as they are.
 # The message of one whose photos all come from the cache:
 ALL_ANALYZED = 'All photos are analyzed already – nothing new to analyze'
+# and of one that analyzed no photo although some could not be read (review)
+NONE_ANALYZED = 'No photo newly analyzed – some could not be analyzed, see the log'
 
 
 def _timestamp():
@@ -208,6 +210,19 @@ def status_text(status):
 def analysis_only(status):
     """Return True if status is the one of an analysis without a search (F18)."""
     return isinstance(status, dict) and status.get('analyze_only') is True
+
+
+def nothing_new_message(analyze_only, errors):
+    """Return the engine's message when no photo needed a new analysis (F2), e.g. all came from the cache.
+
+    A search still ranks the photos (NOTHING_NEW). An analysis without a search (F18) says
+    that all photos are analyzed (ALL_ANALYZED) only if none failed: errors counts the photos
+    whose cache row or file could not be read, which are neither in the cache nor analyzed
+    (review).
+    """
+    if not analyze_only:
+        return NOTHING_NEW
+    return NONE_ANALYZED if errors else ALL_ANALYZED
 
 
 def run_name(status):

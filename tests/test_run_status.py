@@ -11,7 +11,7 @@ import pytest
 
 from framescout_core import (ALL_ANALYZED, FINAL_PHASES, LOADING_DETECTOR, NOTHING_NEW, analysis_only,
                              analysis_result_text, run_name, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
-                             read_status, run_active, started_in_time, status_fraction, status_text,
+                             nothing_new_message, read_status, run_active, started_in_time, status_fraction, status_text,
                              stopped_status, write_status)
 
 REPO = Path(__file__).resolve().parents[1]
@@ -509,6 +509,16 @@ def test_the_status_of_an_analysis_starts_as_an_analysis():
     assert status_text(status) == 'Analyzing photos: 25/50 · 20 new · 4 from cache · 1 errors'
     assert status_text({'phase': 'analyzing', 'analyze_only': True, 'message': ALL_ANALYZED}) == \
         f'Analyzing photos · {ALL_ANALYZED}'
+
+
+def test_an_analysis_with_errors_does_not_claim_all_photos_are_analyzed():
+    # review: no new analysis can also mean photos whose cache row or file could not be read
+    assert nothing_new_message(analyze_only=True, errors=0) == ALL_ANALYZED
+    message = nothing_new_message(analyze_only=True, errors=2)
+    assert message != ALL_ANALYZED and 'All photos' not in message and 'log' in message
+    # a search ranks the photos it has either way
+    assert nothing_new_message(analyze_only=False, errors=0) == NOTHING_NEW
+    assert nothing_new_message(analyze_only=False, errors=2) == NOTHING_NEW
 
 
 def test_a_finished_analysis_names_its_counts_and_leaves_the_results():
