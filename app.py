@@ -1,4 +1,8 @@
-"""FrameScout: local Streamlit user interface for framescout_engine.py."""
+"""FrameScout: local Streamlit user interface for framescout_engine.py.
+
+This file is the page Streamlit runs: its layout, the photo source tab and the search tab.
+The other areas are modules of the package framescout_ui (A46).
+"""
 import sys
 import time
 from pathlib import Path
@@ -14,27 +18,17 @@ from framescout_core import (CACHE_FILE, EXAMPLE_PROFILES_FILE, MODELS, QUICK_DI
                              cleanup_running, count_text, create_from_example, distinct_folders, engine_command,
                              finishing_minutes, gallery_thumbnails, join_scans, known_throughput, quick_scope_text,
                              read_profiles_versioned, remembered_scans, skipped_lines, start_summary, windows_path)
+from framescout_ui.cleanup import cleanup_signature, show_cache_check, show_cleanup
 from framescout_ui.common import (BASE, DECODERS, EXAMPLE_PROFILES, PROFILES, QUICK_JSON, RESULTS, SUPPORTED,
                                   clean_project_folder, file_key, open_results_folder, plain)
-from framescout_ui.settings import setting_key, show_ai_settings, sync_settings
-from framescout_ui.run import cached_analyzed_photos, low_space_warning, run_state, show_status, start_run, stop_run
-from framescout_ui.results import load_results, show_quick_results, show_results
-from framescout_ui.cleanup import cleanup_signature, show_cache_check, show_cleanup
 from framescout_ui.profiles import show_profiles
-
-
-
+from framescout_ui.results import load_results, show_quick_results, show_results
+from framescout_ui.run import cached_analyzed_photos, low_space_warning, run_state, show_status, start_run, stop_run
+from framescout_ui.settings import setting_key, show_ai_settings, sync_settings
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
 .stButton button{border-radius:8px}</style>''', unsafe_allow_html=True)
-
-
-
-
-
-
-
 
 st.title('🔎 FrameScout')
 st.caption('Local AI search in large photo collections · your images stay on your computer')
