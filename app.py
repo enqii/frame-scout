@@ -15,15 +15,17 @@ import streamlit as st
 FRAMESCOUT_PACKAGES = True
 
 from framescout_core import (CACHE_FILE, EXAMPLE_PROFILES_FILE, MODELS, QUICK_DIR, QUICK_QUERY_MAX, RESULTS_FILE,
-                             cleanup_running, count_text, create_from_example, distinct_folders, engine_command,
-                             finishing_minutes, gallery_thumbnails, join_scans, known_throughput, quick_scope_text,
-                             read_profiles_versioned, remembered_scans, skipped_lines, start_summary, windows_path)
+                             RUN_TAB, START_NEEDS_TAB, cleanup_running, count_text, create_from_example, distinct_folders,
+                             engine_command, finishing_minutes, gallery_thumbnails, join_scans, known_throughput,
+                             quick_scope_text, read_profiles_versioned, remembered_scans, skipped_lines,
+                             start_blocked_text, start_needs, start_needs_line, start_summary, windows_path)
 from framescout_ui.cleanup import cleanup_signature, show_cache_check, show_cleanup
 from framescout_ui.common import (BASE, EXAMPLE_PROFILES, PROFILES, QUICK_JSON, RESULTS, clean_project_folder,
                                   decoders, file_key, open_results_folder, plain, supported)
 from framescout_ui.profiles import show_profiles
 from framescout_ui.results import load_results, show_quick_results, show_results
-from framescout_ui.run import cached_analyzed_photos, low_space_warning, run_state, show_status, start_run, stop_run
+from framescout_ui.run import (cached_analyzed_photos, low_space_warning, run_state, show_state_line, show_status,
+                               start_run, stop_run)
 from framescout_ui.settings import setting_key, show_ai_settings, sync_settings
 
 # the readable formats, in every page run: clearing the cache of decoders() refreshes them (review)
@@ -34,7 +36,10 @@ st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
 .stButton button{border-radius:8px}</style>''', unsafe_allow_html=True)
 
-st.title('🔎 FrameScout')
+title_col, state_col = st.columns([1, 2], vertical_alignment='bottom')
+title_col.title('🔎 FrameScout')
+# F27: the run state on every tab, filled once the photos are counted (below)
+state_area = state_col.container()
 st.caption('Local AI search in large photo collections · your images stay on your computer')
 
 # "Find similar" clicked on a result card (F11): its fragment asked this page run to start it.
@@ -67,6 +72,7 @@ profiles_shown = st.session_state.get('profiles_shown', profiles_version)
 # whether a search runs, also after a reload or in another tab (A4)
 active, run_status = run_state()
 st.session_state.page_run_state = (active, run_status)
+st.session_state.state_line_state = (active, run_status)  # for the state line next to the title (F27)
 
 # the settings of the widgets, synchronized with settings.json (A8)
 settings, seen, shown, settings_taken_over = sync_settings()
@@ -74,7 +80,8 @@ settings, seen, shown, settings_taken_over = sync_settings()
 photo_folders = [Path(folder).expanduser() for folder in settings['photo_folders']]
 # a folder listed twice or inside another listed folder is searched once (A25)
 search_folders, dropped_folders = distinct_folders([folder.resolve() for folder in photo_folders])
-p_tab, f_tab, settings_tab, run_tab = st.tabs(['Search profiles', 'Photo source', 'AI settings', 'Search & results'])
+p_tab, f_tab, settings_tab, run_tab = st.tabs([START_NEEDS_TAB['profiles'], START_NEEDS_TAB['photos'],
+                                               START_NEEDS_TAB['model'], RUN_TAB])
 
 with p_tab:
     show_profiles(profiles, profiles_version, profiles_shown, active)
@@ -128,23 +135,35 @@ with f_tab:
     # settings, the analyzed photos and how to start the engine
     analyze_area = st.container()
 
+with state_area:
+    show_state_line(len(photo_scan.paths) if folder_scans else None)
+
 with settings_tab:
     info, model_missing = show_ai_settings(settings, seen, shown, active)
 
 with run_tab:
     st.subheader('Start search')
+    # F27: what a search needs, with what is missing and the tab to fix it in. At least one
+    # listed folder must exist (as sorted out in the Photo source tab, without asking the file
+    # system again, review); the engine leaves out the others with a note (A25). A search
+    # model without its package would only fail in the engine (E22 review)
+    needs = start_needs(len(profiles), len(photo_scan.paths) if folder_scans else None, bool(photo_folders),
+                        MODELS[settings['model']].label, model_missing)
+    cleaning = active and cleanup_running(RESULTS)  # a cleanup holding the run lock is no search (review)
+    start_blocked = start_blocked_text(needs, active, cleaning)
     c1,c2 = st.columns([1,1])
     with c1:
-        # at least one listed folder must exist (as sorted out in the Photo source tab, without
-        # asking the file system again, review); the engine leaves out the others with a note (A25).
-        # A search model without its package would only fail in the engine (E22 review)
-        start = st.button('▶ Start search', type='primary', width='stretch',
-                          disabled=active or not profiles or not folder_scans or bool(model_missing))
+        start = st.button('▶ Start search', type='primary', width='stretch', disabled=bool(start_blocked))
     with c2:
         # a cleanup holding the run lock is no search to stop (review)
-        stop = st.button('■ Stop search', disabled=not active or cleanup_running(RESULTS), width='stretch',
+        stop = st.button('■ Stop search', disabled=not active or cleaning, width='stretch',
                          help='Stops the running search, also an analysis started with "Analyze photos now" in the '
                               'tab "Photo source". Photos analyzed so far are kept in the cache.')
+    st.caption(plain(start_needs_line(needs)))
+    if start_blocked and active:
+        st.caption(plain(start_blocked))  # show_status below shows what runs
+    elif start_blocked:
+        st.warning(plain(start_blocked))
     def start_engine(notice='run_notice', **search):
         """Start the engine with the current settings: search is profiles=..., quick_query=... (F10), like=... (F11)
         or analyze_only=True (F18).
@@ -189,7 +208,7 @@ with run_tab:
     if st.session_state.get('run_notice'):
         st.warning(st.session_state.pop('run_notice'))
     if model_missing and not active:
-        st.warning(model_missing)  # why Start is not available
+        st.warning(model_missing)  # how to make the search model usable
     analyzed = None  # the photos analyzed with these settings: counted only while no search runs
     quick_counts = None  # quick_scope: (analyzed, not analyzed, partners) of a quick search, as the engine counts (E61)
     analysis_text = None  # what "Analyze photos now" would do (F18)
