@@ -1,8 +1,59 @@
 """The state line next to the app's title and what a search needs at the Start button (F27)."""
-from framescout_core import (NOTHING_NEW, START_NEEDS_TAB, start_blocked_text, start_needs, start_needs_line,
-                             state_line)
+import ast
 
-POINTER = 'progress and Stop in the tab "Search & results"'
+from app_source import app_files, page_tree
+from framescout_core import (APP_TABS, NOTHING_NEW, RESULTS_TAB, RUN_TAB, START_NEEDS_TAB, start_blocked_text,
+                             start_needs, start_needs_line, state_line)
+
+POINTER = 'progress and Stop in the tab "Search"'
+
+
+# --- the app's five tabs (F28) ---
+
+def test_the_app_has_five_tabs_in_this_order():
+    assert APP_TABS == ('Search profiles', 'Photo source', 'Settings', 'Search', 'Results')
+    assert (START_NEEDS_TAB['profiles'], START_NEEDS_TAB['photos'], START_NEEDS_TAB['model'], RUN_TAB,
+            RESULTS_TAB) == APP_TABS
+
+
+def tab_blocks():
+    """{tab label: the source of its with-blocks} of app.py, which makes the tabs in one st.tabs(APP_TABS) call."""
+    page = page_tree()
+    [tabs] = [node for node in page.body if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+              and ast.unparse(node.value.func) == 'st.tabs']
+    assert ast.unparse(tabs.value) == 'st.tabs(list(APP_TABS))'
+    names = [ast.unparse(target) for target in tabs.targets[0].elts]
+    blocks = {name: '' for name in names}
+    for node in page.body:
+        if isinstance(node, ast.With) and ast.unparse(node.items[0].context_expr) in blocks:
+            blocks[ast.unparse(node.items[0].context_expr)] += ast.unparse(node)
+    return dict(zip(APP_TABS, blocks.values()))
+
+
+def only_in(blocks, tab, text):
+    return text in blocks[tab] and all(text not in source for other, source in blocks.items() if other != tab)
+
+
+def test_each_tab_holds_its_own_jobs():
+    blocks = tab_blocks()
+    assert only_in(blocks, 'Search profiles', 'show_profiles(')
+    assert only_in(blocks, 'Photo source', "setting_key('photo_folders')")
+    # storage maintenance belongs to the settings, not to the results
+    for call in ('show_ai_settings(', 'show_cleanup(', 'show_cache_check('):
+        assert only_in(blocks, 'Settings', call), call
+    # start, "Analyze ahead", progress and Stop in one place
+    for text in ("'▶ Start search'", "'■ Stop search'", "'Analyze photos now'", 'show_status(', "'quick_search'"):
+        assert only_in(blocks, 'Search', text), text
+    # the results on their own
+    for call in ('show_results(', 'show_quick_results('):
+        assert only_in(blocks, 'Results', call), call
+
+
+def test_no_text_of_the_app_names_a_tab_that_no_longer_exists():
+    for path in app_files():
+        source = path.read_text(encoding='utf-8')
+        for old in ('Search & results', 'tab "AI settings"', "tab 'AI settings'"):
+            assert old not in source, (path.name, old)
 
 
 # --- state_line: one line on every tab ---
@@ -92,10 +143,10 @@ def test_what_is_missing_names_the_tab_to_fix_it_in():
                      ('model', False, f'the search model "M" cannot be used (tab "{START_NEEDS_TAB["model"]}")')]
     assert start_blocked_text(needs) == ('Start is not available because: no search profile (tab "Search profiles"); '
                                          'no photo folder (tab "Photo source"); the search model "M" cannot be used '
-                                         '(tab "AI settings").')
+                                         '(tab "Settings").')
     assert start_needs_line(needs) == ('A search needs: ✗ no search profile (tab "Search profiles") · ✗ no photo '
                                        'folder (tab "Photo source") · ✗ the search model "M" cannot be used '
-                                       '(tab "AI settings")')
+                                       '(tab "Settings")')
 
 
 def test_listed_folders_that_do_not_exist():

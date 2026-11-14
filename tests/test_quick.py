@@ -418,9 +418,10 @@ def test_the_app_starts_both_searches_through_engine_command():
     tree = app_tree()
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
              and getattr(node.func, 'id', None) == 'start_engine']
-    # and "Analyze photos now" (F18), whose note goes next to its button
+    # and "Analyze photos now" (F18), whose note goes next to its button, as the note of
+    # "Find similar" goes to the results tab (F28)
     assert sorted(k.arg for call in calls for k in call.keywords) == [
-        'analyze_only', 'like', 'like_part', 'notice', 'profiles', 'quick_query']
+        'analyze_only', 'like', 'like_part', 'notice', 'notice', 'profiles', 'quick_query']
     assert "start_engine(notice='analyze_notice', analyze_only=True)" in [ast.unparse(call) for call in calls]
     assert [node for node in ast.walk(tree) if isinstance(node, ast.Call)
             and getattr(node.func, 'id', None) == 'engine_command']
@@ -450,9 +451,10 @@ def test_the_app_warns_of_low_disk_space_next_to_analyze_photos_now():
               and any(k.arg == 'analysis' for k in node.keywords)]
     assert ast.unparse(call.args[2]) == '0'  # no profile: no gallery thumbnails
     assert ast.unparse(call.args[5]) == 'analysis_done'
-    [area] = [node for node in ast.walk(tree) if isinstance(node, ast.With)
-              and ast.unparse(node.items[0].context_expr) == 'analyze_area']
-    assert 'st.warning(analysis_space)' in ast.unparse(area)
+    # since F28 next to its button in the search tab, as the search's own warning
+    [area] = [node for node in page_tree().body if isinstance(node, ast.With)
+              and ast.unparse(node.items[0].context_expr) == 'search_tab']
+    assert 'st.warning(analysis_space)' in ast.unparse(area) and 'st.warning(space_warning)' in ast.unparse(area)
 
 
 def test_every_result_card_of_the_app_offers_find_similar():
@@ -467,8 +469,9 @@ def test_every_result_card_of_the_app_offers_find_similar():
     assert "st.session_state.find_similar = (card['path'], card['label'])" in button
     assert 'st.rerun()' in button
     [start] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
-               and getattr(node.func, 'id', None) == 'start_engine' and node.keywords[0].arg == 'like']
-    assert ast.unparse(start) == 'start_engine(like=find_similar_request[0], like_part=find_similar_request[1])'
+               and getattr(node.func, 'id', None) == 'start_engine' and 'like' in [k.arg for k in node.keywords]]
+    assert ast.unparse(start) == ("start_engine(notice='like_notice', like=find_similar_request[0], "
+                                  'like_part=find_similar_request[1])')
     # review: the request is taken from the session state first thing in the page run (before
     # any st.stop), and one that cannot start while a search runs gets a notice
     # (in app.py, whose page run it is: compared by its line numbers, A46)
@@ -482,7 +485,11 @@ def test_every_result_card_of_the_app_offers_find_similar():
     [handled] = [node for node in ast.walk(tree) if isinstance(node, ast.If)
                  and ast.unparse(node.test) == 'find_similar_request']
     [branch] = handled.body
-    assert ast.unparse(branch.test) == 'active' and 'run_notice' in ast.unparse(branch.body)
+    assert ast.unparse(branch.test) == 'active' and 'like_notice' in ast.unparse(branch.body)
+    # F28: the notice is shown in the tab "Results", where the card was clicked
+    [results_tab] = [node for node in page.body if isinstance(node, ast.With)
+                     and ast.unparse(node.items[0].context_expr) == 'results_tab']
+    assert "st.session_state.pop('like_notice')" in ast.unparse(results_tab)
     # it loads no model, so a missing model package does not disable it
     assert 'model_missing' not in button
     # the quick result caption names the photo by its file name, as the gallery title does

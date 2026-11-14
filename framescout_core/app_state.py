@@ -2,9 +2,13 @@
 from .run_status import FINAL_PHASES, PHASE_LABELS, _count, analysis_only, status_fraction
 
 # the tab in which a missing need is fixed, as the app names its tabs
-START_NEEDS_TAB = {'profiles': 'Search profiles', 'photos': 'Photo source', 'model': 'AI settings'}
-# the tab with a run's progress, its log and the Stop button
-RUN_TAB = 'Search & results'
+START_NEEDS_TAB = {'profiles': 'Search profiles', 'photos': 'Photo source', 'model': 'Settings'}
+# the tab with Start, "Analyze ahead", a run's progress, its log and the Stop button
+RUN_TAB = 'Search'
+# the tab with the results of the last search and of the last quick search
+RESULTS_TAB = 'Results'
+# the app's tabs in their order (F28)
+APP_TABS = (START_NEEDS_TAB['profiles'], START_NEEDS_TAB['photos'], START_NEEDS_TAB['model'], RUN_TAB, RESULTS_TAB)
 
 
 def _plural(count, one, many):
