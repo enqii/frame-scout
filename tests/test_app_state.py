@@ -17,21 +17,40 @@ def test_the_app_has_five_tabs_in_this_order():
 
 
 def tab_blocks():
-    """{tab label: the source of its with-blocks} of app.py, which makes the tabs in one st.tabs(APP_TABS) call."""
+    """{tab label: the source of its with-blocks} of app.py, which makes the tabs in one st.tabs(APP_TABS) call.
+
+    Every with-block of a tab counts, also one nested in an if or a function (review); the
+    key None holds the whole page, for only_in to see code outside every tab.
+    """
     page = page_tree()
     [tabs] = [node for node in page.body if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
               and ast.unparse(node.value.func) == 'st.tabs']
     assert ast.unparse(tabs.value) == 'st.tabs(list(APP_TABS))'
     names = [ast.unparse(target) for target in tabs.targets[0].elts]
     blocks = {name: '' for name in names}
-    for node in page.body:
+    for node in ast.walk(page):
         if isinstance(node, ast.With) and ast.unparse(node.items[0].context_expr) in blocks:
             blocks[ast.unparse(node.items[0].context_expr)] += ast.unparse(node)
-    return dict(zip(APP_TABS, blocks.values()))
+    return {**dict(zip(APP_TABS, blocks.values())), None: ast.unparse(page)}
 
 
 def only_in(blocks, tab, text):
-    return text in blocks[tab] and all(text not in source for other, source in blocks.items() if other != tab)
+    """Whether text is in the tab's blocks and nowhere else in app.py: not in another tab, not outside the tabs."""
+    return text in blocks[tab] and blocks[None].count(text) == blocks[tab].count(text)
+
+
+def test_only_in_sees_code_outside_the_tabs_and_nested_tab_blocks(monkeypatch):
+    # review: a widget drifting out of its tab, into an if or a helper at module level, must
+    # fail the check; a tab block nested in an if still counts for its tab
+    source = ("p_tab, f_tab, settings_tab, search_tab, results_tab = st.tabs(list(APP_TABS))\n"
+              "with search_tab:\n    st.button('A')\n"
+              "if x:\n    st.button('A')\n    with results_tab:\n        show_results()\n"
+              "def helper():\n    st.button('B')\n")
+    monkeypatch.setitem(globals(), 'page_tree', lambda: ast.parse(source))
+    blocks = tab_blocks()
+    assert not only_in(blocks, 'Search', "st.button('A')")
+    assert only_in(blocks, 'Results', 'show_results(')
+    assert not only_in(blocks, 'Search', "st.button('B')")
 
 
 def test_each_tab_holds_its_own_jobs():
