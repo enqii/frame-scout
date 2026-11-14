@@ -104,6 +104,8 @@ with f_tab:
                                          RESULTS, recount=st.session_state.pop('recount_photos', False))
     folder_scans = list(zip(existing, scans))
     photo_scan = join_scans(scans)
+    # the photos counted in the existing folders, None without one: the state line and Start's needs (F27)
+    photo_count = len(photo_scan.paths) if folder_scans else None
     if len(search_folders) == 1 and folder_scans:
         st.success(f'{len(photo_scan.paths):,} supported image files found.')
     elif folder_scans:
@@ -136,7 +138,7 @@ with f_tab:
     analyze_area = st.container()
 
 with state_area:
-    show_state_line(len(photo_scan.paths) if folder_scans else None)
+    show_state_line(photo_count)
 
 with settings_tab:
     info, model_missing = show_ai_settings(settings, seen, shown, active)
@@ -147,8 +149,8 @@ with run_tab:
     # listed folder must exist (as sorted out in the Photo source tab, without asking the file
     # system again, review); the engine leaves out the others with a note (A25). A search
     # model without its package would only fail in the engine (E22 review)
-    needs = start_needs(len(profiles), len(photo_scan.paths) if folder_scans else None, bool(photo_folders),
-                        MODELS[settings['model']].label, model_missing)
+    needs = start_needs(len(profiles), photo_count, bool(photo_folders), MODELS[settings['model']].label,
+                        model_missing)
     cleaning = active and cleanup_running(RESULTS)  # a cleanup holding the run lock is no search (review)
     start_blocked = start_blocked_text(needs, active, cleaning)
     c1,c2 = st.columns([1,1])
