@@ -249,6 +249,15 @@ def quick_entry_label(results, names=()):
     return label
 
 
+def quick_result_id(results):
+    """Tell one quick search's result file from the next one (F34): its finish time and its entry.
+
+    The entry is taken without the profile names (quick_entry_label), so that a profile name
+    clashing with it does not make the same result look new (review).
+    """
+    return results.get('finished'), quick_entry_label(results)
+
+
 def results_choice(options, chosen, quick_option=None, quick_new=False):
     """Return the entry the results selector shows (F34), or None for its first one.
 

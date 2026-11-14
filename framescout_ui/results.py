@@ -6,7 +6,7 @@ import streamlit as st
 from framescout_core import (GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS, QUICK_DIR, QUICK_GALLERY, hidden_text,
                              hide_no_match, mark_style, page_cards, page_count, profile_fingerprints, profile_state,
                              progress_text, query_caption, query_summary, quick_entry_label, quick_folders_differ,
-                             quick_note, read_results, results_choice, results_model, review_progress)
+                             quick_note, quick_result_id, read_results, results_choice, results_model, review_progress)
 
 from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file_key, keep_value, open_gallery,
                      open_photo, open_quick_folder, open_quick_gallery, open_results_folder, plain, restore_value,
@@ -97,7 +97,7 @@ def show_results(results, quick, photo_folders, folders, model, find_disabled):
     options = names + ([quick_option] if quick_option else [])
     # a quick result this browser session has not seen yet is shown at once; one that was
     # there at the session's first page run is not (it is the result of an earlier visit)
-    quick_id = (quick.get('finished'), quick_option) if quick else None
+    quick_id = quick_result_id(quick) if quick else None
     quick_new = 'quick_seen' in st.session_state and st.session_state.quick_seen != quick_id
     st.session_state.quick_seen = quick_id
     chosen = results_choice(options, st.session_state.get('results_profile'), quick_option, quick_new)
