@@ -148,7 +148,8 @@ with run_tab:
     # F27: what a search needs, with what is missing and the tab to fix it in. At least one
     # listed folder must exist (as sorted out in the Photo source tab, without asking the file
     # system again, review); the engine leaves out the others with a note (A25). A search
-    # model without its package would only fail in the engine (E22 review)
+    # model without its package would only fail in the engine (E22 review); how to install it is
+    # shown in the tab "AI settings", which the blocked line names (review)
     needs = start_needs(len(profiles), photo_count, bool(photo_folders), MODELS[settings['model']].label,
                         model_missing)
     cleaning = active and cleanup_running(RESULTS)  # a cleanup holding the run lock is no search (review)
@@ -209,8 +210,6 @@ with run_tab:
         st.rerun()
     if st.session_state.get('run_notice'):
         st.warning(st.session_state.pop('run_notice'))
-    if model_missing and not active:
-        st.warning(model_missing)  # how to make the search model usable
     analyzed = None  # the photos analyzed with these settings: counted only while no search runs
     quick_counts = None  # quick_scope: (analyzed, not analyzed, partners) of a quick search, as the engine counts (E61)
     analysis_text = None  # what "Analyze photos now" would do (F18)
