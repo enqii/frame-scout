@@ -2111,4 +2111,8 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       under the same conditions as before. Tests: `tests/test_app_state.py`; full suite 1614 passed, 2
       skipped; Streamlit AppTest run without errors. Not verified: the look in a real browser
       (fragment reruns every 2 s) and a real running search. No schema, CLI, cache or widget key
-      change.)
+      change. Review: the state line reruns the page when a run starts or ends, like
+      `show_status`; a missing model package is reported once at Start (the install hint stays
+      in "AI settings"); the counts are read with `run_status._count`, as `status_fraction`
+      reads them; full suite 1615 passed, 2 skipped. Deferred: the reasons of the other
+      disabled buttons (F37); the look at narrow widths goes to the browser pass A52.)
