@@ -2159,9 +2159,21 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       (<part>)` or `Last quick search`); a result that finishes in the session is selected at
       once (`results_choice`, session key `quick_seen`). The expander above the profile results is
       gone; `show_results` is the one fragment, `show_profile_results`/`show_quick_results` plain
-      functions. The quick text stays in its field (`keep_value`/`restore_value`, also for "Hide
-      photos marked as no match"). Tests: `test_quick.py`, `test_app_state.py`; full suite 1634
-      passed, 2 skipped; Streamlit AppTest page run with sample result files without exceptions.
-      Not verified: a real quick search or "Find similar" with the engine, the look in a real
-      browser. No schema, CLI, cache, `settings.json` or `results/quick/` change; new session keys
-      `quick_seen`, `quick_query__kept`, `hide_rejected__kept`. Follow-up: F38.
+      functions. The quick text stays in its field (`keep_value`/`restore_value`, put back only
+      while a run disables the field, review). Review: a new quick result is told by
+      `quick_result_id` (finish time and label without the profile names); "Hide photos marked as
+      no match" and the page boxes keep their values with `persist_state='page'` (F38). Tests:
+      `test_quick.py`, `test_app_state.py`; full suite 1635 passed, 2 skipped; Streamlit AppTest
+      page run with sample result files without exceptions. Not verified: a real quick search or
+      "Find similar" with the engine, the look in a real browser. No schema, CLI, cache,
+      `settings.json` or `results/quick/` change; new session keys `quick_seen`,
+      `quick_query__kept`.
+- [x] `minor` **F38 – Keep the page of a profile gallery when another results entry is shown:**
+      the page box of a profile gallery (`results_page_<name>`) is not kept when another entry
+      (another profile or the quick result) is shown, so returning to a profile shows page 1
+      again. Found in the review of F34. Size S.
+      Done (2026-11-14, in the F34 PR after its review): the page boxes of the profile galleries
+      and of the quick result and "Hide photos marked as no match" are drawn with
+      `persist_state='page'`, so Streamlit keeps their values while another entry is shown
+      (checked with a minimal Streamlit AppTest: without it the box fell back to page 1). Test:
+      `test_quick.py::test_the_views_of_the_results_selector_keep_their_boxes`.

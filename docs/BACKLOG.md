@@ -604,7 +604,3 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `start_needs`/`start_blocked_text` of `framescout_core/app_state.py` without the
       profile need. Affected: `app.py`, `framescout_core/app_state.py`, user guide. Found in
       the PR #108 review. Size S.
-- [ ] `minor` **F38 – Keep the page of a profile gallery when another results entry is shown:**
-      the page box of a profile gallery (`results_page_<name>`) is not kept when another entry
-      (another profile or the quick result) is shown, so returning to a profile shows page 1
-      again. Sketch: `keep_value`/`restore_value` (F34). Found in the review of F34. Size S.
