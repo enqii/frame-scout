@@ -598,18 +598,28 @@ def test_the_quick_search_text_stays_in_its_field():
               and ast.unparse(node.items[0].context_expr) == 'search_tab']
     source = ast.unparse(area)
     assert "on_click=keep_value, args=('quick_query',)" in source
+    # only while the field is disabled: putting a value into a widget's key resets the field in
+    # the browser, which would drop a text typed but not yet searched for (review)
+    [guard] = [node for node in ast.walk(area) if isinstance(node, ast.If)
+               and "restore_value('quick_query')" in ast.unparse(node)]
+    assert ast.unparse(guard) == "if active:\n    restore_value('quick_query')"
     restore = "restore_value('quick_query')"
-    assert restore in source
     assert source.index(restore) < source.index("key='quick_query'")
-
-
-def test_kept_widget_values_have_a_session_key_of_their_own():
-    # keep_value copies the value on the widget's change, restore_value puts it back before
-    # the widget is drawn: also "Hide photos marked as no match", not drawn while the quick
-    # result is shown (F34)
     functions = {node.name: ast.unparse(node) for node in app_tree().body if isinstance(node, ast.FunctionDef)}
     assert 'st.session_state[kept_key(key)] = st.session_state.get(key)' in functions['keep_value']
     assert 'st.session_state[key] = st.session_state[kept_key(key)]' in functions['restore_value']
-    profile = functions['show_profile_results']
-    assert "on_change=keep_value, args=('hide_rejected',)" in profile
-    assert profile.index("restore_value('hide_rejected')") < profile.index("key='hide_rejected'")
+
+
+def test_the_views_of_the_results_selector_keep_their_boxes():
+    # F34 review: Streamlit drops the value of a widget a run does not draw; the box "Hide photos
+    # marked as no match" and the page boxes are not drawn while another entry is shown, so they
+    # keep their values with persist_state (also F38: the page of a profile gallery)
+    functions = {node.name: node for node in app_tree().body if isinstance(node, ast.FunctionDef)}
+    widgets = {}
+    for name in ('show_profile_results', 'show_quick_results'):
+        for call in ast.walk(functions[name]):
+            if isinstance(call, ast.Call) and ast.unparse(call.func) in ('st.checkbox', 'st.selectbox'):
+                keywords = {k.arg: ast.unparse(k.value) for k in call.keywords}
+                widgets[keywords['key']] = keywords.get('persist_state')
+    assert widgets == {"'hide_rejected'": "'page'", 'key': "'page'", "'quick_page'": "'page'"}
+    assert 'restore_value' not in ast.unparse(functions['show_profile_results'])
