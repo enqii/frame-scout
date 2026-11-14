@@ -61,6 +61,13 @@ def test_idle_without_an_existing_photo_folder():
     assert state_line(False, None, None) == 'Idle · no search yet · no existing photo folder'
 
 
+def test_a_count_that_is_not_a_whole_number_shows_only_the_phase():
+    # the 2 s fragment must not fail on a status it cannot count (review)
+    for done, total in ((5.0, 10), ('5', 10), (True, 10), (5, None), (None, 10), (5, 0), (5, -1)):
+        status = {'phase': 'analyzing', 'done': done, 'total': total}
+        assert state_line(True, status, 10) == f'Search running · Analyzing photos · {POINTER}'
+
+
 def test_the_message_of_a_run_is_left_to_the_search_tab():
     status = {'phase': 'scoring', 'done': 1, 'total': 4, 'message': NOTHING_NEW}
     assert state_line(True, status, 4) == f'Search running · Scoring photos 1/4 (25%) · {POINTER}'
