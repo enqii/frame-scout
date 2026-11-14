@@ -219,6 +219,10 @@ search" first shows the new ones and asks you to start again.
 
 ### Search & results
 
+A one-line state next to the title (on every tab) says what FrameScout is doing: while a search or analysis runs, its step and progress and that progress and **Stop** are in "Search & results"; otherwise how the last search ended with its time, and how many photos are in your photo folders. While a storage cleanup or cache check runs, the line says so.
+
+Under **Start search**, "A search needs" lists the three things a search requires, each with a check mark or a cross: search profiles, photos (an existing photo folder) and the search model. If one is missing, "Start is not available because ..." says which and in which tab to fix it; while a search runs, it says that one is running.
+
 Start the search; the page shows the current step and its progress. The search keeps
 running when you reload or close the tab (as long as the `Start-FrameScout.bat` window
 stays open), and opening the page again lets you stop it. Only one search runs at a time.

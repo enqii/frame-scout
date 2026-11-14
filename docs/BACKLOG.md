@@ -553,15 +553,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `Start-FrameScout.bat` starts a second app of the same folder on the next free port. The app
       could take the lock itself (e.g. via `st.cache_resource`). Affected: `app.py`,
       `framescout_core/app_instance.py`, `docs/ARCHITECTURE.md`. Found in F22. Size S.
-- [ ] `ready` **F27 – A global run state and reasons for disabled controls:** while a search or
-      analysis runs, almost every widget in every tab is disabled, but only "Search & results" says
-      why; Start can be disabled for reasons shown in another tab. Sketch: a one-line state under
-      the title ("Search running – progress in Search & results") and a "Start is not available
-      because ..." line under the Start button. Affected: `app.py`, user guide. Found in the F24
-      review (`docs/UI-REVIEW.md` §4). Decided 2026-11-13: the state line sits next to the title on every
-      tab (idle: last search and photo count; running: progress and a pointer to the search
-      tab), and the start area lists what a search needs (profiles, photos, model) with what
-      is missing. Size S. Roadmap P32.
 - [ ] `ready` **F28 – Five tabs instead of "Search & results":** the tab holds start/stop,
       status, quick search and its gallery, the profile results, copy, export and storage
       maintenance. Decided 2026-11-13: five tabs (Search profiles, Photo source, Settings,

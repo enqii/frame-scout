@@ -69,6 +69,8 @@ download and the fallback after an incomplete cache are **not runtime-tested** (
 
 ### `app.py` and `framescout_ui/`
 
+F27: next to the title, `app.py` reserves a container (`state_area`) that is filled once the photos are counted with the fragment `framescout_ui.run.show_state_line(photos)` (`run_every='2s'`, on every tab). The page run stores `(active, status)` in `st.session_state.state_line_state` like `page_run_state` for `show_status`; the fragment pops it on the page run and reads `run_state()` itself on fragment-only reruns. The start area shows `start_needs_line` and, when Start is disabled, `start_blocked_text` (a warning when idle, a caption while a run is active); Start's disabled conditions are unchanged (no profile, no existing folder, missing model package, active run). Test: `tests/test_app_state.py` (the pure functions only, not the app wiring); AppTest ran the page without errors, the look in a browser and a real running search were not verified.
+
 A46: `app.py` keeps the page layout (startup checks, the tabs, the "Photo source" tab, the search tab and
 `start_engine`); the areas live in the package `framescout_ui/` (imports streamlit; imported only by `app.py`, never by
 another module; no module imports `app`; `tests/test_app_source.py` checks both). Code was moved verbatim. Where a moved
@@ -80,7 +82,7 @@ browser sessions): `active`, `folder_scans`, `settings`, `profiles_shown`. The s
 |---|---|
 | `common.py` | project paths (`BASE`, `PROFILES`, `RESULTS`, `QUICK`, `MARKS`, ...), `decoders()`/`supported()`/`upload_types()` (the readable formats, evaluated in every page run), `open_path`/`reveal_path`/`gallery_action`, `widget_id`, `plain` (Markdown escaping), `clean_project_folder` (E44), `LOW_SPACE_TTL` |
 | `settings.py` | settings widgets (`setting_key`, `setting_of_widget`, `widget_of_setting`), `sync_settings()` (A8), `show_ai_settings(settings, seen, shown, active)` with "Check installation" |
-| `run.py` | `run_state`, `start_run`, `stop_run`, `end_processes`, `cache_env`, `cached_analyzed_photos`, `low_space_warning`, `show_status(active)` |
+| `run.py` | `run_state`, `start_run`, `stop_run`, `end_processes`, `cache_env`, `cached_analyzed_photos`, `low_space_warning`, `show_state_line(photos)`, `show_status(active)` |
 | `marks.py` | `load_marks`, `set_mark`, `marks_backup_offer`, `restore_marks_backup` |
 | `copy_export.py` | `copy_matches`, `export_list`, `show_copy`, `show_export` |
 | `results.py` | `load_results`, `show_results`, `show_quick_results`, `find_similar_button` |
@@ -252,6 +254,7 @@ the module of its area and to the re-exports in `__init__.py`.
 - `run_status.py`:
   `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`/`LOADING_DETECTOR`/`ALL_ANALYZED`/`NONE_ANALYZED`/`nothing_new_message`/`analysis_only`/`run_name`/`analysis_result_text`
   (F18: see "Run state"; one search per output folder, its phase and progress, A4/A5).
+- `app_state.py` (F27): the app's state line and what a search needs, standard library only. `state_line(active, status, photos, cleanup)` is the one line next to the title (running: `Search|Analysis running · <phase> <done>/<total> (<pct>%) · progress and Stop in the tab "Search & results"`; `cleanup` (a cleanup or cache check holds the run lock) has its own text; idle: how the last run ended with its time and the photo count, or `no search yet`, `no existing photo folder`); `start_needs(profiles, photos, folders_listed, model_label, model_missing)`, `start_needs_line(needs)` (`A search needs: ✓/✗ ...`) and `start_blocked_text(needs, active, cleaning)` (`Start is not available because: ...`, naming the tab that fixes a missing need); constants `START_NEEDS_TAB` (the tab labels of the three needs) and `RUN_TAB`: `app.py` takes its tab labels from them, so renaming a tab (F28) happens in one place.
 - `estimate.py` (F12): the time estimate of a search, standard library only.
   `AnalysisRate` (the engine's measure of the analysis speed: `add(fresh, now)` per stored
   group, `per_minute()` a moving average over at least the last `RATE_WINDOW` = 300 s, falling

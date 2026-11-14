@@ -2090,3 +2090,25 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       review), via `framescout_core.detector_weights_line` in `cache_dirs.py`. Tests:
       `test_cache_dirs.py`, `test_engine_defaults.py` (the line comes before the load). No cache,
       signature or CLI change. Not tested: a run with a real detector. Left over: E64.)
+
+- [x] `ready` **F27 – A global run state and reasons for disabled controls:** while a search or
+      analysis runs, almost every widget in every tab is disabled, but only "Search & results" says
+      why; Start can be disabled for reasons shown in another tab. Sketch: a one-line state under
+      the title ("Search running – progress in Search & results") and a "Start is not available
+      because ..." line under the Start button. Affected: `app.py`, user guide. Found in the F24
+      review (`docs/UI-REVIEW.md` §4). Decided 2026-11-13: the state line sits next to the title on every
+      tab (idle: last search and photo count; running: progress and a pointer to the search
+      tab), and the start area lists what a search needs (profiles, photos, model) with what
+      is missing. Size S. Roadmap P32.
+      (done 2026-11-14 in PR #108: a state line next to the title on every tab (fragment
+      `show_state_line` in `framescout_ui/run.py`, every 2 s) and, in the start area, the line
+      `A search needs: ✓/✗ search profiles · photos · search model "<label>"` with the tab that fixes a
+      missing need and `Start is not available because ...` (a warning when idle, a caption while a
+      run is active). The logic is the new standard-library module `framescout_core/app_state.py`
+      (`state_line`, `start_needs`, `start_needs_line`, `start_blocked_text`, `START_NEEDS_TAB`,
+      `RUN_TAB`; `app.py` takes its tab labels from the constants, so F28 renames them in one place).
+      The idle photo count is the one remembered for the browser session (A27). Start is disabled
+      under the same conditions as before. Tests: `tests/test_app_state.py`; full suite 1614 passed, 2
+      skipped; Streamlit AppTest run without errors. Not verified: the look in a real browser
+      (fragment reruns every 2 s) and a real running search. No schema, CLI, cache or widget key
+      change.)

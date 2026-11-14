@@ -30,7 +30,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       rebuild (A46) (2026-11-13)
 
 ### P32 – Run state (added 2026-11-13)
-- [ ] A state line next to the title and what a search still needs at the Start button (F27)
+- [x] A state line next to the title and what a search still needs at the Start button (F27) (2026-11-14)
 
 ### P33 – Tabs and settings (added 2026-11-13)
 - [ ] (A) Five tabs: results on their own, storage maintenance in the settings, "Analyze
