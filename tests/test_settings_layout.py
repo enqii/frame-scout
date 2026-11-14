@@ -56,16 +56,18 @@ def test_every_ai_setting_has_one_widget_in_its_group():
 
 
 def details_expander():
-    expanders = [node.items[0].context_expr for node in ast.walk(show_ai_settings()) if isinstance(node, ast.With)
+    """The `with st.expander(DETAILS_LABEL, ...)` statement of show_ai_settings."""
+    expanders = [node for node in ast.walk(show_ai_settings()) if isinstance(node, ast.With)
                  and ast.unparse(node.items[0].context_expr).startswith(f'st.expander({DETAILS_LABEL!r}')]
-    assert len(expanders) == 1, expanders
+    assert len(expanders) == 1, f'one expander {DETAILS_LABEL!r}, found {len(expanders)}'
     return expanders[0]
 
 
 def test_the_expander_does_not_close_by_itself_while_the_user_edits():
     # Streamlit closes an open expander when `expanded` turns False on a rerun, e.g. after a
     # value is set back to its default (review): `expanded` only ever turns True in a session
-    [expanded] = [keyword.value for keyword in details_expander().keywords if keyword.arg == 'expanded']
+    [expanded] = [keyword.value for keyword in details_expander().items[0].context_expr.keywords
+                  if keyword.arg == 'expanded']
     assert ast.unparse(expanded) == "st.session_state.get('ai_details_open', False)"
     function = show_ai_settings()
     opens = [node for node in ast.walk(function) if isinstance(node, ast.Assign)
@@ -87,22 +89,34 @@ def test_the_widgets_are_drawn_in_the_order_of_the_settings():
 
 
 def disabled_of(name):
-    [disabled] = [keyword.value for keyword in setting_widgets()[name][0].keywords if keyword.arg == 'disabled']
-    return ast.unparse(disabled)
+    disabled = [keyword.value for keyword in setting_widgets()[name][0].keywords if keyword.arg == 'disabled']
+    assert len(disabled) == 1, f'{name}: no disabled= argument'
+    return ast.unparse(disabled[0])
 
 
 def test_the_person_settings_are_disabled_while_the_detection_is_off():
     for name in PERSON_DETECTION_SETTINGS:
         assert disabled_of(name) == 'active or not detecting', name
     # the detection's own checkbox value of this page run, after the settings were synchronized
-    [assign] = [node for node in ast.walk(show_ai_settings()) if isinstance(node, ast.Assign)
-                and [ast.unparse(target) for target in node.targets] == ['detecting']]
-    assert ast.unparse(assign.value) == "st.session_state[setting_key('person_detection')]"
-    detection_line = setting_widgets()['person_detection'][0].lineno
-    assert detection_line < assign.lineno < setting_widgets()['max_persons'][0].lineno
+    assigns = [node for node in ast.walk(show_ai_settings()) if isinstance(node, ast.Assign)
+               and [ast.unparse(target) for target in node.targets] == ['detecting']]
+    assert len(assigns) == 1, f'`detecting` is assigned once, found {len(assigns)}'
+    assert ast.unparse(assigns[0].value) == "st.session_state[setting_key('person_detection')]"
+    widgets = setting_widgets()
+    assert widgets['person_detection'][0].lineno < assigns[0].lineno < widgets['max_persons'][0].lineno
     # the other settings only while a run is active
     for name in set(AI_SETTINGS) - set(PERSON_DETECTION_SETTINGS):
         assert disabled_of(name) == 'active', name
+
+
+def test_the_caption_explains_the_disabled_person_settings_in_the_expander():
+    widgets = setting_widgets()
+    captions = [node for node in ast.walk(details_expander()) if isinstance(node, ast.If)
+                and ast.unparse(node.test) == 'not detecting'
+                and any(ast.unparse(statement).startswith('st.caption(') for statement in node.body)]
+    assert len(captions) == 1, f'one caption under `if not detecting:` in the expander, found {len(captions)}'
+    # below the two person settings it explains, above the reference weight
+    assert widgets['person_confidence'][0].lineno < captions[0].lineno < widgets['reference_weight'][0].lineno
 
 
 def test_the_widgets_get_their_values_only_through_the_session_state():
