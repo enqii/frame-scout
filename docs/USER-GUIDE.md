@@ -31,7 +31,7 @@ error that names the file and the folder (`framescout_core` or `framescout_scori
 
 If the app does not start or a search fails after a Windows update, a moved or copied
 folder or an interrupted installation, double-click `Check-FrameScout.bat`, or open
-AI settings → "Check installation" when the app runs. The check changes nothing, installs
+Settings → "Check installation" when the app runs. The check changes nothing, installs
 nothing and downloads nothing (it only creates and deletes a small temporary file in
 `.cache` and `results` to see whether they can be written). It reports, with one sentence
 of what to do for each problem:
@@ -94,7 +94,7 @@ With several GPUs it prefers a build that suits all of them. If no build fits, i
 and installs the CPU version. These limits come from the CUDA and PyTorch documentation and
 are **not verified**; the GPU path has only been tested on one machine (GeForce RTX 4070, CUDA 13.0),
 so treat it as experimental. Person detection can find slightly different boxes on a GPU
-than on the CPU, so the order of near-equal matches may differ a little between devices. Under "AI settings" the app shows whether PyTorch can use the
+than on the CPU, so the order of near-equal matches may differ a little between devices. Under "Settings" the app shows whether PyTorch can use the
 GPU and offers "cuda" only then.
 
 ## Using the app
@@ -164,7 +164,7 @@ search downloads them again there (about 600 MB for the default model). The unin
 script lists such folders outside the project but does not delete them. A `yolo11n.pt` in
 the folder of a manual run is used instead of the cached copy.
 
-**Analyze ahead** (end of the tab) analyzes the photos without a search, for example overnight, so
+**Analyze ahead** (in the "Search" tab, below Start) analyzes the photos without a search, for example overnight, so
 that a later search only has to rank them. The section shows the current search model and
 person detection setting, how many photos are analyzed with them already and, if an earlier
 search measured a speed, a rough duration. A JPEG or HEIC whose shot is analyzed through its RAW
@@ -176,11 +176,13 @@ since. If the drive of the results may run short of space, a warning is shown he
 Analyses only help a search with
 the same search model and person detection settings: after a change of these, the photos are
 analyzed again. An analysis changes no results: the galleries, `results.json`, marks and the
-last quick search stay as they are. Progress, "time left" and **Stop** are in "Search & results";
+last quick search stay as they are. Progress, "time left" and **Stop** are in the same "Search" tab, below the button;
 "Keep the PC responsive" applies as for a search. A photo edited after its analysis counts as
 not analyzed.
 
-### AI settings
+### Settings
+
+The tab holds the AI settings and, below them, "Storage" with [Clean up storage](#cleaning-up-storage) (cleanup and cache check).
 
 - **Search model:** the default, OpenAI CLIP ViT-B/32, is the fastest and the one the
   settings are tuned for. Optional: ViT-B/16 and ViT-L/14 (DataComp-XL) and SigLIP B/16,
@@ -203,7 +205,7 @@ not analyzed.
 - **Person detection:** finds people with YOLO11n and compares each person separately,
   which helps with group photos. Turn it off for other motifs: JPEGs are then decoded
   at a reduced resolution, which is noticeably faster.
-- **Check installation:** an expander at the end of the tab that runs the check of
+- **Check installation:** an expander in this tab that runs the check of
   [Checking the installation](#checking-the-installation) and shows each result.
 - **Weight of the reference images:** see [What the numbers mean](#what-the-numbers-mean).
 - **Defaults:** the help text of each setting ends with its default, and a line below the
@@ -217,9 +219,11 @@ to return to the defaults. An unreadable file is left unchanged, and an invalid 
 replaced by its default with a warning. If another tab changed the settings, "Start
 search" first shows the new ones and asks you to start again.
 
-### Search & results
+### Search and Results
 
-A one-line state next to the title (on every tab) says what FrameScout is doing: while a search or analysis runs, its step and progress and that progress and **Stop** are in "Search & results"; otherwise how the last search ended with its time, and how many photos are in your photo folders. While a storage cleanup or cache check runs, the line says so.
+The "Search" tab holds Start/Stop, the progress and log, "Analyze ahead" and the quick search; the "Results" tab shows the results (see below).
+
+A one-line state next to the title (on every tab) says what FrameScout is doing: while a search or analysis runs, its step and progress and that progress and **Stop** are in the tab "Search"; otherwise how the last search ended with its time, and how many photos are in your photo folders. While a storage cleanup or cache check runs, the line says so.
 
 Under **Start search**, "A search needs" lists the three things a search requires, each with a check mark or a cross: search profiles, photos (an existing photo folder) and the search model. If one is missing, "Start is not available because ..." says which and in which tab to fix it; while a search runs, it says that one is running.
 
@@ -230,7 +234,7 @@ A repeat search on a folder that is already analyzed (e.g. after changing only a
 text or the reference weight) skips loading the person detector and shows "Nothing new to
 analyze – ranking only"; the detector is loaded only when a photo has to be analyzed.
 
-An analysis started in "Photo source" (see "Analyze ahead") is shown here too: "Analysis running
+An analysis started with "Analyze ahead" is shown here too: "Analysis running
 …" with its progress and **Stop**, "about N min left" for the analysis alone (there is no scoring
 or gallery step) and afterwards "The last analysis finished successfully" with the number of
 newly analyzed photos and those already in the cache. An interrupted or failed analysis is
@@ -238,7 +242,7 @@ described as such, not as a search run. If no photo needed a new analysis, the p
 "All photos are analyzed already", or, if some photos could not be read, "No photo newly analyzed –
 some could not be analyzed, see the log". Only one search or analysis runs at a time.
 
-Before a search the run tab summarizes what it will do: how many photos were found, how many
+Before a search the "Search" tab summarizes what it will do: how many photos were found, how many
 are already analyzed with the current settings and how many remain to analyze. If an earlier
 search with the same settings (search model, person detection) ran on the same device, it also
 gives a rough duration for the analysis, plus an upper bound for scoring and writing the
@@ -256,7 +260,7 @@ part assumes that every thumbnail is new, so on a repeat search it is an overest
 that you edited after its analysis counts as not yet analyzed; one edited while the page is open
 counts as analyzed until you press "Recount".
 
-Before a search the run tab warns when a drive would keep less than 1 GB free after the
+Before a search the "Search" tab warns when a drive would keep less than 1 GB free after the
 search: it lists the drives with the space needed and the space free, and what the search
 writes (cache, thumbnails, and the search model or person detector if they still have to
 be downloaded). Only photos not yet analyzed with the current AI settings count for the
@@ -271,7 +275,7 @@ profile: type a search text in English (up to 300 characters) and press "Quick s
 searches only the photos already analyzed with the current AI settings (the caption says
 "N of M photos analyzed and searched"; a photo whose same picture in another format, such as the RAW file, is searched is not counted as missing), so it is fast and loads no person detector or analysis;
 it is not available while no photo is analyzed, while a search runs or without photo folders.
-The result goes to `results/quick/` and appears under "Results of the last quick search"
+The result goes to `results/quick/` and appears in the tab "Results" under "Results of the last quick search"
 (thumbnails, 48 per page, "Open"/"Folder" per photo, the gallery and the folder), with the
 photo folders it searched and a note if you have chosen other folders since. A new quick
 search replaces the last one. The scores are scaled over the photos searched, so they differ
@@ -288,7 +292,8 @@ search in `results/quick/` and is shown under "Results of the last quick search 
 similar"" (title "Similar to <file>"). The scores are relative to the photos compared, and
 shots of a burst may take the top places. If the photo is not analyzed with the current
 settings (or changed since), the search stops with a message; start a search with profiles
-over its folder first. The button is disabled while a search runs. The HTML galleries have
+over its folder first. The button is disabled while a search runs; if it cannot start, the note appears in the
+"Results" tab. The HTML galleries have
 no button.
 
 **Results** shows the last finished search per profile: thumbnails, best first, 48 per
@@ -419,7 +424,7 @@ gallery shows and temporary files a stopped search left behind.
 
 ### Cleaning up storage
 
-Nothing is deleted silently. **Search & results → Clean up storage** lists what can go:
+Nothing is deleted silently. **Settings → Storage → Clean up storage** lists what can go:
 click **Scan** (it only looks), check the categories, click **Delete selected** and
 confirm. Deleting is **permanent** (no Recycle Bin) and not possible while a search runs.
 

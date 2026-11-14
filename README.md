@@ -47,13 +47,13 @@ Details, GPU support and updating: [user guide](docs/USER-GUIDE.md#installation-
    custom search texts) and optionally add reference images. Example profiles are
    included.
 3. **Photo source:** enter one or more local photo folders; subfolders are included.
-4. **AI settings:** keep the defaults, or choose another search model, the GPU or turn
-   person detection off for motifs other than people.
-5. **Search & results:** start the search, browse the ranked photos, mark matches and
-   copy them to a folder or export the list as CSV / text file. A quick search and "Find
-   similar" search the analyzed photos without a profile; "Analyze photos now" analyzes ahead of time (e.g. overnight)
-   without a search. HTML galleries are written to
-   `results/`.
+4. **Settings:** keep the defaults, or choose another search model, the GPU or turn
+   person detection off for motifs other than people; storage cleanup is here too.
+5. **Search:** start the search; a quick search searches the analyzed photos without a
+   profile; "Analyze photos now" analyzes ahead of time (e.g. overnight) without a search.
+6. **Results:** browse the ranked photos, mark matches and copy them to a folder or export
+   the list as CSV / text file; "Find similar" works from any photo. HTML galleries are
+   written to `results/`.
 
 Supported formats: JPG, PNG, WebP, BMP, TIFF, AVIF, HEIC/HEIF and common camera RAW
 formats. Everything else, including what each setting does and how to clean up storage,

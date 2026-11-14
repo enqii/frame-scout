@@ -33,8 +33,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] A state line next to the title and what a search still needs at the Start button (F27) (2026-11-14)
 
 ### P33 – Tabs and settings (added 2026-11-13)
-- [ ] (A) Five tabs: results on their own, storage maintenance in the settings, "Analyze
-      ahead" in the search tab (F28)
+- [x] (A) Five tabs: results on their own, storage maintenance in the settings, "Analyze
+      ahead" in the search tab (F28) (2026-11-14)
 - [ ] (B) Group the AI settings (F32)
 
 ### P34 – Quick search in the results view (added 2026-11-13)

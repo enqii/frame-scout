@@ -69,7 +69,7 @@ download and the fallback after an incomplete cache are **not runtime-tested** (
 
 ### `app.py` and `framescout_ui/`
 
-F27: next to the title, `app.py` reserves a container (`state_area`) that is filled once the photos are counted with the fragment `framescout_ui.run.show_state_line(active, photos)` (`run_every='2s'`, on every tab). The page run stores `(active, status)` in `st.session_state.state_line_state` like `page_run_state` for `show_status`; the fragment pops it on the page run and reads `run_state()` itself on fragment-only reruns, and like `show_status` it reruns the whole page when that differs from the page run's `active`, so the line and the tabs never disagree about a run for longer than that rerun. The start area shows `start_needs_line` and, when Start is disabled, `start_blocked_text` (a warning when idle, a caption while a run is active); a missing model package is not repeated there (its install hint is in "AI settings", which the line names). Start's disabled conditions are unchanged (no profile, no existing folder, missing model package, active run). Test: `tests/test_app_state.py` (the pure functions only, not the app wiring); AppTest ran the page without errors, the look in a browser and a real running search were not verified.
+F27: next to the title, `app.py` reserves a container (`state_area`) that is filled once the photos are counted with the fragment `framescout_ui.run.show_state_line(active, photos)` (`run_every='2s'`, on every tab). The page run stores `(active, status)` in `st.session_state.state_line_state` like `page_run_state` for `show_status`; the fragment pops it on the page run and reads `run_state()` itself on fragment-only reruns, and like `show_status` it reruns the whole page when that differs from the page run's `active`, so the line and the tabs never disagree about a run for longer than that rerun. The start area shows `start_needs_line` and, when Start is disabled, `start_blocked_text` (a warning when idle, a caption while a run is active); a missing model package is not repeated there (its install hint is in "Settings", which the line names). Start's disabled conditions are unchanged (no profile, no existing folder, missing model package, active run). Test: `tests/test_app_state.py` (the pure functions only, not the app wiring); AppTest ran the page without errors, the look in a browser and a real running search were not verified.
 
 A46: `app.py` keeps the page layout (startup checks, the tabs, the "Photo source" tab, the search tab and
 `start_engine`); the areas live in the package `framescout_ui/` (imports streamlit; imported only by `app.py`, never by
@@ -92,22 +92,22 @@ browser sessions): `active`, `folder_scans`, `settings`, `profiles_shown`. The s
 The text below describes the behavior of the whole frontend; function names that it gives are found in the modules above
 (`start_engine` and the page layout stay in `app.py`).
 
-`app.py`: Streamlit frontend. Tabs: Search profiles, Photo source, AI settings, Search &
-results. F18: the "Photo source" tab ends with the section "Analyze ahead" (an `st.container` created there and filled from the run
-tab's code, which knows the run state): explanation, the current search model and person detection,
+`app.py`: Streamlit frontend. Tabs (F28, `framescout_core.APP_TABS`): Search profiles, Photo source, Settings (the AI settings, then the
+subheader "Storage" with the expander "Clean up storage": cleanup and cache check), Search (Start/Stop, status and log, "Analyze ahead", "Quick search") and
+Results (`RESULTS_TAB`: the quick result expander, then the profile results). F18: the "Search" tab has the section "Analyze ahead" below Start (drawn inline in the run tab's code, which knows the run state; F28 removed the `analyze_area` container from the photo tab): explanation, the current search model and person detection,
 `start_summary(..., analysis_only=True)`, its own low disk space warning (`low_space_warning(..., analysis=True)`: no profile, so
 no gallery thumbnails) and the button "Analyze photos now" (disabled like "Start search" while a run or cleanup is active, without
 an existing folder or with a missing model package; not by the photo count, which is the one remembered for the browser session
 (A27) while the engine reads the folders again, review). Its counts treat the JPEG/HEIC partners searched through another file of
-their shot (`quick_scope`'s third count) as analyzed, since they never get a cache row of their own (review); the run tab shows the analysis with `run_name` texts and `analysis_result_text`. Handles profile CRUD, reference uploads, settings saved in `settings.json` (A8),
+their shot (`quick_scope`'s third count) as analyzed, since they never get a cache row of their own (review); the Search tab shows the analysis with `run_name` texts and `analysis_result_text`. Handles profile CRUD, reference uploads, settings saved in `settings.json` (A8),
 hardware display, analysis process, progress/log UI, and the result gallery of the last
 search from `results/results.json` (P4 (A), A12: thumbnail grid, 48 per page,
 "Open"/"Folder" per photo, "Open gallery in browser", "Open results folder", HTML
 download, a note for profiles changed since; results folders without the file list their
 HTML files by name) with a three-state mark per photo (Undecided / Match / No match, saved
 in `results/marks.json`), "Hide photos marked as no match" and copying of a profile's
-matches to a folder (A17); below it the expander "Clean up storage" (E7). Between the search
-status and "Results" sits the section "Quick search" (F10, `QUICK`/`QUICK_JSON`/`QUICK_THUMBS`
+matches to a folder (A17); the expander "Clean up storage" (E7) moved to the Settings tab (F28). After the search
+status sits the section "Quick search" (F10, `QUICK`/`QUICK_JSON`/`QUICK_THUMBS`
 are `results/quick/`, its `results.json` and `thumbnails/`): a text input (`quick_query`, at
 most `QUICK_QUERY_MAX` = 300 characters) and the button "Quick search" (disabled while a search
 runs, without folders, with a missing model package or while no photo is searched: none is analyzed itself or through another file of its shot, E61), the
@@ -121,11 +121,11 @@ and every card of `show_results` and `show_quick_results` has a "Find similar" b
 since it loads no model). The button is a fragment that stores `st.session_state.find_similar = (path, label)` and
 reruns the page; that page run pops the request first thing (before any `st.stop`, so a run that stops early drops it
 instead of leaving it for a later run) into `find_similar_request` and, under "Start search", calls
-`start_engine(like=…, like_part=…)`, or sets a `run_notice` if a search is running meanwhile (the fragment's button may
+`start_engine(like=…, like_part=…, notice='like_notice')`, or sets a `like_notice` (shown in the Results tab, F28) if a search is running meanwhile (the fragment's button may
 be stale). The quick result caption then reads "Photos similar to <file name> (<part>)". The HTML galleries have no button (static pages). `load_results(path)` reads either
 result file. Both searches start through `start_engine`, which builds the command with
-`framescout_core.engine_command`; the settings-taken-over guard applies to both. The AI settings tab ends
-with the expander "Check installation" (F15): a button runs `check_installation(BASE, os.environ)`
+`framescout_core.engine_command`; the settings-taken-over guard applies to both. The Settings tab has
+the expander "Check installation" (F15): a button runs `check_installation(BASE, os.environ)`
 (importing torch takes seconds, so never automatically) and shows each result as error with
 "Fix:", success or information; the results stay in `st.session_state['install_check']`, with a
 "Checked at" caption from `install_check_at`. The check runs in the script thread under a
@@ -254,7 +254,7 @@ the module of its area and to the re-exports in `__init__.py`.
 - `run_status.py`:
   `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`/`LOADING_DETECTOR`/`ALL_ANALYZED`/`NONE_ANALYZED`/`nothing_new_message`/`analysis_only`/`run_name`/`analysis_result_text`
   (F18: see "Run state"; one search per output folder, its phase and progress, A4/A5).
-- `app_state.py` (F27): the app's state line and what a search needs, standard library only. `state_line(active, status, photos, cleanup)` is the one line next to the title (running: `Search|Analysis running · <phase> <done>/<total> (<pct>%) · progress and Stop in the tab "Search & results"`; `cleanup` (a cleanup or cache check holds the run lock) has its own text; idle: how the last run ended with its time and the photo count, or `no search yet`, `no existing photo folder`); `start_needs(profiles, photos, folders_listed, model_label, model_missing)`, `start_needs_line(needs)` (`A search needs: ✓/✗ ...`) and `start_blocked_text(needs, active, cleaning)` (`Start is not available because: ...`, naming the tab that fixes a missing need); constants `START_NEEDS_TAB` (the tab labels of the three needs) and `RUN_TAB`: `app.py` takes its tab labels from them, so renaming a tab (F28) happens in one place.
+- `app_state.py` (F27): the app's state line and what a search needs, standard library only. `state_line(active, status, photos, cleanup)` is the one line next to the title (running: `Search|Analysis running · <phase> <done>/<total> (<pct>%) · progress and Stop in the tab "Search"`; `cleanup` (a cleanup or cache check holds the run lock) has its own text; idle: how the last run ended with its time and the photo count, or `no search yet`, `no existing photo folder`); `start_needs(profiles, photos, folders_listed, model_label, model_missing)`, `start_needs_line(needs)` (`A search needs: ✓/✗ ...`) and `start_blocked_text(needs, active, cleaning)` (`Start is not available because: ...`, naming the tab that fixes a missing need); constants `START_NEEDS_TAB` (the tab labels of the three needs), `RUN_TAB` ("Search"), `RESULTS_TAB` ("Results") and `APP_TABS` (all five labels in order; `START_NEEDS_TAB['model']` is "Settings" since F28): `app.py` takes its tab labels from them, so renaming a tab happens in one place.
 - `estimate.py` (F12): the time estimate of a search, standard library only.
   `AnalysisRate` (the engine's measure of the analysis speed: `add(fresh, now)` per stored
   group, `per_minute()` a moving average over at least the last `RATE_WINDOW` = 300 s, falling
@@ -1425,7 +1425,7 @@ records: `settings_seen` (the saved value last taken from or written to the file
 written, e.g. rounded) and `settings_shown` (the value the widget showed; they differ for
 slider noise and for the device substitute). A widget that differs from `settings_shown`
 was changed in this session and is saved; a saved value that differs from `settings_seen`
-came from another session and is shown, so the latest action wins. The "Reset to defaults" button of the AI settings tab (A26,
+came from another session and is shown, so the latest action wins. The "Reset to defaults" button of the Settings tab (A26,
 disabled while a search runs or when `changed_from_defaults` is empty) resets
 `AI_SETTINGS` (the model included, the photo folders not) in an `on_click` callback that
 writes the `setting_<name>` session state (before the widgets are drawn, never `value=`)
@@ -1438,7 +1438,7 @@ settings that differ. A Start in a page run
 that took over such values is refused once with a note. `save_settings` holds a `RunLock`
 on `settings.json.lock` around its read-merge-write (sessions are threads of one process).
 The widgets take their ranges from `SETTING_RANGES`; `system_info` (which imports torch)
-runs in the AI settings tab, so the profile tab is drawn first. A read that still fails
+runs in the Settings tab, so the profile tab is drawn first. A read that still fails
 with an `OSError` (file in use) gets a different message than a corrupt file
 (`ValueError`). Only values that differ from the defaults are written, so the default
 photo folder follows a moved project folder; unknown keys are kept. Keys follow the CLI
@@ -1569,7 +1569,7 @@ without `.html`. See "Storage cleanup" for why exports are never deleted.
 ### Storage cleanup
 
 Cleanup (E7, E11, E13, E23, A14, E8; user decisions at the PR #18 hold point): the expander
-"Clean up storage" at the end of the "Search & results" tab. "Scan" (disabled while a
+"Clean up storage" in the "Storage" section of the Settings tab (F28; was the end of "Search & results"). "Scan" (disabled while a
 search runs) calls `scan_cleanup(RESULTS, PROFILES, REFS, signature
 of the current settings, `current_model=`)` and keeps the result in the session; each category of
 `CLEANUP_CATEGORIES` is a checkbox (key `cleanup_<category>`, set from `CLEANUP_DEFAULTS`
@@ -1750,7 +1750,7 @@ named (`analyze_notice`).
 
 The frontend spawns the engine via `subprocess.Popen` and redirects stdout/stderr to
 `run.log`, with `PYTHONIOENCODING=utf-8` (`cache_env`, which also keeps cache variables the user set, A36), as it reads `run.log` as UTF-8;
-it passes `--model` from the setting `model` (the AI settings tab starts with
+it passes `--model` from the setting `model` (the Settings tab starts with
 the "Search model" selectbox, key `setting_model`, `format_func=model_label`, with a
 caption per model and a warning from `model_problem`, E22; `models_downloaded` (`st.cache_data`, `LOW_SPACE_TTL`) marks cached models "downloaded" in the list and the caption, A39; with such a problem Start is
 disabled and the run tab shows the same warning). `start_run` takes the run lock (1 s timeout: every open tab probes it every two
@@ -2041,7 +2041,7 @@ the gain in responsiveness are not measured, E52; `os.nice` is not run on a non-
 the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
 read from its syntax tree, settings migration, results format 1/2) are
 covered by `tests/` (via `framescout_core` and `framescout_scoring`), as is the quick search (F10:
-`tests/test_quick.py` for `quick_profile`, `quick_photos`, `quick_folders_differ`, `quick_scope`, `quick_scope_text`, `quick_note`,
+F28: `tests/test_app_state.py` checks `APP_TABS`/`RESULTS_TAB` and that `app.py` builds its five tabs from them in order, with the sections in the expected tab (checked in `app.py`'s syntax tree; a Streamlit AppTest page run showed no exceptions; the look in a browser is not verified); `tests/test_quick.py` also covers `like_notice`. `tests/test_quick.py` for `quick_profile`, `quick_photos`, `quick_folders_differ`, `quick_scope`, `quick_scope_text`, `quick_note`,
 `engine_command`, the quick output folder, its cleanup and that the `results/` cleanup keeps
 `results/quick/`; `test_engine_defaults.py` for the engine's `--quick-query` (exclusive with
 `--profiles`, no detector, no analysis, the cache check before the model load, the output
