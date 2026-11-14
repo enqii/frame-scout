@@ -307,7 +307,8 @@ no button.
 page, with rank, score, the best-matching part ("Full image" or "Person 1", …) and the
 file name. "Open" opens a photo, "Folder" shows it in its folder, and buttons open the
 HTML gallery and the `results` folder. A profile changed, renamed or deleted since the
-search is marked, since its results no longer fit it.
+search is marked, since its results no longer fit it. Switching to another entry of
+"Results of" and back keeps the page you were on and "Hide photos marked as no match".
 
 ### Which search text matched
 
