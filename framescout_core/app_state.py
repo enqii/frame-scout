@@ -1,5 +1,5 @@
 """The app's state line next to its title and what a search needs at the Start button (F27)."""
-from .run_status import FINAL_PHASES, PHASE_LABELS, analysis_only, status_fraction
+from .run_status import FINAL_PHASES, PHASE_LABELS, _count, analysis_only, status_fraction
 
 # the tab in which a missing need is fixed, as the app names its tabs
 START_NEEDS_TAB = {'profiles': 'Search profiles', 'photos': 'Photo source', 'model': 'AI settings'}
@@ -13,11 +13,6 @@ def _plural(count, one, many):
     return f"{count:,} {one if count == 1 else many}"
 
 
-def _count(status, key):
-    value = status.get(key)
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
-
-
 def _short_phase(status):
     """The phase of a running status with its count and percentage, without the details of status_text."""
     phase = status.get('phase')
@@ -25,9 +20,10 @@ def _short_phase(status):
         text = 'Starting the analysis'
     else:
         text = PHASE_LABELS.get(phase, str(phase))
-    fraction = status_fraction(status)
-    if fraction is not None:
-        text += f" {_count(status, 'done'):,}/{_count(status, 'total'):,} ({fraction:.0%})"
+    # the counts as status_fraction reads them (the same _count), so a fraction implies both (review)
+    done, total, fraction = _count(status, 'done'), _count(status, 'total'), status_fraction(status)
+    if fraction is not None and done is not None and total is not None:
+        text += f" {done:,}/{total:,} ({fraction:.0%})"
     return text
 
 
