@@ -8,8 +8,8 @@ import streamlit as st
 from framescout_core import (FINAL_PHASES, MODELS, PHASE_LABELS, RunLock, StatusReporter, analysis_only,
                              analysis_result_text, analyzed_paths, app_search_needs, cache_paths, cleanup_running,
                              default_cache_env, lock_held, low_space, low_space_lines, quick_scope, read_status,
-                             remaining_text, run_active, run_name, started_in_time, status_fraction, status_text,
-                             stopped_status, write_status)
+                             remaining_text, run_active, run_name, started_in_time, state_line, status_fraction,
+                             status_text, stopped_status, write_status)
 
 from .common import BASE, LOCK, LOG, LOW_SPACE_TTL, RESULTS, STATUS, plain
 from .settings import AI_LABELS
@@ -196,6 +196,19 @@ def low_space_warning(photos, top, profile_count, model, person_detection, analy
             f'downloads a search model or the person detector the first time it is used. A full disk can make the '
             f'{run} fail or leave a model download or the cache incomplete. Free some disk space'
             + ('' if analysis else ' or lower "' + AI_LABELS['top'] + '"') + f'. You can still start the {run}.')
+
+
+@st.fragment(run_every='2s')
+def show_state_line(photos):
+    """The one-line run state next to the title, on every tab, read again every 2 s (F27).
+
+    photos: the photos counted in the listed folders (None without an existing one), as the
+    page run counted them; show_status reruns the page when a run starts or ends.
+    """
+    # the state of this page run, read once at its top; fragment-only reruns read it again
+    fresh = st.session_state.pop('state_line_state', None)
+    active, status = fresh if fresh else run_state()
+    st.caption(plain(state_line(active, status, photos, cleanup=active and cleanup_running(RESULTS))))
 
 
 @st.fragment(run_every='2s')
