@@ -482,3 +482,34 @@ Disposition: take over → F24; roadmap P28 (2026-11-12)
 - **Risks:** a redesign touches many screens at once; keep general-purpose wording and
   the existing settings/state keys working.
 - **Hold point:** product decision (design decisions).
+
+## 2026-11-14
+
+Single idea added by hand (no brainstorming run); not checked against the earlier ideas.
+
+### 1. Linux support
+- **Problem:** FrameScout installs and starts only on Windows: the four `.bat` files are
+  the only supported way, and nothing is runtime-tested on Linux. The Python code already
+  has POSIX branches (file locks with `fcntl`, `os.nice`, `xdg-open` for "Open"/"Folder",
+  `.venv/bin/python`, unmounted mount points of E54), so a manual start probably works.
+- **Solution sketch:** (a) add `ubuntu-latest` to the CI matrix and fix what fails;
+  (b) shell scripts next to the four `.bat` files (same cache variables, `.tmp`,
+  `PIP_CONSTRAINT`, leftover check, exit codes), using the system's `python3` (3.12 or
+  newer, with `venv`) instead of a downloaded private Python; (c) Linux driver minimums
+  in `CUDA_BUILDS`; (d) Linux paths in the uninstaller (`bin/python`, the Ultralytics
+  settings folder); (e) messages that name the script of the platform instead of
+  `Start-FrameScout.bat` etc.; (f) one full search on a Linux machine or in WSL2.
+- **Affected:** new `.sh` scripts, `framescout_core/torch_build.py`,
+  `framescout_core/uninstall.py`, `framescout_core/portable_python.py`, the messages in
+  `framescout_core/`, `framescout_ui/`, `install_torch.py`, `framescout_check.py` and
+  `framescout_uninstall.py`, `.github/workflows/tests.yml`,
+  `requirements/constraints.txt`, README, user guide, `docs/DEVELOPMENT.md`,
+  `docs/ARCHITECTURE.md`, `CLAUDE.md` ("How to run").
+- **Effort:** M–L; (a) alone is S.
+- **Risks:** `requirements/constraints.txt` was checked for `win_amd64` only, and the
+  Linux CUDA wheels pull in further packages without a pin; `opencv-python` may need
+  system libraries (`libGL`) on minimal systems; distributions without Python 3.12 or
+  newer; `xdg-open` cannot select a file in its folder (A19); a second set of scripts to
+  keep in sync with the `.bat` files.
+- **Hold point:** product decision (distribution: a second supported platform); not
+  runtime-testable without a Linux machine, CUDA on Linux not without an NVIDIA GPU there.
