@@ -282,21 +282,20 @@ profile: type a search text in English (up to 300 characters) and press "Quick s
 searches only the photos already analyzed with the current AI settings (the caption says
 "N of M photos analyzed and searched"; a photo whose same picture in another format, such as the RAW file, is searched is not counted as missing), so it is fast and loads no person detector or analysis;
 it is not available while no photo is analyzed, while a search runs or without photo folders.
-The result goes to `results/quick/` and appears in the tab "Results" under "Results of the last quick search"
-(thumbnails, 48 per page, "Open"/"Folder" per photo, the gallery and the folder), with the
+The result goes to `results/quick/` and appears in the tab "Results" as the last entry of the selector "Results of", next to your search
+profiles, and is selected at once (thumbnails, 48 per page, "Open"/"Folder" per photo, the gallery and the folder), with the
 photo folders it searched and a note if you have chosen other folders since. A new quick
-search replaces the last one. The scores are scaled over the photos searched, so they differ
+search replaces the last one. The text stays in the field after you press the button. The scores are scaled over the photos searched, so they differ
 from a search with profiles; a quick search has no marks, copying or export, and it never
 changes your profile galleries, `results.json` or marks.
 
-**Find similar** (button on every result card, in "Results" and in the quick results) shows
+**Find similar** (button on every result card, in "Results", also in the quick result) shows
 more photos that look like that one. It compares the photo (or the part named on the card,
 e.g. "Person 1") with all other photos already analyzed with the current AI settings; no search
 text is used, nothing is analyzed and no model is loaded. The photo itself and the other files
 of its shot (a JPEG and the RAW file of the same name) are not part of the result. The result
 replaces the last quick
-search in `results/quick/` and is shown under "Results of the last quick search or "Find
-similar"" (title "Similar to <file>"). The scores are relative to the photos compared, and
+search in `results/quick/` and is shown as that entry of the selector "Results of" (title "Similar to <file>"). The scores are relative to the photos compared, and
 shots of a burst may take the top places. If the photo is not analyzed with the current
 settings (or changed since), the search stops with a message; start a search with profiles
 over its folder first. The button is disabled while a search runs; if it cannot start, the note appears in the

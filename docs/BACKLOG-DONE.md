@@ -2146,3 +2146,22 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       with a caption while person detection is off. Tests: new `test_settings_layout.py` (source checks); full
       suite 1626 passed, 2 skipped; Streamlit AppTest: expander drawn, sub-settings disabled after unchecking
       detection. Not verified: the look in a real browser. No schema, CLI, cache or widget key change.)
+- [x] `ready` **F34 – The quick search result is an entry of the results selector:** after one
+      quick search the page grows from about 9,300 px to 16,700 px and the profile results
+      start 8,400 px down, because the quick result gallery sits above them; the search text
+      field is empty afterwards. Decided 2026-11-13: the result of a quick search or "Find
+      similar" opens in the results view as its own entry next to the profiles (replacing the
+      previous quick result, without marks, as today), and the text stays in the field.
+      Affected: `app.py` (its modules after A46), user guide; `results/quick/` unchanged.
+      Builds on F28. Size M. Roadmap P34.
+      Done (2026-11-14): the selector "Results of" lists the profiles of the last search and, last,
+      the last quick result (`quick_entry_label`: `Quick search: "<text>"`, `Find similar: <file>
+      (<part>)` or `Last quick search`); a result that finishes in the session is selected at
+      once (`results_choice`, session key `quick_seen`). The expander above the profile results is
+      gone; `show_results` is the one fragment, `show_profile_results`/`show_quick_results` plain
+      functions. The quick text stays in its field (`keep_value`/`restore_value`, also for "Hide
+      photos marked as no match"). Tests: `test_quick.py`, `test_app_state.py`; full suite 1634
+      passed, 2 skipped; Streamlit AppTest page run with sample result files without exceptions.
+      Not verified: a real quick search or "Find similar" with the engine, the look in a real
+      browser. No schema, CLI, cache, `settings.json` or `results/quick/` change; new session keys
+      `quick_seen`, `quick_query__kept`, `hide_rejected__kept`. Follow-up: F38.
