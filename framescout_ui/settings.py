@@ -1,4 +1,4 @@
-"""The settings: settings.json synchronized with the widgets, and the tab "AI settings" (A8, A26, A46)."""
+"""The settings: settings.json synchronized with the widgets, and the AI settings in the tab "Settings" (A8, A46)."""
 import os
 import platform
 import time
@@ -153,7 +153,7 @@ def sync_settings():
 
 
 def show_ai_settings(settings, seen, shown, active):
-    """The tab "AI settings"; returns (system_info() or None, model_problem of the chosen model or None)."""
+    """The AI settings of the tab "Settings"; returns (system_info() or None, model_problem of the chosen model or None)."""
     st.subheader('AI processing')
     # imports torch: here rather than at the top, so the profile tab is drawn first (review)
     try:
