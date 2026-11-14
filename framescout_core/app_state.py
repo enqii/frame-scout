@@ -73,6 +73,21 @@ def state_line(active, status, photos, cleanup=False):
     return f'Idle · {last} · {count}'
 
 
+def results_running_text(active, status, cleanup=False):
+    """Return the note of the tab "Results" while a search or an analysis runs, or None (F28 review).
+
+    "Find similar" starts from that tab, and its result (as a search's) appears only when the
+    run is done; the note says so and where to follow it. A cleanup holding the run lock
+    (cleanup) is no run.
+    """
+    if not active or cleanup:
+        return None
+    pointer = f'progress and Stop in the tab "{RUN_TAB}"'
+    if analysis_only(status):
+        return f'An analysis is running ({pointer}). It changes none of the results here.'
+    return f'A search is running ({pointer}). Its results appear here when it is done.'
+
+
 def start_needs(profiles, photos, folders_listed, model_label, model_missing):
     """Return what a search needs as (need, met, text) for profiles, photos and the search model (F27).
 

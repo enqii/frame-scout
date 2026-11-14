@@ -18,8 +18,9 @@ FRAMESCOUT_PACKAGES = True
 from framescout_core import (APP_TABS, CACHE_FILE, EXAMPLE_PROFILES_FILE, MODELS, QUICK_DIR, QUICK_QUERY_MAX,
                              RESULTS_FILE, RESULTS_TAB, cleanup_running, count_text, create_from_example, distinct_folders,
                              engine_command, finishing_minutes, gallery_thumbnails, join_scans, known_throughput,
-                             quick_scope_text, read_profiles_versioned, remembered_scans, skipped_lines,
-                             start_blocked_text, start_needs, start_needs_line, start_summary, windows_path)
+                             quick_scope_text, read_profiles_versioned, remembered_scans, results_running_text,
+                             skipped_lines, start_blocked_text, start_needs, start_needs_line, start_summary,
+                             windows_path)
 from framescout_ui.cleanup import cleanup_signature, show_cache_check, show_cleanup
 from framescout_ui.common import (BASE, EXAMPLE_PROFILES, PROFILES, QUICK_JSON, RESULTS, clean_project_folder,
                                   decoders, file_key, open_results_folder, plain, supported)
@@ -311,7 +312,11 @@ with search_tab:
             st.warning('Type a search text first.')
 
 with results_tab:
-    # F28: the results on their own, without the start and status area
+    # F28: the results on their own, without the start and status area; while a run is
+    # active, e.g. one "Find similar" started here, the tab says so (review)
+    running_note = results_running_text(active, run_status, cleaning)
+    if running_note:
+        st.info(running_note)
     if st.session_state.get('like_notice'):
         st.warning(st.session_state.pop('like_notice'))  # a "Find similar" that could not start
     quick_results, quick_error = load_results(QUICK_JSON)

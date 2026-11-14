@@ -2,8 +2,8 @@
 import ast
 
 from app_source import app_files, page_tree
-from framescout_core import (APP_TABS, NOTHING_NEW, RESULTS_TAB, RUN_TAB, START_NEEDS_TAB, start_blocked_text,
-                             start_needs, start_needs_line, state_line)
+from framescout_core import (APP_TABS, NOTHING_NEW, RESULTS_TAB, RUN_TAB, START_NEEDS_TAB, results_running_text,
+                             start_blocked_text, start_needs, start_needs_line, state_line)
 
 POINTER = 'progress and Stop in the tab "Search"'
 
@@ -75,6 +75,19 @@ def test_the_note_of_a_start_that_failed_is_shown_in_the_tab_of_its_button():
     blocks = tab_blocks()
     for key, tab in (('run_notice', 'Search'), ('analyze_notice', 'Search'), ('like_notice', 'Results')):
         assert only_in(blocks, tab, f"st.warning(st.session_state.pop('{key}'))"), key
+
+
+def test_the_results_tab_says_that_a_run_is_running():
+    # review: "Find similar" starts from the tab "Results", whose results change only when the
+    # run is done; the tab says so and where its progress and Stop are
+    assert results_running_text(False, {'phase': 'finished'}) is None
+    assert results_running_text(True, None, cleanup=True) is None  # a cleanup is no run
+    assert results_running_text(True, {'phase': 'analyzing'}) == (
+        f'A search is running ({POINTER}). Its results appear here when it is done.')
+    assert results_running_text(True, None) == results_running_text(True, {'phase': 'loading'})
+    assert results_running_text(True, {'phase': 'analyzing', 'analyze_only': True}) == (
+        f'An analysis is running ({POINTER}). It changes none of the results here.')
+    assert only_in(tab_blocks(), 'Results', 'results_running_text(active, run_status, cleaning)')
 
 
 def test_no_text_of_the_app_names_a_tab_that_no_longer_exists():

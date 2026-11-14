@@ -55,7 +55,7 @@ from .pipeline import (progress_line, progress_due, DRAFT_REDUCING_GAP, DRAFT_DE
 from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINAL_PHASES, NOTHING_NEW, LOADING_DETECTOR,
     ALL_ANALYZED, NONE_ANALYZED, StatusReporter, write_status, stopped_status, started_in_time, final_status, read_status,
     run_active, status_fraction, status_text, analysis_only, nothing_new_message, run_name, analysis_result_text)
-from .app_state import START_NEEDS_TAB, RUN_TAB, RESULTS_TAB, APP_TABS, state_line, start_needs, start_needs_line, start_blocked_text
+from .app_state import START_NEEDS_TAB, RUN_TAB, RESULTS_TAB, APP_TABS, state_line, results_running_text, start_needs, start_needs_line, start_blocked_text
 from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
     DEFAULT_REFERENCE_WEIGHT, AI_SETTINGS, SETTINGS_LOCK_TIMEOUT, LEGACY_PHOTO_FOLDER, default_settings, folder_lines,
     read_settings, save_settings, reconcile_settings, changed_from_defaults, setting_text, engine_command)
