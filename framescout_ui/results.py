@@ -8,9 +8,8 @@ from framescout_core import (GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS, Q
                              progress_text, query_caption, query_summary, quick_entry_label, quick_folders_differ,
                              quick_note, quick_result_id, read_results, results_choice, results_model, review_progress)
 
-from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file_key, keep_value, open_gallery,
-                     open_photo, open_quick_folder, open_quick_gallery, open_results_folder, plain, restore_value,
-                     show_photo, widget_id)
+from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file_key, open_gallery, open_photo,
+                     open_quick_folder, open_quick_gallery, open_results_folder, plain, show_photo, widget_id)
 
 from .marks import MARK_LABELS, load_marks, marks_backup_offer, restore_marks_backup, set_mark
 from .copy_export import show_copy, show_export
@@ -188,10 +187,9 @@ def show_profile_results(results, name, photo_folders, model, find_disabled):
         st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
     marks = all_marks.get(name, {})
     can_mark = marks_error is None and states[name] != 'missing'
-    # kept while the quick result is shown instead, which does not draw the box (F34)
-    restore_value('hide_rejected')
-    hide = st.checkbox('Hide photos marked as no match', key='hide_rejected', on_change=keep_value,
-                       args=('hide_rejected',),
+    # persist_state: kept while another entry of the selector is shown, which does not draw
+    # the box (F34)
+    hide = st.checkbox('Hide photos marked as no match', key='hide_rejected', persist_state='page',
                        help='Hides them on the page shown; every page keeps its photos, so the ranks of a page '
                             'stay the same.')
     pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
@@ -216,7 +214,8 @@ def show_profile_results(results, name, photo_folders, model, find_disabled):
     # (A24): filtering first pulled the photos of the following pages up into this one
     page = 1
     if pages > 1:
-        page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key)
+        # persist_state: kept while another entry of the selector is shown (F38)
+        page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key, persist_state='page')
     shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
     if hidden:
         st.caption(hidden_text(hidden, len(shown), page < pages))
@@ -313,7 +312,8 @@ def show_quick_results(results, folders, model, find_disabled):
     if pages > 1:
         if st.session_state.get('quick_page', 1) not in range(1, pages + 1):
             st.session_state.pop('quick_page', None)  # a page of a longer list of an earlier quick search
-        page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key='quick_page')
+        page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key='quick_page',
+                            persist_state='page')  # kept while a profile is shown (F34)
     shown = page_cards(entry['cards'], page, GALLERY_PAGE_SIZE)
     # a new container for every page and card count, as in show_results
     with st.container(key=f'quick_gallery_{page}_{len(shown)}'):

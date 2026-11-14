@@ -297,8 +297,10 @@ with search_tab:
                f'"{RESULTS_TAB}", as an entry next to your search profiles; "Find similar" on a result card searches the same way by the image similarity with '
                'that photo, and its result appears there too.')
     # F34: the text stays in the field; Streamlit emptied it in the run after the click, in
-    # which the field is disabled while the search runs
-    restore_value('quick_query')
+    # which the field is disabled while the search runs. Only then: a value put into the key
+    # resets the field in the browser, which would drop a text typed but not searched for yet
+    if active:
+        restore_value('quick_query')
     with st.form('quick_search', border=False):
         c1, c2 = st.columns([4, 1], vertical_alignment='bottom')
         c1.text_input('Search text (in English)', key='quick_query', max_chars=QUICK_QUERY_MAX, disabled=active,
