@@ -420,9 +420,18 @@ def test_the_app_starts_both_searches_through_engine_command():
              and getattr(node.func, 'id', None) == 'start_engine']
     # and "Analyze photos now" (F18), whose note goes next to its button, as the note of
     # "Find similar" goes to the results tab (F28)
-    assert sorted(k.arg for call in calls for k in call.keywords) == [
-        'analyze_only', 'like', 'like_part', 'notice', 'notice', 'profiles', 'quick_query']
-    assert "start_engine(notice='analyze_notice', analyze_only=True)" in [ast.unparse(call) for call in calls]
+    # (review: per call, so that no two notice keys can be swapped unnoticed)
+    [start_engine] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+                      and node.name == 'start_engine']
+    assert [ast.unparse(arg) for arg in start_engine.args.defaults] == ["'run_notice'"]
+    notices = {}
+    for call in calls:
+        keywords = {k.arg: k.value for k in call.keywords}
+        notice = keywords.pop('notice', None)
+        notices[tuple(sorted(keywords))] = ast.literal_eval(notice) if notice else 'run_notice'
+    assert len(notices) == len(calls)
+    assert notices == {('profiles',): 'run_notice', ('quick_query',): 'run_notice',
+                       ('like', 'like_part'): 'like_notice', ('analyze_only',): 'analyze_notice'}
     assert [node for node in ast.walk(tree) if isinstance(node, ast.Call)
             and getattr(node.func, 'id', None) == 'engine_command']
     # no second, hand-built command line
