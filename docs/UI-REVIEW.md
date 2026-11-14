@@ -11,6 +11,14 @@ Basis: reading the code (`app.py` at about 2,000 lines, the gallery export in
 browser. Judgements about "feels crowded" are therefore estimates from the element count and
 order; a quick screenshot pass should come with the first rebuild PR.
 
+**Status (2026-11-14):** a record of the interface at the time of the review, not kept
+current. Since then F27 (state line, start checklist) and F28 (five tabs: Search profiles,
+Photo source, Settings, Search, Results; "Analyze ahead" in Search, "Clean up storage" in
+Settings) are implemented, so the four tabs, the tab names "AI settings" and "Search &
+results" and the open F28 decision below describe the old layout. The current interface is
+described in `docs/USER-GUIDE.md`; the state of each follow-up is in `docs/BACKLOG.md` and
+`docs/BACKLOG-DONE.md`.
+
 ## Constraints for every follow-up
 
 - Keep the `setting_<name>` session keys and the rule that widgets get values only through
