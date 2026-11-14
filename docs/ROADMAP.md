@@ -38,8 +38,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] (B) Group the AI settings (F32) (2026-11-14)
 
 ### P34 – Quick search in the results view (added 2026-11-13)
-- [ ] The result of a quick search or "Find similar" is an entry of the results selector
-      (F34)
+- [x] The result of a quick search or "Find similar" is an entry of the results selector
+      (F34) (2026-11-14)
 
 ### P35 – Result card (added 2026-11-13)
 - [ ] One card for both views: equal cells, "Match"/"No" as the main buttons, the other

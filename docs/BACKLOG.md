@@ -585,14 +585,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `framescout_engine.py`, user guide. F24 review §5. Size S–M.
       Triage 2026-11-13: not decided; assess again after F30, because in the browser pass the
       gallery (seven equal columns over the full width) was easier to scan than the app.
-- [ ] `ready` **F34 – The quick search result is an entry of the results selector:** after one
-      quick search the page grows from about 9,300 px to 16,700 px and the profile results
-      start 8,400 px down, because the quick result gallery sits above them; the search text
-      field is empty afterwards. Decided 2026-11-13: the result of a quick search or "Find
-      similar" opens in the results view as its own entry next to the profiles (replacing the
-      previous quick result, without marks, as today), and the text stays in the field.
-      Affected: `app.py` (its modules after A46), user guide; `results/quick/` unchanged.
-      Builds on F28. Size M. Roadmap P34.
 - [ ] `parked` **F35 – Thumbnail size as a setting:** F30 fixes the cell size at about 250 px.
       A setting (e.g. small, medium, large) would let the user trade overview for detail.
       Parked 2026-11-13 by the user: a feature for later. Affected: `app.py`, `settings.json`
@@ -612,3 +604,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `start_needs`/`start_blocked_text` of `framescout_core/app_state.py` without the
       profile need. Affected: `app.py`, `framescout_core/app_state.py`, user guide. Found in
       the PR #108 review. Size S.
+- [ ] `minor` **F38 – Keep the page of a profile gallery when another results entry is shown:**
+      the page box of a profile gallery (`results_page_<name>`) is not kept when another entry
+      (another profile or the quick result) is shown, so returning to a profile shows page 1
+      again. Sketch: `keep_value`/`restore_value` (F34). Found in the review of F34. Size S.
