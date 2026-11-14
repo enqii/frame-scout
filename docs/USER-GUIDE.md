@@ -203,21 +203,22 @@ The tab holds the AI settings and, below them, "Storage" with [Clean up storage]
   slows the search and how much it helps has not been measured yet. The command line option
   is `--low-priority`.
 - **Person detection and reference images:** an expander below the everyday settings
-  (search model, device, batch size, priority, maximum matches). It is open while one of its
-  settings differs from its default and closed otherwise. It holds:
+  (search model, device, batch size, priority, maximum matches). It opens by itself when one
+  of its settings differs from its default, and it does not close by itself while you edit.
+  It holds:
   - **Person detection:** finds people with YOLO11n and compares each person separately,
     which helps with group photos. Turn it off for other motifs: JPEGs are then decoded
-    at a reduced resolution, which is noticeably faster. The maximum number of persons and
-    the minimum confidence are disabled while it is off (a caption says so); their values
-    are kept and used again when you turn it on.
-  - **Maximum persons** and **minimum confidence** of the detection.
+    at a reduced resolution, which is noticeably faster. Below it are the **maximum
+    persons** per photo and the **minimum confidence** of the detection; they are disabled
+    while it is off (a caption says so), and their values are kept and used again when you
+    turn it on.
   - **Weight of the reference images:** see [What the numbers mean](#what-the-numbers-mean).
-- **Check installation:** an expander in this tab that runs the check of
-  [Checking the installation](#checking-the-installation) and shows each result.
 - **Defaults:** the help text of each setting ends with its default, and a line below the
   settings lists the ones you changed. "Reset to defaults" (disabled while a search runs)
   sets all settings of this tab, the search model included, back to their defaults. Your
   photo folders are not reset.
+- **Check installation:** an expander below the AI settings that runs the check of
+  [Checking the installation](#checking-the-installation) and shows each result.
 
 Photo folders and AI settings are saved in `settings.json` as soon as you change them and
 apply in every tab. Only values that differ from the defaults are stored; delete the file
