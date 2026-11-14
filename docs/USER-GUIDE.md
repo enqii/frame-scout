@@ -293,7 +293,8 @@ similar"" (title "Similar to <file>"). The scores are relative to the photos com
 shots of a burst may take the top places. If the photo is not analyzed with the current
 settings (or changed since), the search stops with a message; start a search with profiles
 over its folder first. The button is disabled while a search runs; if it cannot start, the note appears in the
-"Results" tab. The HTML galleries have
+"Results" tab. While it (or any search or analysis) runs, the "Results" tab says so and names the tab
+"Search" with its progress and Stop; the result appears when it is done. The HTML galleries have
 no button.
 
 **Results** shows the last finished search per profile: thumbnails, best first, 48 per
