@@ -6,8 +6,6 @@ START_NEEDS_TAB = {'profiles': 'Search profiles', 'photos': 'Photo source', 'mod
 # the tab with a run's progress, its log and the Stop button
 RUN_TAB = 'Search & results'
 
-_LAST_RUN = {'finished': 'finished', 'interrupted': 'interrupted', 'failed': 'failed'}
-
 
 def _plural(count, one, many):
     return f"{count:,} {one if count == 1 else many}"
@@ -28,7 +26,11 @@ def _short_phase(status):
 
 
 def _status_time(status):
-    """The time the status was written as "YYYY-MM-DD HH:MM", or None."""
+    """The time the status was written as "YYYY-MM-DD HH:MM", or None.
+
+    The local time of the engine that wrote it on this computer, shown as written (without
+    its UTC offset), as show_status shows it in the search tab (review).
+    """
     updated = status.get('updated')
     if not isinstance(updated, str) or len(updated) < 16:
         return None
@@ -57,7 +59,8 @@ def state_line(active, status, photos, cleanup=False):
         last = 'no search yet'
     else:
         name = 'analysis' if analysis_only(status) else 'search'
-        last = f"last {name} {_LAST_RUN.get(status.get('phase'), 'ended without finishing')}"
+        phase = status.get('phase')
+        last = f"last {name} {phase if phase in FINAL_PHASES else 'ended without finishing'}"
         when = _status_time(status)
         if when:
             last += f' {when}'
