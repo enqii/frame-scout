@@ -63,9 +63,8 @@ def test_each_tab_holds_its_own_jobs():
     # start, "Analyze ahead", progress and Stop in one place
     for text in ("'▶ Start search'", "'■ Stop search'", "'Analyze photos now'", 'show_status(', "'quick_search'"):
         assert only_in(blocks, 'Search', text), text
-    # the results on their own
-    for call in ('show_results(', 'show_quick_results('):
-        assert only_in(blocks, 'Results', call), call
+    # the results on their own; the quick result is an entry of their selector (F34)
+    assert only_in(blocks, 'Results', 'show_results(')
 
 
 def test_the_note_of_a_start_that_failed_is_shown_in_the_tab_of_its_button():

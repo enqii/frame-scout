@@ -10,8 +10,8 @@ from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_Q
                              engine_command, generic_prompts, like_crop, like_labels_fit, like_profile, like_scan_path,
                              quick_folders_differ,
                              quick_note,
-                             quick_photos, quick_profile, quick_scope, quick_scope_text, read_results,
-                             results_document,
+                             quick_entry_label, quick_photos, quick_profile, quick_scope, quick_scope_text,
+                             read_results, results_choice, results_document,
                              publish_export, result_card, scan_cleanup)
 
 from app_source import app_tree, page_tree
@@ -471,7 +471,7 @@ def test_every_result_card_of_the_app_offers_find_similar():
     # card's photo and the part it names, and the page run (not the fragment) starts it
     tree = app_tree()
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
-    for name in ('show_results', 'show_quick_results'):
+    for name in ('show_profile_results', 'show_quick_results'):
         assert 'find_similar_button' in [getattr(call.func, 'id', None) for call in ast.walk(functions[name])
                                          if isinstance(call, ast.Call)]
     button = ast.unparse(functions['find_similar_button'])
@@ -517,3 +517,86 @@ def test_the_app_shows_the_quick_search_from_its_own_folder():
     # no marks, copying or export: those belong to the profiles (marks.json)
     for name in ('load_marks', 'set_mark', 'show_copy', 'show_export', 'THUMBS /'):
         assert name not in source.replace('QUICK_THUMBS /', '')
+
+
+def quick_results(name='red car', quick=None, finished='2026-11-14T10:00:00'):
+    return {'finished': finished, 'photo_folders': [], 'settings': {},
+            'profiles': [{'name': name, 'cards': []}] if name is not None else [],
+            **({'quick': quick} if quick is not None else {})}
+
+
+def test_quick_entry_label_names_the_text_or_the_photo_of_find_similar():
+    # F34: the last quick search is an entry of the results selector next to the profiles
+    assert quick_entry_label(quick_results()) == 'Quick search: "red car"'
+    like = {'like': str(Path('photos') / 'a.jpg'), 'part': 'Person 1'}
+    assert quick_entry_label(quick_results('Similar to a.jpg (Person 1)', like)) == 'Find similar: a.jpg (Person 1)'
+    assert quick_entry_label(quick_results('Similar to a.jpg', {'like': 'a.jpg'})) == 'Find similar: a.jpg'
+    # a file without a gallery or with a damaged "quick" part still gets an entry
+    assert quick_entry_label(quick_results(None)) == 'Last quick search'
+    assert quick_entry_label(quick_results('dog', {'like': 3, 'part': None})) == 'Quick search: "dog"'
+
+
+def test_quick_entry_label_differs_from_every_profile_name():
+    # the selector tells its entries by their labels: a profile of that name must not hide it
+    label = 'Quick search: "red car"'
+    assert quick_entry_label(quick_results(), ['Cars', label]) == label + ' (last quick result)'
+    taken = [label, label + ' (last quick result)']
+    assert quick_entry_label(quick_results(), taken) not in taken
+
+
+def test_results_choice_keeps_the_entry_shown_and_opens_a_new_quick_result():
+    options = ['Cars', 'Dogs', 'Quick search: "red car"']
+    assert results_choice(options, 'Dogs') == 'Dogs'
+    assert results_choice(options, 'Deleted profile') is None  # the selector shows its first entry
+    assert results_choice(options, None) is None
+    # a quick search or "Find similar" that finished since the last page run is shown at once
+    assert results_choice(options, 'Dogs', quick_option=options[2], quick_new=True) == options[2]
+    assert results_choice(options, 'Dogs', quick_option=options[2]) == 'Dogs'
+    assert results_choice(['Cars'], 'Cars', quick_option=None, quick_new=True) == 'Cars'
+
+
+def test_the_results_selector_holds_the_profiles_and_the_last_quick_result():
+    # F34: one selector instead of the quick result's gallery above the profile results
+    tree = app_tree()
+    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+    selector = ast.unparse(functions['show_results'])
+    assert 'quick_entry_label(quick, names)' in selector
+    assert 'results_choice(' in selector
+    assert "st.selectbox('Results of', options, key='results_profile')" in selector
+    assert 'show_quick_results(' in selector and 'show_profile_results(' in selector
+    # one fragment around both views; the views themselves are no fragments of their own
+    decorated = {name for name, node in functions.items()
+                 if any(ast.unparse(d) == 'st.fragment' for d in node.decorator_list)}
+    assert 'show_results' in decorated
+    assert not {'show_quick_results', 'show_profile_results'} & decorated
+    # the page draws no quick gallery of its own above the profile results any more
+    [results_tab] = [node for node in page_tree().body if isinstance(node, ast.With)
+                     and ast.unparse(node.items[0].context_expr) == 'results_tab']
+    area = ast.unparse(results_tab)
+    assert 'show_quick_results(' not in area and 'st.expander' not in area
+    assert 'show_results(last_results, quick_results,' in area
+
+
+def test_the_quick_search_text_stays_in_its_field():
+    # F34: the field is disabled while the search runs, which emptied it; the text submitted
+    # is kept and put back before the field is drawn
+    page = page_tree()
+    [area] = [node for node in page.body if isinstance(node, ast.With)
+              and ast.unparse(node.items[0].context_expr) == 'search_tab']
+    source = ast.unparse(area)
+    assert "on_click=keep_value, args=('quick_query',)" in source
+    restore = "restore_value('quick_query')"
+    assert restore in source
+    assert source.index(restore) < source.index("key='quick_query'")
+
+
+def test_kept_widget_values_have_a_session_key_of_their_own():
+    # keep_value copies the value on the widget's change, restore_value puts it back before
+    # the widget is drawn: also "Hide photos marked as no match", not drawn while the quick
+    # result is shown (F34)
+    functions = {node.name: ast.unparse(node) for node in app_tree().body if isinstance(node, ast.FunctionDef)}
+    assert 'st.session_state[kept_key(key)] = st.session_state.get(key)' in functions['keep_value']
+    assert 'st.session_state[key] = st.session_state[kept_key(key)]' in functions['restore_value']
+    profile = functions['show_profile_results']
+    assert "on_change=keep_value, args=('hide_rejected',)" in profile
+    assert profile.index("restore_value('hide_rejected')") < profile.index("key='hide_rejected'")

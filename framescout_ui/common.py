@@ -178,6 +178,27 @@ def widget_id(*parts):
     return hashlib.sha256('\0'.join(parts).encode('utf-8')).hexdigest()[:16]
 
 
+def kept_key(key):
+    """The session key that keeps the value of the widget with key (keep_value, restore_value)."""
+    return key + '__kept'
+
+
+def keep_value(key):
+    """on_change (or on_click of a form's submit button) of a widget whose value must outlive it (F34).
+
+    Streamlit drops a widget's value in a page run that does not draw it (e.g. a view not
+    shown) and empties a field that is disabled in the run after its form was submitted, so
+    the value is copied to a session key of its own, which restore_value puts back.
+    """
+    st.session_state[kept_key(key)] = st.session_state.get(key)
+
+
+def restore_value(key):
+    """Put the value keep_value kept back into the widget with key; called before the widget is drawn."""
+    if kept_key(key) in st.session_state:
+        st.session_state[key] = st.session_state[kept_key(key)]
+
+
 def version_key(path):
     """(path, mtime_ns, size, file id) of path: the cache key of the files saved by replacing them.
 
