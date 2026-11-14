@@ -555,14 +555,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `Start-FrameScout.bat` starts a second app of the same folder on the next free port. The app
       could take the lock itself (e.g. via `st.cache_resource`). Affected: `app.py`,
       `framescout_core/app_instance.py`, `docs/ARCHITECTURE.md`. Found in F22. Size S.
-- [ ] `ready` **F28 – Five tabs instead of "Search & results":** the tab holds start/stop,
-      status, quick search and its gallery, the profile results, copy, export and storage
-      maintenance. Decided 2026-11-13: five tabs (Search profiles, Photo source, Settings,
-      Search, Results); "Clean up storage" and the cache check move to Settings; "Analyze
-      ahead" moves from Photo source to the Search tab, next to Start, so that start, progress
-      and Stop are in one place. Affected: `app.py` (its modules after A46), user guide. Risks:
-      widget keys and fragments must keep working; `setting_<name>` keys unchanged.
-      `docs/UI-REVIEW.md` §1. Size M. Roadmap P33 (A).
 - [ ] `ready` **F29 – One-row results toolbar and a pager below the grid:** the first photo
       starts 520 px below the "Results" heading (profile selector, captions, info boxes,
       buttons, a checkbox, a pager); copy and export are below the 48 cards; no pager below the

@@ -2116,3 +2116,21 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       in "AI settings"); the counts are read with `run_status._count`, as `status_fraction`
       reads them; full suite 1615 passed, 2 skipped. Deferred: the reasons of the other
       disabled buttons (F37); the look at narrow widths goes to the browser pass A52.)
+- [x] `ready` **F28 – Five tabs instead of "Search & results":** the tab holds start/stop,
+      status, quick search and its gallery, the profile results, copy, export and storage
+      maintenance. Decided 2026-11-13: five tabs (Search profiles, Photo source, Settings,
+      Search, Results); "Clean up storage" and the cache check move to Settings; "Analyze
+      ahead" moves from Photo source to the Search tab, next to Start, so that start, progress
+      and Stop are in one place. Affected: `app.py` (its modules after A46), user guide. Risks:
+      widget keys and fragments must keep working; `setting_<name>` keys unchanged.
+      `docs/UI-REVIEW.md` §1. Size M. Roadmap P33 (A).
+      Done (2026-11-14): five tabs, labels from `framescout_core.APP_TABS` (new `RESULTS_TAB`;
+      `START_NEEDS_TAB['model']` is "Settings", `RUN_TAB` is "Search"). Settings: the AI settings,
+      then "Storage" with "Clean up storage" (cleanup and cache check). Search: Start/Stop, needs
+      line, summary, "Analyze ahead" (inline, no `analyze_area` container), status and log, quick
+      search. Results: the quick result expander, then "Results of the last search". A "Find
+      similar" that cannot start is reported in Results via `like_notice` (was `run_notice`).
+      Tests: `test_app_state.py`, `test_quick.py`; full suite 1618 passed, 2 skipped; Streamlit
+      AppTest page run without exceptions. Not verified: the look in a real browser and a real
+      run across the tabs. No schema, CLI, cache or widget key change. Note for F34: a quick
+      search is typed in "Search" and shown in "Results" (one tab switch).)
