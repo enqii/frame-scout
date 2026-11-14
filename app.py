@@ -23,9 +23,10 @@ from framescout_core import (APP_TABS, CACHE_FILE, EXAMPLE_PROFILES_FILE, MODELS
                              windows_path)
 from framescout_ui.cleanup import cleanup_signature, show_cache_check, show_cleanup
 from framescout_ui.common import (BASE, EXAMPLE_PROFILES, PROFILES, QUICK_JSON, RESULTS, clean_project_folder,
-                                  decoders, file_key, open_results_folder, plain, supported)
+                                  decoders, file_key, keep_value, open_results_folder, plain, restore_value,
+                                  supported)
 from framescout_ui.profiles import show_profiles
-from framescout_ui.results import load_results, show_quick_results, show_results
+from framescout_ui.results import load_results, show_results
 from framescout_ui.run import (cached_analyzed_photos, low_space_warning, run_state, show_state_line, show_status,
                                start_run, stop_run)
 from framescout_ui.settings import setting_key, show_ai_settings, sync_settings
@@ -293,13 +294,17 @@ with search_tab:
                'current AI settings are searched; nothing new is analyzed, so it is fast. Its result replaces the '
                f'previous quick search (folder {QUICK_DIR} in the results folder); the results and marks of your '
                f'search profiles stay as they are. Search texts are in English. Its result appears in the tab '
-               f'"{RESULTS_TAB}"; "Find similar" on a result card searches the same way by the image similarity with '
+               f'"{RESULTS_TAB}", as an entry next to your search profiles; "Find similar" on a result card searches the same way by the image similarity with '
                'that photo, and its result appears there too.')
+    # F34: the text stays in the field; Streamlit emptied it in the run after the click, in
+    # which the field is disabled while the search runs
+    restore_value('quick_query')
     with st.form('quick_search', border=False):
         c1, c2 = st.columns([4, 1], vertical_alignment='bottom')
         c1.text_input('Search text (in English)', key='quick_query', max_chars=QUICK_QUERY_MAX, disabled=active,
                       placeholder='e.g. a red car in the snow')
-        quick_start = c2.form_submit_button('Quick search', width='stretch',
+        quick_start = c2.form_submit_button('Quick search', width='stretch', on_click=keep_value,
+                                            args=('quick_query',),
                                             disabled=active or not folder_scans or bool(model_missing)
                                             or (quick_counts is not None and not (quick_counts[0] or quick_counts[2])))
     if quick_counts is not None:
@@ -319,38 +324,38 @@ with results_tab:
         st.info(running_note)
     if st.session_state.get('like_notice'):
         st.warning(st.session_state.pop('like_notice'))  # a "Find similar" that could not start
+    st.subheader('Results')
+    # the galleries of the last complete search, as the engine wrote them (A12), and the last
+    # quick search or "Find similar" as an entry of the same selector (F34)
+    last_results, results_error = load_results()
+    if results_error:
+        st.warning(f'{RESULTS_FILE} cannot be read, so the results of the last search are not shown here. Starting '
+                   f'the search again writes it anew.\n\nDetails: {plain(str(results_error))}')
     quick_results, quick_error = load_results(QUICK_JSON)
     if quick_error:
         st.warning(f'The result file of the last quick search ({QUICK_DIR}/{RESULTS_FILE}) cannot be read, so its '
                    f'results are not shown here. The next quick search writes it anew.\n\n'
                    f'Details: {plain(str(quick_error))}')
-    if quick_results:
-        with st.expander('Results of the last quick search or "Find similar"', expanded=True):
-            show_quick_results(quick_results, search_folders, settings['model'], active or not folder_scans)
-        st.divider()
-    st.subheader('Results of the last search')
-    # the galleries of the last complete search, as the engine wrote them (A12)
-    last_results, results_error = load_results()
-    if results_error:
-        st.warning(f'{RESULTS_FILE} cannot be read, so the results of the last search are not shown here. Starting '
-                   f'the search again writes it anew.\n\nDetails: {plain(str(results_error))}')
-    if last_results:
+    if last_results or quick_results:
         # a copy target must not be in a photo folder of this search or of the next one (A17, A25)
-        show_results(last_results, [*last_results['photo_folders'], *map(str, photo_folders)], settings['model'],
-                     active or not folder_scans)
-    elif RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
-        # galleries of a search before results.json: listed by file name, since the
-        # current profile list may no longer match them (A12)
-        st.caption('These galleries come from a search by an earlier FrameScout version. Start the search again '
-                   'to see its results here.')
-        for page in old_pages:
-            st.download_button(f'Download {page.name}', page.read_bytes(), file_name=page.name, mime='text/html',
-                               key=f'dl_{page.name}')
-            st.caption(f'Open the local gallery: {plain(str(page))}')
-        st.button('Open results folder', on_click=open_results_folder)
-        if st.session_state.get('gallery_notice'):
-            st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
-    else:
-        st.caption('After the first search run, its results appear here.')
+        show_results(last_results, quick_results,
+                     [*(last_results['photo_folders'] if last_results else []), *map(str, photo_folders)],
+                     search_folders, settings['model'], active or not folder_scans)
+    if not last_results:
+        if RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
+            # galleries of a search before results.json: listed by file name, since the
+            # current profile list may no longer match them (A12)
+            st.caption('These galleries come from a search by an earlier FrameScout version. Start the search again '
+                       'to see its results here.')
+            for page in old_pages:
+                st.download_button(f'Download {page.name}', page.read_bytes(), file_name=page.name, mime='text/html',
+                                   key=f'dl_{page.name}')
+                st.caption(f'Open the local gallery: {plain(str(page))}')
+            st.button('Open results folder', on_click=open_results_folder)
+            if st.session_state.get('gallery_notice'):
+                st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
+        else:
+            st.caption('After the first search with your search profiles, its results appear here'
+                       + (' too.' if quick_results else '.'))
     st.caption('The HTML galleries in the results folder link to the local thumbnails and original photos; keep '
                'the results folder together for the complete gallery.')

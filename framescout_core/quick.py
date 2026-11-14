@@ -225,3 +225,37 @@ def quick_note(searched, not_analyzed, like=False):
              if not_analyzed else '.')
     return text + (' The scores are scaled over the photos searched, so they differ from those of a search with '
                    'profiles.')
+
+
+def quick_entry_label(results, names=()):
+    """Return the entry of the last quick search or "Find similar" in the app's results selector (F34).
+
+    results: the quick search's result file (read_results); names: the profile names of the
+    selector, from which the label is kept distinct (the selector tells its entries by their
+    labels).
+    """
+    quick = results.get('quick') if isinstance(results.get('quick'), dict) else {}
+    like = quick.get('like') if isinstance(quick.get('like'), str) else None
+    part = quick.get('part') if isinstance(quick.get('part'), str) else None
+    entries = results.get('profiles') or []
+    if like:
+        label = f'Find similar: {Path(like).name}' + (f' ({part})' if part else '')
+    elif entries:
+        label = f'Quick search: "{entries[0]["name"]}"'
+    else:
+        label = 'Last quick search'
+    while label in names:
+        label += ' (last quick result)'
+    return label
+
+
+def results_choice(options, chosen, quick_option=None, quick_new=False):
+    """Return the entry the results selector shows (F34), or None for its first one.
+
+    chosen: the entry shown so far (none, or one no longer offered, gives None);
+    quick_option: the entry of the last quick search, if there is one; quick_new: whether
+    that result finished since the page last showed it, so that it opens at once.
+    """
+    if quick_new and quick_option in options:
+        return quick_option
+    return chosen if chosen in options else None

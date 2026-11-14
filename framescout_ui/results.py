@@ -5,11 +5,12 @@ import streamlit as st
 
 from framescout_core import (GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS, QUICK_DIR, QUICK_GALLERY, hidden_text,
                              hide_no_match, mark_style, page_cards, page_count, profile_fingerprints, profile_state,
-                             progress_text, query_caption, query_summary, quick_folders_differ, quick_note,
-                             read_results, results_model, review_progress)
+                             progress_text, query_caption, query_summary, quick_entry_label, quick_folders_differ,
+                             quick_note, read_results, results_choice, results_model, review_progress)
 
-from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file_key, open_gallery, open_photo,
-                     open_quick_folder, open_quick_gallery, open_results_folder, plain, show_photo, widget_id)
+from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file_key, keep_value, open_gallery,
+                     open_photo, open_quick_folder, open_quick_gallery, open_results_folder, plain, restore_value,
+                     show_photo, widget_id)
 
 from .marks import MARK_LABELS, load_marks, marks_backup_offer, restore_marks_backup, set_mark
 from .copy_export import show_copy, show_export
@@ -73,29 +74,57 @@ def find_similar_button(card, key, disabled):
 
 
 @st.fragment
-def show_results(results, photo_folders, model, find_disabled):
-    """The galleries of the last search as a grid of thumbnails; its buttons rerun only this part (P4).
+def show_results(results, quick, photo_folders, folders, model, find_disabled):
+    """The results of the last search and of the last quick search, one at a time; its buttons rerun only this part.
 
-    With a mark per photo and copying of the matches (A17); photo_folders: the folders a
-    copy target must not be in. model: the search model the AI settings choose now;
+    A selector offers the galleries of the last search (P4) and, as an entry of its own, the
+    last quick search or "Find similar" (F34), which it shows at once when it is new.
+    results, quick: their result files (either may be None); photo_folders: the folders a
+    copy target must not be in (show_profile_results); folders: the photo folders chosen now
+    (show_quick_results); model: the search model the AI settings choose now;
     find_disabled: whether "Find similar" is disabled (find_similar_button).
     """
-    entries = results['profiles']
-    if not entries:
-        st.caption('The last search wrote no galleries.')
+    entries = results['profiles'] if results else []
+    if not entries and not quick:
+        if results:
+            st.caption('The last search wrote no galleries.')
         return
+    names = [e['name'] for e in entries]
+    quick_option = quick_entry_label(quick, names) if quick else None
+    # the options are the plain names: a state note in them would give the widget a new
+    # identity in Streamlit versions that do not use the key as its identity and jump back
+    # to the first profile whenever a profile is edited (review); the notes are shown below
+    options = names + ([quick_option] if quick_option else [])
+    # a quick result this browser session has not seen yet is shown at once; one that was
+    # there at the session's first page run is not (it is the result of an earlier visit)
+    quick_id = (quick.get('finished'), quick_option) if quick else None
+    quick_new = 'quick_seen' in st.session_state and st.session_state.quick_seen != quick_id
+    st.session_state.quick_seen = quick_id
+    chosen = results_choice(options, st.session_state.get('results_profile'), quick_option, quick_new)
+    if chosen is None:
+        st.session_state.pop('results_profile', None)  # e.g. a profile of an earlier search
+    else:
+        st.session_state.results_profile = chosen
+    name = st.selectbox('Results of', options, key='results_profile')
+    if name == quick_option:
+        show_quick_results(quick, folders, model, find_disabled)
+    else:
+        show_profile_results(results, name, photo_folders, model, find_disabled)
+
+
+def show_profile_results(results, name, photo_folders, model, find_disabled):
+    """The gallery of the profile name of the last search as a grid of thumbnails (P4).
+
+    With a mark per photo and copying of the matches (A17); photo_folders: the folders a
+    copy target must not be in; model and find_disabled as in show_results.
+    """
+    entries = results['profiles']
     try:
         fingerprints = cached_fingerprints(*file_key(PROFILES))
     except (OSError, ValueError):
         fingerprints = {}
     states = {e['name']: profile_state(e, fingerprints) for e in entries}
     names = [e['name'] for e in entries]
-    if st.session_state.get('results_profile') not in names:
-        st.session_state.pop('results_profile', None)  # e.g. a profile of an earlier search
-    # the options are the plain names: a state note in them would give the widget a new
-    # identity in Streamlit versions that do not use the key as its identity and jump back
-    # to the first profile whenever a profile is edited (review); the notes are shown below
-    name = st.selectbox('Search profile', names, key='results_profile')
     entry = entries[names.index(name)]
     # the settings of that search, not the app's settings
     run_settings = results.get('settings') if isinstance(results.get('settings'), dict) else {}
@@ -159,7 +188,10 @@ def show_results(results, photo_folders, model, find_disabled):
         st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
     marks = all_marks.get(name, {})
     can_mark = marks_error is None and states[name] != 'missing'
-    hide = st.checkbox('Hide photos marked as no match', key='hide_rejected',
+    # kept while the quick result is shown instead, which does not draw the box (F34)
+    restore_value('hide_rejected')
+    hide = st.checkbox('Hide photos marked as no match', key='hide_rejected', on_change=keep_value,
+                       args=('hide_rejected',),
                        help='Hides them on the page shown; every page keeps its photos, so the ranks of a page '
                             'stay the same.')
     pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
@@ -232,12 +264,11 @@ def show_results(results, photo_folders, model, find_disabled):
     show_export(name, entry, marks, marks_error)
 
 
-@st.fragment
 def show_quick_results(results, folders, model, find_disabled):
     """The gallery of the last quick search (F10) as a grid of thumbnails; no marks, copying or export.
 
     folders: the photo folders chosen now, to tell whether it searched others; model and
-    find_disabled as in show_results. Its buttons rerun only this part, as in show_results.
+    find_disabled as in show_results, whose entry it is (F34).
     """
     entries = results['profiles']
     if not entries:
