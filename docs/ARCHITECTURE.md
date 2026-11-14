@@ -92,7 +92,7 @@ browser sessions): `active`, `folder_scans`, `settings`, `profiles_shown`. The s
 The text below describes the behavior of the whole frontend; function names that it gives are found in the modules above
 (`start_engine` and the page layout stay in `app.py`).
 
-`app.py`: Streamlit frontend. Tabs (F28, `framescout_core.APP_TABS`): Search profiles, Photo source, Settings (the AI settings, then the
+`app.py`: Streamlit frontend. Tabs (F28, `framescout_core.APP_TABS`): Search profiles, Photo source, Settings (the AI settings: the everyday ones first, then the expander "Person detection and reference images" (F32; open while `changed_from_defaults` over `AI_DETAIL_SETTINGS` finds a change; `max_persons` and `person_confidence` are disabled while person detection is off or a run is active, with a caption), then the
 subheader "Storage" with the expander "Clean up storage": cleanup and cache check), Search (Start/Stop, status and log, "Analyze ahead", "Quick search") and
 Results (`RESULTS_TAB`: while a search or an analysis runs, the note `results_running_text`; the quick result expander, then the profile results). F18: the "Search" tab has the section "Analyze ahead" below Start (drawn inline in the run tab's code, which knows the run state; F28 removed the `analyze_area` container from the photo tab): explanation, the current search model and person detection,
 `start_summary(..., analysis_only=True)`, its own low disk space warning (`low_space_warning(..., analysis=True)`: no profile, so
@@ -331,7 +331,7 @@ the module of its area and to the re-exports in `__init__.py`.
   (the cache tables with the `signatures` side table, and which engine version and
   settings a cached row belongs to, E11).
 - `settings.py`:
-  `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`AI_SETTINGS`/`DEVICES`/`LEGACY_PHOTO_FOLDER`/`default_settings`/`folder_lines`/`read_settings`/`save_settings`/`reconcile_settings`/`changed_from_defaults`/`setting_text`
+  `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`AI_SETTINGS`/`AI_DETAIL_SETTINGS`/`PERSON_DETECTION_SETTINGS`/`DEVICES`/`LEGACY_PHOTO_FOLDER`/`default_settings`/`folder_lines`/`read_settings`/`save_settings`/`reconcile_settings`/`changed_from_defaults`/`setting_text`
   (the app's `settings.json`, the ranges of its widgets, the engine's `--device` choices,
   the sync of the widgets with the file, A8, and the settings of the AI tab with the
   "Default: …" texts and the reset, A26).
@@ -2030,7 +2030,7 @@ no folders, a folder gone and back; A27, `test_photos.py`; the app side was run 
 hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the review progress `review_progress`/`progress_text` (F20; the app side was run with `AppTest` only), the closest search text (F17: `best_matches`, `rank_photos(best=)` unchanged ranking, `query_labels` and its order against `text_queries`, `closest_query`, `query_summary`, `read_results` validation in `test_scoring.py`/`test_profiles.py`/`test_results.py`/`test_engine_defaults.py`; the engine on synthetic photos and the app's caption with `AppTest` only), the
 CSS of `mark_style`, its Streamlit pin and its selector names in the installed Streamlit bundle (skipped without Streamlit), `marks_restore_offer`, `remove_marks(unless_profile_of=)`, `test_marks.py`; the cleanup categories `marks_profiles` and `broken_files`, `test_cleanup.py`; `unlisted_paths`, `test_export.py`) and the AI settings reset
 (`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
-`test_settings.py`; A24, A26; the buttons and the mark colors were run with `AppTest`/the
+`test_settings.py`; the grouping of the widgets in `show_ai_settings` by source checks in `test_settings_layout.py` (F32; the expander and the disabled sub-settings were run with `AppTest` only); A24, A26; the buttons and the mark colors were run with `AppTest`/the
 generated style only, not in a browser),
 the thread counts and the priority (`torch_threads`, `lower_priority` with injected calls,
 the failure text, and a child process that really lowers and reads back its priority class:

@@ -35,7 +35,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 ### P33 – Tabs and settings (added 2026-11-13)
 - [x] (A) Five tabs: results on their own, storage maintenance in the settings, "Analyze
       ahead" in the search tab (F28) (2026-11-14)
-- [ ] (B) Group the AI settings (F32)
+- [x] (B) Group the AI settings (F32) (2026-11-14)
 
 ### P34 – Quick search in the results view (added 2026-11-13)
 - [ ] The result of a quick search or "Find similar" is an entry of the results selector

@@ -578,10 +578,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       Affected: `app.py` (its modules after A46), `framescout_core/marks.py` (`mark_style`),
       user guide. Risks: CSS on Streamlit internals, see A49; `marks.json` unchanged.
       `docs/UI-REVIEW.md` §2 and §5. Size M. Roadmap P35.
-- [ ] `ready` **F32 – Group the AI settings:** ten widgets in one list. Sketch: everyday settings
-      first (model, device, batch size, priority, number of results), person detection and
-      reference weight in an expander, the person sub-settings disabled while detection is off.
-      Affected: `app.py`, user guide. Keys `setting_<name>` unchanged. F24 review §3. Size S. Roadmap P33 (B).
 - [ ] `decision` **F33 – HTML gallery parity with the app:** the gallery has a fixed dark theme,
       no marks, no paging and no way back to the navigation. **Options:** (a) light/dark by
       `prefers-color-scheme`, file name first, link to the top; (b) also show marks (baked in at
