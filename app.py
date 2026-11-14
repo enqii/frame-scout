@@ -138,7 +138,7 @@ with f_tab:
     analyze_area = st.container()
 
 with state_area:
-    show_state_line(photo_count)
+    show_state_line(active, photo_count)
 
 with settings_tab:
     info, model_missing = show_ai_settings(settings, seen, shown, active)

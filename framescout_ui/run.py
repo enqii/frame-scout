@@ -199,16 +199,20 @@ def low_space_warning(photos, top, profile_count, model, person_detection, analy
 
 
 @st.fragment(run_every='2s')
-def show_state_line(photos):
+def show_state_line(active, photos):
     """The one-line run state next to the title, on every tab, read again every 2 s (F27).
 
-    photos: the photos counted in the listed folders (None without an existing one), as the
-    page run counted them; show_status reruns the page when a run starts or ends.
+    active: the page run's; photos: the photos counted in the listed folders (None without an
+    existing one), as the page run counted them. When a run starts or ends, the whole page
+    runs again, as in show_status, so the line never says idle while the tabs show a run or
+    the other way round (review).
     """
     # the state of this page run, read once at its top; fragment-only reruns read it again
     fresh = st.session_state.pop('state_line_state', None)
-    active, status = fresh if fresh else run_state()
-    st.caption(plain(state_line(active, status, photos, cleanup=active and cleanup_running(RESULTS))))
+    now_active, status = fresh if fresh else run_state()
+    if now_active != active:
+        st.rerun()  # a search started or ended, also in another tab: update the whole page
+    st.caption(plain(state_line(now_active, status, photos, cleanup=now_active and cleanup_running(RESULTS))))
 
 
 @st.fragment(run_every='2s')
