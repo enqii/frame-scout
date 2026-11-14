@@ -2134,3 +2134,14 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       AppTest page run without exceptions. Not verified: the look in a real browser and a real
       run across the tabs. No schema, CLI, cache or widget key change. Note for F34: a quick
       search is typed in "Search" and shown in "Results" (one tab switch).)
+- [x] `ready` **F32 – Group the AI settings:** ten widgets in one list. Sketch: everyday settings
+      first (model, device, batch size, priority, number of results), person detection and
+      reference weight in an expander, the person sub-settings disabled while detection is off.
+      Affected: `app.py`, user guide. Keys `setting_<name>` unchanged. F24 review §3. Size S. Roadmap P33 (B).
+      Done (2026-11-14): the everyday settings (model, device, batch size, priority, maximum matches) come first;
+      the expander "Person detection and reference images" holds person detection, maximum persons, minimum
+      confidence and the weight of the reference images and is open while one of them differs from its default
+      (`AI_DETAIL_SETTINGS`). Maximum persons and minimum confidence (`PERSON_DETECTION_SETTINGS`) are disabled
+      with a caption while person detection is off. Tests: new `test_settings_layout.py` (source checks); full
+      suite 1626 passed, 2 skipped; Streamlit AppTest: expander drawn, sub-settings disabled after unchecking
+      detection. Not verified: the look in a real browser. No schema, CLI, cache or widget key change.)
