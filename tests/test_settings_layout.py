@@ -5,6 +5,7 @@ from app_source import UI_PACKAGE
 from framescout_core import AI_DETAIL_SETTINGS, AI_SETTINGS, PERSON_DETECTION_SETTINGS
 
 SETTINGS_UI = UI_PACKAGE / 'settings.py'
+DETAILS_LABEL = 'Person detection and reference images'
 
 
 def show_ai_settings():
@@ -52,6 +53,31 @@ def test_every_ai_setting_has_one_widget_in_its_group():
             assert expanders == ("'Person detection and reference images'",), name
         else:
             assert expanders == (), name
+
+
+def details_expander():
+    expanders = [node.items[0].context_expr for node in ast.walk(show_ai_settings()) if isinstance(node, ast.With)
+                 and ast.unparse(node.items[0].context_expr).startswith(f'st.expander({DETAILS_LABEL!r}')]
+    assert len(expanders) == 1, expanders
+    return expanders[0]
+
+
+def test_the_expander_does_not_close_by_itself_while_the_user_edits():
+    # Streamlit closes an open expander when `expanded` turns False on a rerun, e.g. after a
+    # value is set back to its default (review): `expanded` only ever turns True in a session
+    [expanded] = [keyword.value for keyword in details_expander().keywords if keyword.arg == 'expanded']
+    assert ast.unparse(expanded) == "st.session_state.get('ai_details_open', False)"
+    function = show_ai_settings()
+    opens = [node for node in ast.walk(function) if isinstance(node, ast.Assign)
+             and [ast.unparse(target) for target in node.targets] == ["st.session_state['ai_details_open']"]]
+    assert len(opens) == 1, f'one place opens the expander, found {len(opens)}'
+    assert ast.unparse(opens[0].value) == 'True'
+    openings = [node for node in ast.walk(function) if isinstance(node, ast.If) and opens[0] in node.body]
+    assert len(openings) == 1, 'the expander is opened only under a condition'
+    opening = openings[0]
+    assert ast.unparse(opening.test).startswith('changed_from_defaults(')
+    assert 'AI_DETAIL_SETTINGS' in ast.unparse(opening.test)
+    assert opening.lineno < details_expander().lineno
 
 
 def test_the_widgets_are_drawn_in_the_order_of_the_settings():

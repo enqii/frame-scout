@@ -218,10 +218,13 @@ def show_ai_settings(settings, seen, shown, active):
     st.number_input(AI_LABELS['top'], **number_range('top'), step=25, key=setting_key('top'), disabled=active,
                     help=default_help('top'))
     # F32: the settings changed less often in an expander, open while one of them differs from
-    # its default, so a changed value is never hidden
-    details_changed = changed_from_defaults({name: st.session_state[setting_key(name)] for name in AI_DETAIL_SETTINGS},
-                                            DEFAULT_SETTINGS, AI_DETAIL_SETTINGS)
-    with st.expander('Person detection and reference images', expanded=bool(details_changed)):
+    # its default, so a changed value is never hidden. `expanded` only ever turns True in a
+    # browser session: Streamlit closes an open expander when it turns False on a rerun, e.g.
+    # after a value is set back to its default (review)
+    if changed_from_defaults({name: st.session_state[setting_key(name)] for name in AI_DETAIL_SETTINGS},
+                             DEFAULT_SETTINGS, AI_DETAIL_SETTINGS):
+        st.session_state['ai_details_open'] = True
+    with st.expander('Person detection and reference images', expanded=st.session_state.get('ai_details_open', False)):
         st.checkbox(AI_LABELS['person_detection'], key=setting_key('person_detection'), disabled=active,
                     help=default_help('person_detection'))
         # the checkbox value of this page run: its sub-settings apply only while it is on
