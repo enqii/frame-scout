@@ -68,6 +68,15 @@ def test_each_tab_holds_its_own_jobs():
         assert only_in(blocks, 'Results', call), call
 
 
+def test_the_note_of_a_start_that_failed_is_shown_in_the_tab_of_its_button():
+    # review: start_engine stores it under the key its caller names (tests/test_quick.py);
+    # Start, Stop, the quick search and "Analyze photos now" are in "Search", "Find similar"
+    # is on the cards in "Results"
+    blocks = tab_blocks()
+    for key, tab in (('run_notice', 'Search'), ('analyze_notice', 'Search'), ('like_notice', 'Results')):
+        assert only_in(blocks, tab, f"st.warning(st.session_state.pop('{key}'))"), key
+
+
 def test_no_text_of_the_app_names_a_tab_that_no_longer_exists():
     for path in app_files():
         source = path.read_text(encoding='utf-8')
