@@ -13,6 +13,11 @@ merits.
 Your only write actions are the review comments (posted by `/code-review` or, if it posted
 nothing, by you as below) and the label change.
 
+**Leave the main checkout as you found it:** do not run `gh pr checkout`, `git switch` or
+`git checkout` there (a PR checkout left it on a detached HEAD after the review of PR #109).
+Read the PR through `gh pr diff`, `gh pr view` and `git show origin/<branch>:<file>`; if you
+must run code from the PR, use a separate worktree and remove it before you return.
+
 1. Before the review, record the baseline: the number of inline comments
    (`gh api repos/enqii/frame-scout/pulls/{PR}/comments --jq length`) and of general comments
    (`gh pr view {PR} --json comments --jq '.comments | length'`) now on the PR. Then run the
