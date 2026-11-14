@@ -6,7 +6,7 @@ import time
 import psutil
 import streamlit as st
 
-from framescout_core import (AI_SETTINGS, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEVICES, MODELS, MODEL_KEYS,
+from framescout_core import (AI_DETAIL_SETTINGS, AI_SETTINGS, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEVICES, MODELS, MODEL_KEYS,
                              SETTING_RANGES, SETTING_STEPS, changed_from_defaults, check_installation, cuda_status,
                              default_settings, device_choices, downloaded_models, folder_lines, model_label,
                              model_problem, read_settings, reconcile_settings, save_settings, setting_text)
@@ -217,19 +217,28 @@ def show_ai_settings(settings, seen, shown, active):
                                                   'the GPU does the work; how much it helps is not measured yet.'))
     st.number_input(AI_LABELS['top'], **number_range('top'), step=25, key=setting_key('top'), disabled=active,
                     help=default_help('top'))
-    st.checkbox(AI_LABELS['person_detection'], key=setting_key('person_detection'), disabled=active,
-                help=default_help('person_detection'))
-    st.number_input(AI_LABELS['max_persons'], **number_range('max_persons'), key=setting_key('max_persons'),
-                    disabled=active, help=default_help('max_persons'))
-    st.slider(AI_LABELS['person_confidence'], **number_range('person_confidence'),
-              step=SETTING_STEPS['person_confidence'], key=setting_key('person_confidence'), disabled=active,
-              help=default_help('person_confidence'))
-    st.slider(AI_LABELS['reference_weight'], **number_range('reference_weight'),
-              step=SETTING_STEPS['reference_weight'], key=setting_key('reference_weight'), disabled=active,
-              help=default_help('reference_weight', f'0 = text only; {DEFAULT_REFERENCE_WEIGHT:g} = '
-                                f'{DEFAULT_REFERENCE_WEIGHT:.0%} reference images and {1 - DEFAULT_REFERENCE_WEIGHT:.0%} '
-                                'text. Text and reference scores are scaled to the photos of the search before they '
-                                'are weighted.'))
+    # F32: the settings changed less often in an expander, open while one of them differs from
+    # its default, so a changed value is never hidden
+    details_changed = changed_from_defaults({name: st.session_state[setting_key(name)] for name in AI_DETAIL_SETTINGS},
+                                            DEFAULT_SETTINGS, AI_DETAIL_SETTINGS)
+    with st.expander('Person detection and reference images', expanded=bool(details_changed)):
+        st.checkbox(AI_LABELS['person_detection'], key=setting_key('person_detection'), disabled=active,
+                    help=default_help('person_detection'))
+        # the checkbox value of this page run: its sub-settings apply only while it is on
+        detecting = st.session_state[setting_key('person_detection')]
+        st.number_input(AI_LABELS['max_persons'], **number_range('max_persons'), key=setting_key('max_persons'),
+                        disabled=active or not detecting, help=default_help('max_persons'))
+        st.slider(AI_LABELS['person_confidence'], **number_range('person_confidence'),
+                  step=SETTING_STEPS['person_confidence'], key=setting_key('person_confidence'),
+                  disabled=active or not detecting, help=default_help('person_confidence'))
+        if not detecting:
+            st.caption('The two person settings apply only while the person detection is on.')
+        st.slider(AI_LABELS['reference_weight'], **number_range('reference_weight'),
+                  step=SETTING_STEPS['reference_weight'], key=setting_key('reference_weight'), disabled=active,
+                  help=default_help('reference_weight', f'0 = text only; {DEFAULT_REFERENCE_WEIGHT:g} = '
+                                    f'{DEFAULT_REFERENCE_WEIGHT:.0%} reference images and '
+                                    f'{1 - DEFAULT_REFERENCE_WEIGHT:.0%} text. Text and reference scores are scaled '
+                                    'to the photos of the search before they are weighted.'))
     # what differs from the defaults, as the widgets show it now (a substituted device is
     # shown as "auto"), and the way back to them (A26)
     not_default = changed_from_defaults({name: st.session_state[setting_key(name)] for name in AI_SETTINGS},

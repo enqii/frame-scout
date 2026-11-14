@@ -27,6 +27,11 @@ DEFAULT_REFERENCE_WEIGHT = 0.3
 # in the Photo source tab.
 AI_SETTINGS = ('model', 'device', 'batch_size', 'low_priority', 'top', 'person_detection', 'max_persons',
                'person_confidence', 'reference_weight')
+# the AI settings the tab shows in an expander after the everyday ones (F32): the last ones
+# of AI_SETTINGS
+AI_DETAIL_SETTINGS = ('person_detection', 'max_persons', 'person_confidence', 'reference_weight')
+# the settings of the person detection, disabled in the tab while the detection is off (F32)
+PERSON_DETECTION_SETTINGS = ('max_persons', 'person_confidence')
 # the on/off settings (checkboxes)
 _BOOL_SETTINGS = ('person_detection', 'low_priority')
 # seconds save_settings waits for the lock around its read-merge-write
