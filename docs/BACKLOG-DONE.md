@@ -2140,8 +2140,9 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       Affected: `app.py`, user guide. Keys `setting_<name>` unchanged. F24 review §3. Size S. Roadmap P33 (B).
       Done (2026-11-14): the everyday settings (model, device, batch size, priority, maximum matches) come first;
       the expander "Person detection and reference images" holds person detection, maximum persons, minimum
-      confidence and the weight of the reference images and is open while one of them differs from its default
-      (`AI_DETAIL_SETTINGS`). Maximum persons and minimum confidence (`PERSON_DETECTION_SETTINGS`) are disabled
+      confidence and the weight of the reference images; it opens once one of them differs from its default
+      (`AI_DETAIL_SETTINGS`) and stays open for the browser session (review: Streamlit closed it when a value
+      was set back to its default). Maximum persons and minimum confidence (`PERSON_DETECTION_SETTINGS`) are disabled
       with a caption while person detection is off. Tests: new `test_settings_layout.py` (source checks); full
       suite 1626 passed, 2 skipped; Streamlit AppTest: expander drawn, sub-settings disabled after unchecking
       detection. Not verified: the look in a real browser. No schema, CLI, cache or widget key change.)
