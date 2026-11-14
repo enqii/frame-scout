@@ -57,7 +57,7 @@ from .run_status import (RUN_LOCK, RUN_STATUS, STATUS_FORMAT, PHASE_LABELS, FINA
     run_active, status_fraction, status_text, analysis_only, nothing_new_message, run_name, analysis_result_text)
 from .app_state import START_NEEDS_TAB, RUN_TAB, RESULTS_TAB, APP_TABS, state_line, results_running_text, start_needs, start_needs_line, start_blocked_text
 from .settings import (SETTINGS_FILE, DEVICES, SETTING_RANGES, SETTING_STEPS,
-    DEFAULT_REFERENCE_WEIGHT, AI_SETTINGS, SETTINGS_LOCK_TIMEOUT, LEGACY_PHOTO_FOLDER, default_settings, folder_lines,
+    DEFAULT_REFERENCE_WEIGHT, AI_SETTINGS, AI_DETAIL_SETTINGS, PERSON_DETECTION_SETTINGS, SETTINGS_LOCK_TIMEOUT, LEGACY_PHOTO_FOLDER, default_settings, folder_lines,
     read_settings, save_settings, reconcile_settings, changed_from_defaults, setting_text, engine_command)
 from .quick import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, quick_profile, quick_photos, quick_scope, quick_scope_text,
     quick_note, quick_folders_differ, like_profile, like_crop, like_labels_fit, like_scan_path)
