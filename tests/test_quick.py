@@ -10,7 +10,7 @@ from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_Q
                              engine_command, generic_prompts, like_crop, like_labels_fit, like_profile, like_scan_path,
                              quick_folders_differ,
                              quick_note,
-                             quick_entry_label, quick_photos, quick_profile, quick_scope, quick_scope_text,
+                             quick_entry_label, quick_photos, quick_result_id, quick_profile, quick_scope, quick_scope_text,
                              read_results, results_choice, results_document,
                              publish_export, result_card, scan_cleanup)
 
@@ -542,6 +542,19 @@ def test_quick_entry_label_differs_from_every_profile_name():
     assert quick_entry_label(quick_results(), ['Cars', label]) == label + ' (last quick result)'
     taken = [label, label + ' (last quick result)']
     assert quick_entry_label(quick_results(), taken) not in taken
+
+
+def test_quick_result_id_depends_on_the_result_file_only():
+    # review: a profile name that clashes with the entry changes its label, but must not make
+    # the selector take the result for a new one and jump to it
+    results = quick_results()
+    assert quick_result_id(results) == ('2026-11-14T10:00:00', 'Quick search: "red car"')
+    assert quick_result_id(results) != quick_entry_label(results, ['Quick search: "red car"'])
+    assert quick_result_id(quick_results(finished='2026-11-14T11:00:00')) != quick_result_id(results)
+    assert quick_result_id(quick_results('dog')) != quick_result_id(results)
+    selector = ast.unparse({node.name: node for node in app_tree().body
+                            if isinstance(node, ast.FunctionDef)}['show_results'])
+    assert 'quick_id = quick_result_id(quick) if quick else None' in selector
 
 
 def test_results_choice_keeps_the_entry_shown_and_opens_a_new_quick_result():
