@@ -158,6 +158,21 @@ def test_a_press_acts_only_on_the_photo_still_shown():
     assert "state = st.session_state.review = {**state, 'path': card['path'], 'notice': None}" in ast.unparse(functions['review_dialog'])
 
 
+def test_unreadable_marks_are_neither_named_nor_written_against():
+    # review: without readable marks (or for a profile that is gone) every photo would look
+    # undecided, so the dialog names no saved mark there, and a choice does not save one
+    functions = app_functions()
+    choice = functions['review_choice']
+    assert 'load_marks()[0]' not in ast.unparse(choice)
+    guards = [n for n in ast.walk(choice) if isinstance(n, ast.If) and 'marks_error' in ast.unparse(n.test)]
+    assert guards and isinstance(guards[0].body[-1], ast.Return) and 'save_marks' not in calls_in(guards[0])
+    assert guards[0].lineno < next(n.lineno for n in ast.walk(choice)
+                                   if isinstance(n, ast.Call) and ast.unparse(n.func) == 'save_marks')
+    named = [n for n in ast.walk(functions['review_dialog'])
+             if isinstance(n, ast.IfExp) and 'review_state_text' in calls_in(n.body)]
+    assert len(named) == 1 and 'can_mark' in ast.unparse(named[0].test)
+
+
 def test_the_dialog_shows_the_card_text_as_the_gallery_does():
     # the row of the closest search text as in the gallery: for all cards of the list, so the
     # text keeps its height from photo to photo (review)
