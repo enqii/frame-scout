@@ -47,18 +47,33 @@ def _show(path, notice=None):
     st.session_state.review = {**st.session_state.get('review', {}), 'path': path, 'notice': notice}
 
 
-def review_step(cards, index, step):
-    """Show the photo step places from the one at index (on_click of "Previous" and "Next")."""
+def _still_shown(path):
+    """Whether the dialog still shows the photo path, for which the button pressed was drawn.
+
+    A second press before the dialog is drawn again (e.g. M pressed twice quickly) arrives
+    with the arguments of the photo before: it is ignored, so it neither saves that photo
+    again nor acts on the next one, which the user has not seen yet (review).
+    """
+    return st.session_state.get('review', {}).get('path') == path
+
+
+def review_step(cards, path, step):
+    """Show the photo step places from the photo path (on_click of "Previous" and "Next")."""
+    if not _still_shown(path):
+        return
+    index = review_index(cards, {}, path)
     _show(cards[min(max(index + step, 0), len(cards) - 1)]['path'])
 
 
-def review_choice(profile, cards, index, state):
-    """Save state for the photo at index and show the next undecided photo (on_click of "Match", "No match", "Skip").
+def review_choice(profile, cards, path, state):
+    """Save state for the photo path and show the next undecided photo (on_click of "Match", "No match", "Skip").
 
     state None is "Skip": the photo stays as it is. A mark is saved through save_marks, only
     for a profile that still exists, as on a card (set_mark).
     """
-    path = cards[index]['path']
+    if not _still_shown(path):
+        return
+    index = review_index(cards, {}, path)
     marks = dict(load_marks()[0].get(profile, {}))
     if state is not None:
         try:
@@ -119,6 +134,10 @@ def review_dialog(cards, thumbs, profile, can_mark, find_disabled):
     marks = load_marks()[0].get(profile, {}) if profile is not None else {}
     index = review_index(cards, marks, state.get('path'))
     card = cards[index]
+    if state.get('path') != card['path']:
+        # the photo shown (the first undecided one, or another if the list changed), which
+        # the buttons below act on (_still_shown)
+        state = st.session_state.review = {**state, 'path': card['path'], 'notice': None}
     saved = marks.get(card['path'])
     st.caption(REVIEW_STYLE + '\n\n' + review_position(index, len(cards))
                + (f' · {review_state_text(saved)}' if profile is not None else '')
@@ -131,20 +150,20 @@ def review_dialog(cards, thumbs, profile, can_mark, find_disabled):
         {'success': st.success, 'info': st.info}.get(kind, st.warning)(plain(text))
     if profile is not None:
         with st.container(horizontal=True, gap='small'):
-            st.button('Match', key='review_match', on_click=review_choice, args=(profile, cards, index, MARK_MATCH),
-                      shortcut='M', disabled=not can_mark,
+            st.button('Match', key='review_match', on_click=review_choice,
+                      args=(profile, cards, card['path'], MARK_MATCH), shortcut='M', disabled=not can_mark,
                       help='Saves this photo as a match and shows the next undecided one.')
             st.button('No match', key='review_no_match', on_click=review_choice,
-                      args=(profile, cards, index, MARK_NO_MATCH), shortcut='N', disabled=not can_mark,
+                      args=(profile, cards, card['path'], MARK_NO_MATCH), shortcut='N', disabled=not can_mark,
                       help='Saves this photo as no match and shows the next undecided one.')
-            st.button('Skip', key='review_skip', on_click=review_choice, args=(profile, cards, index, None),
+            st.button('Skip', key='review_skip', on_click=review_choice, args=(profile, cards, card['path'], None),
                       shortcut='S', help='Leaves this photo as it is and shows the next undecided one.')
         if not can_mark:
             st.caption('The photos of this list cannot be marked here (see the note above the gallery).')
     with st.container(horizontal=True, gap='small'):
-        st.button('Previous', key='review_previous', on_click=review_step, args=(cards, index, -1),
+        st.button('Previous', key='review_previous', on_click=review_step, args=(cards, card['path'], -1),
                   shortcut='Left', disabled=index == 0)
-        st.button('Next', key='review_next', on_click=review_step, args=(cards, index, 1),
+        st.button('Next', key='review_next', on_click=review_step, args=(cards, card['path'], 1),
                   shortcut='Right', disabled=index == len(cards) - 1)
         st.button('Open photo', key='review_open', on_click=open_photo, args=(card['path'],), shortcut='O',
                   help='Opens the photo in your image viewer.')

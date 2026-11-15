@@ -142,6 +142,22 @@ def test_only_decoding_the_preview_falls_back_to_the_thumbnail():
     assert 'st.image' in calls_in(show_preview)
 
 
+def test_a_press_acts_only_on_the_photo_still_shown():
+    # review: a second press of M before the dialog was drawn again must neither save the
+    # photo twice nor mark the next one, which the user has not seen: the buttons name the
+    # photo they were drawn for, the callbacks do nothing once another photo is shown, and
+    # the dialog keeps the photo it shows in its state
+    functions = app_functions()
+    found = buttons(functions['review_dialog'])
+    for label in ('Match', 'No match', 'Skip', 'Previous', 'Next'):
+        assert "card['path']" in found[label]['args'] and 'index' not in found[label]['args']
+    for callback in ('review_choice', 'review_step'):
+        first = functions[callback].body[1]  # after the docstring
+        assert isinstance(first, ast.If) and ast.unparse(first.test) == 'not _still_shown(path)'
+        assert isinstance(first.body[0], ast.Return)
+    assert "state = st.session_state.review = {**state, 'path': card['path'], 'notice': None}" in ast.unparse(functions['review_dialog'])
+
+
 def test_the_dialog_shows_the_card_text_as_the_gallery_does():
     # the row of the closest search text as in the gallery: for all cards of the list, so the
     # text keeps its height from photo to photo (review)
