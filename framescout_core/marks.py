@@ -23,11 +23,29 @@ MARK_OPEN, MARK_MATCH, MARK_NO_MATCH = 'open', 'match', 'no-match'
 MARK_STATES = (MARK_OPEN, MARK_MATCH, MARK_NO_MATCH)
 # seconds save_marks and rename_marks wait for the lock around their read-change-write
 MARKS_LOCK_TIMEOUT = 5.0
-# the color of the selected option of a mark in the app's gallery (A24): (background, border)
-# per state; Undecided keeps Streamlit's look. Translucent backgrounds and the theme's text
+# the color of a mark in the app's gallery (A24, F30): (background, border) per state, for
+# the selected button of a card's mark control and (the border color) the card's frame;
+# Undecided keeps Streamlit's look. Blue and orange of the Okabe-Ito palette, told apart
+# without red and green (decided 2026-11-13). Translucent backgrounds and the theme's text
 # color keep the label readable in the light and the dark theme.
-MARK_COLORS = {MARK_MATCH: ('rgba(33, 195, 84, 0.25)', 'rgb(33, 195, 84)'),
-               MARK_NO_MATCH: ('rgba(255, 75, 75, 0.25)', 'rgb(255, 75, 75)')}
+MARK_COLORS = {MARK_MATCH: ('rgba(0, 114, 178, 0.25)', 'rgb(0, 114, 178)'),
+               MARK_NO_MATCH: ('rgba(230, 159, 0, 0.25)', 'rgb(230, 159, 0)')}
+# how much of the photo of a card marked as no match shows (F30): dimmed, so the two states
+# differ by more than their color
+MARK_NO_MATCH_OPACITY = 0.4
+# the key of a gallery card's container in the app starts with this (F30); CARD_STYLE and
+# mark_style find the cards by it
+CARD_KEY_PREFIX = 'fscard-'
+# equal cells (F30): the photo of every card is fitted whole into a square box (as in the
+# HTML gallery), so portrait and landscape photos give cards of one height; CSS, so the
+# thumbnails and the cache signature stay as they are. Streamlit sizes the elements around an
+# image to its natural width, also with width='stretch' (checked with 1.66.1), so they are
+# stretched too: Streamlit internals (their data-testid), see MARK_STYLE_STREAMLIT
+_CARD = f'[class*="st-key-{CARD_KEY_PREFIX}"]'
+CARD_STYLE = (f'<style>{_CARD} :is(div:has(> [data-testid="stImage"]), [data-testid="stImage"], '
+              '[data-testid="stImageContainer"]){width:100%!important}'
+              f'{_CARD} img{{width:100%!important;height:auto!important;aspect-ratio:1/1;object-fit:contain;'
+              'background:rgba(128, 128, 128, 0.12);border-radius:4px}</style>')
 # the Streamlit version whose internals mark_style was checked against (its frontend bundle:
 # the key class st-key-<key>, data-variant="segmented_control" on the buttons and the
 # data-selected attribute of the selected one; the old kind attribute is gone, A49);
@@ -363,24 +381,32 @@ def progress_text(progress, paged):
 
 
 def mark_style(states):
-    """Return a <style> block coloring the selected option of each mark control, or '' (A24).
+    """Return a <style> block showing the saved mark of each gallery card, or '' (A24, F30).
 
-    states maps the widget key of a mark control to its saved state. st.segmented_control
-    has no colors per option, so the style targets the element of each control by its key
-    class and its selected button: Streamlit internals, see MARK_STYLE_STREAMLIT.
+    states maps the key of a card's container (CARD_KEY_PREFIX) to its saved state. A
+    marked card gets a frame in its state's color, the photo of one marked as no match is
+    dimmed, and the selected option of the card's mark control takes the color too
+    (st.segmented_control has no colors per option). The style targets each card by its
+    key class and the selected button by its attributes: Streamlit internals, see
+    MARK_STYLE_STREAMLIT.
     """
     rules = []
     for state, (background, border) in MARK_COLORS.items():
-        # the class Streamlit gives the element of a widget with a key; a disabled control
-        # (its profile is no longer searched) keeps the color of its saved mark on purpose
-        selectors = ', '.join(f'.st-key-{re.sub(r"[^a-zA-Z0-9_-]", "-", key.strip())} '
-                              'button[data-variant="segmented_control"][data-selected]'
-                              for key, saved in states.items() if saved == state)
-        if selectors:
-            # !important: Streamlit's own rules for the selected button (its class with
-            # [data-selected]:not([data-disabled]), plus hover and focus states) must not win
-            rules.append(f'{selectors}{{background-color:{background}!important;border-color:{border}!important;'
-                         'color:inherit!important}')
+        # the class Streamlit gives the element of a container with a key; a disabled
+        # control (its profile is no longer searched) keeps the color of its saved mark on purpose
+        cards = [f'.st-key-{re.sub(r"[^a-zA-Z0-9_-]", "-", key.strip())}'
+                 for key, saved in states.items() if saved == state]
+        if not cards:
+            continue
+        # a box-shadow, not a border: it follows the rounded corners and changes no size
+        rules.extend(f'{card}{{box-shadow:0 0 0 3px {border}!important}}' for card in cards)
+        if state == MARK_NO_MATCH:
+            rules.extend(f'{card} img{{opacity:{MARK_NO_MATCH_OPACITY}!important}}' for card in cards)
+        selectors = ', '.join(f'{card} button[data-variant="segmented_control"][data-selected]' for card in cards)
+        # !important: Streamlit's own rules for the selected button (its class with
+        # [data-selected]:not([data-disabled]), plus hover and focus states) must not win
+        rules.append(f'{selectors}{{background-color:{background}!important;border-color:{border}!important;'
+                     'color:inherit!important}')
     return f'<style>{"".join(rules)}</style>' if rules else ''
 
 

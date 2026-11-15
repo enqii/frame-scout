@@ -1,5 +1,6 @@
 """The results file of a run (results.json), gallery paging and opening photos."""
 import hashlib
+import html
 import json
 import os
 import re
@@ -102,6 +103,39 @@ def closest_query(index, queries):
 def query_caption(best_query):
     """Return the line of a gallery card that names its closest search text (F17)."""
     return f'Closest search text: {best_query}'
+
+
+# a row of a card's text in the app (F30): one line, cut with "…" if too long (the whole
+# text is its tooltip), so every card of a view is as tall as the others
+_CARD_LINE = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+_CARD_DETAIL = _CARD_LINE + ';font-size:0.875em;opacity:0.7'
+
+
+def _card_escape(text):
+    """text as HTML that neither Streamlit's Markdown nor its math reads ($ is a formula there)."""
+    return html.escape(str(text)).replace('$', '&#36;')
+
+
+def card_text(card, closest_line):
+    """Return the HTML of the text of a gallery card in the app, on one line (F30).
+
+    Rows: rank, score caption and part; the detail; the closest search text (query_caption,
+    only with closest_line, the same for every card of a view: an empty row for a card that
+    names none); the photo's relative path. Each row is one line long, with its whole text
+    as a tooltip, so all cards of a view have the same height. For st.markdown with
+    unsafe_allow_html: everything is escaped, and the HTML has no line break, which would
+    end its HTML block in the Markdown.
+    """
+    head = f"#{card['rank']} · {card['caption']} · {card['label']}"
+    rows = [(_CARD_LINE, head, f"<b>#{_card_escape(card['rank'])}</b> · {_card_escape(card['caption'])} · "
+                               f"{_card_escape(card['label'])}"),
+            (_CARD_DETAIL, card['detail'], None)]
+    if closest_line:
+        closest = card.get('best_query')
+        rows.append((_CARD_DETAIL, query_caption(closest) if closest else '', None if closest else '&nbsp;'))
+    rows.append((_CARD_DETAIL, card['relative'], None))
+    return ''.join(f'<div style="{style}" title="{_card_escape(title)}">'
+                   f'{_card_escape(title) if shown is None else shown}</div>' for style, title, shown in rows)
 
 
 def query_summary(entry):
