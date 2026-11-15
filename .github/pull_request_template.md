@@ -34,7 +34,7 @@
 - [ ] Commits follow Conventional Commits (English, imperative, lowercase, backlog IDs)
 - [ ] Tests executed and their output included above; not-executed tests listed
 - [ ] CI checks green (`tests` workflow, `gh pr checks <PR>`)
-- [ ] `docs/ROADMAP.md`/`docs/BACKLOG.md` updated (a finished item moved with its report to `docs/BACKLOG-DONE.md`, checked off with date)
+- [ ] `docs/ROADMAP.md`/`docs/BACKLOG.md` updated (a finished item reduced to one line (ID, title, date, PR link) in `docs/BACKLOG-DONE.md`, checked off with date)
 - [ ] Out-of-scope findings added to `docs/BACKLOG.md` as new items (IDs: …), or none found;
       declined review findings that defer work name their backlog ID (no GitHub issues)
 - [ ] `README.md`, `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md` updated, or not affected

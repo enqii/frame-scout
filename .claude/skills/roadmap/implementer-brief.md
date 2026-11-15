@@ -28,7 +28,7 @@ commit convention). This brief only adds the procedure and commands. If this bri
 `CLAUDE.md` ever disagree, `CLAUDE.md` wins – mention the conflict in your report.
 
 Read only what the item needs – every token you read is paid again on each later turn:
-- `docs/BACKLOG.md` (open items, 39 KB) and `docs/BACKLOG-DONE.md` (finished items, 55 KB):
+- `docs/BACKLOG.md` (open items, 39 KB) and `docs/BACKLOG-DONE.md` (finished items, one line each):
   do not read them whole. Grep both for the item's IDs (e.g. `\*\*E7 –`) and Read those
   entries. `docs/ROADMAP.md` is short (about 50 lines) and may be read whole.
 - `docs/ARCHITECTURE.md`: Grep for the files, functions and IDs you touch and read those
@@ -114,7 +114,7 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   context is large by now). After the last code and test commit is pushed and the tests
   pass, post a PR comment starting with `Docs pending:` that lists the item, the backlog
   IDs, the commit SHAs, behavior and compatibility changes, out-of-scope findings and which
-  docs to update (README, user guide, DEVELOPMENT, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md`; new items). Leave the
+  docs to update (README, user guide, DEVELOPMENT, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md` as one line (ID, title, date, PR link); new items). Leave the
   label `fs:in-progress` and return; the orchestrator spawns the `docs-update` agent.
 - Before you return (every mode), delete your own smoke and scratch data under the
   worktree's `.tmp/` (gitignored leftovers make the orchestrator's worktree removal need
