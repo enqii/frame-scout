@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 
 from framescout_core import (MARK_MATCH, MARK_NO_MATCH, REVIEW_PHOTO_KEY, REVIEW_PREVIEW_SIZE, REVIEW_STYLE, card_text,
-                             first_undecided, next_undecided, openable_photo, review_index, review_position,
+                             first_undecided, has_closest_line, next_undecided, openable_photo, review_index, review_position,
                              review_state_text, save_marks)
 from framescout_images import render_preview
 
@@ -124,7 +124,7 @@ def review_dialog(cards, thumbs, profile, can_mark, find_disabled):
                + (f' · {review_state_text(saved)}' if profile is not None else '')
                + ' · A ranking by similarity, not a guaranteed identification.', unsafe_allow_html=True)
     show_preview(card, thumbs)
-    st.markdown(card_text(card, bool(card.get('best_query'))), unsafe_allow_html=True)
+    st.markdown(card_text(card, has_closest_line(cards)), unsafe_allow_html=True)
     notice = state.get('notice')
     if notice:
         kind, text = notice
