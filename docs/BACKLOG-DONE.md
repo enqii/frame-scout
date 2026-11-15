@@ -2177,3 +2177,34 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `persist_state='page'`, so Streamlit keeps their values while another entry is shown
       (checked with a minimal Streamlit AppTest: without it the box fell back to page 1). Test:
       `test_quick.py::test_the_views_of_the_results_selector_keep_their_boxes`.
+- [x] `ready` **F30 – A new result card, drawn by one function:** `show_results` and
+      `show_quick_results` repeat the card code; cards of portrait and landscape photos have
+      different heights, so the rows are ragged; five equal buttons per card; a marked card
+      looks like an unmarked one; the page is limited to 1,300 px, which leaves a third of a
+      1920 px window empty and the thumbnails 253 px wide. Decided 2026-11-13: one function
+      for both views; cells of one size (the photo fitted into a square, as in the HTML
+      gallery; by padded thumbnails or CSS, without changing the cache signature); the two
+      main buttons "Match" and "No" (neither pressed = undecided, a second click takes the mark
+      back); "Open photo", "Show in folder" and "Find similar" in a popover; the card shows its
+      state (match: blue frame, no match: photo dimmed; blue and orange, told apart without
+      red/green); the grid uses the window width with a fixed cell size of about 250 px.
+      Affected: `app.py` (its modules after A46), `framescout_core/marks.py` (`mark_style`),
+      user guide. Risks: CSS on Streamlit internals, see A49; `marks.json` unchanged.
+      `docs/UI-REVIEW.md` §2 and §5. Size M. Roadmap P35.
+      Done (2026-11-15): `draw_cards` (`framescout_ui/results.py`) draws the cards of the profile
+      results and of the quick result; each is a bordered container (key `fscard-<id>`) of 250 px
+      in a wrapping horizontal container, so the cards use the window width. The photo is fitted
+      whole into a square box by `CARD_STYLE` (CSS, thumbnails and cache signature unchanged); a
+      card without a thumbnail shows a square "No thumbnail" box. `framescout_core.card_text`:
+      one line per row with "..." and a tooltip. Marking: "Match"/"No" (second click takes the
+      mark back, neither = undecided; no "Undecided" option any more); "Open photo", "Show in
+      folder" and "Find similar" in the popover "More". `mark_style` takes the card keys and
+      shows the state by a 3 px frame, the selected button and, for no match, the photo dimmed to
+      0.4; `MARK_COLORS` are Okabe-Ito blue (match) and orange (no match) instead of green/red.
+      `app.py` no longer limits the page to 1,300 px (all tabs use the window width). Tests:
+      `test_results.py` (`card_text`), `test_marks.py` (`mark_style`, the bundle test also checks
+      the `stImage`/`stImageContainer` names). Browser check (headless Edge, 1920 px, Streamlit
+      1.66.1, dark and light theme, a harness with 14 synthetic cards): all cards 399 px high,
+      six per row, the mark states and the popover as described. Not verified: clicking
+      "Match"/"No" in the real app and a real search in a browser (F40). No schema, CLI, cache,
+      `marks.json`, settings or thumbnail change.

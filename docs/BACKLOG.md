@@ -564,20 +564,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       for exceptional states (other model, changed profile, missing profile) only when they
       apply; a second pager and "Go to first undecided" below the grid. Affected: `app.py`
       (its modules after A46), user guide. `docs/UI-REVIEW.md` §1. Size M. Roadmap P36.
-- [ ] `ready` **F30 – A new result card, drawn by one function:** `show_results` and
-      `show_quick_results` repeat the card code; cards of portrait and landscape photos have
-      different heights, so the rows are ragged; five equal buttons per card; a marked card
-      looks like an unmarked one; the page is limited to 1,300 px, which leaves a third of a
-      1920 px window empty and the thumbnails 253 px wide. Decided 2026-11-13: one function
-      for both views; cells of one size (the photo fitted into a square, as in the HTML
-      gallery; by padded thumbnails or CSS, without changing the cache signature); the two
-      main buttons "Match" and "No" (neither pressed = undecided, a second click takes the mark
-      back); "Open photo", "Show in folder" and "Find similar" in a popover; the card shows its
-      state (match: blue frame, no match: photo dimmed; blue and orange, told apart without
-      red/green); the grid uses the window width with a fixed cell size of about 250 px.
-      Affected: `app.py` (its modules after A46), `framescout_core/marks.py` (`mark_style`),
-      user guide. Risks: CSS on Streamlit internals, see A49; `marks.json` unchanged.
-      `docs/UI-REVIEW.md` §2 and §5. Size M. Roadmap P35.
 - [ ] `decision` **F33 – HTML gallery parity with the app:** the gallery has a fixed dark theme,
       no marks, no paging and no way back to the navigation. **Options:** (a) light/dark by
       `prefers-color-scheme`, file name first, link to the top; (b) also show marks (baked in at
@@ -604,3 +590,11 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `start_needs`/`start_blocked_text` of `framescout_core/app_state.py` without the
       profile need. Affected: `app.py`, `framescout_core/app_state.py`, user guide. Found in
       the PR #108 review. Size S.
+- [ ] `minor` **F39 – A width limit for the form tabs:** with the 1,300 px limit gone (F30), the
+      other tabs (forms, settings, text areas) stretch over the whole window too. A width limit
+      for those tabs only (not for "Results") could be considered. Affected: `app.py`. Found in
+      F30. Size S.
+- [ ] `minor` **F40 – Check clicking "Match" and "No" in a browser:** the browser check of F30
+      used a harness that draws `draw_cards`; a click would have written the checkout's
+      `marks.json`. Look at the marking with the real app (mark, take the mark back, page change,
+      reload) in the next browser pass, together with F19. Found in F30. Size S.

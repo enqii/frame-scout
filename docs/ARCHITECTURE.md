@@ -85,7 +85,7 @@ browser sessions): `active`, `folder_scans`, `settings`, `profiles_shown`. The s
 | `run.py` | `run_state`, `start_run`, `stop_run`, `end_processes`, `cache_env`, `cached_analyzed_photos`, `low_space_warning`, `show_state_line(active, photos)`, `show_status(active)` |
 | `marks.py` | `load_marks`, `set_mark`, `marks_backup_offer`, `restore_marks_backup` |
 | `copy_export.py` | `copy_matches`, `export_list`, `show_copy`, `show_export` |
-| `results.py` | `load_results`, `show_results` (F34: the one fragment, the selector "Results of" over the profiles and the quick entry), `show_profile_results`, `show_quick_results`, `find_similar_button` |
+| `results.py` | `load_results`, `draw_cards` (F30: the one card function of both views; `card_key`, `CARD_WIDTH` = 250, `NO_THUMBNAIL`), `show_results` (F34: the one fragment, the selector "Results of" over the profiles and the quick entry), `show_profile_results`, `show_quick_results`, `find_similar_button` |
 | `cleanup.py` | `show_cleanup` (E7), `scan_storage`, `delete_storage`, `show_cache_check` (F1) |
 | `profiles.py` | `show_profiles`, `store` (A13), `forget_profile`, `deletion_consequences` |
 
@@ -104,8 +104,8 @@ hardware display, analysis process, progress/log UI, and the result gallery of t
 search from `results/results.json` (P4 (A), A12: thumbnail grid, 48 per page,
 "Open"/"Folder" per photo, "Open gallery in browser", "Open results folder", HTML
 download, a note for profiles changed since; results folders without the file list their
-HTML files by name) with a three-state mark per photo (Undecided / Match / No match, saved
-in `results/marks.json`), "Hide photos marked as no match" and copying of a profile's
+HTML files by name) with a three-state mark per photo (undecided / Match / No match, saved
+in `results/marks.json`; F30: the control has the two options "Match" and "No", neither pressed = undecided, a second click on the pressed one removes the mark), "Hide photos marked as no match" and copying of a profile's
 matches to a folder (A17); the expander "Clean up storage" (E7) moved to the Settings tab (F28). After the search
 status sits the section "Quick search" (F10, `QUICK`/`QUICK_JSON`/`QUICK_THUMBS`
 are `results/quick/`, its `results.json` and `thumbnails/`): a text input (`quick_query`, at
@@ -114,7 +114,7 @@ runs, without folders, with a missing model package or while no photo is searche
 caption `quick_scope_text` (N of M photos analyzed and searched, counted as the engine counts, E61) and the quick result view (`show_quick_results`, an entry of the results selector, F34: `quick_entry_label`; selected at once when its `quick_result_id` (finish time and label without the profile names, review) differs from session key `quick_seen`, `results_choice`; shown with only a quick result and no `results.json` as the one entry plus a hint; the quick text stays in its field through `common.keep_value`/`restore_value` (put back only while a run disables the field), session key `quick_query__kept`; "Hide photos marked as no match" and the page boxes `results_page_<name>`/`quick_page` keep their values while another entry is shown through `persist_state='page'`, F38: text, date, photo folders, model, count, the
 `quick_note`, a note if it searched other photo folders than the ones chosen now
 (`quick_folders_differ`), model-mismatch info, "Open gallery in browser", "Open quick search folder", 48 per page,
-"Open"/"Folder" per photo; no marks, copying or export). F11: every card of `show_results` and `show_quick_results` has a "Find similar" button under Open/Folder
+the same cards; no marks, copying or export). F30: both views draw their cards with `draw_cards` (`framescout_ui/results.py`): a bordered container of the fixed width `CARD_WIDTH` (250 px) with the key `fscard-<id>` (`card_key`, `CARD_KEY_PREFIX`) in a wrapping horizontal container, so the number per row follows the window width (no `GALLERY_COLUMNS` any more; `app.py` no longer limits the page to `max-width:1300px`); the photo, the text from `framescout_core.card_text`, the mark control (`MARK_LABELS` in `framescout_ui/marks.py`) and the popover "More" with "Open photo", "Show in folder" and "Find similar"; a card without a thumbnail shows the square box `NO_THUMBNAIL`. F11: every card of both views has a "Find similar" button in the popover "More"
 (`find_similar_button`; disabled while a search runs or without existing folders, not for a missing model package,
 since it loads no model). The button is a fragment that stores `st.session_state.find_similar = (path, label)` and
 reruns the page; that page run pops the request first thing (before any `st.stop`, so a run that stops early drops it
@@ -339,10 +339,10 @@ the module of its area and to the re-exports in `__init__.py`.
   gallery and thumbnail file names only), whether a profile changed since the search,
   pages, and opening only existing image files, A12). F17: `result_card(best_query=)` adds the
   optional card key `best_query`; `closest_query(index, queries)` maps `Match.query` to a name (None for a single text or
-  "Find similar"); `query_caption` is the card line "Closest search text: …"; `query_summary(entry)` the results view's
+  "Find similar"); `query_caption` is the card line "Closest search text: …"; F30: `card_text(card, closest_line)` returns the HTML of a card's text of the app, one line per row (rank · score · part; detail; the closest search text only if `closest_line`, i.e. a card of the view has one, an empty row for the others; relative path), each with "…" and the whole text as a tooltip (`title`), all escaped (also `$`) and without a line break; `query_summary(entry)` the results view's
   caption with the per-text counts (each distinct text once, so a custom text given twice is listed once; None without `queries`, with fewer than 2 texts or without named cards); `QUERY_NOTE`
   the gallery's note; `read_results` rejects a non-string `best_query` and a `queries` that is no list of strings.
-- `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`marks_restore_offer`/`hide_no_match`/`hidden_text`/`mark_style`/`ReviewProgress`/`review_progress`/`progress_text`
+- `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`marks_restore_offer`/`hide_no_match`/`hidden_text`/`mark_style`/`MARK_COLORS`/`MARK_NO_MATCH_OPACITY`/`CARD_KEY_PREFIX`/`CARD_STYLE`/`ReviewProgress`/`review_progress`/`progress_text`
   (the user's marks, A17; every change goes through `_common._update_locked(..., backup=True)`
   (private `_update_marks`), which first copies the previous, validly read file byte for byte to
   `marks.json.bak` (F1); `marks_backup(path)` names the backup, `restore_marks` keeps a damaged
@@ -355,8 +355,7 @@ the module of its area and to the re-exports in `__init__.py`.
   `save_marks(..., profiles_file=...)` saves only for a name that is a profile now;
   `hide_no_match(cards, marks)` returns the cards not marked as no match and how many it
   left out, applied to the cards of one gallery page, and `hidden_text` the caption of that
-  count; `mark_style(states)` the `<style>` block of the gallery's mark colors `MARK_COLORS`,
-  checked against Streamlit `MARK_STYLE_STREAMLIT`; A24;
+  count; `mark_style(states)` the `<style>` block of the gallery's mark state (A24, F30; `states` maps the key of a card's container to its state): a 3 px frame (`box-shadow`) in the color of `MARK_COLORS` (Okabe-Ito blue match, orange no match), the selected button in that color and, for no match, the photo dimmed to `MARK_NO_MATCH_OPACITY` (0.4); `CARD_STYLE` the `<style>` block of the equal cells (the photo fitted whole into a square by CSS on the `stImage`/`stImageContainer` elements and their parent, since Streamlit 1.66.1 sizes them to the natural image width); both checked against Streamlit `MARK_STYLE_STREAMLIT`;
   `review_progress(cards, marks, size)` returns a `ReviewProgress` (`matches`, `no_matches`,
   `open`, `first_open_rank`, `first_open_page`) over the whole ranked list: states other than
   match/no match count as open, the list order (not the rank numbers) decides which photo is
@@ -1507,12 +1506,12 @@ and F20) and a card line under the detail line (`query_caption(card['best_query'
 the key); the named text is the closest one of the card's best-scoring part, the crop `rank_photos` chose by
 the combined score (with reference images another crop can be closer to another text, so the wording, also
 of `QUERY_NOTE`, names the part, not the whole photo); the quick search is unchanged. The
-selected option is colored by state (green match, red no match) by one `<style>` block per
-page from `framescout_core.mark_style`, targeting `.st-key-mark_<id> button[data-variant="segmented_control"][data-selected]`
+selected option is colored by state (F30: blue match, orange no match, plus the card frame and the dimmed photo) by one `<style>` block per
+page from `framescout_core.mark_style`, targeting the cards `.st-key-fscard-<id>` and `.st-key-mark_<id> button[data-variant="segmented_control"][data-selected]`
 with `!important`; this relies on Streamlit internals (the key class and the button attributes;
 the old `kind="segmented_controlActive"` no longer exists in the 1.66.1 frontend, A49), so `test_marks.py` fails once `requirements/constraints.txt` pins
 another Streamlit than `MARK_STYLE_STREAMLIT`: check the selectors against the new version,
-then raise that constant. Where Streamlit is installed (not in CI), `test_marks.py` also looks for the key class, `data-variant` with `segmented_control` and `&[data-selected]` in the installed frontend bundle, so a version that renames them fails there. A disabled control of a profile that is no longer searched keeps its saved mark's color on purpose, although Streamlit grays a disabled selected button (`[data-selected][data-disabled]`). A49 checked the colors in a real browser (headless Edge, light and dark theme, after mark clicks, a page change and a reload; the script is kept outside the repo, I2); `AppTest` cannot see CSS. A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The gap above the cards is not verified in a browser. A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
+then raise that constant. Where Streamlit is installed (not in CI), `test_marks.py` also looks for the key class, the `stImage`/`stImageContainer` names (F30, `CARD_STYLE`, which the captions above the grids carry like `mark_style`, A38), `data-variant` with `segmented_control` and `&[data-selected]` in the installed frontend bundle, so a version that renames them fails there. A disabled control of a profile that is no longer searched keeps its saved mark's color on purpose, although Streamlit grays a disabled selected button (`[data-selected][data-disabled]`). A49 checked the colors in a real browser (headless Edge, light and dark theme, after mark clicks, a page change and a reload; the script is kept outside the repo, I2); `AppTest` cannot see CSS. A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The gap above the cards is not verified in a browser. A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
 and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
 that are no longer search profiles cannot be marked and their "Copy to folder" field is
 disabled. A gallery drawn before its profile was renamed or deleted (another tab) still
@@ -2026,7 +2025,7 @@ A29, `test_photos.py`), the counts of photos and folders found again (A37), the 
 the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
 no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
 hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the review progress `review_progress`/`progress_text` (F20; the app side was run with `AppTest` only), the closest search text (F17: `best_matches`, `rank_photos(best=)` unchanged ranking, `query_labels` and its order against `text_queries`, `closest_query`, `query_summary`, `read_results` validation in `test_scoring.py`/`test_profiles.py`/`test_results.py`/`test_engine_defaults.py`; the engine on synthetic photos and the app's caption with `AppTest` only), the
-CSS of `mark_style`, its Streamlit pin and its selector names in the installed Streamlit bundle (skipped without Streamlit), `marks_restore_offer`, `remove_marks(unless_profile_of=)`, `test_marks.py`; the cleanup categories `marks_profiles` and `broken_files`, `test_cleanup.py`; `unlisted_paths`, `test_export.py`) and the AI settings reset
+CSS of `mark_style` and `CARD_STYLE`, `card_text` (`test_results.py`; the card look was checked in headless Edge with a harness drawing `draw_cards`, not by clicking Match/No), its Streamlit pin and its selector names in the installed Streamlit bundle (skipped without Streamlit), `marks_restore_offer`, `remove_marks(unless_profile_of=)`, `test_marks.py`; the cleanup categories `marks_profiles` and `broken_files`, `test_cleanup.py`; `unlisted_paths`, `test_export.py`) and the AI settings reset
 (`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
 `test_settings.py`; the grouping of the widgets in `show_ai_settings` by source checks in `test_settings_layout.py` (F32; the expander and the disabled sub-settings were run with `AppTest` only); A24, A26; the buttons and the mark colors were run with `AppTest`/the
 generated style only, not in a browser),

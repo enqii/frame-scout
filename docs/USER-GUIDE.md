@@ -283,13 +283,13 @@ searches only the photos already analyzed with the current AI settings (the capt
 "N of M photos analyzed and searched"; a photo whose same picture in another format, such as the RAW file, is searched is not counted as missing), so it is fast and loads no person detector or analysis;
 it is not available while no photo is analyzed, while a search runs or without photo folders.
 The result goes to `results/quick/` and appears in the tab "Results" as the last entry of the selector "Results of", next to your search
-profiles, and is selected at once (thumbnails, 48 per page, "Open"/"Folder" per photo, the gallery and the folder), with the
+profiles, and is selected at once (the same cards, 48 per page, "More" per photo, the gallery and the folder), with the
 photo folders it searched and a note if you have chosen other folders since. A new quick
 search replaces the last one. The text stays in the field after you press the button. The scores are scaled over the photos searched, so they differ
 from a search with profiles; a quick search has no marks, copying or export, and it never
 changes your profile galleries, `results.json` or marks.
 
-**Find similar** (button on every result card, in "Results", also in the quick result) shows
+**Find similar** (in the "More" menu of every result card, in "Results", also in the quick result) shows
 more photos that look like that one. It compares the photo (or the part named on the card,
 e.g. "Person 1") with all other photos already analyzed with the current AI settings; no search
 text is used, nothing is analyzed and no model is loaded. The photo itself and the other files
@@ -303,9 +303,13 @@ over its folder first. The button is disabled while a search runs; if it cannot 
 "Search" with its progress and Stop; the result appears when it is done. The HTML galleries have
 no button.
 
-**Results** shows the last finished search per profile: thumbnails, best first, 48 per
-page, with rank, score, the best-matching part ("Full image" or "Person 1", …) and the
-file name. "Open" opens a photo, "Folder" shows it in its folder, and buttons open the
+**Results** shows the last finished search per profile: one card per photo, best first, 48 per
+page. The photo is fitted whole into a square box, so every card has the same size (portrait
+and landscape photos alike), and the cards use the whole window width (cards 250 px wide, as many
+per row as fit; the same in every tab). A card shows rank, score and the best-matching part
+("Full image" or "Person 1", …), the detail line and the file name; a long line ends with "…" and
+shows its whole text when you hover over it. The buttons **Match** and **No** mark the photo;
+**More** opens a menu with "Open photo", "Show in folder" and "Find similar". Buttons open the
 HTML gallery and the `results` folder. A profile changed, renamed or deleted since the
 search is marked, since its results no longer fit it. Switching to another entry of
 "Results of" and back keeps the page you were on and "Hide photos marked as no match".
@@ -323,10 +327,12 @@ an earlier version.
 
 ### Marking and copying matches
 
-The results are candidates, not certain hits. Mark a photo you checked as **Match** or
-**No match** (or leave it **Undecided**). Marks are kept per profile and photo across
-later searches and in every tab. The selected option is colored (green for Match, red for
-No match). "Hide photos marked as no match" hides the rejected ones within the page you
+The results are candidates, not certain hits. Mark a photo you checked with **Match** or
+**No** on its card; a second click on the pressed button takes the mark back, and a photo
+with neither pressed is undecided. Marks are kept per profile and photo across
+later searches and in every tab. A marked card shows its state: blue frame and blue button for
+Match; orange frame, orange button and a dimmed photo for No (blue and orange can be told apart
+without red and green). "Hide photos marked as no match" hides the rejected ones within the page you
 are looking at only, so the pages keep their photos and ranks; a caption tells how many
 are hidden, and a page where every photo was rejected says so (see the next page).
 
@@ -389,7 +395,7 @@ ARW, ORF, RW2, RAF, PEF, SRW).
   JPEG/HEIC is searched. If that JPEG cannot be read, or is cut off or damaged in the middle, the RAW file is analyzed instead. A JPEG that lacks only its end marker is searched itself. A HEIC that is cut off fails (it is counted as a failed photo) instead of being searched as a black image.
 - The search log and the "Photo source" tab name skipped files and why.
 - Browsers cannot show HEIC or RAW files: in the HTML gallery the thumbnail works, but a
-  click downloads the file. "Open" in the app uses the program Windows has for it.
+  click downloads the file. "Open photo" in the app uses the program Windows has for it.
 - HEIC needs `pillow-heif`, RAW needs `rawpy`; the installer adds both. An older
   installation skips these formats with a note until you run the installer again.
 
