@@ -24,7 +24,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       rule (I40; kind `docs`) (done 2026-11-15 in PR #118)
 
 ### P39 – Shrink the architecture document (added 2026-11-15)
-- [ ] Cut `docs/ARCHITECTURE.md` to what the code cannot say (I39; kind `docs`)
+- [x] Cut `docs/ARCHITECTURE.md` to what the code cannot say (I39; kind `docs`)
+      (done 2026-11-15 in PR #119)
 
 ### P40 – Rules against unneeded complexity (added 2026-11-15)
 - [ ] Introduce the rules (a)–(e) in `CLAUDE.md`, the reviewer brief and the PR template (I47;
