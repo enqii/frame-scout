@@ -1,4 +1,5 @@
 """The result file of a search (results.json) and the app's result gallery helpers (A12, P4)."""
+import ast
 import json
 import os
 import re
@@ -6,10 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (QUERY_NOTE, RESULTS_FILE, RESULTS_FORMAT, card_text, closest_query, load_profiles, open_command, openable_photo, page_count,
+from framescout_core import (QUERY_NOTE, RESULTS_FILE, RESULTS_FORMAT, card_text, closest_query, has_closest_line, load_profiles, open_command, openable_photo, page_count,
                              page_cards, profile_fingerprints, profile_state, publish_export, query_caption,
                              query_summary, read_results, result_card, results_document, reveal_command,
                              search_fingerprint)
+
+from app_source import app_tree
 
 THUMB = '1c6b57780fa2df6f925b878c.jpg'
 
@@ -73,6 +76,22 @@ def test_card_text_has_the_same_lines_for_every_card_of_a_view():
         # every row stays one line long and shows its whole text as a tooltip
         assert all('white-space:nowrap' in style and 'text-overflow:ellipsis' in style
                    for style in re.findall(r'style="([^"]*)"', html))
+
+
+def test_the_closest_text_row_is_decided_for_the_whole_gallery():
+    # a page whose cards name no closest text keeps the row if another page has one, so the
+    # cards keep one height from page to page (review of F30)
+    assert has_closest_line([card(1), card(2, best_query='"a red car"')])
+    assert not has_closest_line([card(1), card(2)])
+    assert not has_closest_line([])
+
+
+def test_both_views_decide_the_closest_text_row_for_the_whole_gallery():
+    calls = [node for node in ast.walk(app_tree()) if isinstance(node, ast.Call)
+             and getattr(node.func, 'id', None) == 'draw_cards']
+    assert len(calls) == 2
+    # the fifth argument of draw_cards: from all cards of the entry, not from the page shown
+    assert all(ast.unparse(call.args[4]) == "has_closest_line(entry['cards'])" for call in calls)
 
 
 def test_an_empty_row_of_card_text_keeps_its_line():

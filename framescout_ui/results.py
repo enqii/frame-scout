@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 
 from framescout_core import (CARD_KEY_PREFIX, CARD_STYLE, GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS, QUICK_DIR,
-                             QUICK_GALLERY, card_text, hidden_text, hide_no_match, mark_style, page_cards, page_count,
+                             QUICK_GALLERY, card_text, has_closest_line, hidden_text, hide_no_match, mark_style, page_cards, page_count,
                              profile_fingerprints, profile_state, progress_text, query_summary, quick_entry_label,
                              quick_folders_differ, quick_note, quick_result_id, read_results, results_choice,
                              results_model, review_progress)
@@ -86,17 +86,17 @@ def card_key(card, profile=None):
     return CARD_KEY_PREFIX + widget_id(*parts)
 
 
-def draw_cards(cards, thumbs, key, find_disabled, profile=None, can_mark=False):
+def draw_cards(cards, thumbs, key, find_disabled, with_closest, profile=None, can_mark=False):
     """The gallery cards of one page in the container key, as many in a row as the window has room for (F30).
 
     One card for both views: thumbnails (from the folder thumbs) fitted into equal cells by
-    CARD_STYLE, which the view draws; the card text (card_text); the mark control "Match" /
-    "No" of the gallery of profile (None: the quick search, which has no marks), disabled
-    unless can_mark; the other actions in the popover "More". The cards have a fixed width
-    and wrap, so a wide window shows more of them in a row. find_disabled as in show_results.
+    CARD_STYLE, which the view draws; the card text (card_text, with_closest from
+    has_closest_line of the whole gallery); the mark control "Match" / "No" of the gallery of profile
+    (None: the quick search, which has no marks), disabled unless can_mark; the other
+    actions in the popover "More". The cards have a fixed width and wrap, so a wide window
+    shows more of them in a row. find_disabled as in show_results.
     """
     prefix = 'quick_' if profile is None else ''
-    closest_line = any(card.get('best_query') for card in cards)  # F17: only with several texts
     with st.container(key=key, horizontal=True, gap='small'):
         for card in cards:
             with st.container(key=card_key(card, profile), width=CARD_WIDTH, border=True, gap='small'):
@@ -105,7 +105,7 @@ def draw_cards(cards, thumbs, key, find_disabled, profile=None, can_mark=False):
                     st.image(str(thumb), width='stretch')
                 else:
                     st.markdown(NO_THUMBNAIL, unsafe_allow_html=True)
-                st.markdown(card_text(card, closest_line), unsafe_allow_html=True)
+                st.markdown(card_text(card, with_closest), unsafe_allow_html=True)
                 with st.container(horizontal=True, vertical_alignment='center', gap='small'):
                     if profile is not None:
                         mark_key = 'mark_' + widget_id(profile, card['path'])
@@ -283,7 +283,7 @@ def show_profile_results(results, name, photo_folders, model, find_disabled):
     # cards (the shorter last page) the cards of the previous page stayed in the browser
     # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
     draw_cards(shown, THUMBS, f'gallery_{names.index(name)}_{page}_{len(shown)}', find_disabled,
-               profile=name, can_mark=can_mark)
+               has_closest_line(entry['cards']), profile=name, can_mark=can_mark)
     show_copy(name, entry, marks, photo_folders, states[name] != 'missing')
     show_export(name, entry, marks, marks_error)
 
@@ -344,4 +344,5 @@ def show_quick_results(results, folders, model, find_disabled):
     st.caption(CARD_STYLE + '\n\n"More" on a card opens the photo or its folder with the programs of the computer '
                'FrameScout runs on, or finds photos similar to it.', unsafe_allow_html=True)
     # a new container for every page and card count, as in show_profile_results
-    draw_cards(shown, QUICK_THUMBS, f'quick_gallery_{page}_{len(shown)}', find_disabled)
+    draw_cards(shown, QUICK_THUMBS, f'quick_gallery_{page}_{len(shown)}', find_disabled,
+               has_closest_line(entry['cards']))

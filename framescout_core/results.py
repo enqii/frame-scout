@@ -116,6 +116,15 @@ def _card_escape(text):
     return html.escape(str(text)).replace('$', '&#36;')
 
 
+def has_closest_line(cards):
+    """Whether the cards of a gallery have a row for the closest search text in the app (F17, F30).
+
+    For all cards of the gallery, not those of one page: card_text expects it the same for
+    every card of a view, so the cards keep one height from page to page.
+    """
+    return any(card.get('best_query') for card in cards)  # F17: only with several texts
+
+
 def card_text(card, closest_line):
     """Return the HTML of the text of a gallery card in the app, on one line (F30).
 
