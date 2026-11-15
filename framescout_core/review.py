@@ -51,6 +51,17 @@ def review_index(cards, marks, path):
     return first_undecided(cards, marks) if found is None else found
 
 
+def review_shown(state, profile, cards):
+    """Whether the review state (st.session_state.review, or None) opens the dialog over the list cards of profile.
+
+    profile: the profile of the gallery shown (None: the quick search). The dialog is shown
+    only while its state names the list shown and that list has photos; a state of another
+    list must be dropped then (the selector may switch, e.g. to a new quick search, without
+    the dialog's on_dismiss), or the dialog would pop up later unprompted.
+    """
+    return state is not None and bool(cards) and state.get('profile') == profile
+
+
 def review_position(index, total):
     """Return where the photo at index is in a list of total photos, e.g. "Photo 3 of 150"."""
     return f'Photo {index + 1:,} of {total:,}'

@@ -4,9 +4,9 @@ import re
 
 from framescout_core import (CARD_STYLE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, PHOTO_KEY_PREFIX, PREVIEW_KEY_PREFIX,
                              REVIEW_PREVIEW_SIZE, REVIEW_STYLE, first_undecided, next_undecided, review_index,
-                             review_position, review_state_text)
+                             review_position, review_shown, review_state_text)
 
-from app_source import app_tree
+from app_source import app_tree, page_tree
 
 
 def cards(*paths):
@@ -43,6 +43,28 @@ def test_the_photo_shown_is_found_again_by_its_path():
     assert review_index(LIST, {}, 'c.jpg') == 2
     assert review_index(LIST, {'a.jpg': MARK_MATCH}, 'gone.jpg') == 1
     assert review_index(LIST, {}, None) == 0
+
+
+def test_the_dialog_is_shown_only_for_the_list_its_state_names():
+    assert review_shown({'profile': 'Cars', 'path': 'a.jpg'}, 'Cars', LIST)
+    assert review_shown({'profile': None, 'path': None}, None, LIST)
+    # another list is shown (the selector switched, e.g. to a new quick search), or the
+    # list is empty: the state is dropped, so the dialog cannot pop up later (review)
+    assert not review_shown({'profile': 'Cars', 'path': 'a.jpg'}, None, LIST)
+    assert not review_shown({'profile': None, 'path': 'a.jpg'}, 'Cars', LIST)
+    assert not review_shown({'profile': 'Cars', 'path': 'a.jpg'}, 'Cars', [])
+    assert not review_shown(None, 'Cars', LIST)
+
+
+def test_a_review_state_of_another_list_is_dropped():
+    functions = app_functions()
+    show_review = ast.unparse(functions['show_review'])
+    assert 'review_shown(' in show_review and 'close_review()' in show_review
+    # the results that end before a view draws its list drop it too
+    for function in ('show_results', 'show_quick_results'):
+        assert 'close_review' in calls_in(functions[function])
+    page = ast.unparse(page_tree())
+    assert 'close_review()' in page
 
 
 def test_the_position_and_the_saved_mark_are_named():

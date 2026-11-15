@@ -27,6 +27,7 @@ from framescout_ui.common import (BASE, EXAMPLE_PROFILES, PROFILES, QUICK_JSON, 
                                   supported)
 from framescout_ui.profiles import show_profiles
 from framescout_ui.results import load_results, show_results
+from framescout_ui.review import close_review
 from framescout_ui.run import (cached_analyzed_photos, low_space_warning, run_state, show_state_line, show_status,
                                start_run, stop_run)
 from framescout_ui.settings import setting_key, show_ai_settings, sync_settings
@@ -344,6 +345,8 @@ with results_tab:
         show_results(last_results, quick_results,
                      [*(last_results['photo_folders'] if last_results else []), *map(str, photo_folders)],
                      search_folders, settings['model'], active or not folder_scans)
+    else:
+        close_review()  # no list to review: its state must not open the dialog over a later one (F19)
     if not last_results:
         if RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
             # galleries of a search before results.json: listed by file name, since the
