@@ -314,9 +314,9 @@ photo itself opens it large in a dialog (see "Reviewing one photo at a time").
 
 Above the photos sits one row: the selector "Results of", the counts of the profile ("12 match
 · 30 no match · 58 undecided"; hover over them for how to mark), the checkbox **Hide no match**,
-the page box, the button **Review one by one** and the menu **Export and copy**. It holds "Open gallery in browser", "Download HTML
-(without thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export list"
-(see below). The quick search result has the same row with the menu **Gallery and folder**.
+the page box, the button **Review one by one** (see "Reviewing one photo at a time") and the menu
+**Export and copy**. The menu holds "Open gallery in browser", "Download HTML (without
+thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export list" (see below). The quick search result has the same row with the menu **Gallery and folder**.
 Below the row come one caption about the search and only the notes that apply (another search
 model, a profile changed, renamed or deleted since the search, the state of the other profiles,
 an unreadable `marks.json`), then the messages of copying and exporting. Below the photos
@@ -351,7 +351,9 @@ photo is undecided the dialog stays and says so. **Previous** and **Next** step 
 list, including photos that "Hide no match" hides on the page. **Open photo** and **Find similar**
 work as in the menu "More" ("Find similar" closes the dialog). Keys: M (Match), N (No match),
 S (Skip), Left/Right (Previous/Next), O (Open photo). The dialog for a quick search has no
-Match/No match buttons (marks belong to a profile). The gallery behind the dialog shows the new
+Match/No match buttons (marks belong to a profile). Where the gallery cannot mark photos (the
+profile is no longer a search profile, or `marks.json` cannot be read), the dialog shows no saved
+mark and Match/No match are off; Skip, Previous and Next still work. The gallery behind the dialog shows the new
 marks when you close it (X, Esc or a click outside). The first view of a large photo can take a
 moment.
 
