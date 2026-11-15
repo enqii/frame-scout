@@ -87,14 +87,17 @@ def show_preview(card, thumbs):
     photo = openable_photo(card['path'])
     problem = 'The photo is no longer there, so its thumbnail is shown.'
     if photo is not None:
+        # only the decoding is caught: an error after the container below was drawn would
+        # draw a second one with the same key in the fallback (review)
         try:
             with st.spinner('Loading the photo…'):
                 data = cached_preview(*file_key(photo))
+        except Exception as exc:  # any decoder error: the dialog stays usable
+            problem = f'The photo cannot be shown ({plain(str(exc))}), so its thumbnail is shown.'
+        else:
             with st.container(key=REVIEW_PHOTO_KEY):
                 st.image(data, width='stretch')
             return
-        except Exception as exc:  # any decoder error: the dialog stays usable
-            problem = f'The photo cannot be shown ({plain(str(exc))}), so its thumbnail is shown.'
     st.caption(problem)
     thumb = thumbs / card['thumbnail']  # a plain file name, checked by read_results
     if thumb.is_file():

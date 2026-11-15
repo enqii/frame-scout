@@ -104,6 +104,22 @@ def test_the_review_dialog_is_a_streamlit_dialog_with_its_buttons():
     assert 'save_marks' in {ast.unparse(n.func) for n in ast.walk(functions['review_choice']) if isinstance(n, ast.Call)}
 
 
+def calls_in(node):
+    return {ast.unparse(n.func) for n in ast.walk(node) if isinstance(n, ast.Call)}
+
+
+def test_only_decoding_the_preview_falls_back_to_the_thumbnail():
+    # review: an error of st.image after its container was drawn would draw a second
+    # container with the same key in the fallback (a duplicate-key error), so the try covers
+    # the decoding only and the preview is drawn after it
+    show_preview = app_functions()['show_preview']
+    tries = [n for n in ast.walk(show_preview) if isinstance(n, ast.Try)]
+    assert len(tries) == 1
+    assert 'cached_preview' in calls_in(tries[0])
+    assert not {'st.image', 'st.container'} & set().union(*(calls_in(n) for n in tries[0].body))
+    assert 'st.image' in calls_in(show_preview)
+
+
 def test_the_review_dialog_is_opened_from_the_toolbar_and_from_a_card_photo():
     functions = app_functions()
     assert buttons(functions['show_profile_results'])['Review one by one']['on_click'] == 'open_review'
