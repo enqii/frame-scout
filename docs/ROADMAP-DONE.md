@@ -206,3 +206,36 @@ decision in PR #14):
 - [x] Assess the whole user interface and write the findings down, no rebuild; follow-up PRs
       are decided afterwards (F24; kind `docs`; done 2026-11-13, findings in
       [UI-REVIEW.md](UI-REVIEW.md), follow-ups F27–F33)
+
+### P29 – Detector weights (added 2026-11-12)
+- [x] Log which detector weights file was loaded (E60)
+
+### P30 – Mark colors (added 2026-11-13)
+- [x] The mark colors apply again with the pinned Streamlit, checked in a browser (A49)
+
+### P31 – Split `app.py` (added 2026-11-13)
+- [x] Move the areas of `app.py` into modules without changing behavior, before the UI
+      rebuild (A46) (2026-11-13)
+
+### P32 – Run state (added 2026-11-13)
+- [x] A state line next to the title and what a search still needs at the Start button (F27) (2026-11-14)
+
+### P33 – Tabs and settings (added 2026-11-13)
+- [x] (A) Five tabs: results on their own, storage maintenance in the settings, "Analyze
+      ahead" in the search tab (F28) (2026-11-14)
+- [x] (B) Group the AI settings (F32) (2026-11-14)
+
+### P34 – Quick search in the results view (added 2026-11-13)
+- [x] The result of a quick search or "Find similar" is an entry of the results selector
+      (F34) (2026-11-14)
+
+### P35 – Result card (added 2026-11-13)
+- [x] One card for both views: equal cells, "Match"/"No" as the main buttons, the other
+      actions in a popover, a visible mark state, full window width (F30) (2026-11-15)
+
+### P36 – Results toolbar (added 2026-11-13)
+- [x] One toolbar row above the photos, a pager below the grid, copy and export in a
+      popover (F29) (2026-11-15)
+
+### P37 – Review dialog (added 2026-11-13)
+- [x] One photo at a time with a large preview in a dialog (F19) (2026-11-15)
