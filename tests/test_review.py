@@ -120,6 +120,14 @@ def test_only_decoding_the_preview_falls_back_to_the_thumbnail():
     assert 'st.image' in calls_in(show_preview)
 
 
+def test_the_dialog_shows_the_card_text_as_the_gallery_does():
+    # the row of the closest search text as in the gallery: for all cards of the list, so the
+    # text keeps its height from photo to photo (review)
+    texts = [ast.unparse(n) for n in ast.walk(app_functions()['review_dialog'])
+             if isinstance(n, ast.Call) and ast.unparse(n.func) == 'card_text']
+    assert texts == ['card_text(card, has_closest_line(cards))']
+
+
 def test_the_review_dialog_is_opened_from_the_toolbar_and_from_a_card_photo():
     functions = app_functions()
     assert buttons(functions['show_profile_results'])['Review one by one']['on_click'] == 'open_review'
