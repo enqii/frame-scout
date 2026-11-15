@@ -2269,5 +2269,8 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       results, CLI, cache or folder change. Not done: the crop outline (F45). Tests:
       `tests/test_review.py`, `tests/test_images.py` (preview). Verified: pytest 1664 passed,
       2 skipped; a headless Edge harness. Not verified: a real search, closing with Esc and
-      the keys with a real keyboard (F40), RAW/HEIC speed (F46).
+      the keys with a real keyboard (F40), RAW/HEIC speed (F46). Review (PR #116): a press for a
+      photo no longer shown is ignored (`_still_shown`), the review state of a list not shown is
+      dropped (`review_shown`), only the decoding of the preview is caught, no mark is saved or
+      named while marks cannot be read, the card text has the gallery's closest-text row.
 
