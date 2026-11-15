@@ -11,7 +11,7 @@ import pytest
 
 from framescout_core import (CARD_KEY_PREFIX, CARD_STYLE, CONSTRAINTS_FILE, MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
                              MARKS_BACKUP, MARKS_FILE, NEVER_DELETED, RunLock, UnknownProfileError, delete_marks,
-                             hidden_text, hide_no_match, lock_held, mark_style, marks_backup, marks_restore_offer, page_cards,
+                             hidden_text, hide_no_match, lock_held, mark_counts_text, mark_style,marks_backup, marks_restore_offer, page_cards,
                              progress_text, read_marks, ReviewProgress, review_progress,
                              remove_marks, rename_marks, restore_marks, save_marks)
 
@@ -429,6 +429,17 @@ def test_review_progress_of_a_fully_checked_or_empty_list_has_no_first_open_phot
 ])
 def test_progress_text_summarizes_the_review_of_a_profile(progress, paged, text):
     assert progress_text(progress, paged) == text
+
+
+@pytest.mark.parametrize('progress,text', [
+    (ReviewProgress(0, 0, 0, None, None), ''),
+    (ReviewProgress(32, 41, 77, 74, 2), '32 match · 41 no match · 77 undecided'),
+    (ReviewProgress(1200, 3, 0, None, None), '1,200 match · 3 no match · 0 undecided'),
+])
+def test_mark_counts_text_is_the_short_count_of_the_toolbar(progress, text):
+    # F29: the toolbar above the photos names the three counts only; the first undecided
+    # photo is named below the grid, next to the button that shows it
+    assert mark_counts_text(progress) == text
 
 
 # --- the colors of the selected option of a mark (A24) ---

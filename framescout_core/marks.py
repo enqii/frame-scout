@@ -380,6 +380,16 @@ def progress_text(progress, paged):
             + (f' on page {progress.first_open_page}.' if paged else '.'))
 
 
+def mark_counts_text(progress):
+    """Return the short counts of a profile's ReviewProgress for the results toolbar, or '' (F29).
+
+    Only the three counts: progress_text, below the grid, names the first undecided photo.
+    """
+    if not progress.matches + progress.no_matches + progress.open:
+        return ''
+    return f'{progress.matches:,} match · {progress.no_matches:,} no match · {progress.open:,} undecided'
+
+
 def mark_style(states):
     """Return a <style> block showing the saved mark of each gallery card, or '' (A24, F30).
 
