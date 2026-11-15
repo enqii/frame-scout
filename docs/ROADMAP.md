@@ -50,7 +50,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       popover (F29) (2026-11-15)
 
 ### P37 – Review dialog (added 2026-11-13)
-- [ ] One photo at a time with a large preview in a dialog (F19)
+- [x] One photo at a time with a large preview in a dialog (F19) (2026-11-15)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new

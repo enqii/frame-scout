@@ -521,17 +521,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
       may show people (say so in the guide). **Question:** the contents of the new bundle format
       (no `profiles.json` schema change). Size M.
-- [ ] `ready` **F19 – One-photo review in a dialog with a large preview:** marking (A17) happens
-      on small thumbnails. Decided 2026-11-13 (replaces F31): a dialog (`st.dialog`) opened by
-      "Review one by one" in the results toolbar and by a click on a card's photo. It shows one
-      result with a large preview (decoded downscaled in memory), the best crop outlined if the
-      result has the data, rank, score and path, and the buttons "Match", "No match" and "Skip";
-      each choice saves through `save_marks` and shows the next undecided photo; "Previous",
-      "Next", "Open photo" and "Find similar" below. Keyboard keys only without a new
-      dependency. Affected: `app.py` (its modules after A46), `framescout_images.py`,
-      `framescout_core`, user guide. Risks: decoding large RAW/HEIC on every rerun is slow
-      (cache the preview per path and mtime). Builds on F30 and F29: the toolbar row of F29 has
-      no "Review one by one" yet, F19 adds it there. Size M. Roadmap P37.
 - [ ] `parked` **F21 – Warn about cloud-only photos before a search:** photos in OneDrive-style
       folders with files on demand are downloaded when read. Sketch: flag files with
       `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`/`FILE_ATTRIBUTE_OFFLINE` during the scan, show a
@@ -585,7 +574,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 - [ ] `minor` **F40 – Check clicking "Match" and "No" in a browser:** the browser check of F30
       used a harness that draws `draw_cards`; a click would have written the checkout's
       `marks.json`. Look at the marking with the real app (mark, take the mark back, page change,
-      reload) in the next browser pass, together with F19. Found in F30. Size S.
+      reload) in the next browser pass. Also check the review dialog of F19 there: closing it with
+      Esc (a synthetic Esc event did not close it in headless Edge; the X did) and its keys
+      (M, N, S, Left, Right, O) with a real keyboard. Found in F30 and F19. Size S.
 - [ ] `minor` **F41 – Close the popover "More" after its action:** a click on "Open photo",
       "Show in folder" or "Find similar" reruns the page, and Streamlit 1.66.1 keeps the
       popover open (as documented; checked in headless Edge in the F30 review), so it covers the
@@ -611,3 +602,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       copy and export inside the popover "Export and copy" (folder box, "Copy", "Export",
       their notices below the toolbar). Affected: `framescout_ui/results.py`,
       `framescout_ui/copy_export.py`. Found in the PR #115 review. Size S.
+- [ ] `decision` **F45 – The best crop outlined in the large preview:** this part of F19 is not
+      done, because neither the results nor the feature cache store a crop's box (the engine
+      computes it in `crops_for` and keeps only label and embedding). Sketch: store the person
+      box (relative coordinates) in the cache rows and in the result cards (`result_card`, an
+      optional key), then draw it in the review dialog. **Question:** a cache signature or a
+      new column and a result format change (hold point). Affected: `framescout_engine.py`,
+      `framescout_core`, `framescout_ui/review.py`, user guide. Found in F19. Size M.
+- [ ] `minor` **F46 – Preview speed for large RAW/HEIC photos:** not measured in F19. The first
+      view of each photo decodes it, and only 8 previews are cached
+      (`render_preview` with `st.cache_data`). Possibly prefetch the next undecided photo.
+      Affected: `framescout_ui/review.py`, `framescout_images.py`. Found in F19. Size S.

@@ -2244,3 +2244,30 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       bottom pager, notices), `test_quick.py`. Verified: pytest 1651 passed, 2 skipped;
       `AppTest` on a synthetic copy under `.tmp/`; headless Edge 1920 x 889, dark theme. Not
       verified: real photos, narrow windows, light theme, clicking copy or export in the popover.
+- [x] `ready` **F19 – One-photo review in a dialog with a large preview:** marking (A17) happens
+      on small thumbnails. Decided 2026-11-13 (replaces F31): a dialog (`st.dialog`) opened by
+      "Review one by one" in the results toolbar and by a click on a card's photo, with a large
+      preview (decoded downscaled in memory), "Match", "No match" and "Skip", "Previous",
+      "Next", "Open photo" and "Find similar". Size M. Roadmap P37.
+      Done (2026-11-15): "Review one by one" (profile galleries only; disabled where photos
+      cannot be marked) opens the dialog at the first undecided photo of the whole ranked list;
+      a click on a card's photo opens it at that photo, in both views (an invisible button,
+      key prefix `fspreview-`, over the photo container `fsphoto-`, laid out by `CARD_STYLE`).
+      The dialog (`st.dialog`, width "large") shows "Photo n of N", the saved mark, the
+      "ranking, not identification" note, the preview (`framescout_images.render_preview`,
+      longer edge `REVIEW_PREVIEW_SIZE` = 1600 px, in memory, `st.cache_data` per path, mtime
+      and size, 8 entries; a missing or undecodable photo shows its thumbnail with the reason)
+      and the card text. "Match"/"No match" save through `save_marks`; each choice moves to
+      the next undecided photo after the current one and wraps around; if none is left the
+      dialog stays and says so. "Previous"/"Next" step through the whole list, including
+      photos "Hide no match" hides. Keys: M, N, S, Left/Right, O (`st.button(shortcut=...)`,
+      no new dependency). Quick search: the same dialog without the mark buttons. Closing
+      (`on_dismiss`) clears the review state and reruns, so the gallery shows the new marks.
+      `find_similar_button` moved to `framescout_ui/review.py`; new `framescout_core/review.py`.
+      Streamlit internal relied on: `data-testid="stFullScreenFrame"` (pinned in the bundle
+      test of `tests/test_marks.py`). No `profiles.json`, `settings.json`, `marks.json`,
+      results, CLI, cache or folder change. Not done: the crop outline (F45). Tests:
+      `tests/test_review.py`, `tests/test_images.py` (preview). Verified: pytest 1664 passed,
+      2 skipped; a headless Edge harness. Not verified: a real search, closing with Esc and
+      the keys with a real keyboard (F40), RAW/HEIC speed (F46).
+
