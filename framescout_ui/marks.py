@@ -10,8 +10,9 @@ from framescout_core import (MARKS_BACKUP, MARKS_FILE, MARK_MATCH, MARK_NO_MATCH
 from .common import MARKS, PROFILES, version_key
 
 
-# the three states of a mark, as the control on each gallery card shows them (A17)
-MARK_LABELS = {MARK_OPEN: 'Undecided', MARK_MATCH: 'Match', MARK_NO_MATCH: 'No match'}
+# the two buttons of the mark control on each gallery card (A17, F30): neither pressed is
+# undecided (MARK_OPEN), and a second click on the pressed one takes the mark back
+MARK_LABELS = {MARK_MATCH: 'Match', MARK_NO_MATCH: 'No'}
 MARK_BY_LABEL = {label: state for state, label in MARK_LABELS.items()}
 
 
@@ -68,7 +69,7 @@ def restore_marks_backup():
 
 def set_mark(profile, photo, key):
     """Save the mark the control key shows for photo of profile (on_change of the control)."""
-    # no selection (the selected option clicked again) is "open"
+    # no selection (neither button, or the pressed one clicked again) is "open"
     state = MARK_BY_LABEL.get(st.session_state.get(key), MARK_OPEN)
     try:
         # only for a profile that still exists: this gallery may have been drawn before it
