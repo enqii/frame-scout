@@ -309,11 +309,12 @@ and landscape photos alike), and the cards use the whole window width (cards 250
 per row as fit; the other tabs stay at most 1,300 px wide). A card shows rank, score and the best-matching part
 ("Full image" or "Person 1", …), the detail line and the file name; a long line ends with "…" and
 shows its whole text when you hover over it. The buttons **Match** and **No** mark the photo;
-**More** opens a menu with "Open photo", "Show in folder" and "Find similar".
+**More** opens a menu with "Open photo", "Show in folder" and "Find similar". A click on the
+photo itself opens it large in a dialog (see "Reviewing one photo at a time").
 
 Above the photos sits one row: the selector "Results of", the counts of the profile ("12 match
 · 30 no match · 58 undecided"; hover over them for how to mark), the checkbox **Hide no match**,
-the page box and the menu **Export and copy**. It holds "Open gallery in browser", "Download HTML
+the page box, the button **Review one by one** and the menu **Export and copy**. It holds "Open gallery in browser", "Download HTML
 (without thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export list"
 (see below). The quick search result has the same row with the menu **Gallery and folder**.
 Below the row come one caption about the search and only the notes that apply (another search
@@ -334,6 +335,25 @@ run summary counts how many of the listed photos were closest to each text. This
 wins by a small margin and the others can be nearly as close, so a text with a low count did not fail. The HTML
 gallery shows the same line per card. Nothing is shown for a single text, for "Find similar" or for results of
 an earlier version.
+
+### Reviewing one photo at a time
+
+**Review one by one** (in the row above the photos of a profile) opens a dialog at the first
+undecided photo of the whole list; a click on a card's photo opens it at that photo, in the quick
+search too. The dialog shows "Photo n of N", the saved mark, a large preview of the photo (made
+in memory, nothing is written to disk; a photo that is missing or cannot be read shows its small
+thumbnail and the reason) and the card's text, with rank, score, part and path. Like everywhere,
+the ranking is not an identification.
+
+The buttons **Match**, **No match** and **Skip** work like the buttons on a card and move to the
+next undecided photo after the current one, wrapping around to the top of the list; when no
+photo is undecided the dialog stays and says so. **Previous** and **Next** step through the whole
+list, including photos that "Hide no match" hides on the page. **Open photo** and **Find similar**
+work as in the menu "More" ("Find similar" closes the dialog). Keys: M (Match), N (No match),
+S (Skip), Left/Right (Previous/Next), O (Open photo). The dialog for a quick search has no
+Match/No match buttons (marks belong to a profile). The gallery behind the dialog shows the new
+marks when you close it (X, Esc or a click outside). The first view of a large photo can take a
+moment.
 
 ### Marking and copying matches
 
