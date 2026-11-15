@@ -129,27 +129,42 @@ def test_the_results_have_one_toolbar_row_above_the_photos():
 def test_the_results_have_a_pager_below_the_grid():
     # F29: a second pager below the grid; in the profile results with "Go to the first undecided photo"
     functions = app_functions()
-    for name, call in (('show_profile_results', "bottom_pager(key, page, pages, 'results_' + widget_id(name) + '_', "
-                                                "progress)"),
-                       ('show_quick_results', "bottom_pager('quick_page', page, pages, 'quick_')")):
-        body = functions[name].body
-        calls = [ast.unparse(node) for node in body if isinstance(node, ast.Expr)]
-        # the last statement, after the cards
-        assert calls[-1] == call and calls[-2].startswith('draw_cards(')
-    pager = ast.unparse(functions['bottom_pager'])
-    for text in ("'Previous page'", "'Next page'", "'Go to the first undecided photo'",
-                 'on_click=go_to_page, args=(key, page - 1)', 'on_click=go_to_page, args=(key, page + 1)',
-                 'on_click=go_to_page, args=(key, progress.first_open_page)'):
-        assert text in pager
+    for name, page_key, progress in (('show_profile_results', 'key', 'progress'),
+                                     ('show_quick_results', "'quick_page'", None)):
+        # the last two statements: the cards, then the pager with the page box of this view
+        *_, cards, pager = [node.value for node in functions[name].body
+                            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)]
+        assert [call_name(cards), call_name(pager)] == ['draw_cards', 'bottom_pager']
+        assert ast.unparse(pager.args[0]) == page_key
+        assert (ast.unparse(pager.args[4]) if len(pager.args) > 4 else None) == progress
+    # each button of the pager sets the page box through go_to_page, to its own page
+    targets = {}
+    for node in ast.walk(functions['bottom_pager']):
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == 'st.button':
+            keywords = {keyword.arg: keyword.value for keyword in node.keywords}
+            assert ast.unparse(keywords['on_click']) == 'go_to_page'
+            targets[node.args[0].value] = ast.unparse(keywords['args'].elts[1])
+    assert targets == {'Previous page': 'page - 1', 'Next page': 'page + 1',
+                       'Go to the first undecided photo': 'progress.first_open_page'}
+
+
+def call_name(call):
+    return call.func.id if isinstance(call.func, ast.Name) else ast.unparse(call.func)
 
 
 def test_the_notices_of_copy_and_export_are_shown_outside_the_popover():
-    # F29: a closed popover must not hide the result of a copy or an export
+    # F29: a closed popover must not hide the result of a copy or an export: both are drawn
+    # into the container notices below the toolbar
     functions = app_functions()
-    assert any('copy_matches(name, key, photo_folders)' in block
-               for block in with_blocks(functions['show_copy'], 'notices'))
-    assert any("st.session_state.pop('export_notice')" not in block and 'st.success' in block
-               for block in with_blocks(functions['show_export'], 'notices'))
+
+    def names_in_notices(function):
+        """The names (e.g. copy_matches, st.success) used inside a with block of notices."""
+        return {ast.unparse(node) for block in ast.walk(function) if isinstance(block, ast.With)
+                and ast.unparse(block.items[0].context_expr) == 'notices'
+                for node in ast.walk(block) if isinstance(node, (ast.Name, ast.Attribute))}
+
+    assert 'copy_matches' in names_in_notices(functions['show_copy'])
+    assert {'st.success', 'st.warning'} <= names_in_notices(functions['show_export'])
 
 
 def test_an_empty_row_of_card_text_keeps_its_line():
