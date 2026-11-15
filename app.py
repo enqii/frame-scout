@@ -36,7 +36,8 @@ DECODERS = decoders()
 SUPPORTED = supported()
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
-st.markdown('''<style>.block-container{padding-top:2rem;max-width:1300px}
+# the whole window width (F30): the result cards have a fixed width and fill the rows
+st.markdown('''<style>.block-container{padding-top:2rem}
 .stButton button{border-radius:8px}</style>''', unsafe_allow_html=True)
 
 title_col, state_col = st.columns([1, 2], vertical_alignment='bottom')

@@ -471,9 +471,13 @@ def test_every_result_card_of_the_app_offers_find_similar():
     # card's photo and the part it names, and the page run (not the fragment) starts it
     tree = app_tree()
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+
+    def calls(name):
+        return [getattr(call.func, 'id', None) for call in ast.walk(functions[name]) if isinstance(call, ast.Call)]
+    # both views draw their cards with the one card function (F30), which offers it
     for name in ('show_profile_results', 'show_quick_results'):
-        assert 'find_similar_button' in [getattr(call.func, 'id', None) for call in ast.walk(functions[name])
-                                         if isinstance(call, ast.Call)]
+        assert 'draw_cards' in calls(name)
+    assert 'find_similar_button' in calls('draw_cards')
     button = ast.unparse(functions['find_similar_button'])
     assert "st.session_state.find_similar = (card['path'], card['label'])" in button
     assert 'st.rerun()' in button

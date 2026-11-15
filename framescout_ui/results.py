@@ -3,10 +3,11 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS, QUICK_DIR, QUICK_GALLERY, hidden_text,
-                             hide_no_match, mark_style, page_cards, page_count, profile_fingerprints, profile_state,
-                             progress_text, query_caption, query_summary, quick_entry_label, quick_folders_differ,
-                             quick_note, quick_result_id, read_results, results_choice, results_model, review_progress)
+from framescout_core import (CARD_KEY_PREFIX, CARD_STYLE, GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS, QUICK_DIR,
+                             QUICK_GALLERY, card_text, hidden_text, hide_no_match, mark_style, page_cards, page_count,
+                             profile_fingerprints, profile_state, progress_text, query_summary, quick_entry_label,
+                             quick_folders_differ, quick_note, quick_result_id, read_results, results_choice,
+                             results_model, review_progress)
 
 from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file_key, open_gallery, open_photo,
                      open_quick_folder, open_quick_gallery, open_results_folder, plain, show_photo, widget_id)
@@ -15,7 +16,14 @@ from .marks import MARK_LABELS, load_marks, marks_backup_offer, restore_marks_ba
 from .copy_export import show_copy, show_export
 
 
-GALLERY_COLUMNS = 4
+# the width of a gallery card in pixels (F30): fixed, so a wider window shows more cards in a
+# row (a size setting is parked as F35)
+CARD_WIDTH = 250
+# the cell of a card without a thumbnail, as tall as one with a photo (CARD_STYLE); the
+# margin makes up for the negative one Streamlit gives the end of a Markdown element
+NO_THUMBNAIL = ('<div style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;'
+                'opacity:0.6;background:rgba(128, 128, 128, 0.12);border-radius:4px;margin-bottom:1rem">'
+                'No thumbnail</div>')
 
 
 def go_to_page(key, page):
@@ -70,6 +78,47 @@ def find_similar_button(card, key, disabled):
                       'search.'):
         st.session_state.find_similar = (card['path'], card['label'])
         st.rerun()
+
+
+def card_key(card, profile=None):
+    """The key of the container of card in the gallery of profile, or of the quick search for None (F30)."""
+    parts = ('quick', card['path']) if profile is None else ('profile', profile, card['path'])
+    return CARD_KEY_PREFIX + widget_id(*parts)
+
+
+def draw_cards(cards, thumbs, key, find_disabled, profile=None, can_mark=False):
+    """The gallery cards of one page in the container key, as many in a row as the window has room for (F30).
+
+    One card for both views: thumbnails (from the folder thumbs) fitted into equal cells by
+    CARD_STYLE, which the view draws; the card text (card_text); the mark control "Match" /
+    "No" of the gallery of profile (None: the quick search, which has no marks), disabled
+    unless can_mark; the other actions in the popover "More". The cards have a fixed width
+    and wrap, so a wide window shows more of them in a row. find_disabled as in show_results.
+    """
+    prefix = 'quick_' if profile is None else ''
+    closest_line = any(card.get('best_query') for card in cards)  # F17: only with several texts
+    with st.container(key=key, horizontal=True, gap='small'):
+        for card in cards:
+            with st.container(key=card_key(card, profile), width=CARD_WIDTH, border=True, gap='small'):
+                thumb = thumbs / card['thumbnail']  # a plain file name, checked by read_results
+                if thumb.is_file():
+                    st.image(str(thumb), width='stretch')
+                else:
+                    st.markdown(NO_THUMBNAIL, unsafe_allow_html=True)
+                st.markdown(card_text(card, closest_line), unsafe_allow_html=True)
+                with st.container(horizontal=True, vertical_alignment='center', gap='small'):
+                    if profile is not None:
+                        mark_key = 'mark_' + widget_id(profile, card['path'])
+                        st.segmented_control('Mark', list(MARK_LABELS.values()), key=mark_key, on_change=set_mark,
+                                             args=(profile, card['path'], mark_key), disabled=not can_mark,
+                                             label_visibility='collapsed',
+                                             help='Neither pressed: undecided. A second click takes the mark back.')
+                    with st.popover('More', help='Open the photo, show it in its folder or find similar photos.'):
+                        st.button('Open photo', key=f"{prefix}open_{card['rank']}", on_click=open_photo,
+                                  args=(card['path'],), width='stretch', help='Opens the photo in your image viewer.')
+                        st.button('Show in folder', key=f"{prefix}reveal_{card['rank']}", on_click=show_photo,
+                                  args=(card['path'],), width='stretch', help='Shows the photo in its folder.')
+                        find_similar_button(card, f"{prefix}similar_{card['rank']}", find_disabled)
 
 
 @st.fragment
@@ -219,46 +268,22 @@ def show_profile_results(results, name, photo_folders, model, find_disabled):
     shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
     if hidden:
         st.caption(hidden_text(hidden, len(shown), page < pages))
-    mark_keys = {}
     for card in shown:
         # the saved mark, set before the control is drawn (never as its default): the file
-        # is the truth, also for marks made in another tab
-        mark_keys[card['rank']] = key = 'mark_' + widget_id(name, card['path'])
-        st.session_state[key] = MARK_LABELS[marks.get(card['path'], MARK_OPEN)]
-    colors = mark_style({mark_keys[card['rank']]: marks.get(card['path'], MARK_OPEN) for card in shown})
-    # the style block rides in this caption, which is drawn anyway: an element of its own took
+        # is the truth, also for marks made in another tab; None (neither button) is undecided
+        st.session_state['mark_' + widget_id(name, card['path'])] = MARK_LABELS.get(marks.get(card['path']))
+    colors = mark_style({card_key(card, name): marks.get(card['path'], MARK_OPEN) for card in shown})
+    # the style blocks ride in this caption, which is drawn anyway: an element of its own took
     # a layout slot with the block gap above the cards (A38); replaced on every run like it
-    st.caption((colors + '\n\n' if colors else '') +
-               '"Open" and "Folder" use the programs of the computer FrameScout runs on. Mark each photo you have '
-               'checked as Match or No match; marks are kept for this profile across searches.',
-               unsafe_allow_html=bool(colors))
+    st.caption(CARD_STYLE + colors + '\n\n'
+               'Mark each photo you have checked as Match or No; a second click takes the mark back. Marks are kept '
+               'for this profile across searches. "More" opens the photo or its folder with the programs of the '
+               'computer FrameScout runs on.', unsafe_allow_html=True)
     # a new container for every profile, page and card count: in a fragment rerun with fewer
-    # cards (the shorter last page) the rows of the previous page stayed in the browser
+    # cards (the shorter last page) the cards of the previous page stayed in the browser
     # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
-    with st.container(key=f'gallery_{names.index(name)}_{page}_{len(shown)}'):
-        for start in range(0, len(shown), GALLERY_COLUMNS):
-            for column, card in zip(st.columns(GALLERY_COLUMNS), shown[start:start + GALLERY_COLUMNS]):
-                with column:
-                    thumb = THUMBS / card['thumbnail']  # a plain file name, checked by read_results
-                    if thumb.is_file():
-                        st.image(str(thumb))
-                    else:
-                        st.caption('No thumbnail')
-                    st.markdown(f"**#{card['rank']}** · {plain(card['caption'])} · {plain(card['label'])}")
-                    closest = card.get('best_query')  # F17: only with several texts
-                    st.caption(f"{plain(card['detail'])}  \n"
-                               + (f'{plain(query_caption(closest))}  \n' if closest else '')
-                               + plain(card['relative']))
-                    b1, b2 = st.columns(2)
-                    b1.button('Open', key=f"open_{card['rank']}", on_click=open_photo, args=(card['path'],),
-                              width='stretch', help='Opens the photo in your image viewer.')
-                    b2.button('Folder', key=f"reveal_{card['rank']}", on_click=show_photo, args=(card['path'],),
-                              width='stretch', help='Shows the photo in its folder.')
-                    find_similar_button(card, f"similar_{card['rank']}", find_disabled)
-                    key = mark_keys[card['rank']]
-                    st.segmented_control('Mark', list(MARK_LABELS.values()), key=key, on_change=set_mark,
-                                         args=(name, card['path'], key), disabled=not can_mark,
-                                         label_visibility='collapsed')
+    draw_cards(shown, THUMBS, f'gallery_{names.index(name)}_{page}_{len(shown)}', find_disabled,
+               profile=name, can_mark=can_mark)
     show_copy(name, entry, marks, photo_folders, states[name] != 'missing')
     show_export(name, entry, marks, marks_error)
 
@@ -315,21 +340,8 @@ def show_quick_results(results, folders, model, find_disabled):
         page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key='quick_page',
                             persist_state='page')  # kept while a profile is shown (F34)
     shown = page_cards(entry['cards'], page, GALLERY_PAGE_SIZE)
-    # a new container for every page and card count, as in show_results
-    with st.container(key=f'quick_gallery_{page}_{len(shown)}'):
-        for start in range(0, len(shown), GALLERY_COLUMNS):
-            for column, card in zip(st.columns(GALLERY_COLUMNS), shown[start:start + GALLERY_COLUMNS]):
-                with column:
-                    thumb = QUICK_THUMBS / card['thumbnail']  # a plain file name, checked by read_results
-                    if thumb.is_file():
-                        st.image(str(thumb))
-                    else:
-                        st.caption('No thumbnail')
-                    st.markdown(f"**#{card['rank']}** · {plain(card['caption'])} · {plain(card['label'])}")
-                    st.caption(f"{plain(card['detail'])}  \n{plain(card['relative'])}")
-                    b1, b2 = st.columns(2)
-                    b1.button('Open', key=f"quick_open_{card['rank']}", on_click=open_photo, args=(card['path'],),
-                              width='stretch', help='Opens the photo in your image viewer.')
-                    b2.button('Folder', key=f"quick_reveal_{card['rank']}", on_click=show_photo,
-                              args=(card['path'],), width='stretch', help='Shows the photo in its folder.')
-                    find_similar_button(card, f"quick_similar_{card['rank']}", find_disabled)
+    # the style block rides in a caption, as in show_profile_results (A38)
+    st.caption(CARD_STYLE + '\n\n"More" on a card opens the photo or its folder with the programs of the computer '
+               'FrameScout runs on, or finds photos similar to it.', unsafe_allow_html=True)
+    # a new container for every page and card count, as in show_profile_results
+    draw_cards(shown, QUICK_THUMBS, f'quick_gallery_{page}_{len(shown)}', find_disabled)
