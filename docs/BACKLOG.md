@@ -530,7 +530,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       "Next", "Open photo" and "Find similar" below. Keyboard keys only without a new
       dependency. Affected: `app.py` (its modules after A46), `framescout_images.py`,
       `framescout_core`, user guide. Risks: decoding large RAW/HEIC on every rerun is slow
-      (cache the preview per path and mtime). Builds on F30 and F29. Size M. Roadmap P37.
+      (cache the preview per path and mtime). Builds on F30 and F29: the toolbar row of F29 has
+      no "Review one by one" yet, F19 adds it there. Size M. Roadmap P37.
 - [ ] `parked` **F21 – Warn about cloud-only photos before a search:** photos in OneDrive-style
       folders with files on demand are downloaded when read. Sketch: flag files with
       `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`/`FILE_ATTRIBUTE_OFFLINE` during the scan, show a
@@ -555,15 +556,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `Start-FrameScout.bat` starts a second app of the same folder on the next free port. The app
       could take the lock itself (e.g. via `st.cache_resource`). Affected: `app.py`,
       `framescout_core/app_instance.py`, `docs/ARCHITECTURE.md`. Found in F22. Size S.
-- [ ] `ready` **F29 – One-row results toolbar and a pager below the grid:** the first photo
-      starts 520 px below the "Results" heading (profile selector, captions, info boxes,
-      buttons, a checkbox, a pager); copy and export are below the 48 cards; no pager below the
-      grid. Decided 2026-11-13: one toolbar row (profile selector, the counts of match, no
-      match and undecided, "Hide no match", pager, "Review one by one" once F19 exists, and a
-      popover "Export and copy" with copy, list export, gallery and results folder); the notes
-      for exceptional states (other model, changed profile, missing profile) only when they
-      apply; a second pager and "Go to first undecided" below the grid. Affected: `app.py`
-      (its modules after A46), user guide. `docs/UI-REVIEW.md` §1. Size M. Roadmap P36.
 - [ ] `decision` **F33 – HTML gallery parity with the app:** the gallery has a fixed dark theme,
       no marks, no paging and no way back to the navigation. **Options:** (a) light/dark by
       `prefers-color-scheme`, file name first, link to the top; (b) also show marks (baked in at
@@ -600,3 +592,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       cards below until the user clicks elsewhere. Sketch: `st.popover(key=..., on_change=...)`
       tracks its state, and the buttons' callbacks set it closed; costs a rerun per open/close.
       Affected: `framescout_ui/results.py`. Found in the PR #114 review. Size S.
+- [ ] `minor` **F42 – Scroll to the first photo after the bottom pager:** after "Next page" or
+      "Previous page" below the grid the browser keeps its scroll position, so the user lands
+      at the bottom of the new page and scrolls up to its first photo (seen in headless Edge).
+      Streamlit has no scroll API; a fix needs a small JS component or another layout (e.g. the
+      pager only above the grid plus a "back to top" link). Affected:
+      `framescout_ui/results.py`. Found in F29. Size S.
+- [ ] `minor` **F43 – A narrower popover "Export and copy":** the popover is about 700 px wide
+      (set by the caption of the export) and scrolls inside on a window 889 px high. A shorter
+      export caption or a fixed width could help. Affected: `framescout_ui/copy_export.py`,
+      `framescout_ui/results.py`. Found in F29. Size S.

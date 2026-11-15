@@ -46,8 +46,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       actions in a popover, a visible mark state, full window width (F30) (2026-11-15)
 
 ### P36 – Results toolbar (added 2026-11-13)
-- [ ] One toolbar row above the photos, a pager below the grid, copy and export in a
-      popover (F29)
+- [x] One toolbar row above the photos, a pager below the grid, copy and export in a
+      popover (F29) (2026-11-15)
 
 ### P37 – Review dialog (added 2026-11-13)
 - [ ] One photo at a time with a large preview in a dialog (F19)
