@@ -20,7 +20,9 @@ from .copy_export import show_copy, show_export
 # row (a size setting is parked as F35)
 CARD_WIDTH = 250
 # the cell of a card without a thumbnail, as tall as one with a photo (CARD_STYLE); the
-# margin makes up for the negative one Streamlit gives the end of a Markdown element
+# margin is the one a Markdown paragraph has: Streamlit (1.66.1) gives every Markdown
+# container margin-bottom -1rem (its spacing "lg") to cancel its last paragraph's 1rem, which
+# a div lacks (checked in headless Edge: the text starts at the same height as on a photo card)
 NO_THUMBNAIL = ('<div style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;'
                 'opacity:0.6;background:rgba(128, 128, 128, 0.12);border-radius:4px;margin-bottom:1rem">'
                 'No thumbnail</div>')
