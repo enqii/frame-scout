@@ -42,8 +42,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       (F34) (2026-11-14)
 
 ### P35 – Result card (added 2026-11-13)
-- [ ] One card for both views: equal cells, "Match"/"No" as the main buttons, the other
-      actions in a popover, a visible mark state, full window width (F30)
+- [x] One card for both views: equal cells, "Match"/"No" as the main buttons, the other
+      actions in a popover, a visible mark state, full window width (F30) (2026-11-15)
 
 ### P36 – Results toolbar (added 2026-11-13)
 - [ ] One toolbar row above the photos, a pager below the grid, copy and export in a
