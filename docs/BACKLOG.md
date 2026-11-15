@@ -591,7 +591,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       popover open (as documented; checked in headless Edge in the F30 review), so it covers the
       cards below until the user clicks elsewhere. Sketch: `st.popover(key=..., on_change=...)`
       tracks its state, and the buttons' callbacks set it closed; costs a rerun per open/close.
-      Affected: `framescout_ui/results.py`. Found in the PR #114 review. Size S.
+      Affected: `framescout_ui/results.py`. Found in the PR #114 review. Size S. The popover
+      "Export and copy" of the results toolbar (F29) must stay open: its folder box, "Copy"
+      and "Export" are used one after another (PR #115 review).
 - [ ] `minor` **F42 – Scroll to the first photo after the bottom pager:** after "Next page" or
       "Previous page" below the grid the browser keeps its scroll position, so the user lands
       at the bottom of the new page and scrolls up to its first photo (seen in headless Edge).
@@ -602,3 +604,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (set by the caption of the export) and scrolls inside on a window 889 px high. A shorter
       export caption or a fixed width could help. Affected: `framescout_ui/copy_export.py`,
       `framescout_ui/results.py`. Found in F29. Size S.
+- [ ] `minor` **F44 – Check the results toolbar in a browser:** F29 was looked at only in
+      headless Edge at 1920 x 889 in the dark theme. In the next browser pass (with F40), check
+      the toolbar row in a narrow window (Streamlit's horizontal container wraps its elements
+      onto more rows by default; is the order still clear?), in the light theme, and clicking
+      copy and export inside the popover "Export and copy" (folder box, "Copy", "Export",
+      their notices below the toolbar). Affected: `framescout_ui/results.py`,
+      `framescout_ui/copy_export.py`. Found in the PR #115 review. Size S.
