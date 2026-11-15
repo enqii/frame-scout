@@ -3,8 +3,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (CARD_KEY_PREFIX, CARD_STYLE, GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS, QUICK_DIR,
-                             QUICK_GALLERY, card_text, has_closest_line, hidden_text, hide_no_match, mark_counts_text, mark_style,
+from framescout_core import (CARD_KEY_PREFIX, CARD_STYLE, GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS,
+                             PHOTO_KEY_PREFIX, PREVIEW_KEY_PREFIX, QUICK_DIR, QUICK_GALLERY, card_text, has_closest_line, hidden_text, hide_no_match, mark_counts_text, mark_style,
                              page_cards, page_count,
                              profile_fingerprints, profile_state, progress_text, query_summary, quick_entry_label,
                              quick_folders_differ, quick_note, quick_result_id, read_results, results_choice,
@@ -15,6 +15,7 @@ from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file
 
 from .marks import MARK_LABELS, load_marks, marks_backup_offer, restore_marks_backup, set_mark
 from .copy_export import show_copy, show_export
+from .review import find_similar_button, open_review, show_review
 
 
 # the width of a gallery card in pixels (F30): fixed, so a wider window shows more cards in a
@@ -71,22 +72,6 @@ def run_date(results):
     return str(results.get('finished', '')).replace('T', ' ')[:16]
 
 
-def find_similar_button(card, key, disabled):
-    """The button "Find similar" of a gallery card (F11): asks the next page run to start it.
-
-    A fragment cannot start the engine (start_engine reruns the whole page), so the click
-    stores the photo and the part shown on the card and reruns the page, which starts it.
-    A missing model package does not disable it: it loads no model (review). disabled: while
-    a search runs or no photo folder exists (the page run's state).
-    """
-    if st.button('Find similar', key=key, width='stretch', disabled=disabled,
-                 help='Finds photos similar to this one (the part named on the card) among the photos analyzed with '
-                      'the current AI settings, without analyzing anything. The result replaces the last quick '
-                      'search.'):
-        st.session_state.find_similar = (card['path'], card['label'])
-        st.rerun()
-
-
 def card_key(card, profile=None):
     """The key of the container of card in the gallery of profile, or of the quick search for None (F30)."""
     parts = ('quick', card['path']) if profile is None else ('profile', profile, card['path'])
@@ -107,11 +92,17 @@ def draw_cards(cards, thumbs, key, find_disabled, with_closest, profile=None, ca
     with st.container(key=key, horizontal=True, gap='small'):
         for card in cards:
             with st.container(key=card_key(card, profile), width=CARD_WIDTH, border=True, gap='small'):
-                thumb = thumbs / card['thumbnail']  # a plain file name, checked by read_results
-                if thumb.is_file():
-                    st.image(str(thumb), width='stretch')
-                else:
-                    st.markdown(NO_THUMBNAIL, unsafe_allow_html=True)
+                photo_id = widget_id(*(('quick',) if profile is None else ('profile', profile)), card['path'])
+                # a click on the photo opens the review dialog there (F19): the invisible button
+                # laid over the photo by CARD_STYLE
+                with st.container(key=PHOTO_KEY_PREFIX + photo_id, gap=None):
+                    thumb = thumbs / card['thumbnail']  # a plain file name, checked by read_results
+                    if thumb.is_file():
+                        st.image(str(thumb), width='stretch')
+                    else:
+                        st.markdown(NO_THUMBNAIL, unsafe_allow_html=True)
+                    st.button('Large preview', key=PREVIEW_KEY_PREFIX + photo_id, on_click=open_review,
+                              args=(profile, card['path']))
                 st.markdown(card_text(card, with_closest), unsafe_allow_html=True)
                 with st.container(horizontal=True, vertical_alignment='center', gap='small'):
                     if profile is not None:
@@ -263,6 +254,12 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
             # persist_state: kept while another entry of the selector is shown (F38)
             page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key, persist_state='page',
                                 width=TOOLBAR_PAGE_WIDTH)
+        # F19: from the first undecided photo of the whole list
+        st.button('Review one by one', key='review_open_list', on_click=open_review, args=(name, None),
+                  disabled=not can_mark or not entry['cards'],
+                  help='Shows one photo at a time, large, starting with the first undecided one: mark it as Match or '
+                       'No match, or skip it, and the next undecided photo follows. A click on a photo opens it there '
+                       'too.' + ('' if can_mark else ' The photos of this list cannot be marked here.'))
         with st.popover('Export and copy', help='Open or download the gallery, copy the photos marked as match '
                                                 'to a folder or export the result list.'):
             show_gallery_actions(entry)
@@ -324,6 +321,7 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
         show_notice('marks_notice')
         if hidden:
             st.caption(hidden_text(hidden, len(shown), page < pages))
+    show_review(entry['cards'], THUMBS, name, can_mark, find_disabled)  # F19, while it is open
     # a new container for every profile, page and card count: in a fragment rerun with fewer
     # cards (the shorter last page) the cards of the previous page stayed in the browser
     # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
@@ -402,6 +400,7 @@ def show_quick_results(results, folders, model, find_disabled, toolbar):
                 f"{plain(MODELS[model].label)}.")
     show_notice('gallery_notice')
     shown = page_cards(entry['cards'], page, GALLERY_PAGE_SIZE)
+    show_review(entry['cards'], QUICK_THUMBS, None, False, find_disabled)  # F19: the large preview, without marks
     # a new container for every page and card count, as in show_profile_results
     draw_cards(shown, QUICK_THUMBS, f'quick_gallery_{page}_{len(shown)}', find_disabled,
                has_closest_line(entry['cards']))

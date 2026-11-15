@@ -545,6 +545,8 @@ def test_mark_style_selectors_exist_in_the_installed_streamlit_frontend():
     # (review: as the attribute, not only as a word somewhere in the bundle)
     assert any('"data-testid":`stImage`' in text for text in bundle)
     assert any('"data-testid":`stImageContainer`' in text for text in bundle)
+    # the frame around an image, whose content REVIEW_STYLE centers in the review dialog (F19)
+    assert any('"data-testid":`stFullScreenFrame`' in text for text in bundle)
     # the tab panels PAGE_STYLE limits (F30 review): all drawn, after the tab list, so the
     # last child is the panel of the last tab
     assert any(re.search(r'"data-testid":`stTabPanel`,id:String\(\w+\),\$isActive:\w+===\w+,shouldForceMount:!0', text)

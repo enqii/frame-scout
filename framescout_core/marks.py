@@ -36,6 +36,13 @@ MARK_NO_MATCH_OPACITY = 0.4
 # the key of a gallery card's container in the app starts with this (F30); CARD_STYLE and
 # mark_style find the cards by it
 CARD_KEY_PREFIX = 'fscard-'
+# the photo of a card sits in a container whose key starts with PHOTO_KEY_PREFIX, with the
+# button that opens the review dialog (F19) laid over it, whose key starts with
+# PREVIEW_KEY_PREFIX: Streamlit has no clickable image, so a click on the photo reaches the
+# invisible button; it shows when it has the keyboard focus. Neither prefix contains
+# CARD_KEY_PREFIX, whose selector would match them too
+PHOTO_KEY_PREFIX = 'fsphoto-'
+PREVIEW_KEY_PREFIX = 'fspreview-'
 # equal cells (F30): the photo of every card is fitted whole into a square box (as in the
 # HTML gallery), so portrait and landscape photos give cards of one height; CSS, so the
 # thumbnails and the cache signature stay as they are. Streamlit sizes the elements around an
@@ -45,7 +52,12 @@ _CARD = f'[class*="st-key-{CARD_KEY_PREFIX}"]'
 CARD_STYLE = (f'<style>{_CARD} :is(div:has(> [data-testid="stImage"]), [data-testid="stImage"], '
               '[data-testid="stImageContainer"]){width:100%!important}'
               f'{_CARD} img{{width:100%!important;height:auto!important;aspect-ratio:1/1;object-fit:contain;'
-              'background:rgba(128, 128, 128, 0.12);border-radius:4px}</style>')
+              'background:rgba(128, 128, 128, 0.12);border-radius:4px}'
+              f'[class*="st-key-{PHOTO_KEY_PREFIX}"]{{position:relative}}'
+              f'[class*="st-key-{PREVIEW_KEY_PREFIX}"]{{position:absolute;inset:0;width:auto!important;z-index:1}}'
+              f'[class*="st-key-{PREVIEW_KEY_PREFIX}"] :is(div, button){{width:100%!important;height:100%!important}}'
+              f'[class*="st-key-{PREVIEW_KEY_PREFIX}"] button{{opacity:0;cursor:zoom-in}}'
+              f'[class*="st-key-{PREVIEW_KEY_PREFIX}"] button:focus-visible{{opacity:0.85}}</style>')
 # the Streamlit version whose internals mark_style was checked against (its frontend bundle:
 # the key class st-key-<key>, data-variant="segmented_control" on the buttons and the
 # data-selected attribute of the selected one; the old kind attribute is gone, A49);
