@@ -428,26 +428,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
       Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
-- [ ] `ready` **I47 – Keep unneeded complexity out from the start (workflow):** the items I39–I46,
-      A46 and A47 remove complexity that entered one reasonable PR at a time, mostly through
-      review findings about rare cases, compatibility with earlier prototype states and docs
-      that retell the code. Rules to introduce:
-      (a) a rule in `CLAUDE.md` → "Engineering principles": handle a failure case in code only
-      if it was observed or would lose user data; otherwise document it as a known limit;
-      (b) no compatibility code for states that were never released; a format change gets one
-      migration and the old path is removed in the same PR;
-      (c) review findings about hypothetical cases default to "declined, known limit" instead
-      of a fix or a backlog item, unless user data is at risk; the reviewer brief asks for
-      simplification findings too ("what could this PR delete?");
-      (d) every PR states its net line change (code, tests, docs) in the template; a PR that
-      adds more than about 300 lines of non-test code explains why a smaller solution was not
-      enough;
-      (e) every `/triage` round schedules at least one item that only removes code or docs.
-      The user agreed to (a)–(e) in chat on 2026-11-12 and declined a further proposal (a
-      `/triage` question "what observed problem does this solve, and what is the smallest
-      change?" for every new item). Open: write the rules into `CLAUDE.md`, the PR template,
-      the reviewer brief and the triage skill. Found on 2026-11-12 in a simplification review.
-
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
 - [ ] `decision` **F6 – "Not this" search texts per profile:** a profile "red car" also ranks

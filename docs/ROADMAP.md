@@ -28,8 +28,9 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-15 in PR #119)
 
 ### P40 – Rules against unneeded complexity (added 2026-11-15)
-- [ ] Introduce the rules (a)–(e) in `CLAUDE.md`, the reviewer brief and the PR template (I47;
+- [x] Introduce the rules (a)–(e) in `CLAUDE.md`, the reviewer brief and the PR template (I47;
       kind `docs`)
+      (done 2026-11-15 in PR #120)
 
 ### P41 – Lighter PR workflow (added 2026-11-15)
 - [ ] Fold the docs step into the implementer, reduce the labels, shorten the workflow texts

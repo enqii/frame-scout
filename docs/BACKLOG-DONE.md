@@ -136,6 +136,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **I38 – Agent worktrees block the user's manual test and need forced removal (workflow)** – done 2026-11-12, [PR #95](https://github.com/enqii/frame-scout/pull/95)
 - [x] **I39 – Shrink `docs/ARCHITECTURE.md` to what the code cannot say (simplification)** – done 2026-11-15, [PR #119](https://github.com/enqii/frame-scout/pull/119)
 - [x] **I40 – Reduce `docs/BACKLOG-DONE.md` to one line per ID (simplification)** – done 2026-11-15, [PR #118](https://github.com/enqii/frame-scout/pull/118)
+- [x] **I47 – Keep unneeded complexity out from the start (workflow)** – done 2026-11-15, [PR #120](https://github.com/enqii/frame-scout/pull/120)
 - [x] **I48 – Python caches in finished agent worktrees block `git worktree remove` (workflow)** – done 2026-11-14, [PR #107](https://github.com/enqii/frame-scout/pull/107)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
