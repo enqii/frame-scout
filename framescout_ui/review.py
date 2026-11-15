@@ -145,6 +145,8 @@ def review_dialog(cards, thumbs, profile, can_mark, find_disabled):
         # the buttons below act on (_still_shown)
         state = st.session_state.review = {**state, 'path': card['path'], 'notice': None}
     saved = marks.get(card['path'])
+    # the style block rides in this caption, which is drawn anyway, as CARD_STYLE does in the
+    # gallery: an element of its own takes a layout slot with the block gap (A38)
     st.caption(REVIEW_STYLE + '\n\n' + review_position(index, len(cards))
                # no saved mark where the photos cannot be marked: without readable marks, or for
                # a profile that is gone (it took its marks along), every photo would look undecided
