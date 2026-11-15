@@ -61,6 +61,9 @@ in the proposal, fill the gap with `minor` bundles (no decision needed) and put 
 `decision` candidates, each as a decision sheet, to the user until the window is filled or
 no candidate is left. Never leave the window short without telling the user why.
 
+Every round schedules at least one item that only removes code or docs (`CLAUDE.md` → "Triage", I47);
+propose one from the simplification items of the backlog.
+
 Status tags (written in bold after the checkbox, `- [ ] \`tag\` **E15 – …**`):
 
 | Tag | Meaning |
