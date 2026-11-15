@@ -9,6 +9,14 @@ RUN_TAB = 'Search'
 RESULTS_TAB = 'Results'
 # the app's tabs in their order (F28)
 APP_TABS = (START_NEEDS_TAB['profiles'], START_NEEDS_TAB['photos'], START_NEEDS_TAB['model'], RUN_TAB, RESULTS_TAB)
+# the widest the tabs with forms and text areas get, in pixels (F30 review, F39): the page uses
+# the whole window for the result cards, the other tabs keep the width they had before
+FORM_TAB_MAX_WIDTH = 1300
+# the app's page style. The limit holds for every tab panel but the last ("Results", the last
+# of APP_TABS): Streamlit internals (the data-testid of a tab panel; all panels are drawn,
+# after the tab list), checked with the Streamlit of MARK_STYLE_STREAMLIT
+PAGE_STYLE = ('<style>.block-container{padding-top:2rem}.stButton button{border-radius:8px}'
+              f'[data-testid="stTabPanel"]:not(:last-child){{max-width:{FORM_TAB_MAX_WIDTH}px}}</style>')
 
 
 def _plural(count, one, many):

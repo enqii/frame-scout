@@ -2,7 +2,7 @@
 import ast
 
 from app_source import app_files, page_tree
-from framescout_core import (APP_TABS, NOTHING_NEW, RESULTS_TAB, RUN_TAB, START_NEEDS_TAB, results_running_text,
+from framescout_core import (APP_TABS, FORM_TAB_MAX_WIDTH, NOTHING_NEW, PAGE_STYLE, RESULTS_TAB, RUN_TAB, START_NEEDS_TAB, results_running_text,
                              start_blocked_text, start_needs, start_needs_line, state_line)
 
 POINTER = 'progress and Stop in the tab "Search"'
@@ -37,6 +37,17 @@ def tab_blocks():
 def only_in(blocks, tab, text):
     """Whether text is in the tab's blocks and nowhere else in app.py: not in another tab, not outside the tabs."""
     return text in blocks[tab] and blocks[None].count(text) == blocks[tab].count(text)
+
+
+def test_the_tabs_but_results_keep_a_width_limit():
+    # review of F30 (F39): the result cards use the whole window, the forms and text areas of
+    # the other tabs do not stretch over it. The style limits every tab panel but the last,
+    # so "Results" must stay the last tab
+    assert APP_TABS[-1] == RESULTS_TAB
+    assert FORM_TAB_MAX_WIDTH == 1300
+    rule = '[data-testid="stTabPanel"]:not(:last-child){max-width:1300px}'
+    assert rule in PAGE_STYLE and 'max-width' not in PAGE_STYLE.replace(rule, '')
+    assert 'st.markdown(PAGE_STYLE, unsafe_allow_html=True)' in ast.unparse(page_tree())
 
 
 def test_only_in_sees_code_outside_the_tabs_and_nested_tab_blocks(monkeypatch):
