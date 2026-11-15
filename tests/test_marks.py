@@ -529,9 +529,14 @@ def test_mark_style_selectors_exist_in_the_installed_streamlit_frontend():
     assert any('"data-variant":' in text and '`segmented_control`' in text for text in bundle)
     # the selected button is styled by its data-selected attribute
     assert any('&[data-selected]' in text for text in bundle)
-    # the elements around an image that CARD_STYLE stretches (F30)
-    assert any('`stImage`' in text or '"stImage"' in text for text in bundle)
-    assert any('`stImageContainer`' in text or '"stImageContainer"' in text for text in bundle)
+    # the elements around an image that CARD_STYLE stretches (F30), named as their data-testid
+    # (review: as the attribute, not only as a word somewhere in the bundle)
+    assert any('"data-testid":`stImage`' in text for text in bundle)
+    assert any('"data-testid":`stImageContainer`' in text for text in bundle)
+    # the tab panels PAGE_STYLE limits (F30 review): all drawn, after the tab list, so the
+    # last child is the panel of the last tab
+    assert any(re.search(r'"data-testid":`stTabPanel`,id:String\(\w+\),\$isActive:\w+===\w+,shouldForceMount:!0', text)
+               for text in bundle)
 
 
 # --- backup and restore (F1) ----------------------------------------------------------------
