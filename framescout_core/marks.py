@@ -398,8 +398,10 @@ def mark_style(states):
                  for key, saved in states.items() if saved == state]
         if not cards:
             continue
-        # a box-shadow, not a border: it follows the rounded corners and changes no size
-        rules.extend(f'{card}{{box-shadow:0 0 0 3px {border}!important}}' for card in cards)
+        # a box-shadow, not a border: it follows the rounded corners and changes no size;
+        # inset, inside the card's padding, so no parent that clips its overflow (review)
+        # can cut the frame of a card at the edge of a row
+        rules.extend(f'{card}{{box-shadow:inset 0 0 0 3px {border}!important}}' for card in cards)
         if state == MARK_NO_MATCH:
             rules.extend(f'{card} img{{opacity:{MARK_NO_MATCH_OPACITY}!important}}' for card in cards)
         selectors = ', '.join(f'{card} button[data-variant="segmented_control"][data-selected]' for card in cards)

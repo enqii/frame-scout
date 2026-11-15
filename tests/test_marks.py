@@ -456,11 +456,12 @@ def test_mark_style_colors_the_selected_option_of_each_marked_card():
 
 def test_mark_style_shows_the_state_on_the_card_itself():
     # F30: a marked card must not look like an unmarked one; a frame in the state's color
-    # (a box-shadow: it follows the rounded corners and changes no size), and the photo of a
+    # (a box-shadow: it follows the rounded corners and changes no size; inset, so a parent
+    # that clips its overflow cannot cut it, review), and the photo of a
     # card marked as no match is dimmed, so the states differ by more than their color
     style = mark_style({'fscard-a1': MARK_MATCH, 'fscard-b2': MARK_NO_MATCH})
-    assert f'.st-key-fscard-a1{{box-shadow:0 0 0 3px {MARK_COLORS[MARK_MATCH][1]}!important}}' in style
-    assert f'.st-key-fscard-b2{{box-shadow:0 0 0 3px {MARK_COLORS[MARK_NO_MATCH][1]}!important}}' in style
+    assert f'.st-key-fscard-a1{{box-shadow:inset 0 0 0 3px {MARK_COLORS[MARK_MATCH][1]}!important}}' in style
+    assert f'.st-key-fscard-b2{{box-shadow:inset 0 0 0 3px {MARK_COLORS[MARK_NO_MATCH][1]}!important}}' in style
     assert re.search(r'\.st-key-fscard-b2 img\{opacity:0\.\d+!important\}', style)
     assert 'fscard-a1 img' not in style
 
