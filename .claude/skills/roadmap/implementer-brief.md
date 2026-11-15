@@ -114,7 +114,7 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   context is large by now). After the last code and test commit is pushed and the tests
   pass, post a PR comment starting with `Docs pending:` that lists the item, the backlog
   IDs, the commit SHAs, behavior and compatibility changes, out-of-scope findings and which
-  docs to update (README, user guide, DEVELOPMENT, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md` as one line (ID, title, date, PR link); new items). Leave the
+  docs to update (README, user guide, DEVELOPMENT, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md` as one line (ID, title, date, PR link; the PR number of a `docs` item is known once its draft PR exists, so add the line after that; an item without a PR says "no PR" and keeps a short report in the line, never a placeholder or an invented number); new items). Leave the
   label `fs:in-progress` and return; the orchestrator spawns the `docs-update` agent.
 - Before you return (every mode), delete your own smoke and scratch data under the
   worktree's `.tmp/` (gitignored leftovers make the orchestrator's worktree removal need

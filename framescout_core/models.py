@@ -12,7 +12,7 @@ class SearchModel:
     key: the stable name of --model and settings.json; name and pretrained: the OpenCLIP
     model and weights; label: the name shown in the app, the log and the galleries;
     download: the size of the first-use download; cpu_factor: the CPU time per photo part
-    relative to the default (measured in PR #13, see the PR of E22 in docs/BACKLOG-DONE.md); image_size: the input
+    relative to the default (measured in PR #13, the investigation of E22); image_size: the input
     edge in pixels (tested against the OpenCLIP config; the engine's fallback for the draft
     size); requires: Python packages (import names) the model needs beyond
     requirements.txt of v1.1; multilingual: understands search terms in other languages

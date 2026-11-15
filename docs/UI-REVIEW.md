@@ -17,7 +17,7 @@ Photo source, Settings, Search, Results; "Analyze ahead" in Search, "Clean up st
 Settings) are implemented, so the four tabs, the tab names "AI settings" and "Search &
 results" and the open F28 decision below describe the old layout. The current interface is
 described in `docs/USER-GUIDE.md`; the state of each follow-up is in `docs/BACKLOG.md` and
-`docs/BACKLOG-DONE.md`.
+`docs/BACKLOG-DONE.md` (one line and PR link per finished item).
 
 ## Constraints for every follow-up
 
@@ -73,7 +73,7 @@ Severity: **High** hurts the main flow, **Medium** costs time or clarity, **Low*
   maintenance and belong to neither "search" nor "results"; they are disabled during a run and
   rarely used.
 - **Medium – "Analyze ahead" lives in "Photo source", its progress and Stop in "Search &
-  results"** (already noted in the report of F18). The user starts a long job in one tab and
+  results"** (F18, PR #100). The user starts a long job in one tab and
   must switch tabs to see it run.
 - **Low – the page title and sub-line are fine, but nothing says what to do first.** The
   tab order implies profiles, folder, settings, run, but there is no cue which of these is
