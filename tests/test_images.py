@@ -51,6 +51,26 @@ def test_rendering_a_thumbnail_loads_neither_torch_nor_the_cache_variables(tmp_p
     assert result.stdout.strip().splitlines()[-1] == '(380, 253) False None'
 
 
+def test_the_review_preview_is_an_upright_downscaled_jpeg(tmp_path):
+    # F19: needs Pillow, so it is skipped in CI; a portrait photo stored sideways with an EXIF
+    # orientation comes out upright, its longer edge at most the preview size; a small photo
+    # is not enlarged
+    pytest.importorskip('PIL')
+    script = ('import io, sys\n'
+              'from PIL import Image\n'
+              'import framescout_images\n'
+              'big, small = sys.argv[1], sys.argv[2]\n'
+              'exif = Image.Exif(); exif[framescout_images.ORIENTATION] = 6\n'
+              'Image.new("RGB", (4000, 3000), "red").save(big, exif=exif)\n'
+              'Image.new("RGB", (300, 200), "blue").save(small)\n'
+              'for path in (big, small):\n'
+              '    data = framescout_images.render_preview(path, 1600)\n'
+              '    with Image.open(io.BytesIO(data)) as image:\n'
+              '        print(image.format, image.size)\n')
+    assert run_with_pillow(script, tmp_path / 'big.jpg', tmp_path / 'small.png') == [
+        'JPEG (1200, 1600)', 'JPEG (300, 200)']
+
+
 def run_with_pillow(script, *args):
     """The output lines of script, run with Pillow and framescout_images in a fresh interpreter."""
     result = subprocess.run([sys.executable, '-c', script, *map(str, args)], cwd=ROOT, capture_output=True, text=True,

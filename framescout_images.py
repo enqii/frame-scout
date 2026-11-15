@@ -1,9 +1,10 @@
-"""Image decoding of FrameScout: photos as upright RGB images and gallery thumbnails (E49).
+"""Image decoding of FrameScout: photos as upright RGB images, gallery thumbnails (E49) and previews (F19).
 
 Needs Pillow and, for AVIF, HEIC/HEIF and camera RAW photos, pillow-heif and rawpy (E25),
 but neither torch nor numpy: the engine decodes photos with it, and the evaluation tool
 (framescout_eval.py pool) renders the thumbnails its labelling page lacks without loading
-the engine, its torch import and the engine's cache variables (E42). Importing it
+the engine, its torch import and the engine's cache variables (E42); the app renders the
+large preview of its review dialog with it (F19). Importing it
 registers the HEIF decoder with Pillow and sets Pillow's limits for large and truncated
 files, for every program that imports it.
 """
@@ -248,3 +249,16 @@ def render_thumbnail(path, target):
     """
     im = open_image(path, DRAFT_REDUCING_GAP * THUMBNAIL_SIZE)
     im.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE)); im.save(target, quality=82)
+
+
+def render_preview(path, size):
+    """Return the large preview of the photo path as JPEG bytes, its longer edge at most size pixels (F19).
+
+    For the app's review dialog: decoded at reduced scale like a thumbnail (render_thumbnail)
+    and downscaled in memory, never enlarged and never written to a file.
+    """
+    im = open_image(path, size)
+    im.thumbnail((size, size))
+    buffer = io.BytesIO()
+    im.save(buffer, format='JPEG', quality=85)
+    return buffer.getvalue()
