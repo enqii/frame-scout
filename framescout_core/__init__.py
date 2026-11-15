@@ -67,7 +67,7 @@ from .results import (RESULTS_FILE, RESULTS_FORMAT, GALLERY_PAGE_SIZE, QUERY_NOT
 from .marks import (MARKS_FILE, MARKS_BACKUP, MARKS_FORMAT, MARK_OPEN, MARK_MATCH, MARK_NO_MATCH, MARK_STATES,
     MARKS_LOCK_TIMEOUT, marks_backup, read_marks, save_marks, rename_marks, delete_marks, remove_marks,
     restore_marks, marks_restore_offer, hide_no_match, hidden_text,
-    ReviewProgress, review_progress, progress_text, MARK_COLORS, MARK_NO_MATCH_OPACITY, CARD_KEY_PREFIX, CARD_STYLE,
+    ReviewProgress, review_progress, progress_text, mark_counts_text, MARK_COLORS, MARK_NO_MATCH_OPACITY, CARD_KEY_PREFIX, CARD_STYLE,
     MARK_STYLE_STREAMLIT, mark_style)
 from .copying import (COPY_FOLDERS_KEY, COPY_MAX_NAMES, default_copy_folder, copy_target,
     copy_photos, copy_summary_text, read_copy_folders, save_copy_folder, rename_copy_folder, forget_copy_folder)
