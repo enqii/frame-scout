@@ -11,7 +11,8 @@ import pytest
 
 from framescout_core import (CARD_KEY_PREFIX, CARD_STYLE, CONSTRAINTS_FILE, MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
                              MARKS_BACKUP, MARKS_FILE, NEVER_DELETED, RunLock, UnknownProfileError, delete_marks,
-                             hidden_text, hide_no_match, lock_held, mark_counts_text, mark_style,marks_backup, marks_restore_offer, page_cards,
+                             hidden_text, hide_no_match, lock_held, mark_counts_text, mark_style, marks_backup,
+                             marks_restore_offer, page_cards,
                              progress_text, read_marks, ReviewProgress, review_progress,
                              remove_marks, rename_marks, restore_marks, save_marks)
 
