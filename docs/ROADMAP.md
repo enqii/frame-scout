@@ -20,8 +20,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
 ### P38 – Shrink the backlog archive (added 2026-11-15)
-- [ ] Reduce `docs/BACKLOG-DONE.md` to one line per ID and adapt the "moved with its report"
-      rule (I40; kind `docs`)
+- [x] Reduce `docs/BACKLOG-DONE.md` to one line per ID and adapt the "moved with its report"
+      rule (I40; kind `docs`) (done 2026-11-15 in PR #PRNUM)
 
 ### P39 – Shrink the architecture document (added 2026-11-15)
 - [ ] Cut `docs/ARCHITECTURE.md` to what the code cannot say (I39; kind `docs`)

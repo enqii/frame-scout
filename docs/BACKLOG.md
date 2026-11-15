@@ -5,8 +5,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 (E = engine, A = app, I = installation/project, F = feature, taken over from
 [docs/IDEAS.md](IDEAS.md)) are referenced in commits, pull requests and discussions.
 
-- **Finished items** move to [docs/BACKLOG-DONE.md](BACKLOG-DONE.md) with their
-  reports when their PR is merged; the ID stays valid (search both files for it).
+- **Finished items** move to [docs/BACKLOG-DONE.md](BACKLOG-DONE.md) as one line
+  (ID, title, date, PR link) when their PR is merged; the report is the PR description. An
+  item finished without a PR keeps a short report. The ID stays valid (search both files).
 - **The order of work** is in [docs/ROADMAP.md](ROADMAP.md). An item in this file that the
   roadmap does not name is not scheduled.
 - **A new ID** is the next free number of its group: search both files, e.g.
@@ -379,12 +380,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (I41). Found on 2026-11-12 in a simplification review of the whole project: the search
       core (engine, scoring, image loading) has about 1,300 lines, against about 7,500 lines
       of `framescout_core`, 13,800 lines of tests and 530 KB of Markdown.
-- [ ] `ready` **I40 – Reduce `docs/BACKLOG-DONE.md` to one line per ID (simplification):** the file
-      has about 170 KB of reports that repeat the PR descriptions and the git history. Keep
-      one line per finished item (ID, title, date, PR link); the report stays in the PR.
-      Change the rule "moved with its report" in `CLAUDE.md`, the roadmap skill and the briefs
-      accordingly. Items finished without a PR keep a short report. Found on 2026-11-12 in a
-      simplification review.
 - [ ] `ready` **I41 – Lighter PR workflow (simplification):** four state labels, fresh agents per
       phase and a separate docs agent are heavy for a one-person project. After I39/I40
       decide: fold the docs update back into the implementer (the reason for I17 was the
