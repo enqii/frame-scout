@@ -94,6 +94,64 @@ def test_both_views_decide_the_closest_text_row_for_the_whole_gallery():
     assert all(ast.unparse(call.args[4]) == "has_closest_line(entry['cards'])" for call in calls)
 
 
+def app_functions():
+    return {node.name: node for node in app_tree().body if isinstance(node, ast.FunctionDef)}
+
+
+def with_blocks(function, context):
+    """The source of the with blocks of function whose context expression starts with context."""
+    return [ast.unparse(node) for node in ast.walk(function) if isinstance(node, ast.With)
+            and ast.unparse(node.items[0].context_expr).startswith(context)]
+
+
+def test_the_results_have_one_toolbar_row_above_the_photos():
+    # F29: the selector, the counts of the marks, "Hide no match", the page box and the popover
+    # "Export and copy" in one row; the views draw into the row show_results starts
+    functions = app_functions()
+    selector = ast.unparse(functions['show_results'])
+    assert "toolbar = st.container(horizontal=True, vertical_alignment='bottom', gap='small')" in selector
+    [row] = with_blocks(functions['show_results'], 'toolbar')
+    assert "st.selectbox('Results of'" in row
+    assert 'show_quick_results(quick, folders, model, find_disabled, toolbar)' in selector
+    assert 'show_profile_results(results, name, photo_folders, model, find_disabled, toolbar)' in selector
+    [row] = with_blocks(functions['show_profile_results'], 'toolbar')
+    order = ['mark_counts_text(progress)', "st.checkbox('Hide no match'", "st.selectbox(f'Page (of {pages})'",
+             "st.popover('Export and copy'"]
+    assert [row.index(text) for text in order] == sorted(row.index(text) for text in order)
+    # copy, export and the gallery's buttons are in the popover, no longer below the grid
+    [popover] = with_blocks(functions['show_profile_results'], "st.popover('Export and copy'")
+    for call in ('show_gallery_actions(entry)', 'show_copy(', 'show_export('):
+        assert call in popover
+    [row] = with_blocks(functions['show_quick_results'], 'toolbar')
+    assert "st.selectbox(f'Page (of {pages})'" in row and "st.popover('Gallery and folder'" in row
+
+
+def test_the_results_have_a_pager_below_the_grid():
+    # F29: a second pager below the grid; in the profile results with "Go to the first undecided photo"
+    functions = app_functions()
+    for name, call in (('show_profile_results', "bottom_pager(key, page, pages, 'results_' + widget_id(name) + '_', "
+                                                "progress)"),
+                       ('show_quick_results', "bottom_pager('quick_page', page, pages, 'quick_')")):
+        body = functions[name].body
+        calls = [ast.unparse(node) for node in body if isinstance(node, ast.Expr)]
+        # the last statement, after the cards
+        assert calls[-1] == call and calls[-2].startswith('draw_cards(')
+    pager = ast.unparse(functions['bottom_pager'])
+    for text in ("'Previous page'", "'Next page'", "'Go to the first undecided photo'",
+                 'on_click=go_to_page, args=(key, page - 1)', 'on_click=go_to_page, args=(key, page + 1)',
+                 'on_click=go_to_page, args=(key, progress.first_open_page)'):
+        assert text in pager
+
+
+def test_the_notices_of_copy_and_export_are_shown_outside_the_popover():
+    # F29: a closed popover must not hide the result of a copy or an export
+    functions = app_functions()
+    assert any('copy_matches(name, key, photo_folders)' in block
+               for block in with_blocks(functions['show_copy'], 'notices'))
+    assert any("st.session_state.pop('export_notice')" not in block and 'st.success' in block
+               for block in with_blocks(functions['show_export'], 'notices'))
+
+
 def test_an_empty_row_of_card_text_keeps_its_line():
     # an empty div has no height: a card with an empty detail or path (read_results accepts
     # any string) would be shorter than the others (review of F30)

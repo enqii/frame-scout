@@ -1,10 +1,11 @@
-"""The result galleries of the last search and of the last quick search (A12, P4, F10, F11, A46)."""
+"""The result galleries of the last search and of the last quick search (A12, P4, F10, F11, A46, F29)."""
 from pathlib import Path
 
 import streamlit as st
 
 from framescout_core import (CARD_KEY_PREFIX, CARD_STYLE, GALLERY_PAGE_SIZE, MARKS_FILE, MARK_OPEN, MODELS, QUICK_DIR,
-                             QUICK_GALLERY, card_text, has_closest_line, hidden_text, hide_no_match, mark_style, page_cards, page_count,
+                             QUICK_GALLERY, card_text, has_closest_line, hidden_text, hide_no_match, mark_counts_text, mark_style,
+                             page_cards, page_count,
                              profile_fingerprints, profile_state, progress_text, query_summary, quick_entry_label,
                              quick_folders_differ, quick_note, quick_result_id, read_results, results_choice,
                              results_model, review_progress)
@@ -26,10 +27,14 @@ CARD_WIDTH = 250
 NO_THUMBNAIL = ('<div style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;'
                 'opacity:0.6;background:rgba(128, 128, 128, 0.12);border-radius:4px;margin-bottom:1rem">'
                 'No thumbnail</div>')
+# the widths of the boxes of the toolbar row above the photos in pixels (F29); the other
+# controls of the row take the width of their content
+TOOLBAR_SELECT_WIDTH = 280
+TOOLBAR_PAGE_WIDTH = 130
 
 
 def go_to_page(key, page):
-    """Show page of the gallery whose page box has key (on_click of "Go to the first undecided photo", F20)."""
+    """Show page of the gallery whose page box has key (on_click of the pager below the grid, F20, F29)."""
     st.session_state[key] = page
 
 
@@ -115,7 +120,8 @@ def draw_cards(cards, thumbs, key, find_disabled, with_closest, profile=None, ca
                                              args=(profile, card['path'], mark_key), disabled=not can_mark,
                                              label_visibility='collapsed',
                                              help='Neither pressed: undecided. A second click takes the mark back.')
-                    with st.popover('More', help='Open the photo, show it in its folder or find similar photos.'):
+                    with st.popover('More', help='Open the photo or show it in its folder, with the programs of the '
+                                                 'computer FrameScout runs on, or find similar photos.'):
                         st.button('Open photo', key=f"{prefix}open_{card['rank']}", on_click=open_photo,
                                   args=(card['path'],), width='stretch', help='Opens the photo in your image viewer.')
                         st.button('Show in folder', key=f"{prefix}reveal_{card['rank']}", on_click=show_photo,
@@ -123,12 +129,48 @@ def draw_cards(cards, thumbs, key, find_disabled, with_closest, profile=None, ca
                         find_similar_button(card, f"{prefix}similar_{card['rank']}", find_disabled)
 
 
+def bottom_pager(key, page, pages, prefix, progress=None):
+    """The pager below the grid (F29): previous and next page, and the jump to the first undecided photo.
+
+    key is the key of the page box of the toolbar; the buttons set it in a callback, before
+    the run that draws it (go_to_page). prefix tells the buttons of the views apart.
+    progress: the ReviewProgress of a profile whose photos can be marked, or None (F20).
+    """
+    jump = progress is not None and progress.first_open_page and pages > 1
+    if pages > 1 or jump:
+        with st.container(horizontal=True, vertical_alignment='center', gap='small'):
+            if pages > 1:
+                st.button('Previous page', key=prefix + 'previous_page', on_click=go_to_page, args=(key, page - 1),
+                          disabled=page <= 1)
+                st.markdown(f'Page {page} of {pages}', width='content')
+                st.button('Next page', key=prefix + 'next_page', on_click=go_to_page, args=(key, page + 1),
+                          disabled=page >= pages)
+            if jump:
+                st.button('Go to the first undecided photo', key=prefix + 'first_open',
+                          on_click=go_to_page, args=(key, progress.first_open_page),
+                          disabled=page == progress.first_open_page,
+                          help=f'Shows page {progress.first_open_page}, which holds #{progress.first_open_rank}, '
+                               'the best-ranked photo not yet marked as Match or No match.')
+    if progress is not None and (text := progress_text(progress, pages > 1)):
+        st.caption(text)
+
+
+def show_notice(key):
+    """Show and drop the notice a callback left under key in the session state: (kind, text) or a warning text."""
+    if not st.session_state.get(key):
+        return
+    notice = st.session_state.pop(key)
+    kind, text = notice if isinstance(notice, tuple) else ('warning', notice)
+    (st.success if kind == 'success' else st.warning)(plain(text))  # paths: no Markdown
+
+
 @st.fragment
 def show_results(results, quick, photo_folders, folders, model, find_disabled):
     """The results of the last search and of the last quick search, one at a time; its buttons rerun only this part.
 
     A selector offers the galleries of the last search (P4) and, as an entry of its own, the
-    last quick search or "Find similar" (F34), which it shows at once when it is new.
+    last quick search or "Find similar" (F34), which it shows at once when it is new. It is
+    the first control of one toolbar row above the photos (F29), which the views fill.
     results, quick: their result files (either may be None); photo_folders: the folders a
     copy target must not be in (show_profile_results); folders: the photo folders chosen now
     (show_quick_results); model: the search model the AI settings choose now;
@@ -155,18 +197,24 @@ def show_results(results, quick, photo_folders, folders, model, find_disabled):
         st.session_state.pop('results_profile', None)  # e.g. a profile of an earlier search
     else:
         st.session_state.results_profile = chosen
-    name = st.selectbox('Results of', options, key='results_profile')
+    # the toolbar row (F29); bottom: the boxes with a label above and the buttons line up
+    toolbar = st.container(horizontal=True, vertical_alignment='bottom', gap='small')
+    with toolbar:
+        name = st.selectbox('Results of', options, key='results_profile', width=TOOLBAR_SELECT_WIDTH)
     if name == quick_option:
-        show_quick_results(quick, folders, model, find_disabled)
+        show_quick_results(quick, folders, model, find_disabled, toolbar)
     else:
-        show_profile_results(results, name, photo_folders, model, find_disabled)
+        show_profile_results(results, name, photo_folders, model, find_disabled, toolbar)
 
 
-def show_profile_results(results, name, photo_folders, model, find_disabled):
+def show_profile_results(results, name, photo_folders, model, find_disabled, toolbar):
     """The gallery of the profile name of the last search as a grid of thumbnails (P4).
 
     With a mark per photo and copying of the matches (A17); photo_folders: the folders a
-    copy target must not be in; model and find_disabled as in show_results.
+    copy target must not be in; model and find_disabled as in show_results. toolbar: the
+    row above the photos (F29), which gets the counts of the marks, "Hide no match", the page
+    box and the popover "Export and copy"; the notes for exceptional states follow below it
+    only when they apply, a second pager below the grid.
     """
     entries = results['profiles']
     try:
@@ -181,120 +229,130 @@ def show_profile_results(results, name, photo_folders, model, find_disabled):
     folders = results['photo_folders']  # also for a format 1 file (A25)
     model_key = results_model(run_settings)  # the default for a search before E22
     result_model = MODELS.get(model_key) if model_key else None
-    st.caption(f"Search from {run_date(results)} · photo folder{'s' if len(folders) > 1 else ''} "
-               f"{plain('; '.join(folders))} · "
-               + (f'search model {plain(result_model.label)} · ' if result_model else '') +
-               f"{len(entry['cards']):,} photos (at most {run_settings.get('top', '?')}), best first. "
-               'A ranking by similarity, not a guaranteed identification.')
-    # which of the profile's texts the photos were closest to (F17); none for older results
-    if summary := query_summary(entry):
-        st.caption(plain(summary))
-    if model_key != model:
-        # E22 review: the gallery must not look like one of the model chosen now
-        made_with = f'the search model {plain(result_model.label)}' if result_model else 'another search model'
-        st.info(f'These results were made with {made_with}; the AI settings now choose '
-                f"{plain(MODELS[model].label)}. Start the search again for its results.")
-    if states[name] == 'changed':
-        st.info(f'"{plain(name)}" was changed after this search (search texts or reference images), so these '
-                'results may not fit it any more. Start the search again to update them.')
-    elif states[name] == 'missing':
-        st.info(f'"{plain(name)}" is no longer one of your search profiles (renamed or deleted). These are its '
-                f'results from the search of {run_date(results)}. Its photos cannot be marked here, nor its copy '
-                'target folder changed: a renamed '
-                "profile took its marks along, and they appear with the next search's results; deleting "
-                'a profile deletes its marks too.')
-    others = {state: [plain(n) for n in names if n != name and states[n] == state] for state in ('changed', 'missing')}
-    if others['changed'] or others['missing']:
-        st.caption(' · '.join(text + ', '.join(found) for text, found in (
-            ('Changed since this search: ', others['changed']),
-            ('No longer search profiles: ', others['missing'])) if found))
-    c1, c2, c3 = st.columns(3)
-    c1.button('Open gallery in browser', on_click=open_gallery, args=(entry['gallery'],), width='stretch',
-              help=f"Opens {entry['gallery']} from the results folder in your web browser.")
-    c2.button('Open results folder', on_click=open_results_folder, width='stretch')
-    page_file = RESULTS / entry['gallery']
-    try:
-        # cached: a click on Open or Folder reruns this fragment (review)
-        c3.download_button('Download HTML (without thumbnails)', cached_bytes(*file_key(page_file)), file_name=page_file.name,
-                           mime='text/html', width='stretch', key='dl_results_gallery')
-    except OSError:
-        pass  # deleted or in use: the other buttons still work
-    if st.session_state.get('gallery_notice'):
-        st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
     # read on every run of this part: another tab or session may have marked photos (A17)
     all_marks, marks_error = load_marks()
-    if 'marks_notice' in st.session_state:
-        kind, text = st.session_state.pop('marks_notice')
-        (st.success if kind == 'success' else st.warning)(plain(text))
-    # also for a missing marks.json whose backup holds marks, e.g. removed by hand (A40)
-    offer = marks_backup_offer(marks_error)
-    if marks_error:
-        advice = ('Restore the backup below, or fix the file in the results folder' if offer
-                  else 'Fix or remove it in the results folder')
-        st.warning(f'{MARKS_FILE} cannot be read, so marks are not shown and cannot be changed; FrameScout does not '
-                   f'change the file. {advice}.\n\nDetails: {plain(str(marks_error))}')
-    if offer:
-        st.caption(plain(offer))
-        st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
     marks = all_marks.get(name, {})
     can_mark = marks_error is None and states[name] != 'missing'
-    # persist_state: kept while another entry of the selector is shown, which does not draw
-    # the box (F34)
-    hide = st.checkbox('Hide photos marked as no match', key='hide_rejected', persist_state='page',
-                       help='Hides them on the page shown; every page keeps its photos, so the ranks of a page '
-                            'stay the same.')
     pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
     key = 'results_page_' + name
     if st.session_state.get(key, 1) not in range(1, pages + 1):
-        # a page of a longer list of an earlier search; dropped before the jump button below
-        # compares the page shown with its target (F20 review)
+        # a page of a longer list of an earlier search; dropped before the pagers below
+        # compare the page shown with their targets (F20 review)
         st.session_state.pop(key, None)
     # review progress (F20), only where photos can be marked: without readable marks every
     # photo would count as undecided, and a renamed profile took its marks along
     progress = review_progress(entry['cards'], marks, GALLERY_PAGE_SIZE) if can_mark else None
-    if progress and (text := progress_text(progress, pages > 1)):
-        st.caption(text)
-    if progress and progress.first_open_page and pages > 1:
-        # a callback: it sets the page box below before the run that draws it
-        st.button('Go to the first undecided photo', key='first_open_' + widget_id(name),
-                  on_click=go_to_page, args=(key, progress.first_open_page),
-                  disabled=st.session_state.get(key, 1) == progress.first_open_page,
-                  help=f'Shows page {progress.first_open_page}, which holds #{progress.first_open_rank}, '
-                       'the best-ranked photo not yet marked as Match or No match.')
-    # the whole ranked list is paginated and the rejects are hidden within the page shown
-    # (A24): filtering first pulled the photos of the following pages up into this one
-    page = 1
-    if pages > 1:
-        # persist_state: kept while another entry of the selector is shown (F38)
-        page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key, persist_state='page')
+    # below the toolbar, in this order: the caption of the search, the notes, the notices
+    # (drawn into later, after the toolbar's popover may have copied photos)
+    head = st.container(gap='small')
+    notices = st.container(gap='small')
+    with toolbar:
+        if progress and (counts := mark_counts_text(progress)):
+            st.markdown(counts, width='content',
+                        help='Mark each photo you have checked as Match or No; a second click takes the mark back. '
+                             'Marks are kept for this profile across searches.')
+        # persist_state: kept while another entry of the selector is shown, which does not draw
+        # the box (F34)
+        hide = st.checkbox('Hide no match', key='hide_rejected', persist_state='page',
+                           help='Hides the photos marked as no match on the page shown; every page keeps its '
+                                'photos, so the ranks of a page stay the same.')
+        # the whole ranked list is paginated and the rejects are hidden within the page shown
+        # (A24): filtering first pulled the photos of the following pages up into this one
+        page = 1
+        if pages > 1:
+            # persist_state: kept while another entry of the selector is shown (F38)
+            page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key=key, persist_state='page',
+                                width=TOOLBAR_PAGE_WIDTH)
+        with st.popover('Export and copy', help='Open or download the gallery, copy the photos marked as match '
+                                                'to a folder or export the result list.'):
+            show_gallery_actions(entry)
+            st.divider()
+            show_copy(name, entry, marks, photo_folders, states[name] != 'missing', notices)
+            st.divider()
+            show_export(name, entry, marks, marks_error, notices)
     shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
-    if hidden:
-        st.caption(hidden_text(hidden, len(shown), page < pages))
     for card in shown:
         # the saved mark, set before the control is drawn (never as its default): the file
         # is the truth, also for marks made in another tab; None (neither button) is undecided
         st.session_state['mark_' + widget_id(name, card['path'])] = MARK_LABELS.get(marks.get(card['path']))
     colors = mark_style({card_key(card, name): marks.get(card['path'], MARK_OPEN) for card in shown})
-    # the style blocks ride in this caption, which is drawn anyway: an element of its own took
-    # a layout slot with the block gap above the cards (A38); replaced on every run like it
-    st.caption(CARD_STYLE + colors + '\n\n'
-               'Mark each photo you have checked as Match or No; a second click takes the mark back. Marks are kept '
-               'for this profile across searches. "More" opens the photo or its folder with the programs of the '
-               'computer FrameScout runs on.', unsafe_allow_html=True)
+    with head:
+        # the style blocks ride in this caption, which is drawn anyway: an element of its own
+        # took a layout slot with the block gap above the cards (A38); replaced on every run
+        # like it. Which of the profile's texts the photos were closest to (F17) follows on
+        # the same line; none for older results
+        summary = query_summary(entry)
+        st.caption(CARD_STYLE + colors + '\n\n'
+                   + f"Search from {run_date(results)} · photo folder{'s' if len(folders) > 1 else ''} "
+                     f"{plain('; '.join(folders))} · "
+                   + (f'search model {plain(result_model.label)} · ' if result_model else '')
+                   + f"{len(entry['cards']):,} photos (at most {run_settings.get('top', '?')}), best first. "
+                     'A ranking by similarity, not a guaranteed identification.'
+                   + (f' {plain(summary)}' if summary else ''), unsafe_allow_html=True)
+        if model_key != model:
+            # E22 review: the gallery must not look like one of the model chosen now
+            made_with = f'the search model {plain(result_model.label)}' if result_model else 'another search model'
+            st.info(f'These results were made with {made_with}; the AI settings now choose '
+                    f"{plain(MODELS[model].label)}. Start the search again for its results.")
+        if states[name] == 'changed':
+            st.info(f'"{plain(name)}" was changed after this search (search texts or reference images), so these '
+                    'results may not fit it any more. Start the search again to update them.')
+        elif states[name] == 'missing':
+            st.info(f'"{plain(name)}" is no longer one of your search profiles (renamed or deleted). These are its '
+                    f'results from the search of {run_date(results)}. Its photos cannot be marked here, nor its '
+                    'copy target folder changed: a renamed '
+                    "profile took its marks along, and they appear with the next search's results; deleting "
+                    'a profile deletes its marks too.')
+        others = {state: [plain(n) for n in names if n != name and states[n] == state]
+                  for state in ('changed', 'missing')}
+        if others['changed'] or others['missing']:
+            st.caption(' · '.join(text + ', '.join(found) for text, found in (
+                ('Changed since this search: ', others['changed']),
+                ('No longer search profiles: ', others['missing'])) if found))
+        # also for a missing marks.json whose backup holds marks, e.g. removed by hand (A40)
+        offer = marks_backup_offer(marks_error)
+        if marks_error:
+            advice = ('Restore the backup below, or fix the file in the results folder' if offer
+                      else 'Fix or remove it in the results folder')
+            st.warning(f'{MARKS_FILE} cannot be read, so marks are not shown and cannot be changed; FrameScout does '
+                       f'not change the file. {advice}.\n\nDetails: {plain(str(marks_error))}')
+        if offer:
+            st.caption(plain(offer))
+            st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
+    with notices:
+        show_notice('gallery_notice')
+        show_notice('marks_notice')
+        if hidden:
+            st.caption(hidden_text(hidden, len(shown), page < pages))
     # a new container for every profile, page and card count: in a fragment rerun with fewer
     # cards (the shorter last page) the cards of the previous page stayed in the browser
     # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
     draw_cards(shown, THUMBS, f'gallery_{names.index(name)}_{page}_{len(shown)}', find_disabled,
                has_closest_line(entry['cards']), profile=name, can_mark=can_mark)
-    show_copy(name, entry, marks, photo_folders, states[name] != 'missing')
-    show_export(name, entry, marks, marks_error)
+    bottom_pager(key, page, pages, 'results_' + widget_id(name) + '_', progress)
 
 
-def show_quick_results(results, folders, model, find_disabled):
+def show_gallery_actions(entry):
+    """The buttons of the HTML gallery of a profile in the popover "Export and copy" (F29)."""
+    st.markdown('**Gallery**')
+    st.button('Open gallery in browser', on_click=open_gallery, args=(entry['gallery'],), width='stretch',
+              help=f"Opens {entry['gallery']} from the results folder in your web browser.")
+    page_file = RESULTS / entry['gallery']
+    try:
+        # cached: a click on another button reruns this fragment (review)
+        st.download_button('Download HTML (without thumbnails)', cached_bytes(*file_key(page_file)),
+                           file_name=page_file.name, mime='text/html', width='stretch', key='dl_results_gallery')
+    except OSError:
+        pass  # deleted or in use: the other buttons still work
+    st.button('Open results folder', on_click=open_results_folder, width='stretch')
+
+
+def show_quick_results(results, folders, model, find_disabled, toolbar):
     """The gallery of the last quick search (F10) as a grid of thumbnails; no marks, copying or export.
 
     folders: the photo folders chosen now, to tell whether it searched others; model and
-    find_disabled as in show_results, whose entry it is (F34).
+    find_disabled as in show_results, whose entry it is (F34). toolbar: the row above the
+    photos (F29), which gets the page box and the popover "Gallery and folder".
     """
     entries = results['profiles']
     if not entries:
@@ -306,17 +364,31 @@ def show_quick_results(results, folders, model, find_disabled):
     result_model = MODELS.get(model_key) if model_key else None
     searched_folders = results['photo_folders']  # also for a format 1 file (A25)
     quick = results.get('quick') if isinstance(results.get('quick'), dict) else {}
+    pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
+    if st.session_state.get('quick_page', 1) not in range(1, pages + 1):
+        st.session_state.pop('quick_page', None)  # a page of a longer list of an earlier quick search
+    with toolbar:
+        page = 1
+        if pages > 1:
+            page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key='quick_page',
+                                persist_state='page', width=TOOLBAR_PAGE_WIDTH)  # kept while a profile is shown (F34)
+        with st.popover('Gallery and folder', help='Open the gallery of this quick search or its folder.'):
+            st.button('Open gallery in browser', on_click=open_quick_gallery, width='stretch', key='quick_open_gallery',
+                      help=f'Opens {QUICK_GALLERY} from the folder {QUICK_DIR} in the results folder in your web '
+                           'browser.')
+            st.button('Open quick search folder', on_click=open_quick_folder, width='stretch', key='quick_open_folder')
     # "Find similar" (F11) names its photo (by its file name, as the gallery title does, review)
     # and the part compared
     like = quick.get('like') if isinstance(quick.get('like'), str) else None
     part = quick.get('part') if isinstance(quick.get('part'), str) else None
     what = (f"Photos similar to {plain(Path(like).name)}" + (f' ({plain(part)})' if part else '') if like
             else f"Quick search for \"{plain(entry['name'])}\"")
-    st.caption(f"{what} from {run_date(results)} · photo "
+    # the style block rides in this caption, as in show_profile_results (A38)
+    st.caption(CARD_STYLE + f"\n\n{what} from {run_date(results)} · photo "
                f"folder{'s' if len(searched_folders) > 1 else ''} {plain('; '.join(searched_folders))} · "
                + (f'search model {plain(result_model.label)} · ' if result_model else '') +
                f"{len(entry['cards']):,} photos (at most {run_settings.get('top', '?')}), best first. "
-               'A ranking by similarity, not a guaranteed identification.')
+               'A ranking by similarity, not a guaranteed identification.', unsafe_allow_html=True)
     searched, not_analyzed = quick.get('searched'), quick.get('not_analyzed')
     if all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in (searched, not_analyzed)):
         st.caption(quick_note(searched, not_analyzed, like=bool(like)))
@@ -328,23 +400,9 @@ def show_quick_results(results, folders, model, find_disabled):
         made_with = f'the search model {plain(result_model.label)}' if result_model else 'another search model'
         st.info(f'This quick search was made with {made_with}; the AI settings now choose '
                 f"{plain(MODELS[model].label)}.")
-    c1, c2 = st.columns(2)
-    c1.button('Open gallery in browser', on_click=open_quick_gallery, width='stretch', key='quick_open_gallery',
-              help=f'Opens {QUICK_GALLERY} from the folder {QUICK_DIR} in the results folder in your web browser.')
-    c2.button('Open quick search folder', on_click=open_quick_folder, width='stretch', key='quick_open_folder')
-    if st.session_state.get('gallery_notice'):
-        st.warning(plain(st.session_state.pop('gallery_notice')))  # paths: no Markdown
-    pages = page_count(len(entry['cards']), GALLERY_PAGE_SIZE)
-    page = 1
-    if pages > 1:
-        if st.session_state.get('quick_page', 1) not in range(1, pages + 1):
-            st.session_state.pop('quick_page', None)  # a page of a longer list of an earlier quick search
-        page = st.selectbox(f'Page (of {pages})', range(1, pages + 1), key='quick_page',
-                            persist_state='page')  # kept while a profile is shown (F34)
+    show_notice('gallery_notice')
     shown = page_cards(entry['cards'], page, GALLERY_PAGE_SIZE)
-    # the style block rides in a caption, as in show_profile_results (A38)
-    st.caption(CARD_STYLE + '\n\n"More" on a card opens the photo or its folder with the programs of the computer '
-               'FrameScout runs on, or finds photos similar to it.', unsafe_allow_html=True)
     # a new container for every page and card count, as in show_profile_results
     draw_cards(shown, QUICK_THUMBS, f'quick_gallery_{page}_{len(shown)}', find_disabled,
                has_closest_line(entry['cards']))
+    bottom_pager('quick_page', page, pages, 'quick_')
