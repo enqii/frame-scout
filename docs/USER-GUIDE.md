@@ -306,7 +306,7 @@ no button.
 **Results** shows the last finished search per profile: one card per photo, best first, 48 per
 page. The photo is fitted whole into a square box, so every card has the same size (portrait
 and landscape photos alike), and the cards use the whole window width (cards 250 px wide, as many
-per row as fit; the same in every tab). A card shows rank, score and the best-matching part
+per row as fit; the other tabs stay at most 1,300 px wide). A card shows rank, score and the best-matching part
 ("Full image" or "Person 1", …), the detail line and the file name; a long line ends with "…" and
 shows its whole text when you hover over it. The buttons **Match** and **No** mark the photo;
 **More** opens a menu with "Open photo", "Show in folder" and "Find similar". Buttons open the

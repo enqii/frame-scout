@@ -2177,6 +2177,13 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       `persist_state='page'`, so Streamlit keeps their values while another entry is shown
       (checked with a minimal Streamlit AppTest: without it the box fell back to page 1). Test:
       `test_quick.py::test_the_views_of_the_results_selector_keep_their_boxes`.
+- [x] `minor` **F39 – A width limit for the form tabs:** with the 1,300 px limit gone (F30), the
+      other tabs (forms, settings, text areas) stretch over the whole window too. Found in F30.
+      Done (2026-11-15, in the PR #114 review): `framescout_core.PAGE_STYLE` limits every tab
+      panel but the last ("Results") to `FORM_TAB_MAX_WIDTH` (1,300 px); checked in headless
+      Edge at 1920 px (form tabs 1,300 px, "Results" 1,760 px). Test:
+      `test_app_state.py::test_the_tabs_but_results_keep_a_width_limit`, the bundle test checks
+      the `stTabPanel` name.
 - [x] `ready` **F30 – A new result card, drawn by one function:** `show_results` and
       `show_quick_results` repeat the card code; cards of portrait and landscape photos have
       different heights, so the rows are ragged; five equal buttons per card; a marked card
@@ -2201,10 +2208,18 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       folder" and "Find similar" in the popover "More". `mark_style` takes the card keys and
       shows the state by a 3 px frame, the selected button and, for no match, the photo dimmed to
       0.4; `MARK_COLORS` are Okabe-Ito blue (match) and orange (no match) instead of green/red.
-      `app.py` no longer limits the page to 1,300 px (all tabs use the window width). Tests:
+      `app.py` no longer limits the page to 1,300 px; after the review only "Results" uses the
+      window width (`PAGE_STYLE`, F39). Review fixes: an empty card text row keeps its line,
+      the closest-text row is decided for the whole gallery (`has_closest_line`), the mark
+      frame is an inset shadow (a clipping parent cannot cut it), the bundle test checks the
+      `data-testid` attributes. Tests:
       `test_results.py` (`card_text`), `test_marks.py` (`mark_style`, the bundle test also checks
       the `stImage`/`stImageContainer` names). Browser check (headless Edge, 1920 px, Streamlit
       1.66.1, dark and light theme, a harness with 14 synthetic cards): all cards 399 px high,
-      six per row, the mark states and the popover as described. Not verified: clicking
+      six per row, the mark states and the popover as described; after the review again with
+      10 cards (an empty detail line, "No thumbnail" cells, the inset frames: all 399 px
+      high), "Find similar" clicked in the popover inside a fragment (the request was stored
+      and the page reran; the popover stays open, F41) and the real app's tabs (form tabs
+      1,300 px, "Results" the window width). Not verified: clicking
       "Match"/"No" in the real app and a real search in a browser (F40). No schema, CLI, cache,
       `marks.json`, settings or thumbnail change.
