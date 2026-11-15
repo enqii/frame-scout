@@ -369,7 +369,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       unpacked size of the CUDA build of PyTorch and pip's peak space use are not measured;
       `TORCH_INSTALL_SPACE['cuda']` (3 GB download, 6 GB installed) is an estimate. Measure on
       the home PC and correct it; could go into the rest of I11. Found in F3 (PR #64).
-- [ ] **I39 – Shrink `docs/ARCHITECTURE.md` to what the code cannot say (simplification):**
+- [ ] `ready` **I39 – Shrink `docs/ARCHITECTURE.md` to what the code cannot say (simplification):**
       the file has about 177 KB and retells the code function by function, so every PR has to
       update it and the workflow needs a separate `docs-update` agent for that (I17). Cut it to
       roughly 20–30 KB: the search pipeline, cache signature, data formats (`profiles.json`,
@@ -379,13 +379,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (I41). Found on 2026-11-12 in a simplification review of the whole project: the search
       core (engine, scoring, image loading) has about 1,300 lines, against about 7,500 lines
       of `framescout_core`, 13,800 lines of tests and 530 KB of Markdown.
-- [ ] **I40 – Reduce `docs/BACKLOG-DONE.md` to one line per ID (simplification):** the file
+- [ ] `ready` **I40 – Reduce `docs/BACKLOG-DONE.md` to one line per ID (simplification):** the file
       has about 170 KB of reports that repeat the PR descriptions and the git history. Keep
       one line per finished item (ID, title, date, PR link); the report stays in the PR.
       Change the rule "moved with its report" in `CLAUDE.md`, the roadmap skill and the briefs
       accordingly. Items finished without a PR keep a short report. Found on 2026-11-12 in a
       simplification review.
-- [ ] **I41 – Lighter PR workflow (simplification):** four state labels, fresh agents per
+- [ ] `ready` **I41 – Lighter PR workflow (simplification):** four state labels, fresh agents per
       phase and a separate docs agent are heavy for a one-person project. After I39/I40
       decide: fold the docs update back into the implementer (the reason for I17 was the
       context size, mostly caused by the docs), reduce the labels to two (`fs:in-progress`,
@@ -393,7 +393,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       and the briefs (together about 50 KB). Keep: one PR per item, one review round, merge
       only after approval, user data protection. Workflow rule change, so a user decision.
       Found on 2026-11-12 in a simplification review.
-- [ ] **I42 – Replace the mixed-versions guard by something simpler (simplification):**
+      Triage 2026-11-15: decided yes (P41, after I39/I40/I47).
+- [ ] `ready` **I42 – Replace the mixed-versions guard by something simpler (simplification):**
       `framescout_core/layout.py`, `framescout_scoring/layout.py`, the `FRAMESCOUT_PACKAGES`
       marker in six entry points and about 500 lines of `tests/test_layout.py` (I16, I35, I36)
       only protect against extracting a ZIP over another version's folder. Options: the
@@ -401,7 +402,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       version file); or the user guide says "extract into an empty folder" and the `.bat`
       files keep deleting the two known leftover files. Removes a gotcha from `CLAUDE.md`.
       Decide which protection stays. Found on 2026-11-12 in a simplification review.
-- [ ] **I43 – Drop legacy names with one migration (simplification, breaking):** the prototype
+      Triage 2026-11-15: decided: one version file checked by the installer and the start script.
+- [ ] `decision` **I43 – Drop legacy names with one migration (simplification, breaking):** the prototype
       has no release yet but carries compatibility code for its own earlier states: the crop
       label `Gesamtbild` in old cache rows, the thumbnail folder `results/vorschaubilder/`,
       the profile field `franchise` (meaning "Context / origin"), the CLI option
@@ -410,7 +412,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       paths; best together with the first release `v1.1.0` as the cut. Breaking change of the
       `profiles.json` schema and the CLI (hold point): decide per name. Found on 2026-11-12 in
       a simplification review.
-- [ ] **I44 – Reduce defensive handling of rare cases, starting with the storage cleanup
+      Triage 2026-11-15: stays open; better together with the release v1.1.0. **Question:** per name, migrate or keep.
+- [ ] `decision` **I44 – Reduce defensive handling of rare cases, starting with the storage cleanup
       (simplification):** `framescout_core/cleanup.py` has about 1,300 lines and
       `tests/test_cleanup.py` about 1,500, more than the whole engine: reachability probes of
       drive roots in threads, hanging network shares, fstab mount points, dead links. A
@@ -420,7 +423,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       so list per module what would go and let the user decide (the deletion rules for user
       data and `NEVER_DELETED` stay). Found on 2026-11-12 in a simplification review, by
       sampling, not by reading every module.
-- [ ] **I45 – Flatten the package structure (simplification):** `framescout_core/__init__.py`
+      Triage 2026-11-15: stays open; list per module what would go, then decide.
+- [ ] `ready` **I45 – Flatten the package structure (simplification):** `framescout_core/__init__.py`
       re-exports about 200 names by hand, and every new function has to be added there; import
       from the modules instead (`from framescout_core.settings import …`) and keep
       `__init__.py` nearly empty (the mixed-versions guard depends on I42).
@@ -428,7 +432,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       make it one module or a subpackage, keeping the rule "core is standard library only" as
       a test. Do it together with I32 (entry points into a package), so the imports change
       once. Found on 2026-11-12 in a simplification review.
-- [ ] **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
+      Triage 2026-11-15: P43, after I42; I32 stays a separate decision.
+- [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and
       `portable_python.py`, with tests that compare them. A `pyproject.toml` with a lock file
@@ -437,7 +442,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `install_torch.py` and `portable_python.py`. New tool and download in the installer
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
-- [ ] **I47 – Keep unneeded complexity out from the start (workflow):** the items I39–I46,
+      Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
+- [ ] `ready` **I47 – Keep unneeded complexity out from the start (workflow):** the items I39–I46,
       A46 and A47 remove complexity that entered one reasonable PR at a time, mostly through
       review findings about rare cases, compatibility with earlier prototype states and docs
       that retell the code. Rules to introduce:

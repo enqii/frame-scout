@@ -19,38 +19,27 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [~] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
-### P29 – Detector weights (added 2026-11-12)
-- [x] Log which detector weights file was loaded (E60)
+### P38 – Shrink the backlog archive (added 2026-11-15)
+- [ ] Reduce `docs/BACKLOG-DONE.md` to one line per ID and adapt the "moved with its report"
+      rule (I40; kind `docs`)
 
-### P30 – Mark colors (added 2026-11-13)
-- [x] The mark colors apply again with the pinned Streamlit, checked in a browser (A49)
+### P39 – Shrink the architecture document (added 2026-11-15)
+- [ ] Cut `docs/ARCHITECTURE.md` to what the code cannot say (I39; kind `docs`)
 
-### P31 – Split `app.py` (added 2026-11-13)
-- [x] Move the areas of `app.py` into modules without changing behavior, before the UI
-      rebuild (A46) (2026-11-13)
+### P40 – Rules against unneeded complexity (added 2026-11-15)
+- [ ] Introduce the rules (a)–(e) in `CLAUDE.md`, the reviewer brief and the PR template (I47;
+      kind `docs`)
 
-### P32 – Run state (added 2026-11-13)
-- [x] A state line next to the title and what a search still needs at the Start button (F27) (2026-11-14)
+### P41 – Lighter PR workflow (added 2026-11-15)
+- [ ] Fold the docs step into the implementer, reduce the labels, shorten the workflow texts
+      (I41; kind `docs`; workflow rule change, decided 2026-11-15)
 
-### P33 – Tabs and settings (added 2026-11-13)
-- [x] (A) Five tabs: results on their own, storage maintenance in the settings, "Analyze
-      ahead" in the search tab (F28) (2026-11-14)
-- [x] (B) Group the AI settings (F32) (2026-11-14)
+### P42 – Mixed-versions guard (added 2026-11-15)
+- [ ] Replace the guard by one version file checked by the installer and the start script
+      (I42; kind `code-risky`; decided 2026-11-15)
 
-### P34 – Quick search in the results view (added 2026-11-13)
-- [x] The result of a quick search or "Find similar" is an entry of the results selector
-      (F34) (2026-11-14)
-
-### P35 – Result card (added 2026-11-13)
-- [x] One card for both views: equal cells, "Match"/"No" as the main buttons, the other
-      actions in a popover, a visible mark state, full window width (F30) (2026-11-15)
-
-### P36 – Results toolbar (added 2026-11-13)
-- [x] One toolbar row above the photos, a pager below the grid, copy and export in a
-      popover (F29) (2026-11-15)
-
-### P37 – Review dialog (added 2026-11-13)
-- [x] One photo at a time with a large preview in a dialog (F19) (2026-11-15)
+### P43 – Package structure (added 2026-11-15)
+- [ ] Flatten `framescout_core/__init__.py` and the `framescout_scoring` package (I45; after P42)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
