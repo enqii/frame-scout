@@ -15,7 +15,7 @@ import streamlit as st
 # before the first FrameScout import. Streamlit runs this file as the module __main__.
 FRAMESCOUT_PACKAGES = True
 
-from framescout_core import (APP_TABS, CACHE_FILE, EXAMPLE_PROFILES_FILE, MODELS, QUICK_DIR, QUICK_QUERY_MAX,
+from framescout_core import (APP_TABS, CACHE_FILE, EXAMPLE_PROFILES_FILE, MODELS, PAGE_STYLE, QUICK_DIR, QUICK_QUERY_MAX,
                              RESULTS_FILE, RESULTS_TAB, cleanup_running, count_text, create_from_example, distinct_folders,
                              engine_command, finishing_minutes, gallery_thumbnails, join_scans, known_throughput,
                              quick_scope_text, read_profiles_versioned, remembered_scans, results_running_text,
@@ -36,9 +36,9 @@ DECODERS = decoders()
 SUPPORTED = supported()
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
-# the whole window width (F30): the result cards have a fixed width and fill the rows
-st.markdown('''<style>.block-container{padding-top:2rem}
-.stButton button{border-radius:8px}</style>''', unsafe_allow_html=True)
+# the whole window width for the result cards, which have a fixed width and fill the rows (F30);
+# a width limit for the other tabs
+st.markdown(PAGE_STYLE, unsafe_allow_html=True)
 
 title_col, state_col = st.columns([1, 2], vertical_alignment='bottom')
 title_col.title('🔎 FrameScout')
