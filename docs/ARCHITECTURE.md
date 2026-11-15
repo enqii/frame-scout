@@ -1,2152 +1,450 @@
-# FrameScout — architecture and runtime details
+# FrameScout — architecture
 
-Reference for contributors and Claude Code. The rules (language, PR workflow, user data
-protection, git) live in `CLAUDE.md`; this file describes what the code does. Read the
-sections relevant to the files you touch before changing code, and keep this file current
-when behavior changes.
+What the code cannot say by itself: the shape of the system, the search pipeline, the data
+formats, the invariants that are easy to break and what has actually been run. Function-level
+behavior lives in the docstrings (search the code, e.g. `grep -rn "def name" framescout_core`),
+the list of tests is `tests/` (one file per area), the commands are in `docs/DEVELOPMENT.md`
+and the rules in `CLAUDE.md`. Review-round details and old PR reports are in the git history
+and the PR descriptions (`docs/BACKLOG-DONE.md` links them); this file keeps only what is
+true now. Keep it current when a data format, an invariant or the verified status changes.
 
 ## Verified status
-One full end-to-end search run on Windows has been confirmed (I6): `run.log` from the
-original checkout shows 4,997 photos, 6 search profiles, CLIP on CPU, YOLO person
-detection enabled, 0 errors (2,609 new analyses + 2,388 from cache, i.e. a resumed run)
-and 6 HTML galleries written. The project `.venv` used for that run is Python 3.14.8 with
-torch 2.14.1+cpu (per `.venv/pyvenv.cfg` and the installed torch package; `run.log` itself
-does not record versions). The log also shows the QuickGELU warning (E1, fixed since: that
-run's embeddings came from the GELU variant). This is a single CPU-only run, not a test
-suite: the CUDA path has been run on one machine only (the installer option and GPU use
-exist since PR #8): an RTX 4070 with torch 2.14.1+cu130, Python 3.14 (I11, PR #56). CLIP and
-YOLO on CUDA, `--device auto`, the app's device choice (seen in headless Edge), 400
-synthetic photos and 4997 real full-size JPEGs on CUDA and CPU, all four search models
-and the evaluation tool with real models. The empty or missing mount point check of the
-unbound photos on Linux/macOS (E54) is **not runtime-tested** (simulated in tests). A fresh
-`Install-FrameScout.bat cuda`, `cu126` and other or several GPUs are untested (I11), as are
-other Python versions, a fresh install on another machine and the edge cases in the backlog
-are **not** verified. Treat syntax
-checks, unit tests and a real model run as distinct kinds of evidence, and do not call the
-app production-ready. The installer's download, extraction and `venv` creation with the private
-Python 3.14.9 (P5 part C) and the uninstall with it were run under `.tmp`; a full installation
-with PyTorch on it is **not runtime-tested**. The time estimate (F12) is **not runtime-tested**:
-its helpers are unit-tested and the run tab summary was checked with Streamlit `AppTest`, but the
-engine's rate measurement and the "time left" of a live search were never run. "Find similar" (F11) was run as an engine smoke run with synthetic vectors and as a headless `AppTest` run of a copy under `.tmp/`; a real browser click-through, the button on a profile-search card, real CLIP vectors, person parts and CUDA are **not runtime-tested**.
 
-Publishing the export (E24, E26, PR #45): one CPU smoke run (4 synthetic photos, 2 profiles,
-`.tmp/`) wrote both galleries and `results.json`, removed two stale temporary files and kept
-a fresh one. A real stop during the export was **not** reproduced (unit tests only).
-
-Search models (E22, PR #31): CPU smoke runs of all four registered models (default,
-ViT-B/16, ViT-L/14, SigLIP) with `--no-person-detection`, 3 synthetic images and `.tmp/`
-output succeeded, the weights downloaded into the main checkout's `.cache/`. **Not
-verified:** search quality of the three optional models (none is evaluated, E32), CUDA with
-them, person detection with them, a run without `transformers` installed, and
-`Install-FrameScout.bat` with the new requirement. The CPU factors in the registry were
-measured once on a Core Ultra 9 285K.
-
-Evaluation tooling (E32/E20, PR #32): `framescout_eval.py`, `framescout_core/evaluation.py`
-and the engine's `--scores-file` are covered by unit tests, the engine change additionally by
-its syntax tree and `py_compile`; the labelling page was rendered in headless Edge (again
-after the review fixes, with fake scores), and the labelling server answered real HTTP
-requests on Windows (a label POST, a negative `Content-Length`, a wrong token). **Since
-PR #56 (E34, E35):** `run` with all four models on CUDA, `pool`, `metrics` and the engine's
-`--scores-file` ran with real models on 4997 real photos and a collection with profiles
-chosen for them (a local studio-event photo set); the user labelled it in their own browser
-(about 1600 pool photos, 6 of 7 profiles) and `metrics` produced the first AP@40 values (E32);
-the page's keyboard and mouse handling was also driven by trusted CDP input in headless Edge
-(25 of 25 checks, with HEIC pool photos and reference images). **Not run:** macOS/Linux, a
-second collection.
-
-CUDA vs CPU (I11, PR #56, RTX 4070, 4997 real photos, 7 profiles, ViT-B/32): both runs exit
-0 with 0 errors and the same cache signatures; CUDA with person detection 348 s, CPU 486 s,
-CUDA without person detection 93 s (person detection is the GPU bottleneck, E18). Full-image
-embeddings are identical (minimum cosine 1.000000); person crops differ slightly (see
-"Known quirks").
-
-Offline loading (E16/E31/E33, P7 A): a CPU engine smoke run with the cached default model
-and the network blocked finished without Hub requests; SigLIP (cached, network blocked)
-loaded offline with its tokenizer through `import_open_clip` (no engine run). The first
-download and the fallback after an incomplete cache are **not runtime-tested** (E38).
-
-## Files and responsibilities
-
-### `app.py` and `framescout_ui/`
-
-F27: next to the title, `app.py` reserves a container (`state_area`) that is filled once the photos are counted with the fragment `framescout_ui.run.show_state_line(active, photos)` (`run_every='2s'`, on every tab). The page run stores `(active, status)` in `st.session_state.state_line_state` like `page_run_state` for `show_status`; the fragment pops it on the page run and reads `run_state()` itself on fragment-only reruns, and like `show_status` it reruns the whole page when that differs from the page run's `active`, so the line and the tabs never disagree about a run for longer than that rerun. The start area shows `start_needs_line` and, when Start is disabled, `start_blocked_text` (a warning when idle, a caption while a run is active); a missing model package is not repeated there (its install hint is in "Settings", which the line names). Start's disabled conditions are unchanged (no profile, no existing folder, missing model package, active run). Test: `tests/test_app_state.py` (the pure functions only, not the app wiring); AppTest ran the page without errors, the look in a browser and a real running search were not verified.
-
-A46: `app.py` keeps the page layout (startup checks, the tabs, the "Photo source" tab, the search tab and
-`start_engine`); the areas live in the package `framescout_ui/` (imports streamlit; imported only by `app.py`, never by
-another module; no module imports `app`; `tests/test_app_source.py` checks both). Code was moved verbatim. Where a moved
-function used to read a global of the page run, it gets the value as an argument (module globals would be shared by all
-browser sessions): `active`, `folder_scans`, `settings`, `profiles_shown`. The session-state and widget keys
-(`setting_<name>` etc.) are unchanged. Modules:
-
-| Module | Area |
-|---|---|
-| `common.py` | project paths (`BASE`, `PROFILES`, `RESULTS`, `QUICK`, `MARKS`, ...), `decoders()`/`supported()`/`upload_types()` (the readable formats, evaluated in every page run), `open_path`/`reveal_path`/`gallery_action`, `widget_id`, `keep_value`/`restore_value`/`kept_key` (F34: keep a form field's submitted value in the session key `<key>__kept` and put it back only in the page runs that disable the field, since Streamlit empties it then; putting a value into a widget key also resets the field in the browser, review; a widget a page run does not draw keeps its value with `persist_state='page'` instead), `plain` (Markdown escaping), `clean_project_folder` (E44), `LOW_SPACE_TTL` |
-| `settings.py` | settings widgets (`setting_key`, `setting_of_widget`, `widget_of_setting`), `sync_settings()` (A8), `show_ai_settings(settings, seen, shown, active)` with "Check installation" |
-| `run.py` | `run_state`, `start_run`, `stop_run`, `end_processes`, `cache_env`, `cached_analyzed_photos`, `low_space_warning`, `show_state_line(active, photos)`, `show_status(active)` |
-| `marks.py` | `load_marks`, `set_mark`, `marks_backup_offer`, `restore_marks_backup` |
-| `copy_export.py` | `copy_matches`, `export_list`, `show_copy`, `show_export` |
-| `results.py` | `load_results`, `draw_cards` (F30: the one card function of both views; `card_key`, `CARD_WIDTH` = 250, `NO_THUMBNAIL`), `show_results` (F34: the one fragment, the selector "Results of" over the profiles and the quick entry; F29: creates the toolbar container and passes it to the two views), `show_profile_results`, `show_quick_results`, `bottom_pager`, `show_notice`, `show_gallery_actions`; F19: `draw_cards` lays the button `fspreview-<id>` over each card's photo, `show_profile_results` has the toolbar button "Review one by one" |
-| `review.py` | F19: `show_review(...)` (opens `review_dialog`, the `st.dialog`, while its state names the list shown), `open_review`/`close_review`, the callbacks `review_choice`/`review_step` (guarded by `_still_shown`), `show_preview`/`cached_preview`, `find_similar_button` (moved here from `results.py`) |
-| `cleanup.py` | `show_cleanup` (E7), `scan_storage`, `delete_storage`, `show_cache_check` (F1) |
-| `profiles.py` | `show_profiles`, `store` (A13), `forget_profile`, `deletion_consequences` |
-
-The text below describes the behavior of the whole frontend; function names that it gives are found in the modules above
-(`start_engine` and the page layout stay in `app.py`).
-
-`app.py`: Streamlit frontend. Tabs (F28, `framescout_core.APP_TABS`): Search profiles, Photo source, Settings (the AI settings: the everyday ones first, then the expander "Person detection and reference images" (F32; opened once `changed_from_defaults` over `AI_DETAIL_SETTINGS` finds a change, then kept open for the browser session through `st.session_state['ai_details_open']`, because Streamlit closes an open expander when `expanded` turns False on a rerun; `max_persons` and `person_confidence` are disabled while person detection is off or a run is active, with a caption), then the
-subheader "Storage" with the expander "Clean up storage": cleanup and cache check), Search (Start/Stop, status and log, "Analyze ahead", "Quick search") and
-Results (`RESULTS_TAB`: while a search or an analysis runs, the note `results_running_text`; then the subheader "Results" and the selector "Results of" (key `results_profile`) with the profiles of the last search and, last, the entry of the last quick result, F34). F18: the "Search" tab has the section "Analyze ahead" below Start (drawn inline in the run tab's code, which knows the run state; F28 removed the `analyze_area` container from the photo tab): explanation, the current search model and person detection,
-`start_summary(..., analysis_only=True)`, its own low disk space warning (`low_space_warning(..., analysis=True)`: no profile, so
-no gallery thumbnails) and the button "Analyze photos now" (disabled like "Start search" while a run or cleanup is active, without
-an existing folder or with a missing model package; not by the photo count, which is the one remembered for the browser session
-(A27) while the engine reads the folders again, review). Its counts treat the JPEG/HEIC partners searched through another file of
-their shot (`quick_scope`'s third count) as analyzed, since they never get a cache row of their own (review); the Search tab shows the analysis with `run_name` texts and `analysis_result_text`. Handles profile CRUD, reference uploads, settings saved in `settings.json` (A8),
-hardware display, analysis process, progress/log UI, and the result gallery of the last
-search from `results/results.json` (P4 (A), A12: thumbnail grid, 48 per page,
-"Open"/"Folder" per photo, "Open gallery in browser", "Open results folder", HTML
-download, a note for profiles changed since; results folders without the file list their
-HTML files by name) with a three-state mark per photo (undecided / Match / No match, saved
-in `results/marks.json`; F30: the control has the two options "Match" and "No", neither pressed = undecided, a second click on the pressed one removes the mark), "Hide no match" and copying of a profile's
-matches to a folder (A17); F29: the controls of a profile's results are one toolbar row, see below; the expander "Clean up storage" (E7) moved to the Settings tab (F28). After the search
-status sits the section "Quick search" (F10, `QUICK`/`QUICK_JSON`/`QUICK_THUMBS`
-are `results/quick/`, its `results.json` and `thumbnails/`): a text input (`quick_query`, at
-most `QUICK_QUERY_MAX` = 300 characters) and the button "Quick search" (disabled while a search
-runs, without folders, with a missing model package or while no photo is searched: none is analyzed itself or through another file of its shot, E61), the
-caption `quick_scope_text` (N of M photos analyzed and searched, counted as the engine counts, E61) and the quick result view (`show_quick_results`, an entry of the results selector, F34: `quick_entry_label`; selected at once when its `quick_result_id` (finish time and label without the profile names, review) differs from session key `quick_seen`, `results_choice`; shown with only a quick result and no `results.json` as the one entry plus a hint; the quick text stays in its field through `common.keep_value`/`restore_value` (put back only while a run disables the field), session key `quick_query__kept`; "Hide no match" and the page boxes `results_page_<name>`/`quick_page` keep their values while another entry is shown through `persist_state='page'`, F38: text, date, photo folders, model, count, the
-`quick_note`, a note if it searched other photo folders than the ones chosen now
-(`quick_folders_differ`), model-mismatch info, "Open gallery in browser", "Open quick search folder", 48 per page,
-the same cards; no marks, copying or export). F29: `show_results` makes the toolbar `st.container(horizontal=True, vertical_alignment='bottom')` and hands it to `show_profile_results(..., toolbar)`/`show_quick_results(..., toolbar)`, which fill it in this order: the selector "Results of" (`TOOLBAR_SELECT_WIDTH` = 280), for a profile the counts `framescout_core.mark_counts_text(progress)` ("N match · N no match · N undecided", '' for an empty list; its help says how to mark and that marks are kept per profile across searches), the checkbox "Hide no match" (key `hide_rejected`), the page box (`TOOLBAR_PAGE_WIDTH` = 130; keys `results_page_<profile>`/`quick_page`), for a profile the button "Review one by one" (F19, see below) and the popover "Export and copy" (`show_gallery_actions`: "Open gallery in browser", "Download HTML (without thumbnails)", "Open results folder"; then `show_copy` and `show_export`, contents unchanged) or, for the quick entry, the popover "Gallery and folder". Below the toolbar: one caption (search date, model, F17 closest-text summary), then only the notes that apply (other model, changed/missing profile, other profiles' state, unreadable `marks.json` with the backup offer), then the notices (`show_notice(key)`, a tuple or plain text; gallery, marks, and through `show_copy(..., notices)`/`show_export(..., notices)` the copy progress/result and the export result, so they stay visible outside the closed popover) and the hidden-count caption. Below the grid (both views) `bottom_pager(key, page, pages, prefix, progress=None)`: "Previous page", "Page x of n", "Next page" and, for profiles, "Go to the first undecided photo" plus the F20 review progress caption (both moved from above the grid; same `go_to_page` callback and keys). F30: both views draw their cards with `draw_cards` (`framescout_ui/results.py`): a bordered container of the fixed width `CARD_WIDTH` (250 px) with the key `fscard-<id>` (`card_key`, `CARD_KEY_PREFIX`) in a wrapping horizontal container, so the number per row follows the window width (no `GALLERY_COLUMNS` any more; the page is no longer limited to `max-width:1300px`, only the panels of the other tabs are, by `framescout_core.PAGE_STYLE`); the photo, the text from `framescout_core.card_text`, the mark control (`MARK_LABELS` in `framescout_ui/marks.py`) and the popover "More" with "Open photo", "Show in folder" and "Find similar" (a click reruns the page and Streamlit keeps the popover open, F41); a card without a thumbnail shows the square box `NO_THUMBNAIL`. F11: every card of both views has a "Find similar" button in the popover "More"
-(`find_similar_button`; disabled while a search runs or without existing folders, not for a missing model package,
-since it loads no model). The button is a fragment that stores `st.session_state.find_similar = (path, label)` and
-reruns the page; that page run pops the request first thing (before any `st.stop`, so a run that stops early drops it
-instead of leaving it for a later run) into `find_similar_request` and, under "Start search", calls
-`start_engine(like=…, like_part=…, notice='like_notice')`, or sets a `like_notice` (shown in the Results tab, F28) if a search is running meanwhile (the fragment's button may
-be stale). The quick result caption then reads "Photos similar to <file name> (<part>)". The HTML galleries have no button (static pages).
-
-F19: the review dialog (`framescout_ui/review.py`, `st.dialog` width "large", title "Review one by one") opens from the toolbar button "Review one by one" (profile galleries only; disabled where photos cannot be marked: no search profile any more or an unreadable `marks.json`; opens at `first_undecided` of the whole ranked list) or from a click on a card's photo (the overlay button `fspreview-<id>` over the container `fsphoto-<id>`, laid out by `CARD_STYLE`; it shows when it has the keyboard focus, so it is also the keyboard path to the dialog). Session state `st.session_state.review` = {profile (None for quick search), path, notice}; the dialog keeps the path of the photo it shows there (also the first undecided one it opened at). `show_review` is called on every run of a results view and opens the dialog while `framescout_core.review_shown(state, profile, cards)` holds (the state names the list shown, which has photos); otherwise it drops the state, as do `show_results`/`show_quick_results` when they end before a list is drawn and the page when it shows no results, so a dialog hidden by a rerun without its `on_dismiss` (e.g. the selector switching to a new quick search) does not pop up later (review). `on_dismiss` (X, Esc, a click outside) clears the state and reruns the page, so the gallery behind shows the new marks after closing. It shows the position, the saved mark (only where photos can be marked: without readable marks or for a profile that is gone every photo would look undecided), the ranking note, the preview (`render_preview`; only the decoding is caught, a missing or undecodable photo shows its thumbnail and the reason) and the card text (`card_text(card, has_closest_line(cards))`, as in the gallery). `REVIEW_STYLE` rides in the caption of the position, like `CARD_STYLE` in the gallery caption (A38). "Match"/"No match" (`save_marks`, as on a card; nothing is saved while `marks.json` cannot be read; not for the quick search) move to the next undecided photo (wrapping around; a notice if none is left), "Skip" only moves on, "Previous"/"Next" step through the whole ranked list including photos "Hide no match" hides, "Open photo", "Find similar" (closes the dialog and starts the search). The buttons pass the path of the photo they were drawn for, and the callbacks do nothing once another photo is shown (`_still_shown`), so a quick second press neither saves a photo twice nor marks the next, unseen one (review). Keys through `st.button(shortcut=...)`: M, N, S, Left/Right, O. The crop outline of F19 is not implemented (F45).
-
-`load_results(path)` reads either
-result file. Both searches start through `start_engine`, which builds the command with
-`framescout_core.engine_command`; the settings-taken-over guard applies to both. The Settings tab has
-the expander "Check installation" (F15): a button runs `check_installation(BASE, os.environ)`
-(importing torch takes seconds, so never automatically) and shows each result as error with
-"Fix:", success or information; the results stay in `st.session_state['install_check']`, with a
-"Checked at" caption from `install_check_at`. The check runs in the script thread under a
-spinner (a first torch import can take long), so it blocks only that browser session.
-
-### `framescout_engine.py`
-
-`framescout_engine.py`: standalone CLI. Takes one or more photo folders (positional
-`folder`, `nargs='+'`, A25). Parses arguments, loads models, embeds images,
-optionally detects persons, caches embeddings, ranks and exports HTML galleries, then
-removes temporary and unreferenced thumbnails and stale temporary files (`auto_cleanup`,
-E7/E13/E26). The optional
-`--scores-file JSON` (E32, default off, never passed by the app) writes, after scoring and
-before the galleries, every crop's text and reference scores per profile for the
-evaluation tool (`framescout_core.evaluation.scores_document`; see "Model evaluation
-tool"); it changes no cache, profile, settings or `results.json`. The additive
-`--quick-query TEXT` (F10) searches the photos already analyzed with the current settings
-without profiles: it excludes `--profiles`/`--character` (usage error), refuses an empty text
-or one over `QUICK_QUERY_MAX` and builds the profile with `quick_profile`. It loads no detector
-and analyzes nothing; phases `scanning`, `loading`, `scoring` (total = photos searched),
-`exporting`. Only photos with a current cache row are scored (`quick_photos` with the engine's
-`analyzed` check, run right after `prepare_cache` and before the model load); with none the
-run fails at once with "None of these photos is analyzed with these settings yet …" (a damaged
-cache raises its error as before, E50). The output goes to `results/quick/` (see "Outputs and
-thumbnail cleanup").
-
-`--analyze-only` (F18, additive; the app's "Analyze photos now") analyzes the photos without a search: it runs the scan and
-the analysis phase with the given `--model`, person detection settings and `--low-priority` (cache reuse, RAW fallback, lazy
-detector, run lock and status file as for a search), then closes the cache connection and returns 0 before scoring and export
-(`results.json`, galleries, thumbnails, `auto_cleanup`, the scores file and the quick folder are not touched). It excludes
-`--profiles`/`--character`/`--quick-query`/`--like`/`--scores-file` (usage errors, status `failed`; `profiles` is `[]`, so
-nothing is encoded or read); `--top` and `--reference-weight` are accepted and ignored. Log line `N photos; analysis only, no
-search; ...`, final line `Done. Analysis only, no search: new photo analyses: N, from cache: N, errors: N. ...`. Unreadable
-cache rows give the warning of E50 (`cache_read_warning(..., run='analysis')`: "left out of this analysis", E63); none
-readable and nothing analyzed fails like a search; a failed analysis says `The analysis ended with exit code N.`
-(`final_status(code, warnings, run)`). The throughput record (F12) is written as for a search.
-
-`--like PHOTO` with `--like-part PART` (default `Full image`; needs `--like`) (F11) is a quick search by the cached
-vector of one photo's part: it excludes `--profiles`/`--character`/`--quick-query` and `--scores-file` (usage
-errors, exit 2), has no text, loads no model (no `loading` phase, no model package check: `model_problem` is skipped), no detector and
-analyzes nothing; `image_size`/`min_size` are defined only where a model is loaded (`if not like`). The photo is mapped
-to the path the scan names it by (`like_scan_path`: the same text, else a scanned photo or RAW file of the same name
-that `os.path.samefile` matches, e.g. another letter case, a link or a mapped drive), since the cache and the shot are
-keyed by that path. The cache row
-reading of the scoring loop was moved unchanged into `cached_features(path)`, which also reads the `--like` photo.
-The ranking is `rank_similar` (cosine similarity of every crop with the vector, z-scored over all crops, the raw value
-when there are too few). The photo and its whole shot (its RAW file and every partner of that RAW file, whichever of them is the
-photo and whether they have rows, E30) are left out of the ranking and of the not-analyzed count. Exit 2 with a message: the photo has no current cache row of the current signature or a broken or non-finite row
-(also labels that are not one text per vector, `like_labels_fit`)
-("This photo is not analyzed with these settings (or it changed since) … Start a search with profiles over its folder
-first"), the row lacks the part (the message names the parts it has), or no other photo is analyzed ("No other photo of
-these folders is analyzed …"). Output: `results/quick/` like the quick search (it replaces the last one); profile name
-and gallery title `Similar to <file>` (+ ` (<part>)` for a part other than the full image); notes `LIKE_SCORE_NOTE`/`LIKE_RAW_NOTE`
-and `quick_note(..., like=True)`. The image decoding
-(`open_image`, `open_raw`, `raw_preview`, `render_thumbnail`, `DECODERS`, `ORIENTATION`,
-`THUMBNAIL_SIZE`, the HEIF registration, Pillow's `MAX_IMAGE_PIXELS`/`LOAD_TRUNCATED_IMAGES`) lives in
-`framescout_images.py` (E49) and is imported by the engine.
-
-### `framescout_images.py`
-
-Torch-free root module (Pillow plus the optional pillow-heif/rawpy; no torch, no direct numpy
-import, sets no cache variables) with the image decoding and thumbnail rendering moved unchanged
-out of the engine (E49). Used by `framescout_engine.py` and by `framescout_eval.py pool`
-(`load_renderer`), so the evaluation tool no longer imports torch. `tests/test_images.py`: ast
-checks (no torch/numpy import, the engine defines no decoding functions of its own) and, with
-Pillow only, that rendering a thumbnail loads neither torch nor the cache variables. F19: `render_preview(path, size)` decodes a photo downscaled in memory (longer edge `size`, nothing written to disk) for the review dialog; the app imports it (`st.cache_data` per path, mtime and size, 8 entries); the preview test is in `tests/test_images.py` (skipped without Pillow).
-
-### `framescout_core/`
-
-The package `framescout_core/` is shared by app and engine and uses the **standard library
-only** (importable without torch/Streamlit). It has one module per area (I15, split from
-the former single file `framescout_core.py`); `__init__.py` re-exports every public name,
-so callers write `import framescout_core` or `from framescout_core import <name>`. Put
-logic here when both sides need it or it should be unit-tested without models; add it to
-the module of its area and to the re-exports in `__init__.py`.
-
-- `layout.py` (I16): `OBSOLETE_CORE_FILE` (`framescout_core.py`, the single file of FrameScout before I15) and `mixed_versions_message(folder)` (the error text if that file lies next to the package, else `None`). `__init__.py` calls `refuse_mixed_versions(__file__)` **before any other import**, which raises an `ImportError` with that text unless the running script is marked (see below): so an unmarked script stops in a folder with files of two versions: Python would import the package either way, and after going back to an older version the older `app.py` would run silently against the newer core (another `ENGINE` and cache signature). The exception is a **marked script** (I35, `marked_script`): every entry point of this version (`app.py`, `framescout_engine.py`, `framescout_eval.py`, `install_torch.py`, `framescout_check.py`, `framescout_uninstall.py`, `framescout_start.py`) sets the module global `FRAMESCOUT_PACKAGES = True` (`LAYOUT_MARKER`) before its first FrameScout import, and `refused_import(folder, main_module, package)` lets a `__main__` with that marker `is True` load when the script's folder equals the package's folder (for `app.py` the marker is a global of Streamlit's `__main__`, whose `__file__` is the script path). An unmarked script (an older version's `app.py`, engine or `install_torch.py`, or `python -c`) is refused as before. `tests/test_layout.py` checks the marker comes before the first FrameScout import in each entry point and that every root script importing a FrameScout module is an entry point or the library `framescout_images.py`. Rollback: after going back to a version before I15, the entry points that version lacks (evaluation tool, check, uninstall) stay as this version's and load this core; they import only the two packages (each with its guard) and `framescout_images`, which a test checks. This holds only for going back before I15: `framescout_images.py` came with E49, so the versions with the single file `framescout_scoring.py` since E49 have it too; all of today's entry points existed then, so going back to such a version replaces them with its unmarked ones. The marker means "a version with both packages": a future guard for another module that becomes a package needs a **new marker name**, because this version's scripts carry only the current one. Other public names: `CORE_PACKAGE`, `SCORING_PACKAGE`, `REPLACED_PACKAGES`, `leftover_text`, `leftover_fix`; `mixed_versions_message(folder, package='framescout_core')`. Without the marker, the engine, evaluation tool and `install_torch.py` of an older version stop. The message names both fixes (updated: delete `framescout_core.py`; went back: delete the folder `framescout_core`; best: extract a ZIP into a new, empty folder).
-- `quick.py` (F10): the quick search's pure helpers: `QUICK_DIR` (`quick`), `QUICK_GALLERY` (`quick.html`), `QUICK_QUERY_MAX` (300), `quick_profile(text)` (white space joined, no `|` split, the four generated prompts of a profile of that name), `quick_photos(paths, fallbacks, analyzed)` (the photos with a current cache row; a partner without a row through its RAW file if that has one and no other partner of the shot has a row, once per shot; a partner without a row whose shot is searched through another partner or its RAW file is neither scored nor counted as not analyzed, E61; every partner of a shot without any row counts as not analyzed; each photo checked once), `quick_scope(scan, analyzed)` (E61: `(searched, not analyzed, partners)` of a quick search over a `PhotoScan`, from `quick_photos` with `raw_fallbacks(scan)` and `analyzed`, the set of `analyzed_paths` over the scan's photos and RAW files; all three count the scan's photos and add up to them, review: searched are those with a row of their own, partners those searched through another file of their shot, counted explicitly), `quick_folders_differ(searched, folders)` (whether the last quick search searched other photo folders than the existing ones chosen now), `quick_scope_text(photos, searched, not_analyzed, partners=0)` (the app's caption; it names the partners whose shot is searched through another file of it, also when only RAW files are searched) and `quick_note(searched, not_analyzed, like=False)` (the gallery note and app caption). F11 adds `like_profile(photo, part)` (the profile of a "Find similar" result, named `Similar to <file>`), `like_crop(labels, part)` (the index of the part among a row's crop labels; the legacy `Gesamtbild` maps to `Full image`), `like_labels_fit(labels, count)` (whether a row's labels are one text per vector), `like_scan_path(photo, scanned, same_file=os.path.samefile)` (the scan's path of the photo) and `exclude=None` on `quick_photos` (the query photo, its RAW file and every partner of that RAW file are left out). `settings.engine_command(python, engine, folders, output, settings, device, *, profiles=None, quick_query=None)` builds the engine command line of both searches (exactly one of the two, else `ValueError`; the text is passed as `--quick-query=<text>`, so a text starting with `-` is no option). F11: `settings.engine_command(..., like=None, like_part=None)` passes `--like=<path>`/`--like-part=<part>` (one argument each); exactly one of profiles, quick_query and like. F34: `quick_entry_label(results, names=())` (the label of the quick result in the results selector: `Quick search: "<text>"`, `Find similar: <file> (<part>)` or `Last quick search`, with the suffix ` (last quick result)` while it equals a profile name), `quick_result_id(results)` (`(finished, quick_entry_label(results))`, without the profile names, so that a clashing profile name does not make the same result look new, review) and `results_choice(options, chosen, quick_option=None, quick_new=False)` (the entry the selector shows: the new quick result, else the chosen one if still offered, else `None`).
-- `names.py`: `EXT` (supported image extensions, including `HEIF_EXT` and `RAW_EXT`,
-  E25), `slugify`, `profile_slugs` (unique gallery file names, used by the engine).
-- `photos.py` (E25): `available_decoders` (`Decoders`: whether AVIF, HEIC/HEIF and RAW
-  can be read here), `supported_extensions` (`EXT` without the extensions of a missing
-  decoder), `missing_decoder`, `scan_each_folder` (one `PhotoScan` per folder, A28/A29) and `scan_photos` (the photos
-  of one folder as a `PhotoScan`, built on it), `remembered_scans` (A27: `scan_each_folder` result kept in a
-  caller-owned dict, scanned again only when the folders, extensions or output folder change or on `recount`; cleared without folders), `skipped_lines` (the log lines about skipped files, plus A37: photos and folders found again), `PhotoScan.found_again`/`folders_again` (A37, default 0, counted by `scan_each_folder`, summed by `join_scans`), `PhotoScan.stats` (A44: `{path: (mtime_ns, size)}` of `paths` and `raw_pairs` (E61 review: the quick search count looks up the RAW files without an `os.stat` each) from the `os.stat` of the identity, helpers `_file_stat`/`_file_times`, which `disk_space.analyzed_photos` reuses (review); default an empty dict, never changed, so that a scan can be pickled, review),
-  `distinct_folders`/`output_folder_problem`/`missing_folders_message`/`folder_labels`/`photo_name`/`scan_folders`/`join_scans`
-  (several photo folders per search, A25; see "Several photo folders"),
-  `raw_preview_usable`/`RAW_PREVIEW_MIN_EDGE` and `raw_preview_transpose`/`RAW_FLIP_TRANSPOSE`
-  (the engine's RAW decoding; see "Photo formats"), `raw_fallbacks`/`RawFallback` (E30:
-  the RAW file of a partner that cannot be analyzed; see "RAW+JPEG pairs").
-- `references.py`: `reference_folder` (one reference folder per profile, A1),
-  `stage_reference_move`/`update_backup_references` (under `<filename>.lock`, A32)/`finish_reference_move`/`undo_reference_move`
-  (a renamed profile's references follow its name, A1), `write_new_file` (reference
-  uploads without overwriting).
-- `profiles.py`: `create_from_example` (first-start `profiles.json`), `generic_prompts`, `query_labels` (F17: the names of a profile's text queries in `text_queries` order, `motif "<name>"` for the averaged generated texts, then each custom text in quotes with its white space joined to single spaces; `[]` for "Find similar"; a test with one-hot prompt vectors ties it to `text_queries`)
-  and `load_profiles` (profile loading/validation, used by the engine),
-  `read_profiles`/`read_profiles_versioned`/`save_profiles` (the app's `profiles.json`:
-  same validation, v3 conversion, atomic save with `profiles.json.bak`, A2; versioned
-  read and checked save against concurrent edits, A13: `read_profiles_versioned` returns
-  `(profiles, version)`, the version being the SHA-256 of the file's bytes or `None` for
-  a missing file; `save_profiles(filename, profiles, expected=version)` takes a `RunLock`
-  on `profiles.json.lock` (`PROFILES_LOCK_TIMEOUT` = 5 s, then `OSError`), compares the
-  file's current version with `expected` and raises `ProfilesChangedError` (a
-  `ValueError`) without writing if it differs, also for a file created or deleted since;
-  without `expected` the save is unchecked; the lock file stays, empty; `save_profiles`
-  returns the version of the file it wrote; both functions retry a read or replace that
-  fails for a moment on Windows while another session reads or replaces the file, 5
-  tries 0.05 s apart, like the settings and marks files); `require_profile(filename, name)`
-  raises `UnknownProfileError` (a `ValueError`) unless `name` is a profile of the file now
-  (an unreadable file: `ValueError` naming it), the check of `save_marks` and
-  `save_copy_folder` (review of A22, A33).
-- `thumbnails.py`: `thumbnail_name`/`ensure_thumbnail` (gallery thumbnails; a photo
-  deleted before the export is skipped, E6), `SkippedPhotos`/`SKIP_LOG_LIMIT` (one export's
-  photos without a thumbnail: each tried and logged once, only the first 50 logged one by
-  one, then a count), `gallery_cards` (the first `top` photos of a ranking that get a
-  thumbnail, with ranks counting only shown photos, E12), `crop_label`/`FULL_IMAGE_LABEL`
-  (gallery crop labels).
-- `pipeline.py`: `progress_line`/`progress_due` (the progress line the engine logs for
-  people, A11), `prefetch`/`group_batches`/`store_group`/`draft_size`/`DRAFT_DECODING`
-  (the engine's analysis pipeline: decoding ahead in threads, crops of several photos per
-  CLIP batch, photo-by-photo fallback after a failed group, `Image.draft` size and its part
-  of the cache signature, E2), `Lazy` (a value created on the first `get()`; the engine's
-  person detector, F2).
-- `locks.py`: `RunLock`/`lock_held` (the operating-system file lock of a search run, A4,
-  also used around the read-merge-write of `settings.json` and `marks.json`).
-- `run_status.py`:
-  `RUN_LOCK`/`RUN_STATUS`/`StatusReporter`/`read_status`/`write_status`/`run_active`/`started_in_time`/`final_status`/`status_text`/`status_fraction`/`stopped_status`/`PHASE_LABELS`/`FINAL_PHASES`/`NOTHING_NEW`/`LOADING_DETECTOR`/`ALL_ANALYZED`/`NONE_ANALYZED`/`nothing_new_message`/`analysis_only`/`run_name`/`analysis_result_text`
-  (F18: see "Run state"; one search per output folder, its phase and progress, A4/A5).
-- `app_state.py` (F27): the app's state line and what a search needs, standard library only. `state_line(active, status, photos, cleanup)` is the one line next to the title (running: `Search|Analysis running · <phase> <done>/<total> (<pct>%) · progress and Stop in the tab "Search"`; `cleanup` (a cleanup or cache check holds the run lock) has its own text; idle: how the last run ended with its time and the photo count, or `no search yet`, `no existing photo folder`); `start_needs(profiles, photos, folders_listed, model_label, model_missing)`, `start_needs_line(needs)` (`A search needs: ✓/✗ ...`) and `start_blocked_text(needs, active, cleaning)` (`Start is not available because: ...`, naming the tab that fixes a missing need); `results_running_text(active, status, cleanup)` (F28 review: the note of the Results tab while a search or an analysis runs, e.g. one "Find similar" started there, naming the tab with progress and Stop; None when idle or for a cleanup); constants `START_NEEDS_TAB` (the tab labels of the three needs), `RUN_TAB` ("Search"), `RESULTS_TAB` ("Results") and `APP_TABS` (all five labels in order; `START_NEEDS_TAB['model']` is "Settings" since F28): `app.py` takes its tab labels from them, so renaming a tab happens in one place. `PAGE_STYLE` (F30 review) is the page's `<style>` block: every tab panel but the last ("Results", which must stay the last of `APP_TABS`) is limited to `FORM_TAB_MAX_WIDTH` (1,300 px), so the forms keep their width while the result cards use the window; it relies on the `stTabPanel` data-testid and on Streamlit drawing all panels after the tab list (checked in the bundle test and in headless Edge with Streamlit 1.66.1).
-- `estimate.py` (F12): the time estimate of a search, standard library only.
-  `AnalysisRate` (the engine's measure of the analysis speed: `add(fresh, now)` per stored
-  group, `per_minute()` a moving average over at least the last `RATE_WINDOW` = 300 s, falling
-  back to the whole run when that window holds fewer than `RATE_MIN_PHOTOS` = 16 photos, `None`
-  until 16 new photos over `RATE_MIN_SECONDS` = 60 s, counted from the first stored group so
-  that loading the models does not count; `overall()` the average of the whole analysis,
-  `seconds()` the time measured since the first stored group),
-  `duration_text` (generous rounding, never seconds: under 2 min "under 2 min", under 10 min
-  whole minutes, under 60 min steps of 5, under 5 h steps of 30 min as "about 1 h 30 min",
-  else whole hours), `remaining_text(status, now=None)` ("about 25 min left" from the status fields
-  `rate`, `done`, `total`; in the phase `analyzing`, where `done` counts the cache hits
-  first, so `total - done` are the photos left to analyze, plus (F16) scoring of all photos and
-  the planned `thumbnails` at the stored `finishing` speeds, else "... left for the analysis";
-  once every photo is analyzed (or came from the cache, without a `rate`) only scoring and
-  thumbnails, review; in `scoring` (photos left + planned thumbnails) and `exporting` (cards left, each counted as a
-  new thumbnail) only with stored speeds; `None` once `updated` is more than
-  `RATE_STALE` = 300 s old or unreadable, since the rate changes only when photos are stored
-  and a stalled analysis would keep its last estimate, review), `stored_throughput`
-  (validates the `throughput` list of a status file), `remember_throughput`
-  (`THROUGHPUT_KEPT` = 8 records `{signature, device, per_minute}`, newest first, one per
-  signature and device), `run_throughput(records, signature, device, speed)` (the records with
-  this run's `overall()`, or `None` to keep them: the first record of a signature and device is
-  written at once, an existing one is replaced only after `THROUGHPUT_MIN_SECONDS` = 300 s of
-  measurement, so a run stopped early keeps an earlier, longer run's speed, review),
-  `known_throughput(status, signature, device)` (the matching record;
-  device `None` = any device of the signature) and `start_summary(photos, analyzed, per_minute, finishing=None)`
-  (the text of the box before the start; F16: with a known analysis speed it adds ", scoring and
-  writing the galleries up to about N min more", with everything analyzed "... writes the galleries,
-  which takes up to about N ..."). F16: `FINISHING_STEPS` (`scoring`, `thumbnails`),
-  `FINISHING_MIN_ITEMS` = 16, `FINISHING_MIN_SECONDS` = 10, `StepSpeed` (times one step;
-  `timed` wraps a call), `stored_finishing` (validates the `finishing` dict of a status file),
-  `remember_finishing` (keeps a step's speed only from at least 16 items; a stored speed is
-  replaced only by a measurement of at least 10 s, so a small search keeps a larger one's
-  speed, review), `finishing_minutes(finishing, photos,
-  thumbnails)` and `gallery_thumbnails(photos, top, profiles) = min(photos, top * profiles)`.
-- `devices.py`: `detection_options` (YOLO arguments on the CLIP device, E14),
-  `device_choices`/`cuda_status`/`cuda_hint` (the app's device choice, CUDA status and the
-  way to GPU support, A7), `ULTRALYTICS_ENV`/`import_detector_class` (the engine's only
-  import of Ultralytics, without its analytics and run-time installs, E27/E28; see
-  "Environment variables and caches").
-- `torch_build.py`:
-  `TORCH_VERSION`/`TORCHVISION_VERSION`/`CUDA_BUILDS`/`parse_gpu_query`/`cuda_build`/`unsupported_gpus`/`installed_build_matches`/`installed_cuda_build`/`torch_requirements`/`torch_index_url`
-  (which PyTorch build the installer installs, A7/I3).
-- `models.py`:
-  `SearchModel`/`MODELS`/`DEFAULT_MODEL`/`MODEL_KEYS`/`model_label` (`downloaded=True` says "downloaded" instead of the download size, A39)/`results_model`/`missing_packages`/`model_problem`
-  (the registry of the search models the engine's `--model` and the app's selectbox offer,
-  E22; no imports beyond the standard library; fields: key, OpenCLIP name and pretrained
-  weights, label, download size, CPU factor, image size, `requires`, `multilingual`
-  (for E21; none is), `evaluated`; `results_model` reads the model key of a search from
-  its `results.json` settings). The only place of the models' OpenCLIP names, the
-  default's too. Since E16 each model also names `weights_repo` and `tokenizer_repo`
-  (the Hugging Face Hub repositories open_clip loads the weights and a Hugging Face
-  tokenizer from; `''` = built-in tokenizer; tested against open_clip's config).
-- `cache_dirs.py` (E9/I10): `CACHE_DIR`/`cache_paths`/`cache_folder_paths` (I25: the four
-  cache variables under a cache folder itself; `cache_paths(base)` and the evaluation tool's
-  `engine_env` use it)/`default_cache_env`/`engine_cache_env`/`yolo_weights`/`find_yolo_weights`/`detector_weights_line` (E60: the `run.log` line naming the loaded weights)
-  (the project's `.cache/` folders and the engine's defaults for them; A36:
-  `engine_cache_env(environ, base)` is a copy of the environment plus `default_cache_env`
-  (which leaves `TORCH_HOME`/`HF_HOME` to a user's `XDG_CACHE_HOME`, `XDG_DERIVED`, review),
-  what the app and the disk space and install checks give the engine; `find_yolo_weights`
-  is `yolo_weights`' lookup without moving anything, also used by the disk space check,
-  working folder first (E41); see
-  "Environment variables and caches"). E39: `open_clip_cache_dir(model, environ, base)` is the
-  `cache_dir=` the engine passes to `open_clip.create_model_and_transforms`: `XDG_CACHE_HOME/clip`
-  (`.cache/clip`) for a model without `weights_repo` (open_clip's URL download path, which
-  otherwise writes to `~/.cache/clip`), `None` for Hub models (their weights stay in the Hub
-  cache, `HF_HOME`). No model needs the URL path today.
-- `hub.py` (E16/E31/E33): `HUB_QUIET_ENV`/`WEIGHTS_FILES`/`TOKENIZER_FILES`/`OFFLINE_VARIABLES`/`hub_cache_dir`/`hub_file_cached`/`model_cached`/`import_open_clip`/`hub_go_online`/`hub_file_error`/`load_with_hub_fallback`
-  (loading a search model without a Hub request once it is cached; see "Environment
-  variables and caches").
-- `signature.py`: `ENGINE_TEMPLATE`/`engine_id`/`ENGINE`/`MODEL_ENGINES`/`feature_signature`
-  (the engine id per search model and the feature cache signature, E1/E22),
-  `CACHE_FILE`/`DEFAULT_YOLO_MODEL`/`prepare_cache`/`known_signatures`/`SLIDER_NOISE_ULPS`/`classify_signatures`
-  (the cache tables with the `signatures` side table, and which engine version and
-  settings a cached row belongs to, E11).
-- `settings.py`:
-  `SETTINGS_FILE`/`SETTING_RANGES`/`SETTING_STEPS`/`DEFAULT_REFERENCE_WEIGHT`/`AI_SETTINGS`/`AI_DETAIL_SETTINGS`/`PERSON_DETECTION_SETTINGS`/`DEVICES`/`LEGACY_PHOTO_FOLDER`/`default_settings`/`folder_lines`/`read_settings`/`save_settings`/`reconcile_settings`/`changed_from_defaults`/`setting_text`
-  (the app's `settings.json`, the ranges of its widgets, the engine's `--device` choices,
-  the sync of the widgets with the file, A8, and the settings of the AI tab with the
-  "Default: …" texts and the reset, A26).
-- `results.py`:
-  `RESULTS_FILE`/`RESULTS_FORMAT`/`result_card`/`closest_query`/`query_caption`/`query_summary`/`QUERY_NOTE`/`results_document`/`publish_export`/`read_results`/`search_fingerprint`/`profile_fingerprints`/`profile_state`/`GALLERY_PAGE_SIZE`/`page_count`/`page_cards`/`openable_photo`/`open_command`/`reveal_command`
-  (the result file of a search and the app's gallery: validation of the file (plain
-  gallery and thumbnail file names only), whether a profile changed since the search,
-  pages, and opening only existing image files, A12). F17: `result_card(best_query=)` adds the
-  optional card key `best_query`; `closest_query(index, queries)` maps `Match.query` to a name (None for a single text or
-  "Find similar"); `query_caption` is the card line "Closest search text: …"; F30: `card_text(card, closest_line)` returns the HTML of a card's text of the app, one line per row (rank · score · part; detail; the closest search text only if `closest_line`, i.e. `has_closest_line(cards)` of all cards of the gallery, not of the page shown, so the height stays from page to page; an empty row for the others; relative path), each with "…" and the whole text as a tooltip (`title`), an empty row with a non-breaking space so it keeps its line, all escaped (also `$`) and without a line break; `query_summary(entry)` the results view's
-  caption with the per-text counts (each distinct text once, so a custom text given twice is listed once; None without `queries`, with fewer than 2 texts or without named cards); `QUERY_NOTE`
-  the gallery's note; `read_results` rejects a non-string `best_query` and a `queries` that is no list of strings.
-- `review.py` (F19): `first_undecided`/`next_undecided` (the next undecided photo after the current one, wrapping around), `review_index`, `review_shown` (whether the review state opens the dialog over the list shown), `review_position` ("Photo n of N"), `review_state_text` ("Marked as match"/"Marked as no match"/"Undecided"), `REVIEW_PREVIEW_SIZE` = 1600, `REVIEW_PHOTO_KEY` and `REVIEW_STYLE` (the CSS that fits the preview into the window; relies on `data-testid="stFullScreenFrame"`, pinned in the bundle test of `test_marks.py`). `marks.py` gains `PHOTO_KEY_PREFIX` (`fsphoto-`, the photo container of a card) and `PREVIEW_KEY_PREFIX` (`fspreview-`, the invisible button over it, laid out by `CARD_STYLE`).
-- `marks.py`: `MARKS_FILE`/`MARKS_BACKUP`/`MARK_STATES`/`marks_backup`/`restore_marks`/`read_marks`/`save_marks`/`rename_marks`/`delete_marks`/`remove_marks`/`marks_restore_offer`/`hide_no_match`/`hidden_text`/`mark_style`/`MARK_COLORS`/`MARK_NO_MATCH_OPACITY`/`CARD_KEY_PREFIX`/`CARD_STYLE`/`ReviewProgress`/`review_progress`/`progress_text`/`mark_counts_text`
-  (the user's marks, A17; every change goes through `_common._update_locked(..., backup=True)`
-  (private `_update_marks`), which first copies the previous, validly read file byte for byte to
-  `marks.json.bak` (F1); `marks_backup(path)` names the backup, `restore_marks` keeps a damaged
-  file as `marks.json.broken-<date>` and restores the backup; `delete_marks` removes all marks of a deleted profile, A22;
-  `remove_marks(path, entries)` removes single `(profile, photo path)` marks for the cleanup, E8; with
-  `unless_profile_of=profiles_file` it reads `profiles.json` again under the marks lock and keeps the marks of a name that is a profile now
-  (`ValueError` if the file is missing or unreadable; the cleanup category `marks_profiles`, A34);
-  `marks_restore_offer(path, error, read=read_marks)` (the app passes its cached `read_marks`, as it runs on every gallery rerun) returns `(marks in the backup, its mtime)` if restoring the backup can be offered: for a
-  `ValueError` read (damaged file) or for a missing `marks.json` whose readable backup holds at least one mark, else `None` (A40);
-  `save_marks(..., profiles_file=...)` saves only for a name that is a profile now;
-  `hide_no_match(cards, marks)` returns the cards not marked as no match and how many it
-  left out, applied to the cards of one gallery page, and `hidden_text` the caption of that
-  count; `mark_style(states)` the `<style>` block of the gallery's mark state (A24, F30; `states` maps the key of a card's container to its state): a 3 px frame (an inset `box-shadow`, inside the card, so a clipping parent cannot cut it) in the color of `MARK_COLORS` (Okabe-Ito blue match, orange no match), the selected button in that color and, for no match, the photo dimmed to `MARK_NO_MATCH_OPACITY` (0.4); `CARD_STYLE` the `<style>` block of the equal cells (the photo fitted whole into a square by CSS on the `stImage`/`stImageContainer` elements and their parent, since Streamlit 1.66.1 sizes them to the natural image width); both checked against Streamlit `MARK_STYLE_STREAMLIT`;
-  `review_progress(cards, marks, size)` returns a `ReviewProgress` (`matches`, `no_matches`,
-  `open`, `first_open_rank`, `first_open_page`) over the whole ranked list: states other than
-  match/no match count as open, the list order (not the rank numbers) decides which photo is
-  first, `size` is the page size; `progress_text(progress, paged)` is the caption and names the
-  page only when `paged`; F20; `mark_counts_text(progress)` is the short counts text "N match · N no match · N undecided" of the F29 toolbar, empty for an empty list).
-- `copying.py`:
-  `COPY_FOLDERS_KEY`/`default_copy_folder`/`copy_target`/`copy_photos`/`copy_summary_text`/`read_copy_folders`/`save_copy_folder`/`rename_copy_folder`/`forget_copy_folder`
-  (copying marked matches and their saved target folders in `settings.json`, A17;
-  `forget_copy_folder` removes only the saved entry of a deleted profile, A22;
-  `save_copy_folder(..., profiles_file=...)` like `save_marks`).
-- `exporting.py` (F5):
-  `EXPORTS_DIR`/`EXPORT_COLUMNS`/`EXPORT_MARK_TEXT`/`EXPORT_MAX_NAMES`/`export_cards`/`export_csv`/`export_file_list`/`unlisted_paths`/`export_name`/`export_result_list`
-  (exporting the ranked list of one profile as `results/exports/<slug>-<YYYYMMDD-HHMMSS>[-matches].csv`
-  and `.txt`; `export_cards(cards, marks, only_matches)` picks the cards, with only matches just
-  those of this list marked as match, and raises `ValueError` if `marks` is `None`; photos marked in an
-  earlier search but absent from the list have no rank or score and are not exported, unlike
-  "Copy marked matches"; `export_csv` is comma-separated with CRLF line ends, scores with four decimals and a
-  `.` as decimal point, an empty image similarity for text-only searches and the mark as
-  `match`/`no match`/empty, written as UTF-8 with BOM; `export_file_list` is one absolute path per line
-  (LF line ends, UTF-8 without BOM), leaving out a path with a line break (every break `str.splitlines` knows); `unlisted_paths(cards)`
-  returns those paths, the CSV keeps them and the export notice says how many only the CSV lists, A42. `export_result_list` never replaces a file: if either name of the pair is
-  taken both get `-2`, `-3`, ... (up to `EXPORT_MAX_NAMES`), each file is written atomically through
-  `_publish_via_temp`/`_publish_new`, and a failed second file removes the first. The paths are
-  machine-specific, as for the cache and marks, A21. Standard library only.)
-- `cleanup.py`:
-  `THUMBNAILS_DIR`/`LEGACY_THUMBNAILS_DIR`/`GALLERY_MARKER`/`CLEANUP_CATEGORIES`/`CACHE_CATEGORIES`/`CLEANUP_DEFAULTS`/`NEVER_DELETED`/`STALE_TEMP_AGE`/`ROOT_TIMEOUT`/`FOLDER_TIMEOUT`/`project_temp_cleanup`/`scan_cleanup`/`clean_up`/`auto_cleanup`/`cleanup_running`/`size_text`/`count_text`/`cleanup_summary_text`
-  (the storage cleanup, E7/E11/E13/E23/A14/E8; the unbound-photo check is the private `_PathCheck`;
-  E37: its folder pass runs in a daemon thread per root (`_FolderWorker`, `_pass`); a folder that
-  does not answer within `FOLDER_TIMEOUT` (30 s) is not checked (its photos are kept, a note
-  names the folder), then the first junction, mount point or symbolic link above it
-  (`_link_above`: `lstat` from the root down, stopping at the first link or change of `st_dev`,
-  in a thread with `ROOT_TIMEOUT`), else its root, is probed again and, if it is silent, the
-  other folders behind it are not checked either; a folder an abandoned worker still hangs on
-  (`_HANGING`, like `_PROBES`) is given up at once by later passes, without a new thread;
-  `_dead_link(folder)`: photos behind a junction, volume mount
-  point or symbolic link whose target cannot be reached count as not checked (note names the
-  link). E54, Linux/macOS only (`_EMPTY_MOUNT_POINTS`): `_unmounted(folder)` returns
-  `('vanished', path)` if the first missing part of the folder is an fstab mount point
-  (`_FSTAB`) or lies right in one of `_MOUNT_ROOTS` (`/media`, `/mnt`, `/run/media`, `/Volumes`)
-  or in a folder right inside one (such as `/media/<user>`) that has no drive mounted on it
-  (`os.path.ismount`; udisks and macOS remove their mount points on unmount, also when another
-  drive stays mounted next to it, review), else `('unmounted', path)` if the nearest existing
-  part is an empty folder inside `_MOUNT_ROOTS` or an fstab mount point; the photos behind it
-  are not checked. Limitation: a folder emptied or deleted by hand at such a place is treated
-  the same (the safe side). `_look_at` returns `(gone, reason)`. `_unreachable` keeps the cause
-  as `(kind, path)` (`root`, `folder`, `link`, `unmounted`, `vanished`), and `_unchecked_notes`
-  words each kind (review). Only ever fewer photos are offered as unbound.
-  E44: `project_temp_cleanup(folder, now=None)`
-  removes `profiles.json`, `profiles.json.bak` and `settings.json` temp files (`<name>.<8 chars>.tmp`,
-  pattern `_PROJECT_TEMP_FILE`) at least `STALE_TEMP_AGE` old by the folder's clock
-  (`_file_system_now(folder, name)`, read only if such a file exists, so a normal start writes
-  no probe file; `_stale_temp_files(results, now, pattern)`); `app.py` calls it
-  once per app start (`framescout_ui.common.clean_project_folder`, `st.cache_resource`) before `create_from_example`; errors
-  never stop the app, lock files and `profiles.json.bak` itself are never touched;
-  `_holding_run_lock` (the run lock shared with `cache_check`) and `_sqlite_uri` (F1)).
-- `cache_check.py` (F1): `CACHE_CHECK_LINES`/`check_cache`/`cache_check_current`/`set_cache_aside`
-  (the cache health check and renaming a damaged cache, see "Storage cleanup").
-  E50: `cache_error(exc)` is `'damaged'` for exactly `sqlite3.DatabaseError`, `'unreadable'` for a
-  disk I/O error, else `None` (as `_quick_check` tells them apart); `cache_error_message(cache, exc)`
-  names the file and points to "Clean up storage" -> "Check cache" (for a disk I/O error to the drive first);
-  `cache_read_warning(cache, exc, count, run='search')` is the warning of a search that finished although
-  `count` photos could not be read from the cache (review); `run='analysis'` names an analysis without a search (F18, E63).
-  `CACHE_SIDE_FILES` (the `-journal`/`-wal`/`-shm` suffixes) lives in `signature.py` since A40 (the cleanup needs it too) and is
-  re-exported by `framescout_core`.
-  `_common._broken_names` builds the `<name>.broken-<YYYYMMDD-HHMMSS>[-n]` names.
-- `disk_space.py` (F3): the free disk space estimate. Sizes are 1024-based, the units
-  `size_text` shows (1 GB = 1024³ bytes). `TORCH_INSTALL_SPACE` (download, installed bytes
-  per build: `cpu` 0.3 + 1.2 GB, `cuda` 3 + 6 GB; the CPU numbers are measured, the CUDA
-  ones an estimate, I33), `OTHER_PACKAGES_SPACE` (0.2 + 0.4 GB: the `requirements/requirements.txt` part
-  of it, for a rerun with PyTorch installed), `CACHE_BYTES_PER_PHOTO` (10 KB),
-  `THUMBNAIL_BYTES` (50 KB), `DETECTOR_DOWNLOAD` (6 MB), `SPACE_RESERVE` (1 GB),
-  `SPACE_CHECK_TIMEOUT` (1 s), `LowSpace(folder, needed, free)`, `download_bytes("605 MB")`
-  (parses `SearchModel.download`), `search_space_bytes(photos, top, profiles, analyzed=0)`
-  (cache rows for the photos not analyzed yet), `analyzed_paths(cache_file, signature,
-  paths, stats=None)` (E61: the set of those paths, read as `analyzed_photos` reads them; `analyzed_photos` is its length) and `analyzed_photos(cache_file, signature,
-  paths, stats=None)` (how many of the paths have rows of the signature whose `(mtime_ns, size)`
-  equal the photo's, as the engine compares, A44; read-only; compares with the scan's `stats`
-  first and `os.stat`s only a photo whose row differs or that has none, an unreadable photo
-  counts as not analyzed; a missing or unreadable cache counts as empty), `search_space_needs` (looks at the hub
-  cache and the detector weights only if their root answers in time), `app_search_needs`
-  (the needs of a search the app starts: the `cache_paths(base)` variables over the
-  environment, as `cache_env` sets them (a user's value wins, A36), the hub cache from `hub_cache_dir`, the weights
-  from `find_yolo_weights`), `eval_run_needs(runs, photos, top, profiles, hub_cache,
-  detector_weights)` (E51: the needs of `framescout_eval.py run`: each model's output folder
-  `engine/<model>` with every photo counted as new, the downloads of the models missing in the
-  Hub cache of `--cache-dir` added up, the detector weights once; shares `_download_needs`
-  with `search_space_needs`), `downloaded_models(base, environ, timeout, reachable)` (A39: model keys whose files are in the Hub cache the engine loads from, via `engine_cache_env`, as `app_search_needs`; a cache on a drive that does not answer is not read: empty set), `torch_install_needs(build, venv, temp, torch=True)`,
-  `low_space` (probes the drive or share roots first with cleanup's threaded
-  `_reachable_roots` and `SPACE_CHECK_TIMEOUT`, leaving out a root that does not answer;
-  groups the needs by volume – device number, or the anchor if it is 0, plus the volume
-  size, so one volume reached through a subst or mapped letter or a UNC path is one drive
-  and cloned disks with the same serial number stay apart – on the nearest existing folder,
-  nothing is created; returns the drives where free − needed < reserve; a need of 0 or a
-  drive that cannot be asked gives no warning) and `low_space_lines`.
-- `priority.py` (F4): `MAX_TORCH_THREADS` (12), `BELOW_NORMAL_PRIORITY_CLASS` (0x4000),
-  `IDLE_PRIORITY_CLASS` (0x40), `LOW_PRIORITY_NICE` (10),
-  `torch_threads(available, low_priority=False)` (normal:
-  `min(12, max(1, available))`; low priority additionally at most `available - 1`,
-  `available - 2` from 8 cores on, never below 1, so a CPU above the cap keeps its thread
-  count) and `lower_priority(os_name=None, set_priority_class=None, nice=None,
-  get_priority_class=None)` (Windows: `GetPriorityClass`, then
-  `SetPriorityClass(BELOW_NORMAL_PRIORITY_CLASS)` via ctypes unless the process already
-  runs at IDLE or BELOW_NORMAL, which Windows passes on to child processes and which is kept;
-  elsewhere `os.nice(10)`, which on Linux changes only the calling thread and the threads it
-  starts later, so it must run before other threads start; returns None or the error text of
-  an `OSError`, never raises; the parameters allow tests to inject the calls). Standard
-  library only.
-- `portable_python.py` (P5 part C):
-  `PYTHON_VERSION`/`PYTHON_URL`/`PYTHON_SHA256`/`PRIVATE_PYTHON` (the private Python that
-  the installer downloads into `.python`; constants only, checked against the `.bat` by
-  `tests/test_installer.py`).
-- `paths.py` (I31): where the shipped files lie, relative to the FrameScout folder:
-  `REQUIREMENTS_DIR`, `REQUIREMENTS_FILE`, `CONSTRAINTS_FILE` (`requirements/`), `ASSETS_DIR`,
-  `EXAMPLE_PROFILES_FILE`, `EVAL_PAGE_FILE` (`assets/`), and `windows_path(path)` (the Windows
-  form `requirements\constraints.txt` on any system, for messages to the user). A leaf module
-  (no other FrameScout import), so `models.py` and `install_check.py` both use it. Used by
-  `install_torch.REQUIREMENTS`, `check_installation` (reads `base / CONSTRAINTS_FILE` and
-  `base / REQUIREMENTS_FILE`), the messages of `check_packages` and `model_problem`,
-  `app.EXAMPLE_PROFILES` (and its first-start error), the engine's `--profiles` help,
-  `framescout_eval.PAGE` and the tests (review of PR #82).
-- `install_check.py` (F15): the read-only installation self-test.
-  `CheckResult(name, ok, text,
-  fix)` (`ok` True, False or None = information); `check_program_files(base)` (I34: the check
-  line `Program files`, `[OK] No leftovers of another FrameScout version.`, or one problem per
-  `<package>.py` of `REPLACED_PACKAGES` that lies next to `<package>/__init__.py`, with the fix
-  of `leftover_fix`; so `Check-FrameScout.bat` prints a line and exits with 2 instead of
-  showing a traceback); `check_environment(base)` (`.venv/pyvenv.cfg`
-  `home` is this folder's `.python` (compared with `os.path.samefile`, so a link, junction or
-  8.3 name counts) or an installed Python of an older installer; a problem if
-  that Python is missing (moved folder or deleted Python: the installer repairs it) or is the
-  `.python` of another folder (copied or moved folder: delete `.venv`, run the installer, which
-  keeps a working `.venv`)); `check_packages` (installed metadata of `.venv`'s site-packages via
-  `importlib.metadata.distributions(path=...)`: every package of `requirements/requirements.txt` installed,
-  every installed package that `requirements/constraints.txt` pins in the pinned version, torch/torchvision
-  with any build label; a pin of a package that is not installed is no problem unless
-  `requirements/requirements.txt` names it without an environment marker, which the standard library cannot
-  evaluate); `check_torch` (imports torch in a subprocess of `.venv`'s Python
-  with `-B`, `TORCH_CHECK_TIMEOUT` 180 s, the engine's cache variables and the FrameScout folder
-  as working folder, so its `sys.path` is the engine's; no `-I`, since a `PYTHONPATH` that breaks
-  torch breaks the engine too; a CUDA build that
-  finds no GPU is a problem with the `cuda_hint`); `check_writable` (`.cache` and `results`, or
-  the nearest existing parent; creates and deletes a temporary file, writes nothing else);
-  `check_models` (information: `downloaded_models`, `find_yolo_weights`; "not known" if the
-  model cache's drive does not answer within `SPACE_CHECK_TIMEOUT`); `check_disk_space`
-  (a problem below `SPACE_RESERVE`, 1 GB, on the drive of the folder); `check_installation`
-  (all of them, `check_program_files` first; packages and PyTorch are information "Not checked" when `.venv` has no Python or
-  the environment check failed, so a broken environment counts once); `check_lines` (CLI text);
-  `requirement_names` (moved here from `install_torch.py`, which imports it). Standard library
-  only.
-- `uninstall.py` (P5):
-  `UNINSTALL_ITEMS`/`UNINSTALL_KEEP`/`UNINSTALL_FIRST`/`USER_DATA`/`ENVIRONMENT_PROGRAMS`/`UninstallItem`/`PRIVATE_PYTHON_EXIT_CODE`/`running_python`/`protected_folders`/`uninstall_plan`/`user_data`/`outside_leftovers`/`search_running`/`programs_in_use`/`remove_items`
-  (what the uninstall script deletes, keeps and only reports; standard library only. The
-  items include the `__pycache__` folders of the root, `framescout_core/`,
-  `framescout_scoring/` (I30) and `tests/`: a fixed list, so a new program folder adds its
-  own (`tests/test_uninstall.py` fails for a folder with `.py` files that is missing).
-  `uninstall_plan(root, protected)` returns the existing items to delete and the skipped
-  ones: an item that contains a photo or copy folder of `settings.json` (except inside a
-  kept entry, `.tmp/eval`), that lies inside one (a photo folder that is the project
-  folder or above it) or whose kept entries cannot be listed is skipped.
-  `protected_folders` reads `settings.json` once and raises if it is unreadable or its
-  `photo_folders`/`photo_folder`/`copy_folders` are not allowed values (the app would fall
-  back to the default photo folder). Kept entries match case-insensitively where the file
-  system does (`normcase` or `samefile`), like `_inside`. Links and junctions are removed
-  as links, never followed. `remove_items` deletes the environment's
-  `python.exe`/`pythonw.exe` first (`UNINSTALL_FIRST`), retries read-only files and
-  folders after clearing the attribute (only those), continues after a failure (also an
-  unlistable item) and returns the failures; a folder that is not empty because a file
-  inside it failed is not reported again. `search_running` = the run lock of `results/`
-  is held; `programs_in_use(root, clear_read_only=False)` = opening the environment's
-  `python.exe`/`pythonw.exe` for writing fails with a sharing violation (Windows error
-  32), i.e. a process runs or holds them; a read-only program gives "access denied"
-  before that check, so it counts as not running unless `clear_read_only` clears its
-  attribute first (done only after the user typed `yes`). `user_data` lists names only
-  (no sizes: no walk of `photos/`, `results/`). `outside_leftovers` lists the PyTorch, Hugging Face
-  and Ultralytics folders outside the project (from `TORCH_HOME`, `HF_HOME`,
-  `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `APPDATA` or the user profile defaults), never
-  deleted: they are shared with other programs, I10).
-- `evaluation.py` (E32/E20):
-  `SCORES_FORMAT`/`LABELS_FORMAT`/`EVAL_K`/`SCORE_DIGITS`/`collection_name_problem`/`write_document`/`read_document`/`scores_document`/`write_scores`/`read_scores`/`read_labels`/`read_label_file` (labels and motifs in one read)/`save_labels(path, labels, motifs=None)`/`set_label`/`motif`/`record_motif`/`changed_motifs` (E36)/`average_precision`/`build_pool`
-  (the formats of the model evaluation tool: scores file of the engine's `--scores-file`,
-  labels file, AP@k = mean of the precision at each hit in the top k divided by
-  min(labelled hits, k), a labelled hit outside the top k counts as a miss, no hits ->
-  `None`; `build_pool` = union of each ranking's first `depth`, shuffled reproducibly with
-  the profile name as seed, independent of the model order; collection names 1-64 of
-  `A-Za-z0-9_-`, no Windows device names).
-- `_common.py` (internal, not re-exported): helpers several areas share, i.e. atomic
-  writes (`_publish_via_temp`, `_publish_new`, `_replace_atomically`,
-  `_replace_with_retry`, `_temp_path`, `_flush_to_disk`, and `_publish_together`, which
-  writes several files in full to temporary files and only then renames them in order, each
-  rename retried 40 x 50 ms, and restores the files renamed before a rename that fails every
-  try), retrying an action while it raises `OSError` (`_retry`), reading a file (`_read_with_retry`,
-  `_previous_content`) or a JSON object file (`_read_json_object`, `_json_object`) with retries,
-  the bytes of a saved JSON file (`_json_bytes`), the save lock of a file on `<file>.lock`
-  (`_file_lock`, used by `_update_locked` and `save_profiles`), the locked
-  read-change-write of a JSON file (`_update_locked(filename, parse, update, ..., backup=False)`:
-  `parse` gets the raw bytes; with `backup`, the previous content parse accepted goes to
-  `_backup_path` = `<file>.bak` first, without its own fsync; used by settings, copy folders
-  and marks), `_path_key` and `_broken_names`.
-
-Dependencies between the modules go one way (no import cycles): `cleanup` uses most of the
-others, `_common` uses only `locks`. Private helpers (leading underscore) are not
-re-exported (`tests/test_core_package.py` checks both directions: every public name of
-an area module is on the package, no private one is). A test that monkeypatches a helper
-patches the module that calls it, e.g.
-`monkeypatch.setattr(framescout_core.cleanup, '_remove_file', …)`: a patch on the package
-does not reach the calling code. For a private helper such a patch fails (the package has
-no such attribute), but for a public name another module imports, e.g. `read_profiles` as
-used by the cleanup, it succeeds silently and has no effect: patch
-`framescout_core.cleanup.read_profiles`. Standard library functions are patched on their
-own module (`monkeypatch.setattr(os, 'replace', …)`), which reaches every area.
-
-### `framescout_scoring/`
-
-`framescout_scoring/` (I30): package with the engine's scoring, **numpy only** (no torch).
-The code lives in `ranking.py`; `__init__.py` re-exports its public names, so
-`from framescout_scoring import ...` works as before (`tests/test_core_package.py` checks
-the re-exports as for `framescout_core`). It is a package of its own so that
-`framescout_core/` stays standard library only. `layout.py` (I36) holds the guard of
-the leftover `framescout_scoring.py` (a rollback ZIP over a newer folder: the package would
-shadow that older version's module): `__init__.py` raises an `ImportError` (`refuse_scoring_leftover`,
-`scoring_import_refused`, `scoring_leftover_message`, `PACKAGE`, `LAYOUT_MARKER`) unless the running
-script is marked, with the same rule and message wording as `framescout_core.layout`; it is
-written out again because `framescout_core` may be an older version's after a rollback (a test
-checks equality with the core's and that the package imports no FrameScout module).
-`Install-FrameScout.bat` and `Start-FrameScout.bat` delete the leftover like `framescout_core.py`.
-Functions: `text_queries`
-(the generated templates averaged into one query, custom prompts kept apart, E4),
-`best_matches(features, queries)` (F17: each crop's best score and the index of its closest text from one similarity matrix, ties name the first; `best_scores` and `photo_scores` use it), `best_scores`, `spread`/`MIN_SCORES`/`MIN_SPREAD`, `rank_photos(text, visual, weight, best=None)`/`Match` (5th field `query`, default None, also for `rank_similar`; `photo_scores` returns `(text, visual, best)`; the ranking does not depend on `best`; the engine keeps and passes `best` only for a profile with two or more texts, `None` otherwise) (per-profile
-z-scores and their combination, E5) and `score_caption` (the numbers on a gallery card). F11: `rank_similar(similarity)` ranks by one vector's similarities (z-scored over all crops, raw when too few); `Match.text` is Optional (None for a "Find similar" card) and `score_caption` then omits the text similarity.
-
-### `framescout_eval.py` and `assets/framescout_eval_page.html`
-
-Development tool (E32/E20, not part of the app, not on the install path): numpy,
-`framescout_scoring` and `framescout_core`, no torch; `run` starts the engine as a
-subprocess. See "Model evaluation tool" below.
-
-### `tests/`, `pytest.ini`, `requirements/requirements-dev.txt`
-
-`tests/`, `pytest.ini`, `requirements/requirements-dev.txt`: pytest suite for `framescout_core/`,
-`framescout_scoring` and `install_torch.py` (no torch, no model download); dev
-dependencies `pytest` and `numpy` (for `framescout_scoring`, user decision in PR #11).
-`pytest.ini` stays in the root (I31): pytest finds its configuration only in the folder of the call
-or above it, and a copy under `requirements/` would need `-c` on every call and move the rootdir.
-`test_doc_links.py` checks that every relative Markdown link (inline and reference definitions) in
-the Markdown files of every folder resolves, skipping only local gitignored folders and agent worktrees;
-`test_example_profiles.py` that the app creates `profiles.json` from `assets/profiles.example.json`
-(`framescout_ui.common`'s `EXAMPLE_PROFILES` compared as a syntax tree with `BASE / EXAMPLE_PROFILES_FILE`);
-`test_eval_tool.py` that the labelling page is shipped in `assets/`; `test_constraints.py` that the
-requirement files named by the installer and CI exist.
-`test_models.py` (E22) tests the registry, and its checks of every model's open_clip
-config (weights known, image size, QuickGELU of the weights, E1; Hugging Face tokenizer)
-read open_clip's config tables only where open_clip is installed and are skipped in CI.
-
-### `assets/profiles.example.json` and `profiles.json`
-
-`assets/profiles.example.json`: shipped, general-purpose English example profiles (I5).
-`profiles.json`: the user's working profile list, **gitignored**; `app.py` creates it from
-the example on the first start with `framescout_core.create_from_example`, which never
-replaces an existing file. Every app save keeps the previous file as `profiles.json.bak`
-(one generation, gitignored); a file the app cannot read stops the app instead of being
-saved over (A2). Back it up before overwriting user changes. A save is refused if the
-file changed since the page showed it (A13); the lock file `profiles.json.lock` is
-gitignored and in `NEVER_DELETED`. More generations: A30.
-
-### `requirements/requirements.txt`
-
-`requirements/requirements.txt`: `torch==2.14.1` and `torchvision==0.29.1` pinned (same values as
-`framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION`, checked by a test; change them
-together); Streamlit `>=1.66.1` (A10; the version of the verified runs, like the other packages;
-`app.py` needs at least 1.48 for `width='stretch'` on buttons); `transformers>=5.21.0` (the SigLIP tokenizer, E22;
-torch and huggingface-hub unchanged, `pip check` clean); numpy, Pillow, open_clip_torch, ultralytics and
-psutil with the versions of the verified runs as minimum, no upper bounds (user decision);
-the installer pins the versions of the verified runs with `requirements/constraints.txt` (I12). `pillow-heif` and `rawpy` (E25, required by user decision;
-optional extras: E29) have the versions of the venv's smoke runs (PR #26) as minimum.
-
-### `requirements/constraints.txt`
-
-`requirements/constraints.txt` (I12): exact pins (`name==version`) of all 84 packages in the dependency
-closure of `requirements/requirements.txt`, direct and transitive, taken from the project venv (Python
-3.14, Windows); no hashes. torch and torchvision are pinned without a local label
-(`torch==2.14.1`), so the `+cpu`, `+cu126` and `+cu130` builds all satisfy the pin. It is a
-pip constraints file: it limits versions but installs nothing by itself, and
-`requirements/requirements.txt` keeps its ranges (no upper bounds, I3). Only `Install-FrameScout.bat`
-uses it: it sets `PIP_CONSTRAINT=requirements\constraints.txt` (after creating the venv, so `ensurepip`
-is not affected) for the pip call of `install_torch.py` (I18) and passes `-c
-requirements\constraints.txt` to the requirements install. The value is relative because pip splits
-`PIP_CONSTRAINT` at whitespace and the install folder may contain a space; both pip calls
-run in the install folder. A plain `pip install -r requirements/requirements.txt` or a manual
-`install_torch.py` takes the newest releases. The file is sorted by package name.
-Evidence: the pins are the venv of the verified runs (a CPU engine run on Python 3.14);
-3.12 and 3.13 are only checked by the dry-run below; the CUDA wheels only by their
-metadata (their Windows Requires-Dist is the same as that of the `+cpu` wheels and allows
-every pin; PR #33 review). Refreshing is manual, in a PR of its own: update and test the
-venv, write the closure into the file, then check with `pip install --dry-run
---ignore-installed --report r.json --python-version 3.12|3.13|3.14 --platform win_amd64
---only-binary=:all: -r requirements\requirements.txt -c requirements\constraints.txt` that every resolved package is
-pinned and has a wheel, and compare the Requires-Dist lines of the CUDA wheels' metadata
-on the PyTorch index (`<wheel>.metadata`, PEP 658) with the pins; a pip dry-run against
-that index downloads the wheels (pip 25.2 downloads them even with `--dry-run`). The
-header of the file says this. `tests/test_constraints.py` keeps the file consistent (see
-"Test coverage").
-
-### `Install-FrameScout.bat`
-
-`Install-FrameScout.bat [cpu|cuda]` (P5 part C): needs no installed Python and has no
-search for Python 3.14/3.13/3.12. A new installation downloads python.org's full package
-`python-3.14.9-amd64.zip` (about 33 MB, about 117 MB extracted) with `curl.exe` to `.tmp`,
-checks its SHA-256 with `Get-FileHash` (Windows PowerShell; `PSModulePath` is cleared for
-this one call and restored right after it, because a PowerShell 7 parent breaks the
-cmdlet lookup), extracts it with `tar.exe` to `.tmp\python-3.14.9`, moves it as a whole to
-`.python\` (up to five tries about three seconds apart, waiting with `ping`, because a
-virus scanner that checks the new files makes the move fail with "Access is denied"; then
-it reports the move as failed) and creates `.venv` with
-`.python\python.exe -I -m venv --clear .venv`. The pins are `PYTHON_VERSION`/`PYTHON_URL`/
-`PYTHON_SHA256`/`PRIVATE_PYTHON` in `framescout_core/portable_python.py`; the `.bat` holds
-the same values and `tests/test_installer.py` keeps them in sync. An existing `.venv` is kept
-without a download or migration if `.venv\Scripts\python.exe -I -c "import pip"` works,
-also one of an older installer (installed Python 3.12-3.14). Otherwise (its Python is
-gone: `.python` deleted, the folder moved, an installed Python removed; or `venv` stopped
-before pip) the installer gets the private Python, checks the `.venv` again (a `.venv` of
-the private Python works again once `.python` is back, so its packages are kept) and else
-creates it again with `--clear`. A `.python` is reused only if `python.exe` exists and
-runs `import venv, ensurepip` and reports `PYTHON_VERSION` (`platform.python_version()`);
-otherwise it is deleted and downloaded again (I24; a `.python` that cannot be deleted
-stops with a message). If `venv` fails, the half-created `.venv` is removed and the message
-says to delete `.python`. `.venv` refers to `.python` by absolute path, so the folder
-cannot be moved afterwards without running the installer again, which then re-creates
-`.venv` and downloads all packages again (prebuilt movable bundle: I23). The script uses no delayed expansion (a `!` in
-the folder path would be dropped from `cd` and `%CD%`), `goto` instead of parenthesized
-blocks and never the folder path inside parentheses (I21). Right after the argument check it
-deletes `framescout_core.py` if `framescout_core\__init__.py` exists (I16: the leftover of an
-older version after a ZIP update; prints "Deleting framescout_core.py, a leftover of an older
-FrameScout version."; a folder of that name is skipped (`if exist "framescout_core.py\*"`),
-since `del` would ask and delete its files; `del /f` also removes a read-only file, and a file
-that stays (open in another program) stops the script with "framescout_core.py could not be
-deleted. ..." and exit code 1; the same lines as in `Start-FrameScout.bat`, kept identical by
-`tests/test_layout.py`; the jumps to `:obsolete_done` avoid a block). Right after it the same block deletes a leftover `framescout_scoring.py` when `framescout_scoring\__init__.py` exists (I36; label `:obsolete_scoring_done`, messages "Deleting framescout_scoring.py, a leftover of an older FrameScout version." / "framescout_scoring.py could not be deleted. ..."). Then it sets `PIP_CONSTRAINT=requirements\constraints.txt` (I18),
-installs PyTorch with `install_torch.py` (passing the argument on; torch's dependencies
-come in their pinned versions), then `pip install --no-cache-dir -r requirements\requirements.txt -c
-requirements\constraints.txt` (on a re-run this moves installed packages to the pinned versions and may
-downgrade newer ones; an installed CUDA build is kept), performs imports and prints the
-PyTorch build and whether CUDA is available.
-
-### `install_torch.py`
-
-`install_torch.py [cpu|cuda] [--dry-run]`: installs the pinned PyTorch from the PyTorch
-index (dependencies also from PyPI; in the versions of `requirements/constraints.txt` when run by
-`Install-FrameScout.bat`, which sets `PIP_CONSTRAINT`) – the CPU build or the CUDA build that
-`framescout_core.cuda_build` picks from `nvidia-smi` (`cu130`, otherwise `cu126`; a build
-for every GPU, else for the most capable one). Without an argument an installed CUDA build
-is kept and nothing is asked; otherwise it asks for GPU support only if `nvidia-smi` finds
-an NVIDIA driver. If no CUDA build fits, an installed CUDA build is kept, otherwise the
-CPU build is installed; **only an explicit `cpu` replaces a CUDA build** (PR #8 review). A
-matching installed build is not downloaded again. Before the pip call (F3) it checks the
-free space of the drives of `sys.prefix` (the venv) and `tempfile.gettempdir()` (`.tmp`
-under `Install-FrameScout.bat`) with `framescout_core.torch_install_needs`/`low_space`;
-with the build installed already it still checks the space of the other packages
-(`torch=False`, `OTHER_PACKAGES_SPACE`) unless every name of `requirements/requirements.txt`
-(`requirement_names`) is installed, since the `.bat` installs them next (review). On low
-space it prints the drives and asks `Install anyway? [Y/N]` (no console: continues;
-`--dry-run` only warns). N prints "PyTorch was not installed." (or "The other packages were
-not installed.") and exits with `STOPPED_EXIT_CODE` 3; the `.bat` checks `errorlevel 3`
-before `errorlevel 1` and says "Installation stopped. Free some disk space, then run
-Install-FrameScout.bat again." instead of "Installing PyTorch failed" (review). Exit code 0
-done, 1 failed, 3 stopped by the user on low disk space. Standard library only.
-
-### `Check-FrameScout.bat` and `framescout_check.py`
-
-`Check-FrameScout.bat` (F15) runs `framescout_check.py` with `.venv`'s Python if it starts
-(`-I -c "import sys"`), otherwise with the private Python in `.python` (the check is standard
-library only), otherwise it says to run `Install-FrameScout.bat`. The check runs with `-B -E -s`,
-so it writes no compiled files and reads no user site. `framescout_check.py` calls
-`check_installation(ROOT, os.environ)`, prints `check_lines` (stdout reconfigured with
-`errors='replace'`, since redirected output uses the ANSI code page) and a summary; exit code 0
-no problem, `PROBLEMS_FOUND` (2) at least one problem. Any other exit code (1 is Python's for an
-uncaught exception) means the check could not run: the `.bat` then retries with `.python`, and
-if that fails too, it says to run `Install-FrameScout.bat`. It never writes, downloads or repairs.
-
-### `Uninstall-FrameScout.bat` and `framescout_uninstall.py`
-
-`Uninstall-FrameScout.bat [--dry-run]` (P5 part B, I20 in part C) runs
-`framescout_uninstall.py` with `.python\python.exe` if it exists, otherwise (installations
-of older installers, I4) with the `python.exe` in the `home` of `.venv\pyvenv.cfg` (read with
-`for /f "usebackq tokens=1,* delims== "` with the console switched to code page 65001 for that
-one line and back right after, since venv writes the file as UTF-8 and a `home` with a non-ASCII
-user name was misread in e.g. code page 850 (review; the old code page is taken from `chcp` and
-nothing is switched if it is no number); used only if it reports Python 3.12 or newer), otherwise
-with the first of Python 3.14/3.13/3.12 found through the `py` launcher (none: it prints
-"No Python 3.12 or newer found to run the uninstall: there is no private Python in .python,
-.venv\pyvenv.cfg names no usable Python 3.12 or newer, and the py launcher finds none." and the
-manual steps, which name `.venv`, `.python`, `.cache` and `.tmp` and the quoted folder path),
-with `-B -E -s` and **not** with `.venv`'s Python, which
-cannot delete itself while it runs. It sets no cache or `TMP` variables (`.tmp` is
-deleted) and uses no delayed expansion, which would drop a `!` from the folder path and
-the arguments (review: the `cd` then failed and the script of the current directory
-ran); the folder path is never used inside parentheses. The script uses
-`framescout_core.uninstall`: it refuses (deleting nothing) when `results/run.lock` is
-held, the environment's `python.exe`/`pythonw.exe` is in use (checked again after `yes`,
-then with read-only attributes cleared) or `settings.json` is unreadable or has invalid
-photo/copy folders; otherwise it prints the items to delete with sizes, the skipped ones
-with the reason, the kept user data (`USER_DATA`, listed without sizes, never deleted:
-photos, references, results with `marks.json`, profiles and backup, settings, `run.log`,
-`.tmp/eval`) and the caches outside the folder (listed only, with sizes), and deletes
-after the answer `yes`. `--dry-run` stops after the lists. Exit code 0 done or listed, 1
-refused, all items skipped, or failures, `PRIVATE_PYTHON_EXIT_CODE` = 3 everything was
-deleted except the private Python the script runs with: `framescout_core.running_python`
-finds the `.python` item when the interpreter is inside it (not for a link, which the
-script removes itself); the item is listed as "deleted last, when this script has ended"
-and left out of `remove_items`. Exit code 3 is returned only after `yes`, not in a dry run,
-after failures or when `.python` was skipped. The `.bat` then deletes `python.exe`,
-`pythonw.exe` and `.python` (`rmdir /s /q`) and reports a leftover with exit code 1,
-otherwise exit code 0. The "FrameScout is running" check still looks at the `.venv`
-programs. "Python itself was installed separately and stays" is printed only when there is
-no `.python`. Not deleted: the program files themselves, also not a leftover
-`framescout_core.py` of I16 (after going back to a version before I15, which had no
-uninstaller, it is that version's core) nor a leftover `framescout_scoring.py` (I36; tested for
-both); the marker (I35) lets `framescout_uninstall.py` run next to them. Opt-in deletion of user data is I19.
-
-### `Start-FrameScout.bat`
-
-`Start-FrameScout.bat` runs these steps in order:
-
-1. `cd` to its own folder.
-2. Deletes `framescout_core.py` when `framescout_core\__init__.py` exists (I16, same lines and
-   message as in the installer, including the skipped folder and the stop when the file
-   stays), and the same for `framescout_scoring.py` (I36).
-3. Sets the cache variables (A36), `TMP`/`TEMP` to `.tmp` and creates `.tmp`; stops if the
-   venv is missing.
-4. Runs `framescout_start.py` with that venv (F22; an entry point with the I35 marker, in
-   `ENTRY_POINTS`) and pauses if it exits non-zero.
-
-`framescout_start.py` calls `framescout_core.launch` (`framescout_core/app_instance.py`) and
-runs Streamlit **in its own process** (no child process) through `streamlit.web.cli.main` with
-`framescout_core.streamlit_args` (`127.0.0.1`, headless off, no usage stats). One process
-keeps the lock exactly as long as the app runs: a child process would outlive a killed
-launcher without the lock (review). Ctrl+C stops Streamlit's server cleanly (exit 0); a
-`KeyboardInterrupt` outside it (e.g. while waiting for another app) also ends with 0, so the
-`.bat` does not pause.
-
-`launch`:
-
-- takes an OS lock (`RunLock`, trying for `_CLAIM_WAIT` = 0.5 s, because `running()` of a
-  waiting start probes the lock for a moment) on `.tmp/app-instance.lock`, deletes a
-  `.tmp/app-instance.json` left by a killed app right away (so no start reads its port), and
-  writes `.tmp/app-instance.json` (`{"port": N}`) while the app runs, removed on a clean exit.
-  Liveness comes from the lock, never a PID, so PID reuse cannot fake a running app.
-- A second start of the same folder waits up to `INSTANCE_WAIT` (30 s) for that port to
-  answer, opens the browser on `http://127.0.0.1:<port>` and exits 0; if it never answers it
-  prints "close that window ..." and exits 1 (the `.bat` pauses).
-- If the lock file cannot be opened (e.g. kept open by a virus scanner), or the lock looks
-  held without an answering app, the message names `.tmp\app-instance.lock` and says to
-  delete it if no FrameScout window of the folder is open (Windows refuses to delete it while
-  an app holds it). `lock_held` keeps counting an unopenable file as held (the safe side).
-- If another program holds 8501, the next free port of `APP_PORTS` (8501-8510) is used with
-  a printed note; all busy: message, exit 1. `port_free`: nothing answers on `127.0.0.1` and
-  a plain bind of `127.0.0.1` succeeds, the same bind Streamlit makes (no `SO_REUSEADDR` on
-  Windows), so a listener on `0.0.0.0` or dual-stack `::` counts as busy and one on `::1`
-  only does not conflict.
-
-Known gap: an app started by hand (`streamlit run app.py`) or by an older version holds no
-lock, so a later start opens a second app (F26). Both files live under `.tmp` (deleted by the
-uninstaller; no cleanup category touches `.tmp`, so no `NEVER_DELETED` entry). Tests:
-`tests/test_app_instance.py` (ports, lock, JSON, launch paths with fakes, Ctrl+C; no
-Streamlit). Runtime check (review): the real `app.py` of a copy under `.tmp`, started through
-`framescout_start.py` with a logged instead of a real browser, rendered in headless Edge with
-8501 held (port 8502); a second start opened the browser on 8502 and exited 0; after a
-hard kill the next start ignored the stale JSON, and SIGINT stopped it with exit 0 and no
-JSON left. **Not runtime-tested:** a real double-click of the `.bat` with Ctrl+C in its
-console window.
-`Check-FrameScout.bat` stays read-only: in such a folder it prints the `Program files` problem
-line (I34) and exits with 2.
-
-### `README.md`
-
-`README.md`: short English overview (GitHub start page): what FrameScout is,
-installation, quick start, reliability of the matches, license. Details live in
-`docs/USER-GUIDE.md` (every part of the app, formats, results, cleanup, scores,
-uninstalling) and `docs/DEVELOPMENT.md` (manual commands, CLI, tests, evaluation tool,
-project structure).
-
-### `docs/ROADMAP.md`, `docs/BACKLOG.md`, `docs/BACKLOG-DONE.md`, `docs/ROADMAP-DONE.md`
-
-`docs/ROADMAP.md`: the prioritized roadmap that drives the PR workflow (open items first, the
-next item is the first `- [ ]` line; checked-off lines stay in their package until every
-line of it is done).
-`docs/ROADMAP-DONE.md`: the packages whose lines are all done; `/triage` moves them there
-unchanged.
-`docs/BACKLOG.md`: open items (IDs E/A/I/F, each with a status tag once triaged).
-`docs/BACKLOG-DONE.md`: finished items, one line each (ID, title, date,
-PR link; the report is the PR description, an item without a PR keeps a short report); a
-finished item is reduced to that line when it moves there (I22, I40).
-`docs/IDEAS.md` (raw ideas) feeds the backlog and the roadmap only through the `/triage`
-skill (`.claude/skills/triage/`, user-invoked; its result is a docs-only PR without
-`fs:*` label and review round).
-
-### `.claude/skills/roadmap/` and `.claude/settings.json`
-
-`.claude/skills/roadmap/`: the `/roadmap` orchestrator skill plus implementer/reviewer
-briefs (the implementer brief also covers the fresh `docs-update` and `address-review`
-agents, I17). The commit trailer comes from the session's attribution (I29), long runs start
-detached through WMI (I13), and a reviewer whose `/code-review` posted nothing posts one comment
-per finding, inline or as a general `Finding <n>` comment (I28). `.claude/settings.json`: shared
-permission rules for the workflow.
-
-### `.github/pull_request_template.md`
-
-`.github/pull_request_template.md`: definition-of-done checklist for every PR.
-
-### `.github/workflows/tests.yml`
-
-`.github/workflows/tests.yml`: CI – runs `pytest` (plus a `compileall` syntax check of all
-Python files outside dot-directories) on `windows-latest` for Python 3.12/3.13/3.14 on
-every pull request and push to `main`. It installs only `requirements/requirements-dev.txt` and fails
-if torch is installed, so tests must not need torch or model downloads. Green CI is
-unit-test and syntax evidence only, not a model run.
-
-### Runtime data
-
-Runtime data (generated, not in the repo): `settings.json` and `settings.json.lock` (the
-app's settings and the lock of their saves, A8), `photos/` (default input), `references/`,
-`results/`, `results/cache.sqlite3`, `results/thumbnails/` (older runs:
-`results/vorschaubilder/`), `results/quick/` (the last quick search, F10: `quick.html`, `results.json`, `thumbnails/`; the cleanup of `results/` does not look into it), `results/run.lock` and `results/run-status.json` (A4/A5),
-`results/results.json` (the last finished search, A12), `results/exports/` (exported result lists, F5: user data, created on the first export; no cleanup
-category scans this subfolder, so neither `clean_up` nor `auto_cleanup` touches it, and it needs no
-`NEVER_DELETED` entry, which names files of the results folder itself), `results/marks.json` and
-`results/marks.json.lock` (the user's marks, A17: user data, never written by the engine
-and never deleted by the cleanup, E7), `results/marks.json.bak` (F1) and the `*.broken-*` files (damaged
-`marks.json`/`cache.sqlite3` set aside; deleted only by the cleanup category `broken_files`, A40), `profiles.json`, `run.log`, `.cache/`, `.tmp/`,
-`.venv/`, `yolo11n.pt` (older installs; now `.cache/ultralytics/`); `.tmp/eval/<collection>/` of the evaluation tool (below).
-
-### Model evaluation tool
-
-`framescout_eval.py {run,pool,label,metrics}` (E32/E20, PR #32) measures the search
-models on the user's own labelled photos. Collection layout, default
-`<project>/.tmp/eval/<collection>/` (gitignored; `--dir` elsewhere):
-`collection.json` (folders and profiles file, remembered so a re-run may omit them; a file
-without a folder list or profiles path is an error, exit code 2, and is left as it is),
-`engine/<model>/` (one engine output folder per model: cache, galleries, thumbnails; separate
-so one run's thumbnail cleanup never removes another model's), `scores/<model>.json`,
-`pool.json`, `labels.json` (`{"format": 1, "labels": {profile: {absolute photo path:
-true|false}}}`; an unreadable file is never saved over, the page refuses to start). Since
-E36 the file has an optional key `motifs`: `{profile: {"context", "features", "references"}}`
-(format still 1), recorded by the labelling page from the pool profile when the profile's
-first label is set (`record_motif`), kept while the profile has labels and removed when all
-are cleared. `pool` and `metrics` read labels and motifs once (`read_label_file`) and compare
-the motifs with the current ones (`current_motifs`: context and features from the
-collection's profiles file, references from the latest model run; a profile the file does
-not have, or every profile if it cannot be read, has no known motif and is not compared)
-and print "The labels of <name> were made for another motif: the profile's
-<context/features/reference images> differ from those of its first label"
-(`changed_motifs`, `motif_warnings`). Prompts are not part of the motif. The labelling page
-records no motif for a profile without a known one, and `label` warns at its start when
-the pool shows a profile with another motif than `current_motifs` ("run pool again before
-labelling it", `pool_motif_warnings`; review). A file without `motifs` (earlier version)
-gets the then-current motif with the next label set; an older tool version drops the key
-when it saves; keys a later version adds to a motif are kept and not compared. Unreadable
-motifs leave the labels usable: `pool` and `metrics` print one warning and compare nothing,
-the labelling page refuses to start (it would save over them).
-
-- Scores file (`{"format": 1, "model", "signature", "photos": [{"path", "mtime_ns", "crops"}],
-  "profiles": [{"name", "prompts", "references", "text", "visual"}]}`): scores per photo and
-  crop rounded to `SCORE_DIGITS` (6), so the tool's ranking can order near-ties within that
-  rounding differently from the galleries; `visual` is null without reference images.
-  `read_scores` accepts finite numbers only, and `write_document` refuses NaN/infinity
-  (`allow_nan=False`); the engine cannot produce them (`photo_scores` skips such a photo).
-- `run`: per model `framescout_engine.py <folders> --profiles P --output engine/<model>
-  --model <model> --scores-file scores/<model>.json --device --batch-size --top 150
-  [--no-person-detection]` with `TORCH_HOME`/`HF_HOME`/`YOLO_CONFIG_DIR`/`XDG_CACHE_HOME`
-  under the cache folder (`--cache-dir`, default `default_cache_dir()` (E48): `<checkout>/.cache`
-  when the tool runs in a venv, `sys.prefix != sys.base_prefix`, whose parent folder holds
-  `framescout_engine.py` and contains the script, e.g. the main checkout's `.venv` used from
-  a worktree inside it; otherwise the `.cache` next to the script; `run` prints the folder) and `PYTHONIOENCODING=utf-8`. A model with a
-  missing package (`model_problem`) is skipped; exit 1 if any model was not scored. A
-  model's `scores/<model>.json` is removed before its run and again after a failed one, so a
-  skipped or failed model keeps no scores of an older run. A model not yet cached downloads
-  its weights on first use.
-- `pool`: ranks each model's scores with `rank_photos` (the engine's scoring) at
-  `--weights` (default `0,0.3,0.6`, only for profiles with reference images), top `--depth`
-  (100) per model and weight, prints pool size, labelled count and a time estimate (1.5 s
-  per photo), and warns if a profile changed between model runs or the models scored
-  different photos (path and `mtime_ns`). Re-running keeps all labels. Labels are keyed by
-  profile name and photo path only, so they survive prompt edits; the motif recorded with
-  the first label is compared (E36, see `labels.json` below). Finally `pool_thumbnails` (E35) renders a thumbnail for every pool
-  photo (named by its time of scoring) and every reference image that no model's gallery
-  has, into `<collection>/thumbnails/`: `missing_thumbnails` finds them, `load_renderer`
-  takes `render_thumbnail` from `framescout_images` (E49: Pillow, no torch, no cache
-  variables set; on failure, e.g. without Pillow, `pool` prints how many photos stay
-  without a thumbnail and works as before), `render_thumbnails` runs `ensure_thumbnail(path, thumbs,
-  None, render, log, mtime_ns=...)` in up to four threads. A photo whose modification time
-  is no longer its time of scoring gets no thumbnail (logged; the page shows the original),
-  so a thumbnail never shows pixels other than the scored ones under that name; a reference
-  image that cannot be read is named in a note (review). Existing collections get the
-  missing thumbnails on their next `pool` run; labels are untouched.
-- `label`: `LabelServer` (a `ThreadingHTTPServer` without `SO_REUSEADDR` on Windows, where
-  it would let a second page bind the same port silently) on `127.0.0.1:8765` (`--port`
-  0-65535, `--no-browser`; a port in use is an error, exit code 2), every route behind a
-  random token (`/<token>/`, compared with `secrets.compare_digest`); shows the profile and
-  one photo (the thumbnail of any model's run or the collection's own `thumbnails/` if
-  present, else the original, E35; reference images are served the same way;
-  the state's `thumb` flag lets the page prefetch thumbnails only, never originals); each
-  label is POSTed (`Content-Length` 0 to `MAX_BODY` = 10,000, else 400) and saved
-  atomically at once, a failed save is shown and reverted; resumes at the first unlabelled
-  photo.
-- `metrics <collection>...`: AP@`--k` (40) per profile and model at `--weight` (default
-  `DEFAULT_REFERENCE_WEIGHT`), warnings about labels no model run scored (another profile
-  name, a moved or relative photo path: such a match counts as missed by every model,
-  `label_warnings`), unlabelled photos in a top list count as no match, a
-  reference-weight sweep (`--sweep`, best per model marked `*`, every tied weight, none when
-  the best AP is 0, E47), the mean over several
-  collections; Markdown tables, `--json FILE`.
-
-## Current search pipeline
-
-### Model and prompts
-
-The search model is chosen from the registry `framescout_core.MODELS` (E22; engine option
-`--model <key>`, settings key `model`). The default `vit-b-32-openai` is OpenCLIP
-`ViT-B-32-quickgelu`, `pretrained='openai'` (`MODELS[DEFAULT_MODEL]`; the OpenAI
-weights need QuickGELU, plain `ViT-B-32` would run them with GELU, E1). Optional and **not
-evaluated** (E32): `vit-b-16-datacomp` (`ViT-B-16`, `datacomp_xl_s13b_b90k`),
-`vit-l-14-datacomp` (`ViT-L-14`, same weights) and `vit-b-16-siglip` (`ViT-B-16-SigLIP`,
-`webli`; needs `transformers` for its tokenizer, `SearchModel.requires`). The engine
-checks `model_problem` before the scan (`parser.error`), imports open_clip through
-`import_open_clip` (offline when the model is cached, E16; no module-level import), loads
-the model and the tokenizer of that name through `load_with_hub_fallback`, takes the draft size from `model.visual.image_size` (falling back to the
-registry's `image_size`) and logs `search model: <label> (<name>/<pretrained>)`. Its
-stdout/stderr escape characters they cannot encode (`errors='backslashreplace'`, e.g. the
-"·" of a label on a redirected cp932 stdout; E22 review). The
-embeddings are normalized text and image embeddings. The reference weight (E5) and all
-other defaults are tuned for the default model; scores of different models are not
-comparable (SigLIP's raw cosines are lower; the z-scores absorb this). No LLM is required. Four generic English prompt
-templates are derived from each profile's name and optional context, plus two extra
-templates if `features` is provided (`load_profiles` reports their number as `generated`);
-user-defined `prompts` are appended.
-
-### Search terms are English only
-
-Search terms are **English only** (E3, user decision in PR #12): the model understands
-practically only English and nothing is translated. The profile tab shows a hint and
-labels the motif, context, features and custom search text fields "in English"; user guide
-section "Search terms in English". Hint text only: do not add a language check, warning or
-translation without a new user decision. A multilingual model is E21
-(`xlm-roberta-base-ViT-B-32`: about 1.47 GB, `transformers`, re-analysis of every photo; a
-hold point).
-
-### Several photo folders
-
-A search covers a list of photo folders (A25, user decisions at the hold point of PR #28).
-The engine resolves the positional folders (parsed with `parse_intermixed_args`, so they
-may stand between options); an output folder equal to one of them, or containing one
-(whose files the scan would always leave out), is an error (`output_folder_problem`). `distinct_folders` drops a folder listed twice and one inside another listed
-folder (compared by `os.path.normcase` of the resolved path and by `os.stat` identity,
-`st_dev`/`st_ino`, of the folder and its ancestors, so a mapped drive, a UNC path, a `subst`
-drive or a junction to a listed folder counts as the same; without an identity (missing
-folder, `st_ino` 0, stat error) only the path is compared, and the ancestors of a folder are
-stat'ed only when it and another listed folder have an identity, so an unreachable network
-folder is not asked again per ancestor; the notes go to the log).
-Missing folders are left out with a log line ("Photo folder not found, searched without
-it"); only if none exists is it an error (`missing_folders_message`, before the lock as
-for one folder, see "Run lock and status"). `scan_folders` joins the `scan_each_folder`
-scans of the folders. The gallery and `results.json` name a photo by `photo_name`: its path in its
-folder, after the folder's label (`folder_labels`: none for one folder, so a one-folder
-gallery is unchanged; otherwise the folder name, with more trailing path parts for
-folders of the same name, compared case-insensitively, and for a label that starts
-another label, e.g. `Event` and `Event\sub`, so no two photos get the same name; a drive
-root is labeled by its drive, e.g. `D:`). Cache rows and marks stay keyed by absolute path, so neither the cache
-signature (`ENGINE`) nor `marks.json` changes. `scan_each_folder` walks with `os.scandir` and still follows
-folder links (junctions, symlinks; `DirEntry.is_junction`, Python 3.12+), so event folders
-linked into a parent keep working, but finds nothing twice (A29): each folder is walked once
-by identity, all real subfolders of all listed folders before any link, so links into walked
-folders and loops add nothing and a photo reachable both ways is listed by its real path (for
-the folder it is really in; a folder outside all listed folders reached by links from
-several of them counts for the first in list order). A folder is marked as walked only after
-`os.scandir` read it, so an unreadable path is tried again through another one. Folders and
-files without an identity (`st_ino` 0) are compared by `os.path.realpath`, so a link loop
-ends there too (a loop the server follows itself, invisible to the client, is not detected;
-neither did the old `rglob`). Supported files are deduplicated by identity plus size and
-modification time (`_file_identity`: hard links and file symlinks share all four, while
-different photos on a file system with repeated file ids stay apart; A28). One `os.stat` per
-walked folder and per photo file. The output folder is left out wherever it is reached: as
-a listed folder or inside one (by path, as the old `exclude in path.parents` check), or
-through a link or another path (by identity). Photos found twice are counted in
-`PhotoScan.found_again` and folder links into a folder already walked in `folders_again` (counted for the listed folder
-that reached through again; a folder listed twice or inside another listed one is not counted, `distinct_folders` handles it) and named by `skipped_lines` in the log and the photo source tab (A37). Cache rows and marks under a link path of earlier runs are
-no longer used (A21).
-
-The app: the "Photo source" tab has a text area (`setting_photo_folders`, one folder per
-line). `settings.json` stores the list `photo_folders`; `setting_of_widget` /
-`widget_of_setting` in `framescout_ui.settings` convert between the text and the list (`folder_lines`:
-the non-empty lines, stripped), so `reconcile_settings` and `save_settings` work on
-lists. The tab shows the count per existing folder (one `scan_each_folder` call over the distinct folders, so a link into another
-listed folder is not counted twice). The scan is remembered per browser session via
-`remembered_scans` in `st.session_state['photo_count']` (A27, A6): it runs again only when the existing
-folders (`is_dir` is still checked every run), `SUPPORTED` or the output folder change, on the
-"Recount" button (flag `recount_photos`, set by its `on_click`) or in a new session; with no
-existing folder the remembered count is dropped, so a reconnected single folder is counted again; a
-"Counted at HH:MM:SS" caption shows its age. No automatic refresh; the engine still scans on every
-search. The tab also shows the notes of `distinct_folders` and a warning per missing folder. "Start
-search" needs one existing folder (from that scan, no second `is_dir`) and passes all
-distinct folders. The copy target check takes the folders of `results.json` and the
-current list; the cleanup does not depend on the list (E8, see "Storage cleanup").
-Checked in PR #28 with one CPU engine smoke run on synthetic photos under `.tmp/` (two
-folders of the same name, a nested and a missing one; one folder; none existing; output
-equal to a folder; after the review folders between options and a folder inside the
-output folder) and the app with Streamlit's `AppTest` (old `settings.json`, format 1
-`results.json`, editing the list, the cleanup scan of that time with a missing folder listed twice),
-not in a browser.
-
-### Photo formats
-
-The engine reads the files of the photo folders whose extension is in `EXT`
-(`framescout_core.scan_each_folder`, also used for the app's photo count), leaving
-out the output folder. Pillow reads JPEG, PNG, WebP, BMP, TIFF and AVIF (if built with libavif,
-as its wheels are); `pillow-heif` adds HEIC/HEIF (`register_heif_opener` at engine start)
-and `rawpy` camera RAW (`RAW_EXT`, E25). `available_decoders` checks all three by
-importing them (a package that is installed but cannot be loaded counts as missing); the
-engine and the app (`st.cache_resource`, once per app process) call it, so both agree
-(review). The extensions of a missing decoder are left out (`supported_extensions`); a
-reference image of such a format fails with the reason (`missing_decoder`).
-
-- **RAW decoding** (`open_raw`/`raw_preview` in the engine, user decision at the E25 hold
-  point): the embedded JPEG or bitmap preview (`extract_thumb`) if its longer edge has at
-  least `RAW_PREVIEW_MIN_EDGE` (1024) pixels – a JPEG preview is drafted like any JPEG –
-  else the sensor data at half size (`postprocess(half_size=True, use_camera_wb=True)`,
-  which LibRaw turns upright). A preview LibRaw cannot extract or Pillow cannot read also
-  leads to the half-size decode (review). A preview is turned upright by its own EXIF
-  orientation if it has one (2..8), else by LibRaw's `sizes.flip`
-  (`raw_preview_transpose`), never by both.
-- **RAW+JPEG pairs:** a RAW file is skipped if a supported `.jpg`/`.jpeg`/`.heic`/`.heif`
-  file of the same name (ignoring case) is in the same folder (`RAW_PARTNER_EXT`). The
-  rule looks at names only. Fallback (E30): `raw_fallbacks(scan)` maps every partner in
-  `scan.paths` to its RAW file from `scan.raw_pairs` (same folder, same name ignoring case
-  via the `_shot` key `scan_photos` pairs by; several RAW files: the first in sorted
-  order). Every failure of a photo goes through the engine's `failed(path, exc)`: the
-  cache scan (`stat`/SQLite), decoding in `prepare` and `store_failed`. It logs `ERROR
-  <path>: <reason>`; a partner with a RAW file is not counted yet but deferred
-  (`RawFallback.defer`). After all photos, `RawFallback.choose(analyzed)` decides the
-  deferred failures with the whole shot known: the RAW file is chosen for the first failed
-  partner unless another partner of the shot has a current cache row (e.g. good JPEG +
-  broken HEIC: the shot appears once, as the JPEG); further failed partners of the shot
-  stay failures (`analyzed` is asked only for partners of shots with a failure). The log
-  shows `<partner> could not be analyzed; analyzing its RAW file instead: <raw>`, and the
-  chosen RAW files run through the same cache check, decoding threads and batched
-  embedding as any photo (a cached RAW file is not decoded again; one that fails too logs
-  `ERROR <raw>` and counts as a failure). The shot is counted once (progress total
-  unchanged). A RAW file with a current cache row afterwards is recorded with
-  `RawFallback.use`, and scoring and the gallery iterate `RawFallback.photos(paths)`,
-  which names it in its partner's place, so cache row, card, thumbnail, link and
-  `--scores-file` use the RAW path. The partner has no cache row, so every run retries it
-  first (one failed decode and its `ERROR` per run) and a repaired JPEG wins again.
-  Truncated partners (E46, E53, E57): `framescout_images` sets `ImageFile.LOAD_TRUNCATED_IMAGES` to
-  `_LenientUnlessStrict`, true except in a thread inside `_strict()` (thread-local, so the decoding threads
-  can mix both). `open_image(path, min_size=None, complete=False)` with `complete=True` goes to
-  `_open_complete`: a strict decode first (this also detects mid-data damage, `err_code < 0`); if it fails
-  and the file decodes leniently, a JPEG raises `framescout_core.TruncatedImageError(OSError)` with `image
-  data ends early or is damaged (decodes only in part)`; any other file raises the strict error and is not retried.
-  A JPEG that lacks only its EOI marker (E57) is not an error: `_ends_only_its_marker` uses
-  `framescout_core.jpeg_scans_missing(data)` (`photos.py`, stdlib only: follows the marker segments; true if
-  the data ends inside or right after a marker segment or the scans do not cover all components (baseline) /
-  all coefficients at Al=0 (progressive)), then decodes `data + filler + EOI` for `0xAA`/`0x55` fillers and
-  RST0-7 + filler (a trailing `0xFF` gets a `0x00`; the data as is must decode the same) and compares with
-  `data + EOI`; such a partner is analyzed itself. The check relies on libjpeg skipping bytes after the last
-  scan's complete data (measured: 1,500 random cuts on 5 JPEG kinds, no miss, no false alarm; the decode uses
-  Pillow internals and is pinned by `tests/test_images.py`, which runs only where Pillow is installed, not in CI).
-  `RawFallback.strict(path)` is true for a partner with a RAW file: it decodes with `complete=True`, a
-  truncated one fails and its RAW file is analyzed (E30 path). If that RAW file fails too,
-  `defer(path, truncated=True)` keeps the failure, `retry()` returns `(retry, lost)`: `retry` are the partners
-  (attributes `truncated`/`lenient`) the engine analyzes as far as their data goes (log `The RAW file of ...
-  could not be analyzed either; analyzing the readable part of the photo instead.`), counted once for the
-  shot. Every truncated partner of a shot whose RAW file another failed partner got stays waiting in
-  `choose` (not in `lost`); `defer(raw)` then counts the RAW failure for the partner the RAW file was picked
-  for if that one failed otherwise, and queues all waiting ones; `lost` are waiting partners whose RAW file
-  was analyzed, which the engine counts as failures. Photos without a RAW partner decode as before; a
-  truncated partner analyzed by an earlier version stays in the cache.
-  HEIF/AVIF strict (E59): `_open` loads an image whose `format` is in `_STRICT_FORMATS` (`HEIF`, `AVIF`) always inside `_strict()`, with or without `complete`, because pillow-heif swallows the decoding error of a truncated HEIC under `LOAD_TRUNCATED_IMAGES` and leaves it all black. So a truncated HEIC/HEIF fails as a failed photo (a RAW partner's RAW file is analyzed instead), a truncated HEIC reference image stops the engine at start ("Reference image cannot be read"), and `render_thumbnail` (evaluation tool `pool`) fails for it. Pillow's own AVIF reader already rejected a truncated AVIF (pinned in `tests/test_images.py`). Rows cached earlier as black images stay valid (same mtime/size) until the file changes; "Clean up storage" deletes them only with other settings than the current ones (E62).
-- **Damaged cache (E50):** `sqlite3.DatabaseError` / a disk I/O error of the cache file itself
-  (`cache_error`) is handled by where it happens (review): opening the cache (`prepare_cache`) or
-  storing (`store_group(..., fatal=cache_error)` raises it at once, without storing the group's
-  photos one by one) stops the search: `main()` prints `cache_error_message` to stderr (`run.log`),
-  writes it as the status message (phase `failed`, exit code 1) and returns 1 without a traceback.
-  Reading a row (cache scan, `analyzed`, scoring) only leaves out that photo (`ERROR`/`CACHE ERROR`
-  line, as before E50), since a damaged page can hit only a few rows; the photos are collected and
-  the finished search prints `cache_read_warning` (count, file, "Check cache") before `Done.` and
-  passes it to `final_status(0, warnings)` as the message of the `finished` status, which the app
-  shows as a warning under the success note. If no photo could be scored and some rows could not
-  be read (e.g. the table's root page is damaged), the first such error is raised after the scoring,
-  so the search stops as above and the previous galleries stay. Other SQLite errors (locked, full) keep their old
-  handling. The cache is opened (`prepare_cache`) right after the device/thread setup, before the `loading`
-  status and the model load, so a damaged cache is reported at once (E56); if the cache check, the model
-  load or a reference image fails, the connection is closed before the error goes on (review).
-- **Skipped files:** the log names the RAW files skipped for a partner (count and one
-  example), the files of a missing decoder with the reason (only if the folder has such
-  files), and the files of other extensions by extension (`skipped_lines`); the app's
-  "Photo folder" tab shows the same lines. The app remembers the
-  count per session instead of scanning on every rerun (A27).
-- **Cache:** the new extensions only add rows, so the cache signature and `ENGINE` did not
-  change. A change of the RAW decoding (e.g. `RAW_PREVIEW_MIN_EDGE`) changes the embeddings
-  of RAW photos and needs an `ENGINE` bump.
-- Browsers cannot show HEIC/RAW files: the gallery thumbnails are JPEG, but the photo link
-  of such a card downloads the file or hands it to the OS.
-- **Verified (PR #26):** CPU smoke runs with and without person detection on five CC0
-  samples from raw.pixls.us (Canon CR2 and CR3, Nikon NEF, Sony ARW, Pentax DNG; all with a
-  JPEG preview, 1616 px to full size; the forced half-size decode took 0.1–0.7 s each),
-  two HEIC files made with pillow-heif (one stored sideways with EXIF orientation 6, decoded
-  upright by libheif), a HEIC reference image, a RAW+JPEG pair and a `.mov`; a rerun took
-  every photo from the cache. After the review: the fallback for a simulated broken preview
-  (LibRaw error, unreadable JPEG, small bitmap), and engine runs with pillow-heif, rawpy and
-  Pillow's AVIF support blocked (skipped-file lines, HEIC reference error). Not verified: a
-  RAW file with a rotated `flip` or without a usable preview of its own (the fallback was
-  only forced), HEIC from a real phone, other cameras.
+Treat syntax checks, unit tests and a real model run as distinct kinds of evidence. Do not
+call the app production-ready.
+
+**Run for real**
+- One full CPU-only search on Windows (I6): 4,997 photos, 6 profiles, CLIP on CPU, YOLO person
+  detection, 0 errors, Python 3.14, torch 2.14.1+cpu.
+- CUDA on one home PC (RTX 4070, torch 2.14.1+cu130, Python 3.14; I11, PR #56): CLIP and YOLO on
+  CUDA, `--device auto`, the app's device choice (headless Edge), 400 synthetic and 4,997 real
+  photos on CUDA and CPU (348 s CUDA with person detection, 486 s CPU, 93 s CUDA without
+  detection; person detection is the GPU bottleneck, E18).
+- All four registered search models on CPU (E22, synthetic photos) and on CUDA (E34).
+- The evaluation tool (E32/E20, E34/E35) with real models, 4,997 photos and about 1,600 labels
+  made in the user's browser; the labelling page was driven by CDP input in headless Edge.
+- Offline loading of a cached model with the network blocked (E16/E31/E33, default model and
+  SigLIP).
+- Publishing the export (E24/E26) in one CPU smoke run; RAW, HEIC and RAW+JPEG pairs in CPU
+  smoke runs (PR #26).
+- Installer download of the private Python (P5 part C) and the uninstall, both under `.tmp`.
+- Stop, reload and a second browser tab during a search (A4/A5), once by hand.
+- The app with Streamlit `AppTest` (settings, profile forms, marks, cleanup, quick search,
+  find similar) and in headless Edge (settings widgets, gallery, mark colors A49).
+
+**Not runtime-tested**
+- A fresh `Install-FrameScout.bat` with PyTorch on it, `cuda`/`cu126` installs, other or several
+  GPUs, other Python versions, macOS/Linux, a second machine.
+- The first download of a model into an empty cache and the fallback after an incomplete cache
+  (E38); the time estimate (F12) of a live search; "Find similar" (F11) with real CLIP vectors
+  and in a real browser; an export stopped during its writes; closing the
+  `Start-FrameScout.bat` window during a search; the mount-point check of unbound photos on
+  Linux/macOS (E54); HEIC from a real phone; RAW files without a usable preview.
+- The search quality of the three optional models (none is evaluated beyond the first AP@40
+  values, E32).
+
+CI (`.github/workflows/tests.yml`, Windows, Python 3.12/3.13/3.14) runs `pytest` and a
+`compileall` check from `requirements/requirements-dev.txt` only and fails if torch is
+installed: tests must not need torch, Pillow or model downloads. Tests that need Pillow
+(`tests/test_images.py`) or Streamlit's frontend bundle run only locally. `app.py` and
+`framescout_ui/` have no behavior tests, only source checks (`tests/test_app_source.py`,
+`tests/app_source.py`); widget behavior needs `AppTest` plus a real browser (`AppTest` does
+not run the frontend and cannot see CSS).
+
+## Layout
+
+| Area | Files | Notes |
+|---|---|---|
+| Frontend | `app.py`, `framescout_ui/` | Streamlit; `app.py` is page layout, the areas live in `framescout_ui/` (imported only by `app.py`) |
+| Engine | `framescout_engine.py`, `framescout_images.py` | CLI; models, decoding, person detection, cache, ranking, export; `framescout_images` is Pillow/HEIC/RAW decoding and thumbnails (no torch) |
+| Shared logic | `framescout_core/` | one module per area, re-exported by `__init__.py`; **standard library only** |
+| Scoring | `framescout_scoring/` | `ranking.py`, `layout.py`; **numpy only** |
+| Evaluation | `framescout_eval.py`, `assets/framescout_eval_page.html` | labelling and AP@k measurement of the search models |
+| Install and run | `Install-FrameScout.bat`, `install_torch.py`, `Start-FrameScout.bat`, `framescout_start.py`, `Check-FrameScout.bat`, `framescout_check.py`, `Uninstall-FrameScout.bat`, `framescout_uninstall.py` | see "Install, start, uninstall" |
+| Data | `requirements/`, `assets/profiles.example.json` | pins, examples |
+| Workflow | `.claude/skills/`, `.claude/settings.json`, `.github/` | see "Workflow permissions" |
+
+Frontend and engine are separate processes: the app spawns the engine with
+`framescout_core.engine_command`, redirects its output to `run.log` and only reads files the
+engine writes. Only the engine imports torch (`system_info` in the Settings tab is the app's
+one exception). A new root script that imports FrameScout code sets `FRAMESCOUT_PACKAGES = True`
+before its first FrameScout import and joins `ENTRY_POINTS` in `tests/test_layout.py` (I35); the
+batch files delete a leftover `framescout_core.py`/`framescout_scoring.py` of older versions
+(I16/I36) when the package folder exists.
+
+The engine and the evaluation tool import open_clip and Ultralytics only through
+`framescout_core.import_open_clip` / `import_detector_class` (tests check there is no direct
+import), because both set environment variables that must precede the import (see
+"Environment variables, caches and offline loading").
+
+## Search pipeline
+
+### Models and prompts
+
+The search model comes from the registry `framescout_core.MODELS` (engine option `--model`,
+setting `model`). The default `vit-b-32-openai` is OpenCLIP `ViT-B-32-quickgelu` with the
+OpenAI weights (plain `ViT-B-32` would run them with GELU, E1). Optional and **not
+evaluated**: `vit-b-16-datacomp`, `vit-l-14-datacomp`, `vit-b-16-siglip` (needs
+`transformers` for its tokenizer; `model_problem` checks this before the scan). Defaults such as
+the reference weight are tuned for the default model; scores of different models are not
+comparable. Per profile, four generic English templates are derived from name and context,
+two more from `features`, and user `prompts` are appended. Search terms are **English only**
+(E3, user decision): hint text only; no language check, warning or translation without a new
+user decision (a multilingual model is E21, a hold point).
+
+### Photo folders and formats
+
+- A search covers a list of photo folders (A25). `distinct_folders` drops duplicates and
+  folders inside another listed folder (by normalized path and file identity); missing folders
+  are left out with a log line, it is an error only if none exists. An output folder equal to
+  or containing a photo folder is an error. `scan_each_folder` walks each real folder once by
+  identity (links into walked folders and loops add nothing; A28/A29), de-duplicates hard
+  links and file symlinks, and leaves out the output folder wherever it is reached. A photo is
+  named in galleries and `results.json` by `photo_name` (folder label plus relative path).
+  Cache rows and marks are keyed by the absolute path.
+- Extensions come from `EXT`; Pillow reads JPEG, PNG, WebP, BMP, TIFF, AVIF, `pillow-heif` adds
+  HEIC/HEIF and `rawpy` camera RAW. `available_decoders` imports all three; the extensions of a
+  missing decoder are skipped (named in the log and in the app's photo source tab).
+- RAW (E25): the embedded preview if its longer edge is at least `RAW_PREVIEW_MIN_EDGE` (1024),
+  else a half-size sensor decode. A RAW file next to a same-named `.jpg/.jpeg/.heic/.heif`
+  partner is skipped; if the partner cannot be analyzed, `RawFallback` analyzes the RAW file in
+  its place (E30). A truncated JPEG partner counts as failed when a RAW file exists (strict
+  decode, E46/E53/E57); truncated HEIF/AVIF always fail strictly (E59). Details are in the
+  docstrings of `framescout_images` and `RawFallback`.
+- Changing the RAW decoding needs an `ENGINE_TEMPLATE` bump (it changes embeddings).
+- Cache damage (E50): an error of the cache file itself while opening or storing stops the
+  search (exit 1, `cache_error_message`, nothing partial published); an unreadable row only
+  leaves out that photo and the finished search ends with `cache_read_warning`. The app offers
+  "Check cache" (read-only `quick_check`) and "Set cache aside" (rename, never delete).
 
 ### Person detection
 
-Optional Ultralytics `yolo11n.pt` person detection (`classes=[0]`) extracts individual
-person crops **in addition to the full original image**. Detection is deliberately
-optional for non-person motifs; the detector runs on the CLIP device (E14), one photo per
-call under a lock (several photos per call: E18). The detector is created with
-`YOLO(yolo_weights(args.yolo_model, <engine folder>, cwd, os.environ, log))` (E9): a path
-or URL as given; a bare name in the working folder wins (E41: a copy the user put next to
-the run is deliberate), then one in the folder of `YOLO_CONFIG_DIR` (a user's value is kept,
-as in `default_cache_env`; else `.cache/ultralytics/`) if present. Exception: the default
-`yolo11n.pt` in the project folder (also when the engine runs there, as the app does; the
-working folder counts as the project folder by its resolved path, not by `samefile`, which
-would stat a file another search may be moving and is unreliable on volumes without a unique
-file index, review) is treated as an older version's download: a cached copy wins, otherwise it is moved into the
-cache folder once (used in place with a `run.log` line if the move fails; with a copy
-already there it stays for the uninstall); otherwise the cache path,
-where Ultralytics downloads it (its `safe_download` creates the folder). The cache signature still receives `--yolo-model` unchanged (open: E64). E60: `load_detector` prints `Loading person detector weights: <absolute path>` (`framescout_core.detector_weights_line`; a URL as given) before `YOLO(weights)`, so a failed load still names the file tried; a missing file gets a note that Ultralytics downloads only its official weights names and any other file fails to load (review).
+Optional Ultralytics `yolo11n.pt` (`classes=[0]`) adds person crops **in addition to the full
+image**; it is optional because it is meaningless for non-person motifs. It runs on the CLIP
+device, one photo per call under a lock. The detector is created lazily (`Lazy`, F2) on the
+first photo that needs analysis, so a fully cached repeat search never loads YOLO. Weights are
+found by `yolo_weights`/`find_yolo_weights` (E9, E41: a bare name in the working folder, then
+`YOLO_CONFIG_DIR`; an older `yolo11n.pt` in the project folder is moved into the cache folder
+once). Person boxes differ slightly between CUDA and CPU (I11, 9253 vs 9249 crops on 4,997
+photos); the cache signature ignores the device on purpose, so a cache built on one device is
+reused on the other. This is not a bug.
 
-The detector is created lazily (F2): the engine wraps the creation in `framescout_core.Lazy`
-and calls `get()` in `analyze()` on the first non-empty list of photos to analyze (main pass
-or the RAW fallback pass, E30), in the main thread before the decoding threads use it; a
-repeat search on an analyzed folder never loads YOLO. The E27/E28 flags and the E9 weights
-path are unchanged, and it still happens under the run lock. A load error (e.g. a failed
-first download) therefore appears after the cache scan, mid-run, as a failed run.
+### Analysis
 
-### Analysis pipeline
-
-Analysis pipeline (E2): uncached photos are stat-ed, decoded, searched for persons and
-preprocessed in threads – up to four without person detection (`DECODE_THREADS`), two with
-it (`DETECTION_DECODE_THREADS`, so at most two full-resolution photos are in memory while
-the detector runs one photo at a time) – at most `max(2 × threads, --batch-size +
-threads)` photos ahead (`framescout_core.prefetch`); the shared YOLO detector is called
-under a lock. The crops of several photos are embedded in one CLIP forward pass of at most
-`--batch-size` crops (`framescout_core.group_batches`; a photo with more crops is a group
-of its own), and each group is committed to SQLite in one transaction; if that fails, its
-photos are stored one by one, so only a failing photo is counted as an error
-(`framescout_core.store_group`). Without person detection JPEGs are decoded at 1/2, 1/4 or
-1/8 scale (`Image.draft`) down to twice the CLIP input size (`framescout_core.draft_size`,
-448 px); with person detection they keep full resolution. Gallery thumbnails are drafted
-the same way (to 760 px for 380 px thumbnails). Cache signature: with detection it is
-unchanged (the features are identical); without detection it names the drafted decoding
-(`DRAFT_DECODING`, user decision in the PR #7 review), so the first detection-off run
-after E2 analyzes every photo once more and drafted and full-resolution embeddings never
-mix (they agree to a cosine similarity ≥ 0.999 on a 202-photo sample).
-
-The detector is loaded inside `analyze()` (F2, see "Person detection"): while it loads, the
-status phase stays `analyzing` with its progress and counts, and the status message is
-`LOADING_DETECTOR` (log line `Loading the person detector ...`), cleared once it is loaded
-(review: the phase `loading` would show "Loading the AI models" without progress mid-run). The draft size and the thread
-count follow the person-detection setting, not the detector object. If no photo needed an
-analysis (all from the cache, or only cache-scan errors), the log prints `Nothing new to
-analyze – ranking only.` and the status message is `NOTHING_NEW` during scoring and export.
-With `--analyze-only` (F18) the pipeline ends after this phase: the message (`nothing_new_message(analyze_only, errors)`) is
-`ALL_ANALYZED` (log `All photos are analyzed already – nothing new to analyze.`) if no photo failed, else `NONE_ANALYZED`
-(`No photo newly analyzed – some could not be analyzed, see the log`; review: a photo whose cache row or file could not be
-read is neither in the cache nor analyzed), and the engine returns 0 before "Scoring the photos" (an early return after the analysis and
-the check of unreadable cache rows), so nothing is scored or written besides the cache.
+Uncached photos are decoded, searched for persons and preprocessed in threads (`DECODE_THREADS`
+4, `DETECTION_DECODE_THREADS` 2 with detection; `framescout_core.prefetch` bounds the photos in
+memory), the crops of several photos are embedded in one forward pass of at most `--batch-size`
+crops (`group_batches`), and each group is committed to SQLite in one transaction
+(`store_group`; a failing group is stored photo by photo so only a failing photo counts as an
+error). A stop loses at most the group in progress; `KeyboardInterrupt` exits with 130.
+Without person detection JPEGs are decoded at reduced scale down to twice the CLIP input size
+(`draft_size`), which is part of the cache signature (`DRAFT_DECODING`). `--analyze-only` (F18)
+ends after this phase and writes nothing but the cache. The cache is opened right after the
+device setup, before the model loads, so a damaged cache is reported at once (E56).
 
 ### Scoring
 
-Scoring (`framescout_scoring`, E4/E5): the generated templates of a profile are averaged
-into one normalized query (prompt ensemble); each custom prompt stays a query of its own,
-and a crop's text score is its best cosine similarity with one of these queries (user
-decision in PR #11: custom prompts keep their "any of these" meaning). If reference images
-exist, visual score = max over reference vectors. Per profile and run, the text and visual
-scores are z-scored separately over all crops of the searched photos (mean and standard
-deviation of this search), then combined as `(1-reference_weight)*z_text +
-reference_weight*z_visual` (a channel with weight 0 needs no spread) (default reference
-weight 0.3, `framescout_core.DEFAULT_REFERENCE_WEIGHT`, also the engine's
-`--reference-weight` default; 0.35 before E5, changed after the local evaluation in PR #11, E20); with fewer than `MIN_SCORES` (10) crops or a spread below `MIN_SPREAD` in
-either channel, both channels use the raw cosine scores as before E4/E5. The best
-full-image/crop score represents a source photo. The gallery shows the normalized "Score"
-("Similarity" for raw scores) with the raw text and image similarity of that crop in small
-text. A cache row that is broken (labels and vectors do not match, scores not finite) is
-logged as `CACHE ERROR` and skipped (`framescout_scoring.photo_scores`), and `spread`
-ignores non-finite values. Scores depend on the folder searched; they are relative search
-heuristics, not probabilities or guaranteed identification. Scoring needs no cache change:
-it runs on the cached features at query time.
+`framescout_scoring` (E4/E5), on the cached features at query time (no cache change). The
+generated templates of a profile are averaged into one normalized query; each custom prompt
+stays a query of its own, and a crop's text score is its best cosine over these queries (user
+decision, PR #11). With reference images the visual score is the maximum over the reference
+vectors. Per profile and run the text and visual scores are z-scored separately over all crops
+of the searched photos and combined as `(1-w)*z_text + w*z_visual` (`DEFAULT_REFERENCE_WEIGHT`
+0.3, also the engine's `--reference-weight` default). With fewer than `MIN_SCORES` (10) crops or
+a spread below `MIN_SPREAD` the raw cosines are used ("Similarity" instead of "Score"). The best
+crop represents its photo. A broken cache row is logged as `CACHE ERROR` and skipped. Scores
+depend on the folder searched and are relative search heuristics, never probabilities or
+identification.
 
 ### Feature cache
 
-Feature rows are stored in `results/cache.sqlite3` per resolved file path + engine/config
-signature (`framescout_core.feature_signature`: the engine id of the search model, whether
-person detection is on and, only if it is, the detector settings; pinned by golden values
-of every model in `tests/test_signature.py`), checked against modification nanoseconds and size. Image
-embeddings are serialized in float16; profile queries can reuse existing image features.
-Changes to detector settings invalidate the cached feature signature. The engine id comes
-from `ENGINE_TEMPLATE` (`v5-clip-{model}-{pretrained}-crop-features-1`, `engine_id(model)`;
-`ENGINE = engine_id(DEFAULT_MODEL)`, the same string as before E22, so no default-model
-cache row was invalidated): change the template whenever cached embeddings become
-incompatible for all models (preprocessing, crops); another model or other weights is a new
-`MODELS` entry and gets its own id and signature. Each model therefore has its own rows
-next to the others (about 10–15 MB per model for 5,000 photos); switching back reuses
-them. The engine creates the tables with `framescout_core.prepare_cache(..., model=)`,
-which also records its signature with `engine_id(model)` and the settings in the side table `signatures(signature PK,
-engine, settings)` (E11; the features table is unchanged, so older versions read the same
-file). Rows of other signatures are never deleted automatically, only by "Clean up
-storage" after the user's selection (E7, E11).
+`results/cache.sqlite3`, one row per resolved file path and signature, checked against
+modification nanoseconds and size; embeddings are float16. The signature
+(`framescout_core.feature_signature`) is made from the engine id of the model, whether person
+detection is on and, only then, the detector settings (`max_persons`, `person_confidence`,
+`--yolo-model`; open: E64) or, without detection, `DRAFT_DECODING`. Golden values for every model
+are pinned in `tests/test_signature.py`.
 
-### Outputs and thumbnail cleanup
+- `ENGINE_TEMPLATE` (`v5-clip-{model}-{pretrained}-crop-features-1`): change it whenever cached
+  embeddings become incompatible for all models (preprocessing, crops). Another model or other
+  weights is a new `MODELS` entry with its own `engine_id`. The default model's id is unchanged
+  since before E22.
+- Each model has its own rows next to the others (about 10–15 MB per 5,000 photos).
+- The side table `signatures(signature PK, engine, settings)` (E11) records what each signature
+  means so "Clean up storage" can tell old settings from other models. The features table is
+  unchanged, so older versions read the same file.
+- Rows of other signatures are **never deleted automatically**, only by the user's cleanup (E7/E11).
+  A renamed or moved photo is a new photo; its old row and mark stay until cleaned up (E8).
 
-Outputs one ranked `.html` file per profile (`<slug>.html` from
-`framescout_core.profile_slugs`: ASCII transliteration, `-2`, `-3`, … on collisions in
-profile order, hash fallback), with separate JPEG thumbnails in `results/thumbnails/` and
-`file://` links to originals. The export walks the full sorted ranking of a profile through
-`gallery_cards`: a photo whose thumbnail fails (E6) is skipped, lower-ranked photos fill up
-to `--top`, so ranks in the galleries and in `results.json` are contiguous (E12). A
-skipped photo is remembered in `SkippedPhotos` for the whole export: later galleries do
-not try or log it again, and after 50 logged photos a closing line only counts the rest.
-The export progress total is `sum(min(--top, photos))`; every photo tried counts, also a
-skipped one, capped at the profile's share, so the status file stays fresh during a run
-of skipped photos and a full gallery or an exhausted ranking reaches the share. Keep the
-output folder intact; exporting an HTML file on its own does **not** embed thumbnails.
-The engine keeps each gallery's HTML in memory (`pages`) during the export and at the end
-calls `framescout_core.publish_export(output, pages, document)` (E24): it writes every
-gallery and `results.json` in full to `<name>.<random>.tmp` (fsync) and only then renames
-them in profile order, `results.json` last (`_common._publish_together`). A stop or failure
-while writing leaves the previous galleries and `results.json`; it reads the previous
-content of every target first, so if a rename fails every retry, the files renamed before
-it get their previous content back (a new gallery is removed again) and the run fails with
-that error. The gallery path lines in
-the log come after this step. Galleries are written as bytes, so their line ends are `\n`
-on Windows too. After `results.json` is published, still holding the run
-lock, the engine calls `auto_cleanup`: it removes temporary thumbnails
-(`<hash>.jpg.<random>.jpg`, left by a stop during the export, E13), stale temporary files
-(`run-status.json.*.tmp`, `results.json.*.tmp`, `marks.json.*.tmp`, `marks.json.bak.*.tmp`,
-`marks.json.broken-<YYYYMMDD-HHMMSS>[-n].*.tmp` of `restore_marks`, `<slug>.html.*.tmp`
-with a profile slug `[a-z0-9-]+`; random part exactly 8 chars of `[a-z0-9_]`, regex
-`cleanup._TEMP_FILE`) at least `STALE_TEMP_AGE` = 60 s old by mtime, even if
-`results.json` cannot be read (E26; the age limit protects a write the app is doing right
-now). The age is measured against the clock of the results folder's file system: the mtime
-of a probe file `results.json.<random>.tmp` created and removed there
-(`cleanup._file_system_now`; `time.time()` if none can be created), so a network share whose
-clock runs behind the PC's does not make a file being written look old. Then it removes the
-thumbnails (both folders, `[0-9a-f]{24}.jpg` names only) that neither `results.json` nor any HTML file in
-the output folder links; if one of them cannot be read, every thumbnail stays; a failure
-is logged and never fails the run. Every cleanup summary (also of `clean_up`) has
-`temporary`: the temporary thumbnails and temporary files among `files`, counted as they
-are removed; the log line reads "Removed N unused thumbnails or
-temporary files (size)". Local paths may not work on another computer.
+### Outputs
 
-`results/quick/` (F10) has its own cleanup: `auto_cleanup` runs on it only after a quick search
-(its thumbnails against its `results.json` and `quick.html`), while the cleanup of `results/`
-(automatic and "Clean up storage") does not look into it (non-recursive `*.html` and
-`thumbnails/`; `tests/test_quick.py`).
+One ranked gallery `<slug>.html` per profile (`profile_slugs`: ASCII transliteration, `-2`, `-3` on
+collisions), JPEG thumbnails in `results/thumbnails/` (older runs: `results/vorschaubilder/`, no
+longer written) and `file://` links to the originals. A photo whose thumbnail fails is skipped and
+lower ranks fill up to `--top`, so ranks are contiguous (E6/E12). An exported HTML file alone
+embeds no thumbnails: keep the output folder intact.
 
-### Result file
+**Publishing (E24):** the engine keeps the galleries in memory and calls
+`publish_export(output, pages, document)`: every file is written in full to
+`<name>.<random>.tmp` (fsync) and only then renamed, `results.json` last; a failing rename
+restores the previous content. A stop or failure while writing leaves the previous galleries and
+`results.json`. A kill between the renames can still leave galleries newer than `results.json`
+(E45).
 
-The quick search (F10) writes its own set to `results/quick/`: `quick.html`, `results.json`
-(format 2 plus the key `quick`: `query`, `searched`, `not_analyzed`, and for "Find similar" (F11) `like` (the photo's path) and `part`; its cards have `text: null` and `visual` = the raw image similarity; `photos` is every photo
-found) and `thumbnails/` (copied from `results/thumbnails/` when a profile gallery has the
-same thumbnail, else rendered). Run lock, `run-status.json`, `cache.sqlite3` and `run.log` are
-the results folder's. The profile galleries, `results/results.json` and `marks.json` are never
-written by a quick search. The scores are scaled over the photos searched, so they differ from
-a search with profiles (`quick_note` says so).
+**Auto cleanup:** after publishing, still under the run lock, `auto_cleanup` removes stale
+temporary files (random 8-char suffix, at least `STALE_TEMP_AGE` = 60 s old by the results
+folder's file-system clock; the list is `cleanup._TEMP_FILE`) and thumbnails that neither
+`results.json` nor any HTML in the output folder links (nothing is removed if one of them cannot
+be read). A failure is logged and never fails the run. `results/quick/` has its own cleanup after
+a quick search and is not touched by the cleanup of `results/`.
 
-After the galleries the engine writes `results/results.json`
-(`framescout_core.publish_export`, format 2 since A25): run start and end, the searched
-photo folders (`photo_folders`, a list), settings (including `model`, the search model key
-since E22; results without it count as the default, `results_model`, which the app's
-results caption shows as "search model <label>"; results of another model than the one
-chosen now get a note), number of photos and per profile its
-name, `search_fingerprint` (hash of its search texts and reference paths, relative to the
-profiles file's folder when inside it, so a moved project folder changes nothing),
-gallery file name, `normalized`, `queries` (F17, optional: the names of the profile's search texts, `query_labels`; absent for "Find similar") and the cards (rank, path, `relative` (the `photo_name`
-the gallery shows), crop label, score, raw text/visual similarity, the two caption lines,
-thumbnail name, and `best_query` (F17, optional: the closest search text, only in a profile with at least two texts)) in gallery order. Both F17 keys are additive, so the format stays 2 (A25 rule): older apps ignore them, this app shows nothing for older files. The HTML gallery then adds the line "Closest search text: …" per card and `QUERY_NOTE`. `read_results` also reads format 1 (`photo_folder`, a
-string) and returns it with `photo_folders` as a list of one (none for an empty value);
-app versions before A25 reject format 2 ("not a FrameScout result file of format 1") and
-show no results until they run a search themselves. Written only when the export completes, so a stopped
-search leaves the previous file and the previous galleries (`publish_export`, E24); so does
-a rename that fails every retry (a gallery held open for over 2 s, which fails the run),
-since the files renamed before it get their previous content back. Not one step across
-files: a kill between the renames (milliseconds), or a restore that fails too, can still
-leave galleries newer than `results.json` (E45). The app reads it
-(cached by mtime and size) instead of deriving file names from the current profile list
-(A12). The gallery's "Open" uses `os.startfile` and only for an existing file with an
-`EXT` suffix (`openable_photo`), "Folder" `SHOpenFolderAndSelectItems` via ctypes on
-Windows (`explorer /select,` did not select a file with a comma in its name),
-`open`/`xdg-open` elsewhere (untested, A19); they act on the computer the app runs on.
+### Result file (`results/results.json`, format 2 since A25)
 
-### Supported inputs
+Run start and end, `photo_folders` (list), settings (including `model`; absent means the default),
+the photo count, and per profile: name, `search_fingerprint` (hash of the search texts and
+reference paths, relative to the profiles file's folder when inside it), gallery file name,
+`normalized`, optional `queries` (F17), and the cards in gallery order (rank, absolute `path`,
+`relative` name, crop label, score, raw text and visual similarity, caption lines, thumbnail name,
+optional `best_query`). Optional keys are additive: the format stays 2 and older apps ignore them
+(A25 rule). `read_results` also reads format 1 (single `photo_folder`); app versions before A25
+reject format 2. The app reads the file (cached by mtime and size) instead of deriving names from
+the current profile list (A12).
 
-Supported inputs: JPG, JPEG, PNG, WebP, BMP, TIF, TIFF, recursively. The engine excludes
-the output folder if nested in the input root.
+The quick search (F10, and "Find similar", F11) writes its own set to `results/quick/`
+(`quick.html`, `results.json` of format 2 plus a `quick` key, `thumbnails/`) and never touches the
+profile galleries, `results/results.json` or `marks.json`; its scores are scaled over the photos
+searched and differ from a search with profiles.
 
-## Profiles schema
+## Data formats and user files
+
+All of these are user data: never replace an unreadable file, never commit them.
+
+### `profiles.json`
+
 ```json
-{
-  "profiles": [
-    {
-      "name": "Red car",
-      "franchise": "Vehicles",
-      "features": "red bodywork, four wheels",
-      "reference_images": [],
-      "prompts": []
-    }
-  ]
-}
+{"profiles": [{"name": "Red car", "franchise": "Vehicles",
+               "features": "red bodywork, four wheels", "reference_images": [], "prompts": []}]}
 ```
-`franchise` is a legacy internal field name; in the UI it means optional **Context /
-origin** (in English, E3), not necessarily a media franchise. Reference paths are
-interpreted relative to the profile JSON file directory. `app.py` uploads references into
-`references/<slug>/`, or `<slug>-2`, `-3`, … if that folder holds references of another
-profile (`framescout_core.reference_folder`, A1). The folder follows the profile name
-(user decision): on a rename, `app.py` gives the profile's own files under `references/` a
-hard link (or copy) in the new folder, saves `profiles.json` with the new paths, rewrites
-the moved paths in `profiles.json.bak` (`update_backup_references`, so restoring the
-backup keeps working) and only then removes the old names and an emptied old folder; a
-failed save removes only the new names, a failed backup rewrite keeps the old names. Files
-of other profiles, leftovers, missing files and paths outside `references/` are never
-moved; otherwise existing reference paths are left as they are. Uploads are named
-`reference-<n>` with the next free number and never overwrite an existing file. Never
-silently delete or overwrite user profiles/references. There is also a legacy CLI option
-`--character`; consider backward compatibility before renaming it.
 
-## Current UI / runtime details
+`franchise` is a legacy field name for the optional **Context / origin** (the CLI option
+`--character` is legacy too: keep backward compatibility). Reference paths are relative to the
+profile file's folder. The file is gitignored; the app creates it from `assets/profiles.example.json`
+with `create_from_example`, which never overwrites. Every save keeps the previous file as
+`profiles.json.bak` (one generation; more: A30) under `profiles.json.lock`. The app reads it
+with its version on every rerun and a save is refused (`ProfilesChangedError`) if the file
+changed since the page showed it (A13); the page then warns (A31). An unreadable file stops the
+app (A2). Uploaded references go to `references/<slug>/` (`reference_folder`, A1), are named
+`reference-<n>` and never overwrite; a profile rename gives its files a hard link or copy in the
+new folder, saves the profile, rewrites the backup (`update_backup_references`) and only then
+removes the old names.
 
-### Settings (`settings.json`)
+### `settings.json` (A8)
 
-Settings are kept in `settings.json` in the project folder (gitignored, A8): the app reads
-it on every rerun (so a reload, a restart, another tab or session, also during a running
-search, shows them; a read failing while another session replaces the file is retried) and
-saves the values changed in a page run, merged into the current file
-(`framescout_core.save_settings`). The settings widgets have keys (`setting_<name>`) and
-get the saved values through `st.session_state`; never pass them `value=`/`index=`, which
-gives a widget a new identity after every save and drops the next change (PR #10 review).
-Profile forms (A13): `app.py` reads `profiles.json` with `read_profiles_versioned` on every
-rerun and keeps the version that the forms of the last complete run showed in
-`st.session_state.profiles_shown` (set after the forms are drawn; an interrupted run keeps
-the older version, so a save is refused, not lost). `store()` saves with
-`expected=profiles_shown` and, on success, keeps the version `save_profiles` returns as
-`profiles_shown`, so the session's own next save is never refused, also if the following
-run is interrupted before the forms. On `ProfilesChangedError` it increments
-`st.session_state.saves` (new keys for the edit forms: the form at the same place may now
-show another profile, which must not get the edited profile's uploads or ticked "Remove"
-checkbox), stores "Your changes were not saved" in `st.session_state.profile_error` and
-reruns; the message is shown at the top of the profile tab (not in the form's expander,
-which a changed profile name redraws closed), the new-profile form keeps its input.
-Checked once with Streamlit's `AppTest` (refused save after another writer deleted a
-profile above the edited one). A click on a form that no longer exists after
-another session shortened the list is dropped by Streamlit; since A31 the profile tab shows a
-warning from `framescout_core.profiles_changed_notice(shown, current)` when `profiles.json`
-changed since the page last showed the forms (not when `profile_error` already explains it).
-A dropped click leaves no trace, so the warning appears on the first run after any change and
-names the lost click only as a possibility ("If you just clicked ..."); only that run can
-carry such a click, since it redraws the forms (review).
-`update_backup_references` takes the same `profiles.json.lock` as `save_profiles`
-(`_file_lock`, `lock_timeout=PROFILES_LOCK_TIMEOUT`) and raises `OSError` if it is not free in
-time; the app keeps the old reference names then (A32).
+In the project folder, gitignored. Only values that differ from the defaults are written
+(`default_settings`; the default photo folder therefore follows a moved project); unknown keys
+are kept; keys follow the CLI options: `photo_folders` (list; the legacy single `photo_folder` is
+read as a list of one and never written again), `device` (`auto|cpu|cuda`), `batch_size`,
+`low_priority`, `top`, `person_detection`, `max_persons`, `person_confidence`,
+`reference_weight`, `model`, and `copy_folders` ({profile name: folder}, A17). `read_settings`
+checks every value against its widget range and falls back to the default with a warning; an
+unreadable file is never replaced. Saves merge into the current file under
+`settings.json.lock`.
 
-`framescout_core.reconcile_settings` does the sync on every page run with two session
-records: `settings_seen` (the saved value last taken from or written to the file, as
-written, e.g. rounded) and `settings_shown` (the value the widget showed; they differ for
-slider noise and for the device substitute). A widget that differs from `settings_shown`
-was changed in this session and is saved; a saved value that differs from `settings_seen`
-came from another session and is shown, so the latest action wins. The "Reset to defaults" button of the Settings tab (A26,
-disabled while a search runs or when `changed_from_defaults` is empty) resets
-`AI_SETTINGS` (the model included, the photo folders not) in an `on_click` callback that
-writes the `setting_<name>` session state (before the widgets are drawn, never `value=`)
-and sets `st.session_state.settings_reset`; `reconcile_settings(..., reset=)` counts those
-settings as changed in this session, so another session's saved value or a substituted
-device does not win, and the key is cleared after a successful save or when nothing
-changed. `save_settings` then drops the default values from the file. The help text of each
-setting ends with "Default: …" (`setting_text` on `DEFAULT_SETTINGS`) and a caption lists the
-settings that differ. A Start in a page run
-that took over such values is refused once with a note. `save_settings` holds a `RunLock`
-on `settings.json.lock` around its read-merge-write (sessions are threads of one process).
-The widgets take their ranges from `SETTING_RANGES`; `system_info` (which imports torch)
-runs in the Settings tab, so the profile tab is drawn first. A read that still fails
-with an `OSError` (file in use) gets a different message than a corrupt file
-(`ValueError`). Only values that differ from the defaults are written, so the default
-photo folder follows a moved project folder; unknown keys are kept. Keys follow the CLI
-options; defaults (`default_settings`): `photo_folders` `[BASE/photos]` (a list of
-strings, saved without empty or blank entries; an empty list is allowed and disables
-the Start button; A25), `device`
-`auto|cpu|cuda` ("cuda" is offered only if `torch.cuda.is_available()`, A7; a saved device
-PyTorch cannot use is shown and used as "auto" but stays saved until another one or "Use
-auto from now on" is chosen), `batch_size` 8, `low_priority` off (F4: bool, not written
-while off, an invalid value falls back with the usual warning; in `AI_SETTINGS` after
-`batch_size`; Start passes `--low-priority` when on), `top` 150, `person_detection` on,
-`max_persons` 12, `person_confidence` .30, `reference_weight` 0.3
-(`DEFAULT_REFERENCE_WEIGHT`; 0.35 before PR #11, a saved value is not migrated), `model`
-(a registry key, `DEFAULT_MODEL`; not written when it is the default; a free-text name or a
-key removed from the registry falls back to the default with the usual warning, E22).
-`read_settings` checks each value against the range of its widget (an invalid one falls
-back to its default with a warning, `save_settings` removes it with the next save; floats
-are rounded, as sliders return values like 0.30000000000000004); an unreadable file is
-never replaced (like `profiles.json`, A2) and the page keeps the settings it shows. The
-single `photo_folder` (`LEGACY_PHOTO_FOLDER`) of versions before A25 is read as
-`photo_folders`, a list of one (`photo_folders` wins if both are saved; a value that is not
-a string is reported like an invalid value), and every save replaces it by
-`photo_folders` (dropped if equal to the default); it is never written again. Older app
-versions ignore `photo_folders` as an unknown key and use their default folder. The
-copy target folders of A17 are kept in the same file under `copy_folders` ({profile name:
-folder}, only folders that differ from the default), saved with `save_copy_folder` under
-the same lock (`_update_locked`, shared with `save_settings`) and ignored by
-`read_settings`.
+Sync (`reconcile_settings`): the widgets (keys `setting_<name>`, filled through
+`st.session_state`, **never `value=`/`index=`**, PR #10) are compared with two session records,
+`settings_seen` (last value taken from or written to the file) and `settings_shown` (what the
+widget showed). A widget that differs from `settings_shown` was changed here and is saved; a
+saved value that differs from `settings_seen` came from another session and is shown, so the
+latest action wins. "Reset to defaults" (A26) goes through the same mechanism.
 
-### Marks and copying
+### `results/marks.json` (A17)
 
-Marks and copying (A17, user decisions 2026-10-25): `results/marks.json` (`{"format": 1,
-"profiles": {name: {photo path: "match"|"no-match"}}}`; "open" is the absence of a mark)
-is keyed by profile name and the photo path of `results.json` (absolute) and kept
-across searches. `save_marks` merges a change into the current file under a `RunLock` on
-`marks.json.lock` and replaces it atomically; an unreadable file is never replaced and the
-app then shows no marks. The file is user data in the results folder: the engine never
-writes it, and the cleanup never deletes the file (`NEVER_DELETED`); it removes single marks of
-unbound photos only when the user selects that category (E8, `remove_marks`: under the
-same marks lock as `save_marks`, a profile left without marks is dropped, an unreadable
-file is never replaced). F1: `_update_marks` (all four writers; `_update_locked` with
-`backup=True`) first copies the previous file to `marks.json.bak` (only content just read as
-valid; if the copy fails `marks.json` stays unchanged; one generation; the backup is replaced
-atomically but not fsynced, so a mark click costs one fsync; in `NEVER_DELETED`, its stale
-`.tmp` files go with `auto_cleanup`). `restore_marks(path, now=None)` runs under the marks
-lock, raises `ValueError` when `marks.json` can be read or the backup cannot, keeps the damaged
-file as `marks.json.broken-<date>` and replaces `marks.json` atomically with the backup's
-bytes; if that replace fails, the kept copy is removed again (no copy per failed try). The
-gallery offers it (never automatically) only for a `ValueError` read, not for `OSError`, and
-then advises "Restore the backup below, or fix the file" (not "remove": a missing
-`marks.json` gets the same offer only if the backup holds a mark, `marks_restore_offer`, A40: caption plus "Restore marks from backup" below the marks; never automatic, the next mark starts a new `marks.json` and the backup stays). A21 (marks follow the absolute path) is closed as won't do: a
-renamed or moved photo counts as a new photo, its old mark stays until cleaned up. The control on each
-card is an `st.segmented_control` whose session state is set from the file before it is
-drawn on every run of the gallery fragment (no `default=`), so the file is the truth also
-for other tabs; its `on_change` saves. The gallery paginates the whole ranked list and
-"Hide no match" (`hide_no_match`) then hides the rejects within the shown
-page only, so ranks and pages stay stable (A24; a page of only rejects says so). F20 (F29: the caption and the button now sit below the grid, in `bottom_pager`, the counts in the toolbar): below the
-grid (only where `can_mark`: `marks.json` readable and the profile still a search profile) a
-caption from `progress_text(review_progress(...))` shows the counts and the first undecided photo,
-and with more than one page the button "Go to the first undecided photo" sets the page box through
-the callback `go_to_page` (disabled while that page is shown); read-only, and the page follows
-`page_cards` (an undecided photo is never hidden by `hide_no_match`). A page box value out of
-range (a page of a longer list of an earlier search) is dropped right after the page count, before
-the button and the page box read it; cards are counted per card like the pages show them, so a
-photo listed twice counts twice. F17: `show_results` adds a caption under the run caption
-(`query_summary(entry)`, the per-text counts of the gallery's photos, counted per card like the run caption
-and F20) and a card line under the detail line (`query_caption(card['best_query'])`, only when the card has
-the key); the named text is the closest one of the card's best-scoring part, the crop `rank_photos` chose by
-the combined score (with reference images another crop can be closer to another text, so the wording, also
-of `QUERY_NOTE`, names the part, not the whole photo); the quick search is unchanged. The
-selected option is colored by state (F30: blue match, orange no match, plus the card frame and the dimmed photo) by one `<style>` block per
-page from `framescout_core.mark_style`, targeting the cards `.st-key-fscard-<id>` and `.st-key-mark_<id> button[data-variant="segmented_control"][data-selected]`
-with `!important`; this relies on Streamlit internals (the key class and the button attributes;
-the old `kind="segmented_controlActive"` no longer exists in the 1.66.1 frontend, A49), so `test_marks.py` fails once `requirements/constraints.txt` pins
-another Streamlit than `MARK_STYLE_STREAMLIT`: check the selectors against the new version,
-then raise that constant. Where Streamlit is installed (not in CI), `test_marks.py` also looks for the key class, the `stImage`/`stImageContainer` names (F30, `CARD_STYLE`, which the captions above the grids carry like `mark_style`, A38), `data-variant` with `segmented_control` and `&[data-selected]` in the installed frontend bundle, so a version that renames them fails there. A disabled control of a profile that is no longer searched keeps its saved mark's color on purpose, although Streamlit grays a disabled selected button (`[data-selected][data-disabled]`). A49 checked the colors in a real browser (headless Edge, light and dark theme, after mark clicks, a page change and a reload; the script is kept outside the repo, I2); `AppTest` cannot see CSS. A38: the `<style>` block is prepended to the existing caption above the cards (`unsafe_allow_html` only when there is a style) instead of an own `st.markdown` element, so it takes no layout slot of its own; it is replaced on every fragment run. `st.html` was not used (its fragment-rerun behavior is unchecked). The gap above the cards is not verified in a browser. A41: `count_text` gives the singular ("Copy 1 marked photo", "Marked: 1 photo of ..."). A rename in the profile tab calls `rename_marks`
-and `rename_copy_folder` after the profile was saved (`carry_over`); galleries of profiles
-that are no longer search profiles cannot be marked and their "Copy to folder" field is
-disabled. A gallery drawn before its profile was renamed or deleted (another tab) still
-has live controls, so the callbacks `set_mark`/`set_copy_folder` pass
-`profiles_file=PROFILES` to `save_marks`/`save_copy_folder`: under their lock,
-`require_profile` raises `UnknownProfileError` (a `ValueError`) for a name that is not in
-`profiles.json` now, nothing is written and the gallery shows the message (the typed
-folder is not kept for the session either). A rename or deletion saves `profiles.json`
-first and then changes these files under the same locks, so a save in between is moved
-or deleted with them (review of A22, A33). Rename and deletion run their two changes
-through `change_name_data` and add a note with `add_notice`. Deleting a profile is a
-two-step action (A22, user decisions 2026-10-27): "Delete profile" stores
-`st.session_state.delete_pending = (name, saves)` and reruns at once (so a question still
-open for a profile above is not drawn in the same run), then shows a warning below the
-form (`deletion_consequences`: the number of marks with the match/no-match split or why
-they cannot be deleted; the saved copy folder entry and a folder typed in this session
-but not saved (`copy_folders_unsaved`) go, the folder and the copies stay; reference
-images stay, since `profiles.json.bak` still names them) with "Delete for good" (disabled
-while a search runs) and "Cancel"; any save since the click (also a refused one) or the
-profile's disappearance ends the question. The warning is drawn into a container after
-the buttons are handled, and the number of marks it names is kept in
-`st.session_state.delete_marks_named`, so a click compares with the number the user saw.
-After the deletion was saved, `forget_profile` calls `delete_marks` (under the marks lock;
-returns how many it deleted; an unreadable file raises `ValueError` and is never
-replaced) and `forget_copy_folder` (under the settings lock; writes nothing without an
-entry) and drops the session's unsaved copy folder of that name; a different number of
-deleted marks (marked or unmarked since the question was shown) and a part that fails
-are named in the notice at the top of the profile tab. `marks.json` stays in
-`NEVER_DELETED`. Marks that profiles deleted before A22 left behind are offered only by the cleanup category `marks_profiles` (A34); marks of
-photos that no longer exist at their path are removed only on request by the cleanup
-category `marks_unbound` (`remove_marks`, see "Storage cleanup"). A43: a failed backup rewrite after a rename keeps the old reference names and says so; the next save of the profiles replaces `profiles.json.bak`, after which "Reference images no profile uses" offers the old names (pinned by a test in `test_reference_move.py`).
-`marks.json` and the copy folders are read through `st.cache_data`, keyed by path, mtime,
-size and file id (`version_key`). Copying (`copy_photos`): flat into the target,
-`shutil.copy2` via a temporary file published with `_publish_new` (never replaces a file),
-the same name and content under any `name (n).ext` counts as already there (`filecmp`),
-otherwise the next free name (a taken name, also a dangling link, is skipped; at most
-`COPY_MAX_NAMES`); `copy_target` refuses an empty or relative path, a file, and a folder
-inside a photo folder of the shown search, of the current setting or the folder of a
-photo to copy. The copy runs in the page run (not a callback) with a progress bar, so a reload
-or another click stops it between photos. The default target is
-`<Pictures>\FrameScout\<gallery slug>` (Pictures from `SHGetKnownFolderPath`, `~/Pictures`
-elsewhere). Using marks as search feedback: A20.
+`{"format": 1, "profiles": {name: {absolute photo path: "match"|"no-match"}}}`; "open" is no
+entry. Keyed by profile name and the photo path of `results.json`, kept across searches. The
+engine never writes it and the cleanup never deletes it (`NEVER_DELETED`). Writers merge under
+`marks.json.lock` and replace atomically; every write first copies the previous valid content to
+`marks.json.bak` (F1, one generation). `restore_marks` keeps a damaged file as
+`marks.json.broken-<date>` and restores the backup, only on the user's click. Marks of unbound
+photos or of deleted profiles are removed only by the cleanup categories the user ticks.
+`require_profile` refuses a mark or copy-folder save for a name that is no longer in
+`profiles.json` (A33); rename and deletion of a profile move or delete its marks and copy folder
+under the same locks after `profiles.json` was saved (A22). Copying (`copy_photos`) is flat,
+never replaces a file and refuses targets inside a photo folder. The mark colors rely on
+Streamlit internals (`MARK_STYLE_STREAMLIT`: `tests/test_marks.py` fails when
+`requirements/constraints.txt` pins another Streamlit; re-check the selectors then).
 
-Export (F5, `show_export`, below "Copy marked matches" of each profile): the checkbox "Only
-photos marked as match" (key `export_matches_<id>`; disabled while `marks.json` cannot be read),
-the button "Export N photo(s)" (disabled for 0) and "Open exports folder". The marks are read
-at the click (`export_list`, an `on_click` callback); unreadable marks refuse an "only matches"
-export and otherwise export the full list with an empty mark column, said in the notice
-(`st.session_state.export_notice`, shown once). The file name slug is the gallery's name
-without `.html`. See "Storage cleanup" for why exports are never deleted.
+### `results/` contents
 
-### Storage cleanup
+`cache.sqlite3`, `thumbnails/`, `quick/`, `results.json`, galleries, `marks.json*`, `exports/`
+(F5 result lists: user data, no cleanup category touches it), `run.lock`, `run-status.json`,
+`*.broken-*` (damaged files set aside, deleted only by the cleanup category `broken_files`). In
+the project folder: `settings.json`, `profiles.json`, `photos/`, `references/`, `run.log`,
+`.cache/`, `.tmp/` (including `.tmp/eval/` of the evaluation tool), `.venv/`, `.python/`.
+`NEVER_DELETED` lists the files of the results folder that no cleanup may remove (e.g.
+`marks.json`, its `.bak` and lock files, `profiles.json.lock`).
 
-Cleanup (E7, E11, E13, E23, A14, E8; user decisions at the PR #18 hold point): the expander
-"Clean up storage" in the "Storage" section of the Settings tab (F28; was the end of "Search & results"). "Scan" (disabled while a
-search runs) calls `scan_cleanup(RESULTS, PROFILES, REFS, signature
-of the current settings, `current_model=`)` and keeps the result in the session; each category of
-`CLEANUP_CATEGORIES` is a checkbox (key `cleanup_<category>`, set from `CLEANUP_DEFAULTS`
-at the scan, no `value=`) with count and size, or a caption with the reason it is not
-offered. Categories: `temp_thumbnails`; `galleries` (`*.html` in `results/` with
-`GALLERY_MARKER` in its first 4 KB, neither listed in `results.json` nor `profile_slugs`
-of the current profiles; other HTML files are kept; its `thumbnails` are the thumbnails
-only orphaned galleries link, deleted with them); `thumbnails` (linked by neither
-`results.json` nor any HTML file, both thumbnail folders); `cache_missing` (UI label "Cache entries of unbound photos", **default off** since the review of PR #40,
-user decision, A35; the internal
-key kept its name: every cache row whose photo no longer exists at its path, in any folder
-searched so far, E8; rows whose photo still exists are not offered, a path that is not
-absolute is never gone; its `names` are the folders with their photo counts, fullest
-first, so that e.g. the folders of an earlier disk whose drive letter another disk got are
-seen before the deletion, A35); `marks_unbound` ("Marks of unbound photos", **default off**, after
-`cache_missing` in `CLEANUP_CATEGORIES`; items are `(profile, photo path)` pairs, names
-`"profile: path"`; it is one category checkbox, marks are not chosen one by one; not
-offered with "Not offered: marks.json cannot be read (...)" if the file is unreadable);
-`marks_profiles` ("Marks of deleted profiles", **default off**, after `marks_unbound`, A34: `_profile_marks` lists marks saved under a name that is no profile in `profiles.json` now (exact name, like `require_profile`), names "<profile>: N marks"; not offered if `profiles.json` or `marks.json` cannot be read; `_delete_profile_marks` deletes with `remove_marks(..., unless_profile_of=profiles_file)`, so a profile of that name created since the scan keeps its marks, and a `ValueError` skips the step with "Marks of deleted profiles were kept: ...");
-`broken_files` ("Damaged files set aside", **default off**, last in `CLEANUP_CATEGORIES`, A40: `marks.json.broken-<YYYYMMDD-HHMMSS>[-n]` and `cache.sqlite3.broken-...` with `-journal`/`-wal`/`-shm`, matched by `_BROKEN_FILE` directly in the results folder; only files the scan showed are deleted; the notices of a marks restore and of "Set cache aside" point to this category);
-no category lists `results/quick/` (F10: the quick search cleans its own folder, `auto_cleanup` on it after a quick search) or `results/exports/` (F5: exported result lists are user data; `test_cleanup.py`
-checks that a full cleanup and `auto_cleanup` keep it);
-`cache_old` and
-`cache_other` and `cache_models` (`classify_signatures(..., current_engine=)`: the side
-table decides, otherwise `known_signatures`, i.e. the signatures of the default engine id
-of every `max_persons` and every
-slider value of `person_confidence` (each step and its float neighbors up to
-`SLIDER_NOISE_ULPS` = 8 ULPs either way, so slider noise of any arithmetic path counts)
-with `DEFAULT_YOLO_MODEL`, plus the no-detection signature; the current signature is never
-offered). `cache_models` ("Cache entries of other search models", default off, E22) holds
-rows whose recorded engine is that of another registered model, and unrecorded
-`known_signatures` rows when another model is current (those can only be the default's);
-The existence check is `cleanup._PathCheck` (standard library only), shared by the
-cache rows and the marks in **one** pass: one probe per drive or share root
-(`os.path.splitdrive(path)[0] + os.sep`, `os.path.isdir`), all roots in parallel daemon
-threads under one shared timeout `ROOT_TIMEOUT` = 5 s (`_reachable_roots`; a root whose
-probe of an earlier call still hangs gets no second thread, that probe is waited for
-again, `_PROBES`); a root that is
-not reachable or does not answer in time is **not checked** (its photos are neither gone
-nor offered) and each category gets a note per root ("<root> is not reachable now ... N
-photos there were not checked"). Photos are grouped by folder (`_gone_in`): a folder with
-more than `_STAT_UP_TO` = 4 photos is listed once (`os.listdir`, names compared
-normcased); of the names missing from the listing the first 4 are confirmed by a `stat`,
-and only if one of them exists (e.g. another Unicode normalization) every missing name
-gets its own `stat`; a folder with at most 4 photos gets one `stat` per photo; a folder
-that does not exist makes all its photos gone; a folder that cannot be listed (e.g. no
-permission) keeps them. E37: the folder pass of each root runs in a daemon thread (`_FolderWorker`); a folder
-that does not answer within `FOLDER_TIMEOUT` = 30 s is not checked (note "<folder> did not answer within
-30 seconds ...", its photos kept), then the first junction, mount point or symbolic link above it
-(`_link_above`), else the root, is probed again, and if it is silent the folders behind it are given up
-together (note with the link or the root), so a share behind a junction that stops answering costs one
-timeout, not one per folder (review); a folder whose worker of an earlier pass still hangs (`_HANGING`) is
-given up at once, without another thread; photos behind a junction, mount point or symbolic link whose
-target cannot be reached (`_dead_link`) count as not checked (note "<link> cannot be reached now ..."). `FOLDER_TIMEOUT` is not measured: a legitimately slow folder is
-not checked, the safe side (E54). After the pass the gone photos are checked once more (a share
-that dropped during the pass and is back shows them again), then their roots are probed
-again, and a root that is still offline makes its photos count as not checked. Measured on Windows 11 with 30,000 files in 100 folders: stat
-0.12-0.21 s vs listing 0.08-0.11 s locally; through the share `\\localhost\C$` (SMB) 13.8 s vs
-0.19 s. `scan_cleanup(results, profiles_file, refs_root, current_signature, *,
-current_model, progress=None)` has no photo folder parameter any more and calls
-`progress(done, total)` per folder (about 100 calls at most; the app draws "Checking which
-photos still exist ... n of m folders"); `clean_up(results, shown, selected, vacuum,
-alive, profiles_file, refs_root, current_signature, lock_timeout=..., *, current_model)`
-re-checks only the rows and marks the shown scan listed, with a `_PathCheck` of its own
-in each of the two steps (an answer of the cache step, which can include `VACUUM`, may be
-out of date), the photos before the marks lock is taken; its summary has a `marks` count.
-`scan_cleanup` and `clean_up` require `current_model` (keyword-only: the signature, a
-hash, does not tell the model), `CACHE_CATEGORIES` lists the cache categories. Before E22
-rows of any other engine counted as `cache_old` (selected), and an older FrameScout still
-does so with the rows of the optional models;
-`references` (`EXT` files in `references/` that neither `profiles.json` nor
-`profiles.json.bak` names). `galleries`/`thumbnails` are not offered if `results.json` (a
-missing one counts as empty) or `profiles.json` (also missing) cannot be read,
-`references` if `profiles.json` or the `.bak` cannot be read; an unreadable cache blocks
-the cache categories. The cache is read with a read-only URI with an empty authority
-(`_read_only_uri`; never created; `Path.as_uri()` would fail for a UNC path). A scan reads
-`profiles.json` once (also when it fails: that error is the reason for every category that needs it) and every gallery once (its marker and links). "Delete selected" asks
-for a confirmation; `clean_up` takes `results/run.lock` (1 s; refused if held, or if a
-`starting` status names a live engine, `engine_alive`), scans again under the lock and
-deletes only items that the shown scan lists and the fresh scan still has: galleries first
-(with the thumbnails only they showed), then thumbnails computed from the links of the
-galleries left on disk (read once), cache rows in one transaction and an optional
-`VACUUM`, unbound marks (`remove_marks`; a failure goes to "Marks were kept: ..."), then references (profiles read again) with emptied folders below `references/`;
-an emptied `vorschaubilder/` is removed. `_remove_file` refuses every name of
-`NEVER_DELETED` as a guard. All deletes are permanent (no Recycle Bin). Each step
-(temporary thumbnails, galleries and thumbnails, cache rows, marks, references) ends on its own
-`OSError`/`ValueError`/`sqlite3.Error`, which goes to `skipped`, so the summary always
-counts what was deleted; `delete_storage` also catches what `clean_up` raises. The summary
-(`cleanup_summary_text`: files, cache entries, marks, freed bytes, a note when rows were deleted
-without `VACUUM`, failures, skipped steps) is shown after a rerun; a Start drops the scan,
-and so does a change of what it was classified for (`cleanup_inputs`: the current
-signature and the search model; the photo folders are not part of it any more, so editing
-the folder list keeps the scan), with the note "The AI settings changed since the scan.
-Scan again."; the scan runs only on the "Scan" click, never on a rerun or a search.
-No migration: a renamed or moved photo is analyzed again as a new photo, and its old
-cache row and mark stay until the user cleans them up (user decision 2026-10-28, E8).
-Open: E58 (`FOLDER_TIMEOUT` not measured), A35 (a drive
-letter now used by another disk, or on POSIX the root `/` of an unmounted mount, counts as
-reachable; only mitigated by naming the folders).
-F1: below the cleanup, "Check cache" calls `check_cache(results, alive, lock_timeout)` under the
-same run lock (`_holding_run_lock`; refused while a search runs or starts; `cleanup_running` is
-true meanwhile): `PRAGMA quick_check(20)` on `cache.sqlite3` opened read-write by URI (never
-created; a hot journal is rolled back first, as the next search would). States `missing`, `ok`,
-`damaged` (`sqlite3.DatabaseError` or problem lines), `unreadable` (an `OperationalError`
-with `SQLITE_IOERR`, "disk I/O error": a bad sector or an unreachable drive; rename offered),
-`unchecked` (any other `OperationalError`, e.g. locked; no rename offered).
-`set_cache_aside(results, alive, expected)` renames the cache and its
-`-journal`/`-wal`/`-shm` files (side files first, rolled back on failure) to
-`cache.sqlite3.broken-<date>[-n]`, only if size and mtime equal the checked file; it never
-deletes. Starting a search drops a shown check result, a rename drops a shown cleanup scan,
-and `cache_check_current(results, result)` (one `stat` per page run) drops a shown result
-once the cache's size or mtime differs from the checked file (a cleanup, a search of another
-tab, a rename; refused results stay).
-A search on a cache that cannot be opened or written stops with exit code 1 and a message pointing to
-"Check cache" (E50); a row that cannot be read leaves out its photo, and the finished search ends with a
-warning pointing there.
-While `clean_up` holds the lock it registers the results folder in the process
-(`cleanup_running`; app sessions are threads of one process), so other tabs show "The
-storage is being cleaned up" instead of a running search and disable Stop (A23). The
-app's "Temporary thumbnails" category does not list the temporary files `auto_cleanup`
-removes (E26); the temporary files of the app's own atomic writes in the project folder
-(`profiles.json.<random>.tmp`, `settings.json.<random>.tmp`) are cleaned up once per app start by `project_temp_cleanup` (E44): files of the three names
-(`profiles.json`, `profiles.json.bak`, `settings.json`) plus `.<8 chars>.tmp`, at least `STALE_TEMP_AGE` old by the
-folder's clock; lock files and `profiles.json.bak` itself stay.
+### Run lock and status file (A4/A5)
 
-### Run state (lock and status file)
+The engine holds an OS lock on `<output>/run.lock` (`RunLock`: Windows byte-range lock, `flock`
+elsewhere; released by the OS when the process ends in any way) and writes
+`<output>/run-status.json` (`StatusReporter`: format 1, pid, phase `scanning`, `loading`,
+`analyzing`, `scoring`, `exporting`, then `finished`/`failed`/`interrupted`, done/total, counts,
+exit code, message; atomic, at most one write a second, best effort). It takes the lock after
+the cheap argument checks and exits with code 3 (`EXIT_BUSY`) if another search holds it for five
+seconds. Additive fields keep `STATUS_FORMAT` 1 and older apps ignore them: `analyze_only` (F18),
+`rate`, `throughput`, `thumbnails`, `finishing` (F12/F16).
 
-Run state (A4/A5): the engine holds an operating-system lock on `<output>/run.lock`
-(`framescout_core.RunLock`: Windows byte-range lock, `flock` elsewhere; the OS releases it
-when the process ends in any way, also after `kill()`) and writes
-`<output>/run-status.json` (`StatusReporter`: format, pid, phase
-`scanning`/`loading`/`analyzing`/`scoring`/`exporting` →
-`finished`/`failed`/`interrupted`, done/total of the phase, new/cached/errors, exit code,
-message; atomic, at most one write a second, best effort). It takes the lock after the
-cheap argument checks (after `import torch`), waiting up to five seconds; if another
-search holds it, it exits with code 3 (`EXIT_BUSY`). Photo folders none of which exists
-are an error before the lock only if the output folder does not exist yet (no folder is
-created for a mistyped call); otherwise it is reported in the status file. A missing
-folder of several is left out with a log line (A25). The final phase comes from
-the exit code (`final_status(code, warnings, run)`: 0 finished, 130 interrupted, others failed with `The search ended with
-exit code N.`, `run` naming an analysis without a search, F18 review; a finished run's
-message is its warnings, e.g. `cache_read_warning` of E50, which the app shows under the success
-note). The `message`
-is also set during a run: `LOADING_DETECTOR` ("Loading the person detector", F2) while the
-detector loads in the analysis phase, `NOTHING_NEW` ("Nothing new to analyze – ranking only",
-F2) when no photo needed an analysis; `status_text` appends the message of a running (non-final)
-phase, e.g. `Scoring photos: 3/10 · Nothing new to analyze – ranking only`, while the
-message of a final phase is shown by the app in its own line. A successful finish clears it.
+"Running" is derived on every rerun and every two seconds from the lock and the status file, not
+from the session's process handle, so a reload, another tab or another session shows the run and
+can stop it. `start_run` takes the lock, truncates `run.log`, spawns the engine, writes the
+`starting` status with the child's pid and releases the lock to the engine; a start while the
+lock is held or a `starting` status names a live engine (`engine_alive`: `psutil` command line
+and process creation time) is refused. On Windows the venv's `python.exe` is a launcher:
+`Popen.pid` is the launcher, the pid in the status file the engine. Stop (`stop_run`) terminates
+both process trees, kills what is left after five seconds, waits for the lock and marks the status
+`interrupted`. The cleanup holds the same lock (`clean_up`, `check_cache`), so it is refused
+during a search and the app shows "The storage is being cleaned up" meanwhile (A23).
 
-Analysis without a search (F18, additive, `STATUS_FORMAT` stays 1): the status file of `--analyze-only` carries `"analyze_only": true`,
-written on every update by a `StatusReporter(..., analyze_only=True)`: the engine's (from `scanning` on, also its final
-status) and the app's `starting` status (review: the run kind is given once; a search's status has no such field). `analysis_only(status)` tests it,
-`run_name(status)` is `"analysis"` or `"search run"` (the app's texts), `analysis_result_text(status)` is the success note
-(counts of new and cached photos, errors, "the results of the last search stay as they are", a search with the same settings
-uses the analyses). `status_text` shows `Starting the analysis` for the `starting` phase; `ALL_ANALYZED` is the message when all
-photos came from the cache, `NONE_ANALYZED` when no photo was analyzed but some failed (`nothing_new_message`). Older apps ignore the field and show a finished analysis as a finished search run.
+## Storage cleanup
 
-Time estimate (F12, additive, `STATUS_FORMAT` stays 1): the status file has two more fields (F16 adds `thumbnails`, the gallery thumbnails the run renders at most, written at the start of "analyzing", `null` before, and `finishing` `{'scoring': photos/min, 'thumbnails': new thumbnails/min}`, kept from the previous file like `throughput` and validated by `stored_finishing`; the engine stores a speed after the scoring loop and the export, timing only newly rendered thumbnails, at least 16 items; older apps ignore both).
-`rate` is the photos per minute of this run's analysis (`AnalysisRate.per_minute()`, `null`
-until measured) and `throughput` a list of at most 8 records `{signature, device, per_minute}`
-(newest first; the average of a whole analysis, written by the engine's `finished()` through
-`run_throughput`: at once when the signature and device have no record yet, else only after
-300 s of measurement, so a search stopped after a minute does not replace the speed of a longer
-one). `StatusReporter.__init__` reads the file it replaces and keeps its valid
-`throughput` records (`stored_throughput`), so the app's `starting` status, the engine's own
-status, a ranking-only run and a stopped run keep earlier speeds; `rate` starts at `null`
-again. The engine feeds `AnalysisRate` only for newly analyzed photos (`new` of `finished`),
-so cache hits do not count. Older versions ignore the fields.
+"Clean up storage" (Settings tab; E7/E11/E8, A14, A34, A35, A40) is the only code that deletes
+cache rows, marks, references and galleries. All deletes are permanent. Rules to keep:
 
-### Starting a search from the app
+- The user scans first; `clean_up` takes `run.lock`, scans again under the lock and deletes only
+  items the shown scan listed and the fresh scan still has. A change of the AI settings or the
+  model drops the shown scan.
+- Categories (`CLEANUP_CATEGORIES`): temporary thumbnails, orphaned galleries (identified by
+  `GALLERY_MARKER`; other HTML stays), unlinked thumbnails, cache rows of old settings, other
+  settings and other models, references no profile uses, and the opt-in ones (default off):
+  cache rows and marks of unbound photos, marks of deleted profiles, damaged files set aside.
+  `results/quick/` and `results/exports/` are in no category.
+- "Unbound" means the photo no longer exists at its path, anywhere. Existence checks
+  (`cleanup._PathCheck`) probe each drive or share root with a timeout (`ROOT_TIMEOUT`,
+  `FOLDER_TIMEOUT`), and an unreachable root or folder is **not checked**: its photos are neither
+  gone nor offered. A drive letter reused by another disk counts as reachable (A35, open); the
+  scan therefore names folders with counts.
+- Categories that need an unreadable file (`results.json`, `profiles.json`, `marks.json`, the
+  cache) are not offered with the reason. `_remove_file` refuses every `NEVER_DELETED` name.
+  Each step ends on its own error and goes to the summary's `skipped`.
+- The app's own temporary files in the project folder are removed once per start
+  (`project_temp_cleanup`, E44).
 
-Both searches, with profiles and the quick search (F10), build their command line with
-`framescout_core.engine_command` (`start_engine` in `app.py`); the quick search adds
-`--quick-query=<text>` instead of `--profiles`. F18: `engine_command(..., analyze_only=True)` passes `--analyze-only` instead
-(exactly one of profiles, quick_query, like and analyze_only, else `ValueError`); `start_run(cmd, analyze_only=...)` writes the
-`starting` status with `analyze_only` and `start_engine(notice=..., **search)` starts it, a start failure goes to the notice
-named (`analyze_notice`).
+## Install, start, uninstall
 
-The frontend spawns the engine via `subprocess.Popen` and redirects stdout/stderr to
-`run.log`, with `PYTHONIOENCODING=utf-8` (`cache_env`, which also keeps cache variables the user set, A36), as it reads `run.log` as UTF-8;
-it passes `--model` from the setting `model` (the Settings tab starts with
-the "Search model" selectbox, key `setting_model`, `format_func=model_label`, with a
-caption per model and a warning from `model_problem`, E22; `models_downloaded` (`st.cache_data`, `LOW_SPACE_TTL`) marks cached models "downloaded" in the list and the caption, A39; with such a problem Start is
-disabled and the run tab shows the same warning). `start_run` takes the run lock (1 s timeout: every open tab probes it every two
-seconds), truncates `run.log`, spawns the engine and writes the status `starting` with the
-child's pid, then releases the lock to the engine; if that status cannot be written it
-ends the child again. A start while the lock is held, or while a `starting` status names a
-live engine process, is refused. "Running" is derived on every rerun and every two seconds
-(fragment) from the lock and the status file (`run_active`, read once per page run;
-`engine_alive` checks via `psutil` that the pid's command line contains
-`framescout_engine.py` and that the process existed when the status was written,
-`started_in_time`, so a reused pid does not count), not from the session's process handle,
-so a reload, another tab or session shows the run and can stop it; the fragment reruns the
-page when the state changes. On Windows the venv's `python.exe` is a launcher: `Popen.pid`
-is the launcher, the pid in the status file the engine (its child); killing the launcher
-also ends the engine (verified).
+- **Install** (`Install-FrameScout.bat [cpu|cuda]`): downloads python.org's full package of the
+  pinned Python (`framescout_core/portable_python.py` holds version, URL and SHA-256; the `.bat`
+  holds the same values and `tests/test_installer.py` keeps them in sync), checks the hash,
+  extracts it to `.python\` and creates `.venv` with it. An existing working `.venv` is kept. The
+  venv refers to `.python` by absolute path, so the folder cannot be moved afterwards. It then
+  installs PyTorch with `install_torch.py` and the other packages with `-c
+  requirements\constraints.txt` (relative, because pip splits `PIP_CONSTRAINT` at whitespace). The
+  script uses no delayed expansion and no folder path inside parentheses (I21). `install_torch.py`
+  keeps an installed CUDA build unless `cpu` is given explicitly, checks free disk space first
+  (F3; exit code 3 = stopped by the user) and uses the standard library only.
+- **Pins:** `requirements/requirements.txt` has ranges without upper bounds, `torch`/`torchvision`
+  pinned to `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION` (a test checks both files).
+  `requirements/constraints.txt` (I12) pins the whole dependency closure of the verified venv
+  (sorted, no hashes, torch without a local label so `+cpu`/`+cu*` builds all satisfy it); only the
+  installer uses it. Refreshing is manual, in a PR of its own (the file header explains the dry-run
+  check); `tests/test_constraints.py` keeps it consistent.
+- **Start** (`Start-FrameScout.bat` → `framescout_start.py` → `framescout_core.launch`): sets the
+  cache variables, runs Streamlit **in its own process** so the app-instance lock
+  (`.tmp/app-instance.lock`, an OS lock, never a pid) lives exactly as long as the app. A second
+  start of the same folder opens the browser on the running app's port (`.tmp/app-instance.json`).
+  Port 8501, else the next free up to 8510 (`port_free` makes the same bind Streamlit makes). Gap:
+  an app started by hand holds no lock (F26).
+- **Check** (`Check-FrameScout.bat`, F15): read-only; exit 0 no problem, 2 problems found, anything
+  else means it could not run.
+- **Uninstall** (`Uninstall-FrameScout.bat [--dry-run]`, P5 part B): runs with the private
+  `.python` (not with `.venv`'s Python, which cannot delete itself), refuses while a search runs,
+  the environment's Python is in use or `settings.json` is unreadable, lists what it deletes and
+  what it keeps (`USER_DATA`: photos, references, results with marks, profiles and backup,
+  settings, `run.log`, `.tmp/eval`) and the caches outside the folder (listed, never deleted),
+  and deletes after the answer `yes`. Exit code 3: everything deleted except the private Python
+  the script runs with; the `.bat` removes it last. Program files themselves are not deleted.
 
-Low priority (F4): the engine option `--low-priority` makes `search()` call
-`lower_priority()` first (scanning and model loading run low too) and log "Low priority:
-on, …" or, if it failed, "The priority could not be lowered (…); the search runs at normal
-priority."; `torch.set_num_threads` uses `torch_threads(torch.get_num_threads(),
-args.low_priority)`. With OpenMP, `torch.set_num_threads` acts per thread for threads that
-already ran PyTorch code: the CLIP thread keeps its count, but Ultralytics sets
-`min(8, CPU count - 1)` in the decoding thread of its first prediction on the CPU, so with
-`--low-priority` `crops_for` sets the search's count before and after each detector call
-(checked by hand with an untrained detector: 8 threads without it, 3 with it). The engine
-lowers its own priority, not the app via `Popen`
-`creationflags`, so a manual CLI run behaves the same and the start/stop logic above (process
-tree, pid in the status file, `engine_alive`) is unchanged; on Windows only the interpreter
-behind the venv launcher is lowered. The decoding threads (E2) are not reduced, so the
-option lowers the priority but does not reserve cores. The effect is not measured (E52).
+## Environment variables, caches and offline loading
 
-Disk space warning (F3): while photo folders exist and no search runs, the run tab calls
-`low_space_warning(photos, top, profile_count, model, person_detection, analyzed)` and
-shows an `st.warning` for the drives that would keep less than 1 GB free: what the search
-writes (cache, thumbnails, first-use model and detector downloads) and the hint to free
-space or lower "Maximum matches per search profile". Start stays enabled. `analyzed` comes
-from `cached_analyzed_photos(…, _scan)` (returns `quick_scope` of the scan, whose first count is `analyzed`: `analyzed_paths` of the scan's paths and `raw_pairs` and `stats` with the current
-settings' signature `cleanup_signature()`, an `st.cache_data` keyed on `file_key` of the
-cache file, the signature and the scan's folders and `counted_at`), so a repeat search of
-an analyzed collection counts no cache rows (review). The folders come from
-`app_search_needs(BASE, RESULTS, os.environ, …)`: `results/`, the Hub cache
-(`hub_cache_dir` with the variables of `engine_cache_env(os.environ, BASE)`, as `cache_env`
-sets them: a user's `HF_HOME` etc. is kept (A36), as is a user's `HF_HUB_CACHE`) and the detector weights (`find_yolo_weights` with base
-and working folder `BASE`, as the engine runs; none when person detection is off).
-`low_space_warning` is an `st.cache_data` with `ttl=LOW_SPACE_TTL` (30 s), and a drive
-root that does not answer within `SPACE_CHECK_TIMEOUT` is left out, so a disconnected
-network share does not block the page runs (review). `OSError` and `ValueError` give no
-warning; other exceptions are not swallowed (review).
+- The `.bat` files set `TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME` (only if not
+  defined: a user's value wins and the models are then downloaded there, A36) and `TMP`/`TEMP`/
+  `PIP_CACHE_DIR` under the project folder, for an easy cleanup. A user's `XDG_CACHE_HOME` alone
+  keeps `TORCH_HOME` and `HF_HOME` unset (torch and huggingface_hub derive them from it). The
+  engine fills unset ones itself as the first statement of `main()` (`default_cache_env`, E9/I10,
+  E42), the app's `cache_env` and `engine_cache_env` build the same environment. A worktree
+  engine therefore uses the worktree's own `.cache/`: smoke runs point the variables at the main
+  checkout's `.cache/` to avoid a download.
+- Do not promise perfect portability or no residual files: some dependencies may write
+  user-level caches (the uninstall lists them, never deletes them). Open: E39 (open_clip's URL
+  download ignores the variables), I25 (`framescout_eval.py` builds its own paths).
+- **Ultralytics (E27/E28):** `import_detector_class` sets `YOLO_OFFLINE=true` (turns off its
+  analytics, Sentry and update checks; model downloads still work) and `YOLO_AUTOINSTALL=false`
+  (no run-time pip installs) before the import, overriding a user's values, and restores the
+  original `PIL.Image.open` that Ultralytics replaces. Check these switches when raising the
+  Ultralytics minimum version.
+- **Hub requests (E16/E31/E33):** `import_open_clip` sets `HF_HUB_DISABLE_SYMLINKS_WARNING` and
+  `HF_HUB_DISABLE_TELEMETRY` (with `setdefault`) and `HF_HUB_OFFLINE=1` when `model_cached` finds
+  every Hub file of the model in the cache (unless the user set an offline variable), so a cached
+  model starts without Hub requests. If an offline load fails because a file is missing
+  (`hub_file_error`), `load_with_hub_fallback` goes online and loads again; any other error is
+  raised as it is. The variables stay set for the rest of the engine process.
+- Hardware info is detected dynamically (`platform`, `psutil`, `torch.cuda`); `auto` is CUDA if
+  PyTorch finds it, else CPU. Never hardcode a CPU, GPU or RAM size. The app tells a CPU build
+  of PyTorch from a CUDA build that finds no usable GPU.
+- Low priority (F4) is applied by the engine itself (`--low-priority`), not by the app, so manual
+  CLI runs behave the same; its effect is not measured (E52).
 
-The evaluation tool is covered too (E51): `framescout_eval.py run` prints the same kind of
-"Little free disk space" warning before the model runs (`eval_run_needs`, see
-`disk_space.py`), but only warns. It prints "Counting the photos ..." before its own scan of
-the photo folders (as long as the engine's scan; review). An `OSError`/`ValueError` gives
-no warning, any other error a note; the runs start in every case (review).
+## Model evaluation tool
 
-Summary before the start (F12): in the same place, above the disk space warning, the run tab
-shows `st.info(start_summary(photos found, analyzed, known_throughput(run_status, cleanup_signature(), device)))`
-with the `analyzed` count of F3 (`analyzed_photos`: cache rows of the signature that match the photo's modification time and size, A44; a photo edited after the count counts as analyzed until "Recount"). The device "auto" is resolved as CUDA if PyTorch
-can use it (`info['cuda']`), else CPU; without the system details (`info` is `None`) any
-device's record of the signature counts. The text is "N photos found · A already analyzed with
-these settings · T to analyze." plus the rough duration of the analysis from the throughput
-record (`duration_text`) or "The search shows how long it takes after its first minutes."; with
-nothing to analyze it says that the search only ranks and writes the galleries, and with no
-photo found that the search has nothing to analyze (review). For an analysis without a search (F18) `start_summary(photos, analyzed, per_minute, analysis_only=True)` is the summary next to
-the button (one function for both, review: no scoring and galleries, `finishing` ignored, same record of earlier speeds; "The
-analysis shows how long ..."; with all photos analyzed it says so and that photos added since are counted after "Recount", the
-analysis finds them either way; the app passes the partners as analyzed) and `remaining_text` of an `analyze_only` status is
-the analysis alone ("about N min left"; no scoring or thumbnails; `None` outside `analyzing`, once all photos are done or without
-a rate). In the progress
-line of a running search (`show_status`), `remaining_text(status)` is appended after
-`status_text` ("· about 25 min left") only when the run is active (`now_active`), because a
-crashed run keeps its last rate in the file, and only while the engine wrote its status in the
-last 5 minutes (a stalled analysis names no time). With stored `finishing` speeds the estimate adds scoring and the planned thumbnails (F16), also in the phases `scoring` and `exporting`; the summary before the start passes `finishing_minutes(run_status['finishing'], photos, gallery_thumbnails(photos, top, profiles))`.
+`framescout_eval.py {run,pool,label,metrics}` (E32/E20) measures the search models on the user's
+own labelled photos. Collection folder `<project>/.tmp/eval/<collection>/` (gitignored):
+`collection.json` (photo folders and profiles file), `engine/<model>/` (one engine output per
+model so one run's cleanup never removes another's), `scores/<model>.json`, `pool.json`,
+`labels.json`, `thumbnails/`.
 
-### Stopping a search
-
-Stop (`stop_run`) reads the status again, terminates the session's process and the status
-file's engine with their child processes (`psutil`), kills what is left after five seconds
-and then waits up to ten seconds for the lock (Windows may release it a moment after the
-process ended) and marks the status `interrupted` / "Stopped in the app." if its pid is
-one of the ended processes (otherwise another start has replaced it); if it cannot, the
-app says so. Each embedded group of photos (at most `--batch-size` crops, unless one photo
-has more) is committed to SQLite, so a stop loses at most the group in progress. A
-`KeyboardInterrupt` in the CLI cancels the queued decoding and exits with code 130. Not a
-background job manager: the engine is a child of the Streamlit process, and closing the
-`Start-FrameScout.bat` window is not tested with a running search.
-
-### Hardware info
-
-Hardware info is detected dynamically via `platform`, `os`, `psutil` and `torch.cuda`;
-`auto` chooses CUDA if PyTorch detects it, otherwise CPU. Do not hardcode the CPU/GPU
-model or the user's RAM. A GPU may exist without CUDA support; the app tells a CPU build
-of PyTorch (`torch.version.cuda is None`) from a CUDA build that finds no usable GPU (e.g.
-a driver too old for it); the hint says to close FrameScout, run `Install-FrameScout.bat
-cuda` and start it again, since the running app keeps the loaded torch and the cached
-`system_info`.
-
-### Environment variables and caches
-
-The Windows batch scripts set cache/temp environment variables under the project directory
-(`TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME`, `TMP`, `TEMP`), aiming for
-easy cleanup. Since A36 the four cache variables are set only `if not defined` (`TMP`,
-`TEMP` and `PIP_CACHE_DIR` unconditionally): a user's Windows variable wins, so the models
-are downloaded there, also by the app (a user who had such a variable gets a new download,
-about 600 MB for the default model, on the first search). A user's `XDG_CACHE_HOME` alone
-keeps `TORCH_HOME` and `HF_HOME` unset (review): torch and huggingface_hub derive them from
-it (`XDG_CACHE_HOME/torch`, `/huggingface`), as do `hub_cache_dir` and the uninstall's
-`outside_leftovers`, so the models stay in the user's folder; the `.bat` lines for these two
-(`if not defined TORCH_HOME if not defined XDG_CACHE_HOME set …`) come before the
-`XDG_CACHE_HOME` line, and `default_cache_env` (`XDG_DERIVED`) leaves them unset too (an empty
-one is removed). Ultralytics does not read `XDG_CACHE_HOME` on Windows, so `YOLO_CONFIG_DIR`
-still defaults to `.cache/ultralytics`. Since E9/I10 the engine also fills `TORCH_HOME`, `HF_HOME`,
-`XDG_CACHE_HOME` and `YOLO_CONFIG_DIR` itself when they are unset or empty
-(`default_cache_env(os.environ, <engine folder>)`, E42: the first statement of `main()` in
-`framescout_engine.py`, not on import, which therefore sets nothing for other importers;
-it still precedes the first use of the libraries: torch reads `TORCH_HOME`/`XDG_CACHE_HOME`
-per call, huggingface_hub and Ultralytics are imported later via `import_open_clip` and
-`import_detector_class`; a user's value is kept, so no opt-out is needed; no folder is
-created). The app's `cache_env` builds the same environment as `engine_cache_env(os.environ,
-BASE)` (A36: a copy of `os.environ` plus `default_cache_env`), so a user's value wins there
-too, and creates only the `.cache` subfolders of the names `default_cache_env` returns (and
-`.tmp`; review: no comparison of path strings). `disk_space` (`app_search_needs`, `downloaded_models`) and `install_check` (`check_models`, the PyTorch
-probe) keep a user's value as well. A worktree
-engine therefore defaults to the worktree's own `.cache/`: smoke runs there still point the
-variables at the main checkout's `.cache/` to avoid a new download. Open: open_clip's URL
-download path ignores the variables (E39); `framescout_eval.py` builds its own paths
-(I25). Some dependencies may still leave user-level caches (e.g. Ultralytics writes
-`%APPDATA%\Ultralytics\settings.json` when imported without `YOLO_CONFIG_DIR`, which
-the app, the `.bat` files and (since I10) the engine's defaults prevent; the
-uninstall script lists these folders but never deletes them); do
-not promise perfect portability or no residual files.
-
-**Ultralytics without analytics and run-time installs (E27, E28):** the engine imports
-Ultralytics only through `framescout_core.import_detector_class` (a test checks there is
-no direct import in `framescout_engine.py`), which first sets `ULTRALYTICS_ENV` in
-`os.environ`, overriding values a user set, because Ultralytics reads them on import:
-- `YOLO_OFFLINE=true` makes its `ONLINE` flag false, which turns off its usage analytics
-  (`ultralytics/utils/events.py`: an anonymous event per prediction to Google Analytics
-  while its setting `sync` is on, the default), its Sentry reports and PyPI update checks.
-  Model downloads (`yolo11n.pt` on first use) do not check the flag and still work. The
-  setting `sync` itself stays as it is: changing it would write Ultralytics' settings
-  file, which is `%APPDATA%\Ultralytics\settings.json` for a manual run without
-  `YOLO_CONFIG_DIR` and may be shared with other Ultralytics uses.
-- `YOLO_AUTOINSTALL=false` stops `check_requirements` from pip-installing missing
-  packages into the venv.
-- Importing Ultralytics replaces `PIL.Image.open` for the whole process
-  (`ultralytics/utils/patches.py`) with a version that installs and registers `pi-heif`
-  for the first file Pillow cannot identify. `import_detector_class` puts the original
-  back (also when the import fails): the engine hands the detector decoded images and
-  registers `pillow-heif` itself, and a broken photo now fails with Pillow's own error
-  with and without person detection.
-
-Checked with Ultralytics 8.4.183 (a probe: `ONLINE`/`AUTOINSTALL` false, analytics
-`events.enabled` false, `Image.open` restored, a broken `.jpg` raises
-`UnidentifiedImageError` without importing `pi_heif`; plus a CPU smoke run with person
-detection). The first-run weight download was not run (a download), but for the review a
-probe with `safe_download` replaced by a recorder showed that with `ONLINE` false a
-missing `yolo11n.pt` still reaches the download
-(`attempt_download_asset` → `safe_download(.../releases/download/v8.4.0/yolo11n.pt)`;
-neither checks `ONLINE`), and that `Image.open` is still the original after `YOLO()` and a
-prediction (Ultralytics patches it once, when `ultralytics/utils/patches.py` is first
-imported, which happens on `import ultralytics`). The variables stay set for the rest of
-the engine process; the engine starts no subprocesses that would inherit them. A later Ultralytics version may rename these switches; check them when
-raising its minimum version.
-
-**Search models without a Hub request once cached (E16, E31, E33):** open_clip loads the
-weights (and SigLIP its tokenizer) through `huggingface_hub`, which asks the Hub for the
-file on every run even when it is cached. The engine imports open_clip only through
-`framescout_core.import_open_clip` (a test checks there is no direct import of open_clip,
-`huggingface_hub`, `transformers` or `timm` in `framescout_engine.py`), because
-`huggingface_hub` reads its variables when it is imported:
-- `HF_HUB_DISABLE_SYMLINKS_WARNING=1` and `HF_HUB_DISABLE_TELEMETRY=1` are set with
-  `setdefault` (a value the user set wins): no "cache-system uses symlinks" warning in
-  `run.log` on Windows without Developer Mode (the files are stored as copies either way).
-- `HF_HUB_OFFLINE=1` is set when `model_cached` finds every Hub file of the model in the
-  cache: the snapshot that `refs/main` names holds the weights (`WEIGHTS_FILES`,
-  safetensors or bin) and, for SigLIP, `tokenizer_config.json` plus `tokenizer.json` or
-  `spiece.model`. The cache folder is found like `huggingface_hub.constants` does
-  (`hub_cache_dir`: `HF_HUB_CACHE`, `HUGGINGFACE_HUB_CACHE`, `HF_HOME`, `XDG_CACHE_HOME`,
-  `~/.cache`). If the user set `HF_HUB_OFFLINE` or `TRANSFORMERS_OFFLINE` (any value),
-  offline mode is left alone.
-- If something imported `huggingface_hub` before (it would have read the variables
-  already), `import_open_clip` gets `sys.modules` and sets the same values on
-  `huggingface_hub.constants` (and an older transformers' `_is_offline_mode`).
-  huggingface_hub 2.2 reads these constants on every request
-  (`constants.is_offline_mode()`), transformers 5 calls that function.
-- If loading fails in offline mode because a file is missing (`hub_file_error`: an
-  `OSError` in the exception's `__cause__`/`__context__` chain, e.g. huggingface_hub's
-  `LocalEntryNotFoundError` or `OfflineModeIsEnabled`, transformers' `OSError`, or the
-  `RuntimeError` open_clip raises around its `FileNotFoundError`), `load_with_hub_fallback`
-  prints a note, `hub_go_online` switches the environment and those constants back online,
-  and loads again, which downloads the missing files. Any other error (out of memory, a
-  bad device, a broken weights file) is raised as it is. An uncached model is loaded
-  online as before, so the first download is unchanged. The variables apply to app,
-  `.bat`, manual CLI and eval-tool runs alike and stay set for the rest of the engine
-  process, which runs one search (the YOLO weights come from GitHub, not the Hub).
-
-Checked on the default model (ViT-B/32, cached in the main checkout's `.cache/`, CPU, 3
-synthetic photos): with the network blocked by a dead proxy the search finished without Hub
-lines (3.9 s; 5.8 s with `HF_HUB_OFFLINE=0` forced); with the network, no "HF Hub" or
-symlink line appeared, and with `HF_HUB_OFFLINE=0` forced the unauthenticated-requests
-warning came back. SigLIP (`vit-b-16-siglip`, cached, network blocked): `model_cached` was
-true and model plus tokenizer loaded offline through `import_open_clip` and
-`load_with_hub_fallback` without the fallback (1.9 s; a Python check, no engine run).
-With an empty cache in offline mode, the open_clip weights error and the SigLIP tokenizer
-error both carry an `OSError` in their chain, so the fallback would be taken. **Not run:**
-a first download into an empty cache and the fallback after an incomplete cache with real
-files (each downloads at least 605 MB; unit tests only, E38).
-
-## Test coverage and known quirks
-
-### Test coverage
-
-F34: `test_quick.py` (`quick_entry_label`, `quick_result_id`, `results_choice`, the selector's entries, the quick text put back only while disabled and `persist_state` of the views' boxes from the app's syntax tree; a Streamlit AppTest run with sample result files, not part of the suite). F18: `test_quick.py` (`engine_command` with `analyze_only` and its exclusive combinations, the app's button and start call, the partners counted as analyzed and the low disk space warning of the section from the syntax tree), `test_run_status.py` (`analysis_only`, `run_name`, `analysis_result_text`, `Starting the analysis`, `StatusReporter(analyze_only=True)`, `nothing_new_message`, `final_status(..., run='analysis')`), `test_cache_check.py` (`cache_read_warning(..., run='analysis')`), `test_disk_space.py` (the space of an analysis: no thumbnails), `test_estimate.py` (`start_summary(..., analysis_only=True)`, `remaining_text` of an analysis) and `test_engine_defaults.py` (`--analyze-only` from the engine's syntax tree: early return before scoring, no search objects, `quick` independent of it and no `if analyze_only:` in the analysis branch, the reporter's run kind, `final_status`'s run, `nothing_new_message(analyze_only, errors)`; a subprocess test of the refused combinations that needs torch and Pillow and is skipped in CI); AppTest rendered the section, the enabled button and (with a forced reserve) both low disk space warnings, but no click, no run with person detection on and no CUDA run was made.
-
-Add focused tests without requiring full model downloads. Profile loading, reading/saving
-the app's `profiles.json` and `settings.json`, reference folders, prompt generation, slug
-handling, progress lines (A11), the run lock and status file (A4/A5), thumbnails of the
-export (E6), the cache signature, the pipeline helpers for batching/prefetching (E2) and the
-lazy value of the person detector (`Lazy`, F2, `test_pipeline.py`; the engine side only from the
-CPU smoke run: loaded for new photos, not loaded for a fully cached folder), the message
-in the status line (`status_text`, F2, `test_run_status.py`), the
-scoring (E4/E5) the result file with the gallery helpers (A12) the marks, copying and copy
-target folders (A17) with their deletion with a profile and no saves for a name that is no
-profile (A22, A33, `test_marks.py`, `test_copy.py`, the result list export in `test_export.py`
-(F5: the picked cards, CSV content and encoding, file list, naming without replacing a file, a
-failing second file, nothing to export; not run: Excel import, a real browser), `require_profile` in
-`test_profile_file.py`), the versioned read and checked, locked save of `profiles.json` (A13,
-`test_profile_file.py`), the cleanup with the cache side table (E7, E11,
-`test_cleanup.py` also for unbound rows and marks, the marks backup and restore in `test_marks.py`
-and the cache check with real damaged SQLite files, a simulated disk I/O error and outdated results
-in `test_cache_check.py` (F1), the disk space estimate, analyzed photos from a real SQLite cache,
-the app's needs (`app_search_needs`), drive grouping by volume and the root probe timeout in
-`test_disk_space.py`, `find_yolo_weights` and `open_clip_cache_dir` (E39) in `test_cache_dirs.py`,
-`cache_error`/`cache_error_message` with real damaged files and `cache_read_warning` (E50) in
-`test_cache_check.py`, `store_group(..., fatal=)` in `test_pipeline.py` and `final_status(0,
-warnings)` in `test_run_status.py` (E50 review), the folder timeout, a share behind a junction that
-stops answering, a folder that still hangs (no second thread), `_link_above`, the notes per cause,
-dead links and `project_temp_cleanup` without a probe file (E37, E44) in `test_cleanup.py`,
-`RawFallback.strict/defer/retry` (E46) and the waiting partners (also two truncated ones of one
-shot), `retry()` with `lost` and `jpeg_scans_missing` (E53, E57) in `test_photos.py`,
-`open_image(complete=True)` with a truncated JPEG, mid-data damage, a truncated HEIC and a JPEG that
-lacks only its end marker (E53, E57) in `test_images.py` (needs Pillow, so skipped in CI), the empty
-and the missing mount point notes, also next to another mounted drive, and a folder deleted on a
-mounted drive (E54, simulated) in `test_cleanup.py`, the cache opened before the model load and
-closed if the load fails (E56, source checks) in `test_engine_defaults.py`, and the installer's
-check, question, stop exit code (with the `.bat` line) and the check for the other packages in
-`test_torch_install.py` (F3; `app.py` and `framescout_ui` are not imported by the tests, only read as a syntax tree through `tests/app_source.py`), unreachable roots
-simulated by patching
-`_probe_root` and a real unused drive letter, the listing/stat choice, a share that drops and is back, the reused hanging probe and the per-step re-check of `clean_up`, E8;
-`test_cache_signatures.py`, with real SQLite files), the stale temporary files of
-`auto_cleanup` (E26, `test_cleanup.py`: removed; fresh ones, foreign ones and gallery names
-that are no profile slug kept; also with an unreadable `results.json`; the age by the
-results folder's clock, with a patched `time.time`; the `temporary` count), publishing the
-galleries with `results.json` (E24, `test_results.py`: publishes; a failed write publishes
-nothing; all files complete before the first rename and `results.json` last; retry on an
-open file; a rename that fails every try restores the files renamed before it, a failed
-restore is skipped), the cache folders and the `yolo11n.pt`
-location (E9/I10: `test_cache_dirs.py`, also the detector weights line, E60, and also that importing `framescout_core` loads no
-third-party module; E41: the working folder wins; A36: `engine_cache_env`, `cache_env` and
-the cache lines of both `.bat` files, run by cmd.exe, keep a user's value and leave
-`TORCH_HOME`/`HF_HOME` to a user's `XDG_CACHE_HOME`, as `default_cache_env` does; the
-project folder is told by its path, not `samefile`; `cache_env` itself run on `tmp_path`
-in `test_engine_defaults.py`; the engine's defaults call
-as the first statement of `main()` (E42) and its `yolo_weights`
-use, with the E60 line printed before the load, from its syntax tree plus a subprocess import, skipped without torch, in
-`test_engine_defaults.py`; no run with real models, no app session with a user-set variable) and the photo scan
-with RAW+JPEG pairs, skipped files and the RAW preview decisions (E25, `test_photos.py`),
-the RAW fallback's mapping, its agreement with the scan's pairs across mixed-case names
-and joined folders, and the deferred decision (`raw_fallbacks`, `RawFallback`, E30,
-`test_photos.py`; the engine side of the fallback is not runtime-tested),
-the identity-based dedup and link-safe scan, including the output folder as or inside a
-listed folder, repeated file ids, link loops without file ids and an unreadable path (A28,
-A29, `test_photos.py`), the counts of photos and folders found again (A37), the backup rewrite under the lock (A32, `test_reference_move.py`, `test_profile_file.py` with `profiles_changed_notice`, A31) and `downloaded_models` (A39, `test_disk_space.py`, `test_models.py`; the app side of A31/A39 was not run), the installation self-test (F15, `test_install_check.py`: environment cases from `pyvenv.cfg`, pins and requirements with fake metadata, the torch probe with a fake subprocess (CPU, CUDA without a GPU, timeout, crash), writability and disk space with fake folders and usage, the combined result and its "not checked" cases; not run: the CUDA branch on a real GPU and `Check-FrameScout.bat` by double-click), the time estimate (F12: `AnalysisRate` window and thresholds, `duration_text` rounding, `remaining_text` (also its stale-status cut-off), throughput records with `run_throughput` (a short run keeps a longer run's record) and `start_summary` (also without photos) in `test_estimate.py`; the carry-over of `throughput` between status files in `test_run_status.py`; the run tab summary was checked with Streamlit `AppTest` only, the engine side and the live "time left" are not runtime-tested),
-the remembered photo count (`remembered_scans`: scan once, rescan on a changed key or `recount`,
-no folders, a folder gone and back; A27, `test_photos.py`; the app side was run with Streamlit's `AppTest` only, not in a browser),
-hiding no-match photos per page and the mark colors (`hide_no_match`, `hidden_text`, the review progress `review_progress`/`progress_text` (F20; the app side was run with `AppTest` only), the closest search text (F17: `best_matches`, `rank_photos(best=)` unchanged ranking, `query_labels` and its order against `text_queries`, `closest_query`, `query_summary`, `read_results` validation in `test_scoring.py`/`test_profiles.py`/`test_results.py`/`test_engine_defaults.py`; the engine on synthetic photos and the app's caption with `AppTest` only), the
-CSS of `mark_style` and `CARD_STYLE`, `card_text` (`test_results.py`; the card look was checked in headless Edge with a harness drawing `draw_cards`, not by clicking Match/No), its Streamlit pin and its selector names in the installed Streamlit bundle (skipped without Streamlit), `marks_restore_offer`, `remove_marks(unless_profile_of=)`, `mark_counts_text`, `test_marks.py`; the review dialog of F19 (`test_review.py`: the pure functions of `framescout_core/review.py`, the dialog and button calls by their structure; `render_preview` in `test_images.py`; the review fixes (the press guard, dropping the state of another list) were run with `AppTest` on a script calling the callbacks only; the dialog was looked at with a headless Edge harness before the review, not with a real search, Esc or the keys with a real keyboard, F40); the results toolbar and the bottom pager of F29 (`AppTest` in `test_results.py`: the order of the toolbar row, the popover's content, the bottom pager, notices outside the popover; `test_quick.py`: the selector call; the layout was also looked at in headless Edge at 1920 x 889 px, dark theme, with a synthetic copy under `.tmp/`, not with real photos, in a narrow window or the light theme, and without clicking copy or export inside the popover); the cleanup categories `marks_profiles` and `broken_files`, `test_cleanup.py`; `unlisted_paths`, `test_export.py`) and the AI settings reset
-(`AI_SETTINGS`, `reconcile_settings(reset=)`, `changed_from_defaults`, `setting_text`,
-`test_settings.py`; the grouping of the widgets in `show_ai_settings` by source checks in `test_settings_layout.py` (F32; the expander and the disabled sub-settings were run with `AppTest` only); A24, A26; the buttons and the mark colors were run with `AppTest`/the
-generated style only, not in a browser),
-the thread counts and the priority (`torch_threads`, `lower_priority` with injected calls,
-the failure text, and a child process that really lowers and reads back its priority class:
-`test_priority.py`, also a child process started at IDLE that keeps it;
-`low_priority` in `test_settings.py`; F4; the thread count around the detector in `crops_for`
-was checked once by hand, not by a test, since the tests run without torch; the slowdown and
-the gain in responsiveness are not measured, E52; `os.nice` is not run on a non-Windows OS),
-the several photo folders (A25: dedup, labels, joined scans, the `nargs='+'` of the engine
-read from its syntax tree, settings migration, results format 1/2) are
-covered by `tests/` (via `framescout_core` and `framescout_scoring`), as is the quick search (F10:
-F28: `tests/test_app_state.py` checks `APP_TABS`/`RESULTS_TAB` and that `app.py` builds its five tabs from them in order, with the sections in the expected tab (checked in `app.py`'s syntax tree, every with-block of a tab, also nested ones, and nowhere else on the page; a Streamlit AppTest page run showed no exceptions; the look in a browser is not verified), `results_running_text` and the tab of each failed-start note (`run_notice` and `analyze_notice` in Search, `like_notice` in Results); `tests/test_quick.py` pins the notice key of each `start_engine` call. `tests/test_quick.py` for `quick_profile`, `quick_photos`, `quick_folders_differ`, `quick_scope`, `quick_scope_text`, `quick_note`,
-`engine_command`, the quick output folder, its cleanup and that the `results/` cleanup keeps
-`results/quick/`; `test_engine_defaults.py` for the engine's `--quick-query` (exclusive with
-`--profiles`, no detector, no analysis, the cache check before the model load, the output
-folder) from its syntax tree; F11: `test_quick.py` (`like_profile`, `like_crop`, `like_labels_fit`, `like_scan_path`, `quick_photos` exclude with every partner of the shot, `quick_note`, `engine_command` with `like`, the app's request handling and caption), `test_scoring.py` (`rank_similar`, Optional text, caption) and `test_engine_defaults.py` (`--like`/`--like-part`, refused combinations, no model load, no use of the model's names on the `--like` path) likewise; the app's section is covered by a
-headless AppTest run, not by a unit test; no real browser click-through, no person detection on, no CUDA), as are the search
-model registry, the per-model signatures and cleanup category and the `model` setting
-(E22, `test_models.py`; the engine's `--model`, its `stdout.reconfigure` and the app's
-`PYTHONIOENCODING` only from their syntax trees, `test_engine_defaults.py`; the app's
-selectbox, its disabled Start, the results note and the dropped cleanup scan are not
-unit-tested), the offline loading of cached models (E16: `test_hub.py` with fake cache
-layouts, environments, fake already-imported libraries and a failing loader, plus the
-offline switch of the real huggingface_hub in a subprocess, skipped without it; the
-registry's repositories against open_clip's config in `test_models.py`, skipped without
-open_clip; the engine's use of `import_open_clip` and the fallback from its syntax tree in
-`test_engine_defaults.py`, and that importing the engine imports no Hugging Face library,
-skipped without torch and Pillow; no first download, no fallback with real files, E38), and the evaluation tooling (E32: `test_evaluation.py` for the formats, AP@k
-and the pool; `test_eval_tool.py` for the tool's commands, metrics and labelling server
-with fake scores; the engine's `--scores-file` only from its syntax tree in
-`test_engine_defaults.py`; no real-model run, no browser test), and the pinned
-dependencies (I12, `test_constraints.py`: every line of `requirements/constraints.txt` is an exact pin
-without local label, hash or duplicate, sorted by name; every requirement of
-`requirements/requirements.txt` and the pinned numpy of `requirements/requirements-dev.txt` has an allowed pin; a
-non-comment pip line of the installer passes `-r requirements\requirements.txt -c requirements\constraints.txt`, and
-it sets `PIP_CONSTRAINT=requirements\constraints.txt` between the venv and `install_torch.py` (I18);
-the Streamlit floor is at least 1.48 and `app.py` no longer uses `use_container_width`,
-A10);
-the torch pins of both files equal `TORCH_VERSION`/`TORCHVISION_VERSION` in
-`test_torch_install.py`; completeness of the transitive pins is not checkable in CI), and
-the installer (P5 part C, `test_installer.py`, text checks of `Install-FrameScout.bat`:
-pins equal `framescout_core.portable_python`, the full package of python.org, no installed
-Python needed, SHA-256 checked before extraction and use, `PSModulePath` cleared only for
-that check, extracted in `.tmp` and moved as a whole with retries, a working `.venv` kept
-without a download, a broken one checked again and else created again with `--clear`, a
-failed `venv` removed, an existing `.python` checked for `venv`/`ensurepip` and the pinned
-version (the check itself runs on the test Python), no delayed expansion, folder path
-never inside a block; the real download, extraction and `venv` creation and the folder
-`Fo!to (old)\fs` were run by hand under `.tmp`, as were the repair paths of the review
-(`python.exe` of `.python` deleted, pip removed from `.venv`, a failed `venv`, `Lib\venv`
-removed from `.python`, the folder renamed, the move blocked by an open file for 7 s and
-for 25 s); a full install with PyTorch on the private Python was not), and the files of two versions (I16, `tests/test_layout.py`: the message, the package guard through a subprocess import of a package copy, the marker rule (I35: a marked script from the package's folder loads, an unmarked one does not; the marker comes before the first FrameScout import in every entry point, also one inside a block; root scripts importing FrameScout code are entry points or `framescout_images.py`; the rollback entry points import only the two packages and `framescout_images`), the guard of `framescout_scoring` (I36: refusal, equality with the core's, no FrameScout import), the `Program files` check line (I34), the `.bat` cleanup lines of Install and Start identical (with their messages, for `framescout_core.py` and `framescout_scoring.py`) and before any Python run, the uninstaller without them, Start run on a copy in `Fo!to (old) & co`, with a folder named `framescout_core.py` (kept with its file), a read-only leftover (deleted) and a leftover held open (stop, exit code 1); `Install-FrameScout.bat cpu` was run by hand on a scratch copy and deleted the leftover), and the uninstall script (P5, `test_uninstall.py`, I4: order and version check of the `pyvenv.cfg` fallback, tests on `tmp_path` trees: plan, kept
-entries (also in another case, Windows only), protected folders from settings (invalid
-values, read once, photo folder around the project), links and junctions, read-only
-files and folders, unlistable items, failures reported once, user-data and outside
-listings, the run lock, read-only vs. running `python.exe` (Windows only), the dialog of
-`framescout_uninstall.py`, no delayed expansion in the `.bat`; the real `.bat` was run by
-hand on scratch copies, once with `!` and `)` in the folder path as a dry run, not
-against a real installation, not while Streamlit was running and on a PC without the
-`py` launcher only through a `.bat` run with `PATH` limited to System32 (I4: `pyvenv.cfg` whose `home`
-is a junction `Py thon (x86) & !`, one named `Jürgen 写真 (x86) & !` read in a console of its own
-with code page 850, which is restored afterwards, and without any Python, in a folder with `&`); the private Python's deletion (`running_python`, exit code 3, the `.bat`
-removing `.python`) was run by hand under `.tmp` with the real private Python, not against a
-full installation; the running check was tried by hand with a running read-only executable);
-still missing: cache
-reuse and the engine's decoding itself (`open_image`/`open_raw` need Pillow, pillow-heif
-and rawpy, which CI does not install). Add a small integration smoke test for real models when feasible.
-
-### Known quirks
-
-- **Person crops depend on the device (I11, PR #56):** YOLO's boxes differ slightly between
-  CUDA and CPU, and for a few photos a person more or less is found (4997 real photos: 9253
-  vs 9249 crops, 5 photos with another number of crops). Full-image embeddings are identical
-  up to float16 storage; a person crop's embedding and the ranking of near-ties change (top
-  20 of a profile overlap 19 to 20 of 20 between the devices). The cache signature ignores
-  the device on purpose, so a cache built on one device is reused as is on the other. Not a bug.
-
-Potential current quirks to investigate rather than assume solved (most are tracked in
-`docs/BACKLOG.md`): "Clean up storage" was checked with `AppTest` only (not in a browser), and
-`auto_cleanup` in one CPU smoke run with synthetic photos under `.tmp/`; marks follow the
-absolute photo path, a renamed or moved photo counts as new (A21 closed as won't do, E8); the app saves its whole profile list, so a save based on a
-file that another session changed in between is refused and has to be made again (A13);
-the engine still takes an empty folder
-argument as its working directory (the app no longer passes one, A16); result file downloads do not contain thumbnails (ZIP export: P4
-(C), A18); `app.py` and `framescout_ui` themselves have no behavior tests (A46: `tests/test_app_source.py` checks that every name of the app files is defined or imported and the import rules; tests that read the app's source use `tests/app_source.py`, the syntax tree of `app.py` plus `framescout_ui/*.py`) (A4/A5 were checked once with
-Streamlit's `AppTest` and real engine runs, and manually in a browser: start, reload,
-second tab, Stop – successful, user report 2026-10-21; closing the `Start-FrameScout.bat`
-window during a run is still not tested; A8's settings widgets were checked with `AppTest`
-and in headless Edge driven over the DevTools protocol – `AppTest` alone is not enough
-evidence for widget behavior, as it does not run the browser frontend; the marks and
-copying of A17 and the deletion confirmation of A22 were checked with `AppTest` only (not
-yet in a browser); the result gallery
-of P4 (A) was checked with `AppTest` and in headless Edge, and its "Open"/"Folder" buttons
-once on Windows 11 with synthetic photos under `.tmp/`); Python 3.14 has been verified for
-one CPU run only; absolute paths/HTML link portability. The UI's dynamic system
-information is informational, not a hardware benchmark.
+- `labels.json`: `{"format": 1, "labels": {profile: {absolute photo path: true|false}}}` plus the
+  optional `motifs` (E36: the profile's context, features and references when its first label was
+  set; `pool` and `metrics` warn when the profile's motif has changed since). An unreadable file
+  is never saved over. Labels are keyed by profile name and path, so they survive prompt edits.
+- Scores file (engine `--scores-file`, format 1): per photo and crop text and visual scores
+  rounded to `SCORE_DIGITS`; finite numbers only.
+- `run` calls the engine once per model (cache variables under `--cache-dir`, default
+  `default_cache_dir()`, E48); a model with a missing package is skipped; exit 1 if any model was
+  not scored. `pool` ranks each model's scores with the engine's `rank_photos` at several
+  reference weights and renders thumbnails (Pillow only, E49). `label` serves the labelling page
+  on `127.0.0.1:8765` behind a random token (`LabelServer`, every route; a port in use is an error)
+  and saves each label atomically at once. `metrics` computes AP@`--k` (default 40) per profile and
+  model, optionally a reference-weight sweep, and warns about labels no model run scored.
+- `framescout_eval.py run` warns about low disk space like the app (E51) but never blocks.
 
 ## Workflow permissions
-`.claude/settings.json` pre-approves the routine git/gh/pytest commands of this workflow.
-Pushes are pre-approved only as `git push [-u] origin <type>/…`; a bare `git push`, `gh pr
-merge`, force/reset variants of `git branch`/`git switch`, bulk staging (`git add -A`/`.`,
-`git commit -a`, anything naming `profiles.json` or `settings.json`) and engine smoke runs
-ask; force pushes, `--mirror`/`--all`/`--delete`, pushes naming `main` and `git reset
---hard` are denied. Rules are evaluated deny → ask → allow and match the command text with
-`*` wildcards; they steer the agent but are **not** a security boundary (`git -C . push`,
-`sh -c …` or an absolute path to `git` are not matched). Personal overrides go into
-`.claude/settings.local.json` (gitignored).
 
-On GitHub (since I8), the ruleset `protect main` blocks deleting and force-pushing the
-default branch, needs linear history and a pull request (rebase merges only, no approval
-required) and the three `pytest (Windows, Python 3.1x)` checks. Repository admins may
-bypass it only when merging a pull request (`gh pr merge --admin`, denied in
-`.claude/settings.json`), never with a direct push. The repository allows only rebase
-merges; Actions are limited to GitHub-owned actions pinned to a SHA, and workflows of
-outside contributors' pull requests need approval. Secret scanning with push protection,
-Dependabot alerts and private vulnerability reporting are on.
+`.claude/settings.json` pre-approves the routine git/gh/pytest commands of the PR workflow
+(`CLAUDE.md` → "PR workflow"). Pushes are pre-approved only as `git push [-u] origin <type>/…`; a
+bare `git push`, `gh pr merge`, bulk staging (`git add -A`/`.`, `git commit -a`, anything naming
+`profiles.json` or `settings.json`) and engine smoke runs ask; force pushes,
+`--mirror`/`--all`/`--delete`, pushes naming `main` and `git reset --hard` are denied. Rules are
+evaluated deny, ask, allow and match the command text with `*` wildcards; they steer the agent but
+are **not** a security boundary (`git -C . push`, `sh -c …` or an absolute path to `git` are not
+matched). Personal overrides go into `.claude/settings.local.json` (gitignored).
+
+On GitHub (I8) the ruleset `protect main` blocks deleting and force-pushing the default branch,
+needs linear history and a pull request (rebase merges only, no approval required) and the three
+`pytest (Windows, Python 3.1x)` checks. Admins may bypass it only when merging a pull request
+(`gh pr merge --admin`, denied in `.claude/settings.json`), never with a direct push. Actions are
+limited to GitHub-owned actions pinned to a SHA, and workflows of outside contributors' pull
+requests need approval. Secret scanning with push protection, Dependabot alerts and private
+vulnerability reporting are on.
+
+## Known quirks
+
+- Person crops and the ranking of near-ties differ slightly between CUDA and CPU (see "Person
+  detection"); the cache is shared on purpose.
+- Marks follow the absolute photo path; a renamed or moved photo counts as new (A21 closed as won't
+  do, E8).
+- The app saves its whole profile list, so a save based on a file another session changed is
+  refused and has to be made again (A13).
+- The engine still takes an empty folder argument as its working directory (the app does not pass
+  one, A16). HTML files exported alone contain no thumbnails (ZIP export: A18).
+- Absolute paths in galleries and links work only on the computer that made them.
+- Python 3.14 has been verified for one CPU run (and the CUDA runs above) only.
+- The system information in the UI is informational, not a hardware benchmark.

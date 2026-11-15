@@ -13,7 +13,7 @@ Current baseline: **v1.1, prototype**, with a Streamlit frontend and a separate 
 
 ## Where things are
 - `app.py` (Streamlit frontend: page layout), `framescout_ui/` (the app's areas, imported only by `app.py`; needs streamlit), `framescout_engine.py` (CLI engine: models, embedding, person detection, cache, ranking, HTML export), `framescout_core/` (shared logic, one module per area, re-exported by `__init__.py`; **standard library only**), `framescout_scoring/` (package: scoring, **numpy only**), `install_torch.py` + `Install-FrameScout.bat`/`Start-FrameScout.bat`, `tests/` (pytest, no torch), `assets/` (`profiles.example.json`, the evaluation tool's labelling page), `requirements/` (`requirements*.txt`, `constraints.txt`: exact pins of all packages), `README.md` (overview), `docs/USER-GUIDE.md` (user guide), `docs/DEVELOPMENT.md` (CLI, tests, evaluation tool), `docs/ROADMAP.md` (order of work), `docs/BACKLOG.md` (open items), `docs/BACKLOG-DONE.md` (finished items, one line each; the report is the PR description), `.claude/skills/roadmap/` (PR workflow orchestrator), `.claude/skills/triage/` (idea → backlog → roadmap), `docs/IDEAS.md` (raw feature ideas).
-- **`docs/ARCHITECTURE.md`** holds the details: every file's responsibilities and the `framescout_core` functions, the search pipeline, cache signature, scoring, profiles schema, settings sync, run lock/status, start/stop, test coverage and known quirks. Read the sections relevant to the files you touch before changing code; search it instead of reading it whole.
+- **`docs/ARCHITECTURE.md`** holds what the code cannot say: the verified status, the search pipeline, cache signature, scoring, data formats (profiles, settings, results, marks), run lock/status, cleanup rules, environment and known quirks; per-function details are in docstrings. Read the sections relevant to the files you touch before changing code; search it instead of reading it whole.
 
 ## Gotchas (rules that are easy to break without reading the details)
 - Settings widgets (`framescout_ui/settings.py`; the photo folders in `app.py`) get their values through `st.session_state` with keys `setting_<name>`; never pass them `value=`/`index=` (PR #10 review).
@@ -47,7 +47,7 @@ On a fresh clone, `profiles.json` exists only after the first app start; use `--
 2. Keep all user image data local; do not add cloud uploads, tracking, or network services without explicit consent. First use downloads model weights and pip packages.
 3. Separate frontend and engine; maintain a working CLI and a usable CPU-only path (32 GB RAM and a dedicated GPU must **not** be prerequisites).
 4. Save user state safely, validate paths and profiles, protect data during migrations; avoid overwriting `profiles.json` and user-selected photos/results.
-5. Add focused tests without requiring full model downloads (coverage and gaps: `docs/ARCHITECTURE.md` → "Test coverage and known quirks").
+5. Add focused tests without requiring full model downloads (what is verified and what is not: `docs/ARCHITECTURE.md` → "Verified status").
 6. Never conflate a similarity score with certainty. Explain that large group photos, subtle subjects and artwork-to-photo reference comparisons can yield false positives/negatives.
 
 ## Development workflow for Claude Code
