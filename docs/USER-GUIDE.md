@@ -309,10 +309,20 @@ and landscape photos alike), and the cards use the whole window width (cards 250
 per row as fit; the other tabs stay at most 1,300 px wide). A card shows rank, score and the best-matching part
 ("Full image" or "Person 1", …), the detail line and the file name; a long line ends with "…" and
 shows its whole text when you hover over it. The buttons **Match** and **No** mark the photo;
-**More** opens a menu with "Open photo", "Show in folder" and "Find similar". Buttons open the
-HTML gallery and the `results` folder. A profile changed, renamed or deleted since the
-search is marked, since its results no longer fit it. Switching to another entry of
-"Results of" and back keeps the page you were on and "Hide photos marked as no match".
+**More** opens a menu with "Open photo", "Show in folder" and "Find similar".
+
+Above the photos sits one row: the selector "Results of", the counts of the profile ("12 match
+· 30 no match · 58 undecided"; hover over them for how to mark), the checkbox **Hide no match**,
+the page box and the menu **Export and copy**. It holds "Open gallery in browser", "Download HTML
+(without thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export list"
+(see below). The quick search result has the same row with the menu **Gallery and folder**.
+Below the row come one caption about the search and only the notes that apply (another search
+model, a profile changed, renamed or deleted since the search, the state of the other profiles,
+an unreadable `marks.json`), then the messages of copying and exporting. Below the photos
+the buttons **Previous page** and **Next page** and the page number repeat the page box (the
+page stays where the browser is scrolled, so scroll up to the first photo of the new page).
+Switching to another entry of "Results of" and back keeps the page you were on and "Hide no
+match".
 
 ### Which search text matched
 
@@ -332,14 +342,15 @@ The results are candidates, not certain hits. Mark a photo you checked with **Ma
 with neither pressed is undecided. Marks are kept per profile and photo across
 later searches and in every tab. A marked card shows its state: blue frame and blue button for
 Match; orange frame, orange button and a dimmed photo for No (blue and orange can be told apart
-without red and green). "Hide photos marked as no match" hides the rejected ones within the page you
+without red and green). "Hide no match" hides the rejected ones within the page you
 are looking at only, so the pages keep their photos and ranks; a caption tells how many
 are hidden, and a page where every photo was rejected says so (see the next page).
 
-Above the page box a caption per profile shows your progress, e.g. "100 photos: 30 match,
+Below the photos a caption per profile shows your progress, e.g. "100 photos: 30 match,
 30 no match, 40 undecided. The first undecided photo is #61 on page 2." (or "Every photo
-is marked."). With more than one page, **Go to the first undecided photo** opens that page;
-it is disabled while you are on it. Both appear only where marks can be set.
+is marked."). With more than one page, **Go to the first undecided photo** (next to the
+pager) opens that page; it is disabled while you are on it. Both appear only where marks can
+be set.
 
 Before each change of a mark FrameScout keeps the previous `marks.json` as `marks.json.bak`
 (one generation). If `marks.json` is damaged, the gallery warns that no marks are shown
@@ -351,7 +362,7 @@ Nothing is restored on its own; until you restore, the next mark you set starts 
 in the `results` folder; **Clean up storage → Damaged files set aside** offers to delete
 it when you no longer need it.
 
-"Copy N marked photos" copies all photos marked as match into the folder in "Copy to
+In the menu **Export and copy**, "Copy N marked photos" copies all photos marked as match into the folder in "Copy to
 folder" (default `Pictures\FrameScout\<profile>`, saved per profile). Copying never
 moves, changes, deletes or overwrites anything: a different photo with the same name is
 saved as `name (2).jpg`, an identical one counts as "already there". A target folder
@@ -359,7 +370,7 @@ inside a photo folder is refused, since the next search would find the copies ag
 
 ### Exporting a result list
 
-Below each gallery, **Export list** writes the ranked photos of the profile to the
+In the menu **Export and copy**, **Export list** writes the ranked photos of the profile to the
 `exports` folder inside `results`, e.g. for a program you catalog photos with. Each
 export makes two files with the same name, `<profile>-<date>-<time>.csv` and `.txt` (with
 "-matches" in the name if you export only matches):

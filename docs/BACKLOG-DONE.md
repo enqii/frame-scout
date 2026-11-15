@@ -2223,3 +2223,24 @@ finished work are in [ROADMAP-DONE.md](ROADMAP-DONE.md).
       1,300 px, "Results" the window width). Not verified: clicking
       "Match"/"No" in the real app and a real search in a browser (F40). No schema, CLI, cache,
       `marks.json`, settings or thumbnail change.
+- [x] `ready` **F29 – One-row results toolbar and a pager below the grid:** the first photo
+      starts 520 px below the "Results" heading (profile selector, captions, info boxes,
+      buttons, a checkbox, a pager); copy and export are below the 48 cards; no pager below the
+      grid. Decided 2026-11-13: one toolbar row (profile selector, the counts of match, no
+      match and undecided, "Hide no match", pager, "Review one by one" once F19 exists, and a
+      popover "Export and copy" with copy, list export, gallery and results folder); the notes
+      for exceptional states (other model, changed profile, missing profile) only when they
+      apply; a second pager and "Go to first undecided" below the grid. Affected: `app.py`
+      (its modules after A46), user guide. `docs/UI-REVIEW.md` §1. Size M. Roadmap P36.
+      Done (2026-11-15): the controls of a profile's results are one toolbar row: "Results of",
+      the counts ("N match · N no match · N undecided", `mark_counts_text`; its help says how to
+      mark), "Hide no match", the page box and the popover "Export and copy" (gallery, download,
+      results folder, copy, export list; their notices stay below the toolbar); the quick entry
+      has the popover "Gallery and folder". One search caption and only the notes that apply
+      follow; below the grid (both views) "Previous page", "Page x of n", "Next page", "Go to the
+      first undecided photo" and the review progress caption. "Review one by one" is not there:
+      F19 adds it to the toolbar. No file, schema, CLI or cache change; widget keys unchanged.
+      Tests: `test_marks.py` (counts text), `test_results.py` (toolbar order, popover content,
+      bottom pager, notices), `test_quick.py`. Verified: pytest 1651 passed, 2 skipped;
+      `AppTest` on a synthetic copy under `.tmp/`; headless Edge 1920 x 889, dark theme. Not
+      verified: real photos, narrow windows, light theme, clicking copy or export in the popover.

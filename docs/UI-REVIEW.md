@@ -62,10 +62,13 @@ Severity: **High** hurts the main flow, **Medium** costs time or clarity, **Low*
   page selector, a hidden-count caption and a caption explaining Open/Folder and marking. On a
   normal laptop screen the first thumbnail is likely below the fold. Most of it is only needed
   in exceptional states.
+  *Addressed by F29 (2026-11-15): one toolbar row, the notes only when they apply.*
 - **Medium – "Copy marked matches" and "Export" sit below the 48 cards of a page.** They act
   on the whole profile (all marks), not on the page, yet they are reached by scrolling past
   the grid, and the page selector exists only above the grid (no pager below, so going on
   after the last card means scrolling back up).
+  *Addressed by F29 (2026-11-15): copy and export are in the popover "Export and copy" of the
+  toolbar and a pager sits below the grid.*
 - **Medium – "Clean up storage" and the cache check are in the results tab.** They are
   maintenance and belong to neither "search" nor "results"; they are disabled during a run and
   rarely used.
