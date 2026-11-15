@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (CONSTRAINTS_FILE, MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
+from framescout_core import (CARD_KEY_PREFIX, CARD_STYLE, CONSTRAINTS_FILE, MARK_COLORS, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
                              MARKS_BACKUP, MARKS_FILE, NEVER_DELETED, RunLock, UnknownProfileError, delete_marks,
                              hidden_text, hide_no_match, lock_held, mark_style, marks_backup, marks_restore_offer, page_cards,
                              progress_text, read_marks, ReviewProgress, review_progress,
@@ -433,35 +433,73 @@ def test_progress_text_summarizes_the_review_of_a_profile(progress, paged, text)
 
 # --- the colors of the selected option of a mark (A24) ---
 
-def test_mark_style_colors_the_selected_option_of_each_marked_control():
-    style = mark_style({'mark_a1': MARK_MATCH, 'mark_b2': MARK_NO_MATCH, 'mark_c3': MARK_OPEN,
-                        'mark_d4': MARK_MATCH})
+def test_mark_style_colors_the_selected_option_of_each_marked_card():
+    style = mark_style({'fscard-a1': MARK_MATCH, 'fscard-b2': MARK_NO_MATCH, 'fscard-c3': MARK_OPEN,
+                        'fscard-d4': MARK_MATCH})
     assert style.startswith('<style>') and style.endswith('</style>')
     match_background, match_border = MARK_COLORS[MARK_MATCH]
     reject_background, reject_border = MARK_COLORS[MARK_NO_MATCH]
-    # one rule per state listing the selected button of each control in that state, named as
-    # Streamlit 1.66.1 does: the key class of the element, the variant of its buttons and the
-    # data-selected attribute of the selected one (no kind attribute any more, A49)
-    assert ('.st-key-mark_a1 button[data-variant="segmented_control"][data-selected], '
-            '.st-key-mark_d4 button[data-variant="segmented_control"][data-selected]'
+    # one rule per state listing the selected button of the mark control of each card in that
+    # state, named as Streamlit 1.66.1 does: the key class of the card's container, the
+    # variant of its buttons and the data-selected attribute of the selected one (no kind
+    # attribute any more, A49)
+    assert ('.st-key-fscard-a1 button[data-variant="segmented_control"][data-selected], '
+            '.st-key-fscard-d4 button[data-variant="segmented_control"][data-selected]'
             f'{{background-color:{match_background}!important;border-color:{match_border}!important;'
             'color:inherit!important}') in style
-    assert ('.st-key-mark_b2 button[data-variant="segmented_control"][data-selected]'
+    assert ('.st-key-fscard-b2 button[data-variant="segmented_control"][data-selected]'
             f'{{background-color:{reject_background}!important;border-color:{reject_border}!important;'
             'color:inherit!important}') in style
-    assert 'mark_c3' not in style  # undecided keeps Streamlit's look
+    assert 'fscard-c3' not in style  # undecided keeps Streamlit's look
     assert 'kind=' not in style  # the 1.66.1 buttons carry no kind attribute (A49)
+
+
+def test_mark_style_shows_the_state_on_the_card_itself():
+    # F30: a marked card must not look like an unmarked one; a frame in the state's color
+    # (a box-shadow: it follows the rounded corners and changes no size), and the photo of a
+    # card marked as no match is dimmed, so the states differ by more than their color
+    style = mark_style({'fscard-a1': MARK_MATCH, 'fscard-b2': MARK_NO_MATCH})
+    assert f'.st-key-fscard-a1{{box-shadow:0 0 0 3px {MARK_COLORS[MARK_MATCH][1]}!important}}' in style
+    assert f'.st-key-fscard-b2{{box-shadow:0 0 0 3px {MARK_COLORS[MARK_NO_MATCH][1]}!important}}' in style
+    assert re.search(r'\.st-key-fscard-b2 img\{opacity:0\.\d+!important\}', style)
+    assert 'fscard-a1 img' not in style
+
+
+def rgb(color):
+    return [int(n) for n in re.findall(r'\d+', color)[:3]]
+
+
+def test_the_mark_colors_are_blue_and_orange():
+    # told apart without red and green (decided 2026-11-13, F30)
+    for state in (MARK_MATCH, MARK_NO_MATCH):
+        assert rgb(MARK_COLORS[state][0]) == rgb(MARK_COLORS[state][1])  # one hue per state
+    red, green, blue = rgb(MARK_COLORS[MARK_MATCH][1])
+    assert blue > red and blue > green
+    red, green, blue = rgb(MARK_COLORS[MARK_NO_MATCH][1])
+    assert red > green > blue
+
+
+def test_the_card_style_fits_every_photo_into_a_square():
+    # equal cells (F30): the photo of every card container is shown in a square box, whole
+    assert CARD_KEY_PREFIX == 'fscard-'
+    assert CARD_STYLE.startswith('<style>') and CARD_STYLE.endswith('</style>')
+    rule = re.search(r'\[class\*="st-key-fscard-"\] img\{([^}]*)\}', CARD_STYLE)
+    assert rule and 'aspect-ratio:1/1' in rule.group(1) and 'object-fit:contain' in rule.group(1)
+    # Streamlit 1.66.1 sizes the elements around an image to its natural width (checked in a
+    # browser): they are stretched to the card's width, or a small photo gets a smaller cell
+    assert ('[class*="st-key-fscard-"] :is(div:has(> [data-testid="stImage"]), [data-testid="stImage"], '
+            '[data-testid="stImageContainer"]){width:100%!important}') in CARD_STYLE
 
 
 def test_mark_style_is_empty_without_a_decided_mark():
     assert mark_style({}) == ''
-    assert mark_style({'mark_a1': MARK_OPEN}) == ''
+    assert mark_style({'fscard-a1': MARK_OPEN}) == ''
 
 
 def test_mark_style_names_a_key_as_streamlit_turns_it_into_a_class():
     # Streamlit 1.66 trims the key and replaces every character but letters, digits, "_"
     # and "-" by "-"
-    assert '.st-key-mark_a-b-c button' in mark_style({' mark_a.b c ': MARK_MATCH})
+    assert '.st-key-fscard-a-b-c button' in mark_style({' fscard-a.b c ': MARK_MATCH})
 
 
 def test_mark_style_was_checked_with_the_pinned_streamlit():
@@ -490,6 +528,9 @@ def test_mark_style_selectors_exist_in_the_installed_streamlit_frontend():
     assert any('"data-variant":' in text and '`segmented_control`' in text for text in bundle)
     # the selected button is styled by its data-selected attribute
     assert any('&[data-selected]' in text for text in bundle)
+    # the elements around an image that CARD_STYLE stretches (F30)
+    assert any('`stImage`' in text or '"stImage"' in text for text in bundle)
+    assert any('`stImageContainer`' in text or '"stImageContainer"' in text for text in bundle)
 
 
 # --- backup and restore (F1) ----------------------------------------------------------------

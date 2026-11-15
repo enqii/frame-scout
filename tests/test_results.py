@@ -1,11 +1,12 @@
 """The result file of a search (results.json) and the app's result gallery helpers (A12, P4)."""
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
 
-from framescout_core import (QUERY_NOTE, RESULTS_FILE, RESULTS_FORMAT, closest_query, load_profiles, open_command, openable_photo, page_count,
+from framescout_core import (QUERY_NOTE, RESULTS_FILE, RESULTS_FORMAT, card_text, closest_query, load_profiles, open_command, openable_photo, page_count,
                              page_cards, profile_fingerprints, profile_state, publish_export, query_caption,
                              query_summary, read_results, result_card, results_document, reveal_command,
                              search_fingerprint)
@@ -51,6 +52,46 @@ def test_a_card_names_its_closest_search_text_only_when_given():
 
 def test_the_caption_of_the_closest_search_text():
     assert query_caption('"a red sports car"') == 'Closest search text: "a red sports car"'
+
+
+# --- the text of a card in the app (F30) ---
+
+def text_lines(html):
+    """The (title, shown text) of each line of card_text's HTML."""
+    return re.findall(r'<div style="[^"]*" title="([^"]*)">(.*?)</div>', html)
+
+
+def test_card_text_has_the_same_lines_for_every_card_of_a_view():
+    # equal cells: a fixed number of one-line rows, whatever the card holds (F30)
+    plain_card, with_text = card(), card(2, best_query='"a red car"')
+    assert len(text_lines(card_text(plain_card, closest_line=False))) == 3
+    assert len(text_lines(card_text(plain_card, closest_line=True))) == 4  # an empty row for the missing text
+    assert len(text_lines(card_text(with_text, closest_line=True))) == 4
+    for html in (card_text(plain_card, closest_line=True), card_text(with_text, closest_line=True)):
+        # one line of HTML: a blank line would end the HTML block of the Markdown
+        assert '\n' not in html
+        # every row stays one line long and shows its whole text as a tooltip
+        assert all('white-space:nowrap' in style and 'text-overflow:ellipsis' in style
+                   for style in re.findall(r'style="([^"]*)"', html))
+
+
+def test_card_text_names_rank_score_part_detail_closest_text_and_path():
+    lines = text_lines(card_text(card(7, best_query='"a red car"'), closest_line=True))
+    assert [title for title, _ in lines] == ['#7 · Score +3.12 · Full image', 'text 0.310',
+                                             'Closest search text: &quot;a red car&quot;', r'sub\a.jpg']
+    assert lines[0][1] == '<b>#7</b> · Score +3.12 · Full image'
+    assert lines[2] == ('Closest search text: &quot;a red car&quot;', 'Closest search text: &quot;a red car&quot;')
+    # without a closest text in its view the card has no such row
+    assert [title for title, _ in text_lines(card_text(card(7), closest_line=False))] == [
+        '#7 · Score +3.12 · Full image', 'text 0.310', r'sub\a.jpg']
+
+
+def test_card_text_escapes_what_a_photo_name_may_hold():
+    # file names may hold any character: none of it may become HTML, Markdown or math
+    html = card_text(card(relative=r'a<b>&"c" $x$ *y* `z`.jpg', label='<i>'), closest_line=False)
+    assert '<b>&' not in html and '<i>' not in html and '$' not in html
+    assert r'a&lt;b&gt;&amp;&quot;c&quot; &#36;x&#36; *y* `z`.jpg' in html
+    assert '&lt;i&gt;' in html
 
 
 def test_a_card_names_the_closest_text_only_among_several():
