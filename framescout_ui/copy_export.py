@@ -1,4 +1,7 @@
-"""Copying the marked matches and exporting the result list of a profile, below its gallery (A17, F5, A46)."""
+"""Copying the marked matches and exporting the result list of a profile (A17, F5, A46).
+
+Both are in the popover "Export and copy" of the results toolbar (F29).
+"""
 from pathlib import Path
 
 import streamlit as st
@@ -118,11 +121,12 @@ def open_target_folder(key, photo_folders):
     gallery_action(open_path, target if target is not None and target.is_dir() else None, f'The folder {target}')
 
 
-def show_copy(name, entry, marks, photo_folders, profile_exists):
-    """Copying the photos of profile name marked as match to a folder, below its gallery (A17).
+def show_copy(name, entry, marks, photo_folders, profile_exists, notices):
+    """Copying the photos of profile name marked as match to a folder, in the popover "Export and copy" (A17, F29).
 
     The target folder can be changed only for a profile that still exists: it is saved under
-    the profile name, which a later profile could take (A33).
+    the profile name, which a later profile could take (A33). notices: the container below
+    the toolbar that shows the copy's progress and result, also when the popover is closed.
     """
     st.markdown('**Copy marked matches**')
     matches = [photo for photo, state in marks.items() if state == MARK_MATCH]
@@ -152,11 +156,15 @@ def show_copy(name, entry, marks, photo_folders, profile_exists):
     c2.button('Open target folder', on_click=open_target_folder, args=(key, photo_folders),
               disabled=target is None or not target.is_dir(), width='stretch')
     if copy:
-        copy_matches(name, key, photo_folders)
+        with notices:
+            copy_matches(name, key, photo_folders)
 
 
-def show_export(name, entry, marks, marks_error):
-    """Exporting the result list of profile name as a CSV table and a file list, below its gallery (F5)."""
+def show_export(name, entry, marks, marks_error, notices):
+    """Exporting the result list of profile name as a CSV table and a file list, in "Export and copy" (F5, F29).
+
+    notices: the container below the toolbar that shows the result of the last export.
+    """
     st.markdown('**Export list**')
     st.caption(f'Writes the ranked photos of "{plain(name)}" as a CSV table (rank, path, score, crop, mark) and as a '
                'text file with one path per line, e.g. for a cataloging program, to the folder '
@@ -172,7 +180,8 @@ def show_export(name, entry, marks, marks_error):
         st.caption(f'{MARKS_FILE} cannot be read: the mark column of the list stays empty.')
     if 'export_notice' in st.session_state:
         kind, text = st.session_state.pop('export_notice')
-        (st.success if kind == 'success' else st.warning)(plain(text))
+        with notices:
+            (st.success if kind == 'success' else st.warning)(plain(text))
     c1, c2 = st.columns(2)
     c1.button(f"Export {count:,} photo{'' if count == 1 else 's'}", on_click=export_list, args=(name, entry['gallery'], entry['cards'], only),
               disabled=not count, width='stretch', key='export_list')

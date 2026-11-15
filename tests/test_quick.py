@@ -579,7 +579,7 @@ def test_the_results_selector_holds_the_profiles_and_the_last_quick_result():
     selector = ast.unparse(functions['show_results'])
     assert 'quick_entry_label(quick, names)' in selector
     assert 'results_choice(' in selector
-    assert "st.selectbox('Results of', options, key='results_profile')" in selector
+    assert "st.selectbox('Results of', options, key='results_profile', width=TOOLBAR_SELECT_WIDTH)" in selector
     assert 'show_quick_results(' in selector and 'show_profile_results(' in selector
     # one fragment around both views; the views themselves are no fragments of their own
     decorated = {name for name, node in functions.items()
