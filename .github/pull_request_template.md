@@ -16,6 +16,11 @@
      results/references. Write "None" if there are none. Breaking changes need the user's
      approval first and a `!` + `BREAKING CHANGE:` footer in the commit. -->
 
+## Net line change
+
+<!-- Code / tests / docs, e.g. "code +40 −120, tests +10 −60, docs +5 −30" (`git diff --shortstat origin/main...HEAD`
+     per area). More than about 300 added lines of non-test code: explain why a smaller solution was not enough. -->
+
 ## Tests
 
 **Executed** (commands and output):

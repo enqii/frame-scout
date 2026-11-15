@@ -63,6 +63,12 @@ must run code from the PR, use a separate worktree and remove it before you retu
    per finding (file:line – issue), whether any finding looks like a blocker, and where the
    comments are (inline, or your own per-finding comments). Do not paste the full review.
 
+Also look for simplification: ask "what could this PR delete?" (code for unobserved failure
+cases, compatibility code for never-released states, docs that retell the code) and post such
+findings like any other. Do not report hypothetical rare cases as fixes or backlog items: the
+default is "declined, known limit" (`CLAUDE.md` → "Engineering principles") unless user data
+is at risk. Check the PR's "Net line change" section and the 300-line rule.
+
 Review against `CLAUDE.md` as well: project language English, Conventional Commits,
 user data untouched, tests executed vs. claimed, general-purpose wording, and the
 definition of done in `.github/pull_request_template.md`.
