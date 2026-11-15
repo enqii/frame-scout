@@ -122,7 +122,8 @@ def card_text(card, closest_line):
     Rows: rank, score caption and part; the detail; the closest search text (query_caption,
     only with closest_line, the same for every card of a view: an empty row for a card that
     names none); the photo's relative path. Each row is one line long, with its whole text
-    as a tooltip, so all cards of a view have the same height. For st.markdown with
+    as a tooltip, and an empty row keeps its line (a non-breaking space; an empty div has no
+    height), so all cards of a view have the same height. For st.markdown with
     unsafe_allow_html: everything is escaped, and the HTML has no line break, which would
     end its HTML block in the Markdown.
     """
@@ -132,10 +133,10 @@ def card_text(card, closest_line):
             (_CARD_DETAIL, card['detail'], None)]
     if closest_line:
         closest = card.get('best_query')
-        rows.append((_CARD_DETAIL, query_caption(closest) if closest else '', None if closest else '&nbsp;'))
+        rows.append((_CARD_DETAIL, query_caption(closest) if closest else '', None))
     rows.append((_CARD_DETAIL, card['relative'], None))
     return ''.join(f'<div style="{style}" title="{_card_escape(title)}">'
-                   f'{_card_escape(title) if shown is None else shown}</div>' for style, title, shown in rows)
+                   f'{shown or _card_escape(title) or "&nbsp;"}</div>' for style, title, shown in rows)
 
 
 def query_summary(entry):
