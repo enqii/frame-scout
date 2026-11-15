@@ -3,8 +3,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (MARK_MATCH, MARK_NO_MATCH, REVIEW_PHOTO_KEY, REVIEW_PREVIEW_SIZE, REVIEW_STYLE, card_text,
-                             first_undecided, has_closest_line, next_undecided, openable_photo, review_index,
+from framescout_core import (MARKS_FILE, MARK_MATCH, MARK_NO_MATCH, REVIEW_PHOTO_KEY, REVIEW_PREVIEW_SIZE, REVIEW_STYLE,
+                             card_text, first_undecided, has_closest_line, next_undecided, openable_photo, review_index,
                              review_position, review_shown, review_state_text, save_marks)
 from framescout_images import render_preview
 
@@ -69,12 +69,18 @@ def review_choice(profile, cards, path, state):
     """Save state for the photo path and show the next undecided photo (on_click of "Match", "No match", "Skip").
 
     state None is "Skip": the photo stays as it is. A mark is saved through save_marks, only
-    for a profile that still exists, as on a card (set_mark).
+    for a profile that still exists, as on a card (set_mark). If marks.json cannot be read
+    (now), no mark is saved, and Skip moves to the next photo, since every photo counts as
+    undecided then.
     """
     if not _still_shown(path):
         return
     index = review_index(cards, {}, path)
-    marks = dict(load_marks()[0].get(profile, {}))
+    all_marks, marks_error = load_marks()
+    marks = dict(all_marks.get(profile, {}))
+    if marks_error is not None and state is not None:
+        _show(path, ('warning', f'{MARKS_FILE} cannot be read, so the mark is not saved: {marks_error}'))
+        return
     if state is not None:
         try:
             save_marks(MARKS, profile, {path: state}, profiles_file=PROFILES)
@@ -140,7 +146,9 @@ def review_dialog(cards, thumbs, profile, can_mark, find_disabled):
         state = st.session_state.review = {**state, 'path': card['path'], 'notice': None}
     saved = marks.get(card['path'])
     st.caption(REVIEW_STYLE + '\n\n' + review_position(index, len(cards))
-               + (f' · {review_state_text(saved)}' if profile is not None else '')
+               # no saved mark where the photos cannot be marked: without readable marks, or for
+               # a profile that is gone (it took its marks along), every photo would look undecided
+               + (f' · {review_state_text(saved)}' if profile is not None and can_mark else '')
                + ' · A ranking by similarity, not a guaranteed identification.', unsafe_allow_html=True)
     show_preview(card, thumbs)
     st.markdown(card_text(card, has_closest_line(cards)), unsafe_allow_html=True)
