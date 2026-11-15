@@ -134,6 +134,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **I36 – A rollback ZIP over a newer folder leaves `framescout_scoring/`, which shadows the old `framescout_scoring.py`** – done 2026-11-11, [PR #88](https://github.com/enqii/frame-scout/pull/88)
 - [x] **I37 – The reviewer must verify that its findings are on the PR before swapping the label** – done 2026-11-12, [PR #95](https://github.com/enqii/frame-scout/pull/95)
 - [x] **I38 – Agent worktrees block the user's manual test and need forced removal (workflow)** – done 2026-11-12, [PR #95](https://github.com/enqii/frame-scout/pull/95)
+- [x] **I39 – Shrink `docs/ARCHITECTURE.md` to what the code cannot say (simplification)** – done 2026-11-15, [PR #119](https://github.com/enqii/frame-scout/pull/119)
 - [x] **I40 – Reduce `docs/BACKLOG-DONE.md` to one line per ID (simplification)** – done 2026-11-15, [PR #118](https://github.com/enqii/frame-scout/pull/118)
 - [x] **I48 – Python caches in finished agent worktrees block `git worktree remove` (workflow)** – done 2026-11-14, [PR #107](https://github.com/enqii/frame-scout/pull/107)
 

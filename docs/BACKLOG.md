@@ -370,16 +370,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       unpacked size of the CUDA build of PyTorch and pip's peak space use are not measured;
       `TORCH_INSTALL_SPACE['cuda']` (3 GB download, 6 GB installed) is an estimate. Measure on
       the home PC and correct it; could go into the rest of I11. Found in F3 (PR #64).
-- [ ] `ready` **I39 – Shrink `docs/ARCHITECTURE.md` to what the code cannot say (simplification):**
-      the file has about 177 KB and retells the code function by function, so every PR has to
-      update it and the workflow needs a separate `docs-update` agent for that (I17). Cut it to
-      roughly 20–30 KB: the search pipeline, cache signature, data formats (`profiles.json`,
-      `settings.json`, result file, marks), invariants and the verified status. Per-function
-      descriptions go into docstrings (most exist already), the per-file test list is dropped
-      (the test files are the list). Then check whether the separate docs step is still needed
-      (I41). Found on 2026-11-12 in a simplification review of the whole project: the search
-      core (engine, scoring, image loading) has about 1,300 lines, against about 7,500 lines
-      of `framescout_core`, 13,800 lines of tests and 530 KB of Markdown.
 - [ ] `ready` **I41 – Lighter PR workflow (simplification):** four state labels, fresh agents per
       phase and a separate docs agent are heavy for a one-person project. After I39/I40
       decide: fold the docs update back into the implementer (the reason for I17 was the
