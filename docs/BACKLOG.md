@@ -428,6 +428,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
       Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
+
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
 - [ ] `decision` **F6 – "Not this" search texts per profile:** a profile "red car" also ranks
