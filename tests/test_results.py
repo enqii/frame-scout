@@ -75,6 +75,15 @@ def test_card_text_has_the_same_lines_for_every_card_of_a_view():
                    for style in re.findall(r'style="([^"]*)"', html))
 
 
+def test_an_empty_row_of_card_text_keeps_its_line():
+    # an empty div has no height: a card with an empty detail or path (read_results accepts
+    # any string) would be shorter than the others (review of F30)
+    lines = text_lines(card_text(card(detail='', relative=''), closest_line=True))
+    assert len(lines) == 4
+    assert all(shown for _, shown in lines)
+    assert [shown for _, shown in lines[1:]] == ['&nbsp;'] * 3
+
+
 def test_card_text_names_rank_score_part_detail_closest_text_and_path():
     lines = text_lines(card_text(card(7, best_query='"a red car"'), closest_line=True))
     assert [title for title, _ in lines] == ['#7 · Score +3.12 · Full image', 'text 0.310',
