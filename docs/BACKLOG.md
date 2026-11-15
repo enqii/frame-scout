@@ -590,11 +590,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `start_needs`/`start_blocked_text` of `framescout_core/app_state.py` without the
       profile need. Affected: `app.py`, `framescout_core/app_state.py`, user guide. Found in
       the PR #108 review. Size S.
-- [ ] `minor` **F39 – A width limit for the form tabs:** with the 1,300 px limit gone (F30), the
-      other tabs (forms, settings, text areas) stretch over the whole window too. A width limit
-      for those tabs only (not for "Results") could be considered. Affected: `app.py`. Found in
-      F30. Size S.
 - [ ] `minor` **F40 – Check clicking "Match" and "No" in a browser:** the browser check of F30
       used a harness that draws `draw_cards`; a click would have written the checkout's
       `marks.json`. Look at the marking with the real app (mark, take the mark back, page change,
       reload) in the next browser pass, together with F19. Found in F30. Size S.
+- [ ] `minor` **F41 – Close the popover "More" after its action:** a click on "Open photo",
+      "Show in folder" or "Find similar" reruns the page, and Streamlit 1.66.1 keeps the
+      popover open (as documented; checked in headless Edge in the F30 review), so it covers the
+      cards below until the user clicks elsewhere. Sketch: `st.popover(key=..., on_change=...)`
+      tracks its state, and the buttons' callbacks set it closed; costs a rerun per open/close.
+      Affected: `framescout_ui/results.py`. Found in the PR #114 review. Size S.
