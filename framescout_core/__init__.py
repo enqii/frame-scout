@@ -70,7 +70,7 @@ from .marks import (MARKS_FILE, MARKS_BACKUP, MARKS_FORMAT, MARK_OPEN, MARK_MATC
     ReviewProgress, review_progress, progress_text, mark_counts_text, MARK_COLORS, MARK_NO_MATCH_OPACITY, CARD_KEY_PREFIX,
     PHOTO_KEY_PREFIX, PREVIEW_KEY_PREFIX, CARD_STYLE, MARK_STYLE_STREAMLIT, mark_style)
 from .review import (REVIEW_PREVIEW_SIZE, REVIEW_PHOTO_KEY, REVIEW_STYLE, first_undecided, next_undecided, review_index,
-    review_position, review_state_text)
+    review_position, review_shown, review_state_text)
 from .copying import (COPY_FOLDERS_KEY, COPY_MAX_NAMES, default_copy_folder, copy_target,
     copy_photos, copy_summary_text, read_copy_folders, save_copy_folder, rename_copy_folder, forget_copy_folder)
 from .exporting import (EXPORTS_DIR, EXPORT_COLUMNS, EXPORT_MARK_TEXT, EXPORT_MAX_NAMES, export_cards, export_csv,

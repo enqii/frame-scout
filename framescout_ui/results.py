@@ -15,7 +15,7 @@ from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file
 
 from .marks import MARK_LABELS, load_marks, marks_backup_offer, restore_marks_backup, set_mark
 from .copy_export import show_copy, show_export
-from .review import find_similar_button, open_review, show_review
+from .review import close_review, find_similar_button, open_review, show_review
 
 
 # the width of a gallery card in pixels (F30): fixed, so a wider window shows more cards in a
@@ -169,6 +169,7 @@ def show_results(results, quick, photo_folders, folders, model, find_disabled):
     """
     entries = results['profiles'] if results else []
     if not entries and not quick:
+        close_review()  # no list to review (F19)
         if results:
             st.caption('The last search wrote no galleries.')
         return
@@ -354,6 +355,7 @@ def show_quick_results(results, folders, model, find_disabled, toolbar):
     """
     entries = results['profiles']
     if not entries:
+        close_review()  # no list to review (F19)
         st.caption('The last quick search wrote no gallery.')
         return
     entry = entries[0]

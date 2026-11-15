@@ -4,8 +4,8 @@ from pathlib import Path
 import streamlit as st
 
 from framescout_core import (MARK_MATCH, MARK_NO_MATCH, REVIEW_PHOTO_KEY, REVIEW_PREVIEW_SIZE, REVIEW_STYLE, card_text,
-                             first_undecided, has_closest_line, next_undecided, openable_photo, review_index, review_position,
-                             review_state_text, save_marks)
+                             first_undecided, has_closest_line, next_undecided, openable_photo, review_index,
+                             review_position, review_shown, review_state_text, save_marks)
 from framescout_images import render_preview
 
 from .common import MARKS, PROFILES, file_key, open_photo, plain
@@ -156,8 +156,10 @@ def show_review(cards, thumbs, profile, can_mark, find_disabled):
     """Open the review dialog if its state names the gallery of profile (None: the quick search), on every run.
 
     The dialog is called again on each run of the results, so a rerun of the page keeps it open.
+    A state of another list (or of an empty one) is dropped (review_shown).
     """
     state = st.session_state.get('review')
-    if not cards or state is None or state.get('profile') != profile:
+    if not review_shown(state, profile, cards):
+        close_review()
         return
     review_dialog(cards, Path(thumbs), profile, can_mark, find_disabled)
