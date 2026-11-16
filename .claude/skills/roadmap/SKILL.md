@@ -19,7 +19,8 @@ briefs in this folder, relay questions to the user and merge on approval.
 The workflow rules (branch naming, labels, definition of done, hold points, user data
 protection) are defined in `CLAUDE.md` → "PR workflow". This skill is the procedure.
 
-Briefs (fill in the `{PLACEHOLDERS}` and pass the result as the subagent prompt):
+Briefs (never copy them into the prompt: the subagent reads its brief itself, see
+section 3):
 - [implementer-brief.md](implementer-brief.md)
 - [reviewer-brief.md](reviewer-brief.md)
 
@@ -112,9 +113,29 @@ Agent(
   model: "<from table>",
   effort: "<from table>",
   isolation: "worktree",
-  prompt: <implementer-brief.md with placeholders filled in>
+  prompt: <the brief prompt below, with the values filled in>
 )
 ```
+
+**Brief prompt (both agents):** do not read the brief and do not write it out again; the
+subagent reads it (it exists in the worktree and in the main checkout). The prompt is only
+the values and the instruction, so it stays short:
+
+```
+You are the implementer for one FrameScout roadmap item. Read
+`.claude/skills/roadmap/implementer-brief.md` first and follow it exactly. It is a
+template; substitute these values for its `{PLACEHOLDERS}` everywhere:
+- {ITEM}: <roadmap line verbatim>
+- {IDS}: <backlog IDs>
+- {MODE}: <mode>
+- {BRANCH}: <branch>
+- {PR}: <PR number or none>
+- {ANSWERS}: <answers verbatim or none>
+- {KIND}: <kind>
+```
+
+For the reviewer use `reviewer-brief.md`, "reviewer" and the values `{PR}`, `{ITEM}`,
+`{REVIEW_LEVEL}`.
 
 **Reviewer** – fresh context, no isolation needed (it does not change code); `effort`
 is always `"medium"`, `model` is `"opus"` for `code-risky` and `"sonnet"` otherwise:
@@ -125,7 +146,7 @@ Agent(
   subagent_type: "general-purpose",
   model: "<opus for code-risky, else sonnet>",
   effort: "medium",
-  prompt: <reviewer-brief.md with placeholders filled in>
+  prompt: <the brief prompt above, for reviewer-brief.md>
 )
 ```
 

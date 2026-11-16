@@ -1,7 +1,9 @@
 # Implementer brief (template)
 
-The orchestrator fills in the `{PLACEHOLDERS}` and passes everything below the line as
-the implementer's prompt.
+The orchestrator does not copy this file. It spawns the implementer with a short prompt
+that gives the placeholder values and tells it to read this brief and follow it. The
+implementer reads everything below the line and substitutes the values from its prompt for
+the `{PLACEHOLDERS}` (`{ITEM}`, `{IDS}`, `{MODE}`, `{BRANCH}`, `{PR}`, `{ANSWERS}`, `{KIND}`).
 
 ---
 
@@ -27,7 +29,7 @@ commit convention). This brief only adds the procedure and commands. If this bri
 `CLAUDE.md` ever disagree, `CLAUDE.md` wins – mention the conflict in your report.
 
 Read only what the item needs – every token you read is paid again on each later turn:
-- `docs/BACKLOG.md` (open items, 39 KB) and `docs/BACKLOG-DONE.md` (finished items, one line each):
+- `docs/BACKLOG.md` (open items, large) and `docs/BACKLOG-DONE.md` (finished items, one line each):
   do not read them whole. Grep both for the item's IDs (e.g. `\*\*E7 –`) and Read those
   entries. `docs/ROADMAP.md` is short (about 50 lines) and may be read whole.
 - `docs/ARCHITECTURE.md`: Grep for the files, functions and IDs you touch and read those
