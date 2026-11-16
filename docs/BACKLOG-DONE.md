@@ -150,6 +150,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **I45 – Flatten the package structure (simplification)** – done 2026-11-16, [PR #126](https://github.com/enqii/frame-scout/pull/126)
 - [x] **I48 – Python caches in finished agent worktrees block `git worktree remove` (workflow)** – done 2026-11-14, [PR #107](https://github.com/enqii/frame-scout/pull/107)
 - [x] **I50 – Support one Python version only (simplification)** – done 2026-11-16, [PR #129](https://github.com/enqii/frame-scout/pull/129)
+- [x] **I51 – Delete or shorten outdated documents (simplification)** – done 2026-11-16, [PR #130](https://github.com/enqii/frame-scout/pull/130)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
