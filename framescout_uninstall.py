@@ -27,8 +27,9 @@ from pathlib import Path
 
 from framescout_core.cleanup import size_text
 from framescout_core.paths import script
-from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, outside_leftovers, programs_in_use, protected_folders,
-                                       remove_items, running_python, search_running, uninstall_plan, user_data)
+from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, app_running, outside_leftovers, programs_in_use,
+                                       protected_folders, remove_items, running_python, search_running, uninstall_plan,
+                                       user_data)
 
 ROOT = Path(__file__).resolve().parent
 # failed paths shown; the rest is counted
@@ -59,6 +60,9 @@ def _blocked(root, out, confirmed=False):
     check it."""
     if search_running(root):
         out('A search is running. Stop it (or wait for its end), close FrameScout and run the uninstall again.')
+        return True
+    if app_running(root):
+        out(f'FrameScout is still running. Close the window of {script("Start")}, then run the uninstall again.')
         return True
     busy = programs_in_use(root, clear_read_only=confirmed)
     if busy:
