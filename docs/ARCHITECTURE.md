@@ -78,7 +78,8 @@ so a release and the snapshots of `main` until the next release carry the same f
 told apart. The `.bat` files skip a hidden version file, the check counts it. Versions before
 I42 have neither the file nor the check. After an update over such a folder its leftover
 files stay (harmless: a package wins over a leftover `framescout_core.py`/`framescout_scoring.py`
-of the same name), and going back to such a version over a newer folder is not detected.
+of the same name, and a leftover `framescout_scoring/ranking.py` from before I45 is an old copy
+that nothing imports), and going back to such a version over a newer folder is not detected.
 
 The engine and the evaluation tool import open_clip and Ultralytics only through
 `framescout_core.hub.import_open_clip` / `import_detector_class` (tests check there is no direct
