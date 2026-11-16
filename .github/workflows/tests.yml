@@ -1,4 +1,4 @@
-# Runs the test suite on Windows, the platform FrameScout targets.
+# Runs the test suite on Windows, the main platform, and on Linux (F47).
 # Only the development requirements (pytest, numpy) are installed: the tests cover
 # framescout_core, which uses the standard library only, and framescout_scoring,
 # which needs numpy (E4/E5), so the job needs neither
@@ -24,9 +24,18 @@ concurrency:
 
 jobs:
   pytest:
-    name: pytest (Windows, Python 3.14)
-    runs-on: windows-latest
+    name: pytest (${{ matrix.label }}, Python 3.14)
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      # A failure on one platform must not hide the result of the other.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows
+          - os: ubuntu-latest
+            label: Linux
     steps:
       # Actions are pinned to commit SHAs because tags can be moved. When updating,
       # change the SHA and its version comment together (see docs/BACKLOG.md I9).
