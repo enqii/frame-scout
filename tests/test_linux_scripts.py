@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+import install_torch
 from framescout_core.cache_dirs import XDG_DERIVED, cache_paths
 from framescout_core.install_check import VERSION_FILE_PATTERN
 from framescout_core.portable_python import (LINUX_PYTHON_RELEASE, LINUX_PYTHON_SHA256, LINUX_PYTHON_URL,
@@ -160,8 +161,10 @@ def test_the_packages_are_installed_with_the_constraints():
     pip = index(lines, r'^if ! \.venv/bin/python -m pip install --no-cache-dir -r requirements/requirements\.txt '
                        r'-c requirements/constraints\.txt; then$')
     assert constraint < torch < pip
-    # exit code 3 of install_torch.py: the user stopped on low disk space (F3), not a failure
-    assert lines[torch + 1:torch + 4] == ['TORCH_RESULT=$?', 'if [ "$TORCH_RESULT" -ge 3 ]; then',
+    # exit code 3 of install_torch.py: the user stopped on low disk space (F3), not a failure;
+    # exactly 3, since a process killed by a signal (OOM killer, Ctrl+C) exits with 128 + n
+    assert lines[torch + 1:torch + 4] == ['TORCH_RESULT=$?',
+                                          f'if [ "$TORCH_RESULT" -eq {install_torch.STOPPED_EXIT_CODE} ]; then',
                                           'failed "Installation stopped. Free some disk space, then run '
                                           'Install-FrameScout.sh again."']
 

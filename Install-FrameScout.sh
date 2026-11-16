@@ -145,10 +145,11 @@ fi
 # install_torch.py too (I18). Relative: pip splits its value at spaces.
 export PIP_CONSTRAINT="requirements/constraints.txt"
 # PyTorch first (CPU or CUDA build); requirements.txt pins the same version. Exit code 3:
-# the user stopped on low disk space (F3), not a failure.
+# the user stopped on low disk space (F3), not a failure. Exactly 3, unlike the .bat's
+# "errorlevel 3": a process killed by a signal (OOM killer, Ctrl+C) exits with 128 + n.
 .venv/bin/python install_torch.py ${TORCH_VARIANT:+"$TORCH_VARIANT"}
 TORCH_RESULT=$?
-if [ "$TORCH_RESULT" -ge 3 ]; then
+if [ "$TORCH_RESULT" -eq 3 ]; then
   failed "Installation stopped. Free some disk space, then run Install-FrameScout.sh again."
 fi
 if [ "$TORCH_RESULT" -ne 0 ]; then
