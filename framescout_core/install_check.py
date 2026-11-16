@@ -157,7 +157,7 @@ def check_packages(site_packages, constraints_text, requirements_text):
     """Check that the packages of requirements/requirements.txt are installed and every installed pinned package has its pin.
 
     A pin of a package that is not installed is no problem unless requirements.txt names it
-    (requirements/constraints.txt may pin packages another Python version needs), and a requirement with an
+    (requirements/constraints.txt may pin packages this installation does not need), and a requirement with an
     environment marker is not required either. torch and torchvision count with any build
     label (+cpu, +cu130).
     """

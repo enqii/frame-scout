@@ -4,16 +4,14 @@
 #     pip install -r requirements\requirements.txt -c requirements\constraints.txt
 # so a fresh install gets these versions instead of the newest releases; requirements.txt
 # keeps the ranges of the direct dependencies. A constraint only limits versions and
-# installs nothing by itself, so a pin of a package that is not needed (e.g. on another
-# Python version) does no harm.
+# installs nothing by itself, so a pin of a package that is not needed does no harm.
 # torch and torchvision are pinned without a local label, so the pins match the CPU (+cpu)
 # and CUDA (+cu126, +cu130) builds that install_torch.py installs; they must equal
 # TORCH_VERSION and TORCHVISION_VERSION in framescout_core/torch_build.py (a test checks it,
 # and that every requirement has a pin it allows).
 # Source: the project venv of the verified runs (Python 3.14, Windows; a CPU engine run with
-# these versions). Refresh the
-# pins by hand in a change of their own: update and test the venv, write the closure of
-# requirements.txt here, then check
+# these versions). Refresh the pins by hand in a change of their own: update and test the
+# venv, write the closure of requirements.txt here, then check
 # - with pip install --dry-run --ignore-installed --report r.json --python-version 3.14
 #   --platform win_amd64 --only-binary=:all: -r requirements\requirements.txt
 #   -c requirements\constraints.txt (in the FrameScout folder) that every resolved package is pinned and has a Windows wheel (this resolves torch from
