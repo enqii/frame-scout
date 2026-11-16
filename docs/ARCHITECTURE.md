@@ -38,8 +38,8 @@ call the app production-ready.
 
 **Not runtime-tested**
 - A fresh `Install-FrameScout.bat` with PyTorch on it, `cuda`/`cu126` installs, other or several
-  GPUs, other Python versions, macOS, a second machine; on Linux the PyTorch and package
-  installation, the app and any search (F48).
+  GPUs, other Python versions, macOS, a second machine; on Linux CUDA and the uninstall (F48;
+  one full CPU search through the app ran in WSL2 on 2026-11-16: 4997 photos, no errors).
 - The first download of a model into an empty cache and the fallback after an incomplete cache
   (E38); the time estimate (F12) of a live search; "Find similar" (F11) with real CLIP vectors
   and in a real browser; an export stopped during its writes; closing the
