@@ -160,6 +160,7 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `framescout_uninstall.py`, `Uninstall-FrameScout.bat` | Uninstaller |
 | `framescout_check.py`, `Check-FrameScout.bat` | Read-only installation self-test (`framescout_core/install_check.py`) |
 | `install_torch.py`, `Install-FrameScout.bat`, `Start-FrameScout.bat` | Installation (CPU or CUDA build of PyTorch) and start on Windows |
+| `framescout-version-<X.Y.0>.txt` | Marks the version of the folder; both `.bat` files stop if there is more than one (I42); the triage PR renames it to the coming release |
 | `assets/profiles.example.json` | Example search profiles; copied to `profiles.json` on the first start |
 | `requirements/requirements.txt`, `requirements/constraints.txt` | Dependencies (ranges, PyTorch pinned) and the exact versions of the verified runs |
 | `requirements/requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite (`pytest.ini` stays in the root: pytest finds its configuration only there) |
@@ -169,5 +170,3 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `CLAUDE.md`, `.claude/` | Rules for Claude Code and the `/roadmap` workflow skill |
 | `profiles.json`, `settings.json`, `photos/`, `references/`, `results/`, `run.log` | User data and output (not in the repo) |
 | `.python/`, `.venv/`, `.cache/`, `.tmp/` | Private Python, environment, caches and model weights (not in the repo) |
-
-A new entry point (a root script that imports FrameScout code) must set `FRAMESCOUT_PACKAGES = True` before its first FrameScout import, so the import guards of `framescout_core` and `framescout_scoring` let it run next to the leftover single files of an older version (I35, I36); add it to `ENTRY_POINTS` in `tests/test_layout.py`, which enforces the order.

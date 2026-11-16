@@ -117,6 +117,8 @@ PRs and what is missing from the window, and wait for the user's explicit yes. T
    `docs/ROADMAP-DONE.md`. The next item must still be the first `- [ ]` line.
 6. Check the links and IDs: every ID named in `docs/ROADMAP.md` or `docs/ROADMAP-DONE.md`
    exists in `docs/BACKLOG.md` or `docs/BACKLOG-DONE.md`.
+6a. Version file (I42): `git mv` the root file `framescout-version-<X.Y.0>.txt` to the version
+   that step 4 will propose (last release's minor + 1), unless it already has that name.
 7. Commits: Conventional Commits, e.g. `docs(backlog): triage … (F1–F4)`, pushed after
    each commit (`git push -u origin chore/triage-<date>`). Stage files by name.
 8. Open a **non-draft PR** with the template `.github/pull_request_template.md`
