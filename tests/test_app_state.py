@@ -3,8 +3,8 @@ import ast
 
 from app_source import app_files, page_tree
 from framescout_core.app_state import (APP_TABS, FORM_TAB_MAX_WIDTH, PAGE_STYLE, RESULTS_TAB, RUN_TAB, START_NEEDS_TAB,
-                                       results_running_text, start_blocked_text, start_needs, start_needs_line,
-                                       state_line)
+                                       button_blocked_text, results_running_text, start_blocked_text, start_needs,
+                                       start_needs_line, state_line)
 from framescout_core.run_status import NOTHING_NEW
 
 POINTER = 'progress and Stop in the tab "Search"'
@@ -222,3 +222,41 @@ def test_a_running_search_or_cleanup_comes_first():
         'Start is not available because a search or an analysis is running.'
     assert start_blocked_text(needs, active=True, cleanup=True) == \
         'Start is not available because the storage is being cleaned up or the cache checked.'
+
+
+# --- the reasons of "Analyze photos now" and "Quick search" (F37) ---
+
+def test_the_buttons_without_a_profile_ignore_the_profile_need():
+    # neither needs a search profile, so none missing is no reason
+    needs = start_needs(0, 5, True, 'M', None)
+    assert start_blocked_text(needs) is not None
+    for button in ('Analyze photos now', 'Quick search'):
+        assert button_blocked_text(button, needs) is None
+
+
+def test_the_buttons_without_a_profile_name_a_missing_folder_and_model():
+    needs = start_needs(0, None, True, 'M', 'The search model M needs the Python package x.')
+    assert button_blocked_text('Analyze photos now', needs) == (
+        '"Analyze photos now" is not available because: none of the listed photo folders exists (tab "Photo '
+        'source"); the search model "M" cannot be used (tab "Settings").')
+    assert button_blocked_text('Quick search', start_needs(2, None, False, 'M', None)) == (
+        '"Quick search" is not available because: no photo folder (tab "Photo source").')
+
+
+def test_the_buttons_without_a_profile_name_a_running_search_or_cleanup_first():
+    needs = start_needs(0, None, False, 'M', None)
+    assert button_blocked_text('Quick search', needs, active=True) == \
+        '"Quick search" is not available because a search or an analysis is running.'
+    assert button_blocked_text('Analyze photos now', needs, active=True, cleanup=True) == \
+        '"Analyze photos now" is not available because the storage is being cleaned up or the cache checked.'
+
+
+def test_the_app_disables_the_buttons_without_a_profile_by_their_reasons():
+    # F37: the button is disabled exactly when its reason is shown (the quick search also when
+    # nothing is analyzed yet, which its scope line explains)
+    search = tab_blocks()['Search']
+    assert "analyze_blocked = button_blocked_text('Analyze photos now', needs, active, cleaning)" in search
+    assert "st.button('Analyze photos now', disabled=bool(analyze_blocked))" in search
+    assert "quick_blocked = button_blocked_text('Quick search', needs, active, cleaning)" in search
+    assert 'disabled=bool(quick_blocked) or' in search
+    assert 'st.caption(plain(analyze_blocked))' in search and 'st.caption(plain(quick_blocked))' in search

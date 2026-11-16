@@ -10,8 +10,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core.app_state import (APP_TABS, PAGE_STYLE, RESULTS_TAB, results_running_text, start_blocked_text,
-                                       start_needs, start_needs_line)
+from framescout_core.app_state import (APP_TABS, PAGE_STYLE, RESULTS_TAB, button_blocked_text, results_running_text,
+                                       start_blocked_text, start_needs, start_needs_line)
 from framescout_core.cleanup import cleanup_running, count_text
 from framescout_core.estimate import finishing_minutes, gallery_thumbnails, known_throughput, start_summary
 from framescout_core.models import MODELS
@@ -276,16 +276,16 @@ with search_tab:
     if st.session_state.get('analyze_notice'):
         st.warning(st.session_state.pop('analyze_notice'))
     # not gated on the photo count: it is the one remembered for the browser session (A27),
-    # while the engine reads the folders again, e.g. for photos added since (review)
-    analyze_now = st.button('Analyze photos now', disabled=active or not folder_scans or bool(model_missing))
-    if active:
-        st.caption('Not available while a search or an analysis runs or the storage is being cleaned up.')
+    # while the engine reads the folders again, e.g. for photos added since (review). Its
+    # needs are Start's without a profile, and it says which one is missing (F37)
+    analyze_blocked = button_blocked_text('Analyze photos now', needs, active, cleaning)
+    analyze_now = st.button('Analyze photos now', disabled=bool(analyze_blocked))
+    if analyze_blocked:
+        st.caption(plain(analyze_blocked))
     elif analysis_text:
         st.info(analysis_text)
     if analysis_space and not active:
         st.warning(analysis_space)
-    if model_missing and not active:
-        st.warning(model_missing)  # why the button is not available
     if analyze_now:
         start_engine(notice='analyze_notice', analyze_only=True)
     show_status(active)
@@ -304,15 +304,20 @@ with search_tab:
     # resets the field in the browser, which would drop a text typed but not searched for yet
     if active:
         restore_value('quick_query')
+    # its needs are Start's without a profile (F37); that nothing is analyzed yet is said by
+    # its scope line below
+    quick_blocked = button_blocked_text('Quick search', needs, active, cleaning)
     with st.form('quick_search', border=False):
         c1, c2 = st.columns([4, 1], vertical_alignment='bottom')
         c1.text_input('Search text (in English)', key='quick_query', max_chars=QUICK_QUERY_MAX, disabled=active,
                       placeholder='e.g. a red car in the snow')
         quick_start = c2.form_submit_button('Quick search', width='stretch', on_click=keep_value,
                                             args=('quick_query',),
-                                            disabled=active or not folder_scans or bool(model_missing)
-                                            or (quick_counts is not None and not (quick_counts[0] or quick_counts[2])))
-    if quick_counts is not None:
+                                            disabled=bool(quick_blocked) or
+                                            (quick_counts is not None and not (quick_counts[0] or quick_counts[2])))
+    if quick_blocked:
+        st.caption(plain(quick_blocked))
+    elif quick_counts is not None:
         st.caption(quick_scope_text(len(photo_scan.paths), *quick_counts))
     if quick_start:
         query = ' '.join(str(st.session_state.get('quick_query') or '').split())

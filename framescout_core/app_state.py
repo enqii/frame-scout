@@ -1,4 +1,4 @@
-"""The app's state line next to its title and what a search needs at the Start button (F27)."""
+"""The app's state line next to its title and what a search needs at the Start button (F27) and the other run buttons (F37)."""
 from .run_status import FINAL_PHASES, PHASE_LABELS, _count, analysis_only, status_fraction
 
 # the tab in which a missing need is fixed, as the app names its tabs
@@ -128,17 +128,32 @@ def start_needs_line(needs):
     return 'A search needs: ' + ' · '.join(f"{'✓' if met else '✗'} {text}" for _, met, text in needs)
 
 
+def _blocked_text(name, needs, active, cleanup):
+    """Return why the control name is not available, or None: a run or cleanup first, else the missing needs."""
+    if active and cleanup:
+        return f'{name} is not available because the storage is being cleaned up or the cache checked.'
+    if active:
+        return f'{name} is not available because a search or an analysis is running.'
+    missing = [text for _, met, text in needs if not met]
+    if not missing:
+        return None
+    return f'{name} is not available because: ' + '; '.join(missing) + '.'
+
+
 def start_blocked_text(needs, active=False, cleanup=False):
     """Return why Start is not available, or None if it is.
 
     A running search or analysis (active) or a cleanup holding the run lock (cleanup) comes
     first; otherwise the missing needs of start_needs are listed.
     """
-    if active and cleanup:
-        return 'Start is not available because the storage is being cleaned up or the cache checked.'
-    if active:
-        return 'Start is not available because a search or an analysis is running.'
-    missing = [text for _, met, text in needs if not met]
-    if not missing:
-        return None
-    return 'Start is not available because: ' + '; '.join(missing) + '.'
+    return _blocked_text('Start', needs, active, cleanup)
+
+
+def button_blocked_text(button, needs, active=False, cleanup=False):
+    """Return why a run button that needs no search profile is not available, or None (F37).
+
+    For "Analyze photos now" and "Quick search": as start_blocked_text, without the profile
+    need of start_needs. That a quick search has nothing analyzed to search is said by its
+    scope line (quick_scope_text), not here.
+    """
+    return _blocked_text(f'"{button}"', [need for need in needs if need[0] != 'profiles'], active, cleanup)
