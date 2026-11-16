@@ -131,7 +131,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       a warning in a user's `settings.json` (`read_settings`); its cache rows then count as
       "older version" in the cleanup. Search quality is a hold point.
 - [ ] `hardware` **E38 – The online fallback and the first download are not runtime-tested:**
-      `framescout_core.model_cached` decides from the hub cache whether a model loads
+      `framescout_core.hub.model_cached` decides from the hub cache whether a model loads
       offline (E16, P7 A). An engine search ran with the default model only; SigLIP
       (`vit-b-16-siglip`) loaded offline with its tokenizer from a complete cache in a
       Python check (PR #41 review), and with an empty cache the offline errors of open_clip
@@ -320,7 +320,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 - [ ] `hardware` **I11 – The CUDA path is untested on a fresh install and on other GPUs:**
       what remains: a fresh `Install-FrameScout.bat cuda` (about 2.5 GB download; the
       `.venv` already had `cu130`, and only a dry run of the torch step was done), `cu126`
-      and the support limits in `framescout_core.CUDA_BUILDS` (not verified), other GPUs
+      and the support limits in `framescout_core.torch_build.CUDA_BUILDS` (not verified), other GPUs
       and several GPUs (check which one `cuda`, device 0 in CUDA's order, uses when the
       build cannot use all of them), and the app's device choice with a CUDA build on a
       real search (the settings tab was only seen in headless Edge).
@@ -423,7 +423,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `framescout_scoring` a crop's score drops by a weighted z-scored similarity to the best
       exclude text (`z_text - λ·max(0, z_exclude)`); the engine encodes them like custom
       prompts, no cache change. Affected: `app.py`, profile validation and `search_fingerprint`,
-      `framescout_scoring.py`, `framescout_engine.py`, `assets/profiles.example.json`, tests, user
+      `framescout_scoring`, `framescout_engine.py`, `assets/profiles.example.json`, tests, user
       guide. Risks: CLIP handles negation poorly, so it must be a separate query; a too strong λ
       buries real matches. **Question:** additive optional `profiles.json` field (schema change)
       and search quality (λ tuned on a local evaluation set, E32/E20). Size M.
@@ -431,8 +431,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       result pages with the same moment. Sketch: group ranked photos of one folder whose cached
       full-image embeddings have cosine ≥ ~0.95, show the best as the card ("+6 similar",
       expandable); numpy only; toggle "Group similar photos"; marking a group card could offer
-      "apply to all in group". Affected: `framescout_scoring.py`, engine and
-      `framescout_core.write_results` (additive `group` field in `results.json`, check the
+      "apply to all in group". Affected: `framescout_scoring`, engine and
+      `framescout_core.results.result_card` (additive `group` field in `results.json`, check the
       format-version rule of A25), `app.py` gallery, HTML gallery, tests. Risks: the threshold
       depends on the model; different people in the same pose could merge, so a group must stay
       expandable and never hide a photo. **Question:** gallery behavior and the default on/off.
