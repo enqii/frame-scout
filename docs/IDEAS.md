@@ -399,7 +399,7 @@ Disposition: take over → F20; roadmap P25 (A) (2026-11-12)
 - **Hold point:** no.
 
 ### 5. Warn about cloud-only photos before a search
-Disposition: take over → F21; parked: default open, needs real OneDrive (2026-11-12)
+Disposition: discarded: was F21, closed in the triage; default open, needs real OneDrive (2026-11-16)
 - **Problem:** a photo folder inside OneDrive (or another sync client with files on
   demand) can hold thousands of online-only placeholders. Reading them for the analysis
   makes Windows download every file: the search is slow, uses the internet connection,
@@ -444,7 +444,7 @@ Disposition: take over → F22; roadmap P27 (2026-11-12)
 - **Hold point:** no (no new dependency, no schema change).
 
 ### 7. Optional desktop and Start menu shortcut, removed by the uninstaller
-Disposition: take over → F23; parked: first file outside the project folder (2026-11-12)
+Disposition: discarded: was F23, closed in the triage; first file outside the project folder (2026-11-16)
 - **Problem:** users start FrameScout by finding the project folder and double-clicking
   a `.bat` file, which is easy to lose and looks unlike a normal Windows application.
 - **Solution sketch:** at the end of `Install-FrameScout.bat`, ask "Create a desktop

@@ -56,6 +56,10 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **E60 – The feature cache signature names the detector weights only by the name given** – done 2026-11-12, [PR #94](https://github.com/enqii/frame-scout/pull/94)
 - [x] **E61 – The quick search counts a JPEG/HEIC partner as "not analyzed", and the app's count can differ** – done 2026-11-12, [PR #96](https://github.com/enqii/frame-scout/pull/96)
 - [x] **E63 – `cache_read_warning` says "this search" after an analysis without a search** – done 2026-11-13, [PR #100](https://github.com/enqii/frame-scout/pull/100)
+- [x] **E19 – The detection settings in the cache signature are listed by hand** – closed 2026-11-16 in the triage, not done: a comment and the golden test of `detection_options` ask for the manual `ENGINE` bump
+- [x] **E45 – `publish_export` is not one step across files** – closed 2026-11-16 in the triage, not done: a kill within milliseconds between the renames was never observed
+- [x] **E55 – A model without `weights_repo` needs more than E39's download folder** – closed 2026-11-16 in the triage, not done: only needed if such a model is ever added
+- [x] **E62 – Rows cached as black images for a truncated HEIC stay valid after E59** – closed 2026-11-16 in the triage, not done: rare: needs a truncated HEIC analyzed before E59
 
 ### App (`app.py`)
 
@@ -100,6 +104,10 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **A45 – The mark colors in the gallery caption are not checked in a browser** – done 2026-11-13; closed in the triage, no code change: the browser pass found that the colors do not apply with Streamlit 1.66.1; the fix is A49.
 - [x] **A46 – Split `app.py` into modules (simplification)** – done 2026-11-13, [PR #106](https://github.com/enqii/frame-scout/pull/106)
 - [x] **A49 – The mark colors do not apply (replaces A45)** – done 2026-11-13, [PR #105](https://github.com/enqii/frame-scout/pull/105)
+- [x] **A15 – Reference folder and gallery file can get different suffixes** – closed 2026-11-16 in the triage, not done: nothing breaks
+- [x] **A18 – ZIP export** – closed 2026-11-16 in the triage, not done: user decision: copying the matches covers the purpose; a new idea if wanted again
+- [x] **A30 – Only one backup generation of `profiles.json`** – closed 2026-11-16 in the triage, not done: user decision (PR #6 and A13): one backup
+- [x] **A50 – The profile tab is long** – closed 2026-11-16 in the triage, not done: cosmetic
 
 ### Installation / project / workflow
 
@@ -168,3 +176,12 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **F34 – The quick search result is an entry of the results selector** – done 2026-11-13, [PR #113](https://github.com/enqii/frame-scout/pull/113)
 - [x] **F38 – Keep the page of a profile gallery when another results entry is shown** – done 2026-11-14, [PR #113](https://github.com/enqii/frame-scout/pull/113)
 - [x] **F39 – A width limit for the form tabs** – done 2026-11-15, [PR #114](https://github.com/enqii/frame-scout/pull/114)
+- [x] **F21 – Warn about cloud-only photos before a search** – closed 2026-11-16 in the triage, not done: needs a real OneDrive folder and an open default; the idea stays in `docs/IDEAS.md`
+- [x] **F23 – Optional desktop and Start menu shortcut, removed by the uninstaller** – closed 2026-11-16 in the triage, not done: would be the first file written outside the project folder; the idea stays in `docs/IDEAS.md`
+- [x] **F25 – Closest search text in the result list export** – closed 2026-11-16 in the triage, not done: not asked for
+- [x] **F26 – The app itself takes the instance lock of F22** – closed 2026-11-16 in the triage, not done: concerns only an app started with the manual Streamlit command
+- [x] **F35 – Thumbnail size as a setting** – closed 2026-11-16 in the triage, not done: a feature for later, not planned
+- [x] **F42 – Scroll to the first photo after the bottom pager** – closed 2026-11-16 in the triage, not done: would need a JS component
+- [x] **F46 – Preview speed for large RAW/HEIC photos** – closed 2026-11-16 in the triage, not done: never measured
+- [x] **F40 – Check clicking "Match" and "No" in a browser** – closed 2026-11-16 in the triage, not done: merged into A52
+- [x] **F44 – Check the results toolbar in a browser** – closed 2026-11-16 in the triage, not done: merged into A52
