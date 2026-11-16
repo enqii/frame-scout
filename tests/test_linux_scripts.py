@@ -112,6 +112,14 @@ def test_the_download_is_checked_before_it_is_extracted_and_used():
                                                 'match the checksum (SHA-256) that its publisher" \\']
 
 
+def test_an_existing_private_python_is_kept_when_the_download_cannot_happen():
+    lines = commands('Install-FrameScout.sh')
+    start = index(lines, r'^download_python\(\) \{$')
+    prerequisites = [index(lines, r'^if \[ "\$\(uname -m\)" != x86_64 \]; then$'),
+                     index(lines, r'^if ! command -v curl >/dev/null 2>&1; then$')]
+    assert start < min(prerequisites) and max(prerequisites) < index(lines, r'^rm -rf \.python$')
+
+
 def test_the_python_is_extracted_in_tmp_and_moved_as_a_whole():
     # an interrupted extraction must not leave a .python that looks complete
     assert setting('PYTHON_ARCHIVE').startswith('.tmp/')
