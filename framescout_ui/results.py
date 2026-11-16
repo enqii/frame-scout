@@ -35,6 +35,9 @@ NO_THUMBNAIL = ('<div style="aspect-ratio:1/1;display:flex;align-items:center;ju
 # controls of the row take the width of their content
 TOOLBAR_SELECT_WIDTH = 280
 TOOLBAR_PAGE_WIDTH = 130
+# the width of the content of the popover "Export and copy" in pixels (F43): fixed, so a long
+# caption or folder path wraps instead of widening it to about 700 px
+EXPORT_POPOVER_WIDTH = 440
 
 
 def go_to_page(key, page):
@@ -271,7 +274,8 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
                        'No match, or skip it, and the next undecided photo follows. A click on a photo opens it there '
                        'too.' + ('' if can_mark else ' The photos of this list cannot be marked here.'))
         with st.popover('Export and copy', help='Open or download the gallery, copy the photos marked as match '
-                                                'to a folder or export the result list.'):
+                                                'to a folder or export the result list.'), \
+                st.container(width=EXPORT_POPOVER_WIDTH):
             show_gallery_actions(entry)
             st.divider()
             show_copy(name, entry, marks, photo_folders, states[name] != 'missing', notices)

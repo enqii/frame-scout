@@ -169,10 +169,11 @@ def show_export(name, entry, marks, marks_error, notices):
     notices: the container below the toolbar that shows the result of the last export.
     """
     st.markdown('**Export list**')
-    st.caption(f'Writes the ranked photos of "{plain(name)}" as a CSV table (rank, path, score, crop, mark) and as a '
-               'text file with one path per line, e.g. for a cataloging program, to the folder '
-               f'{plain(EXPORTS_DIR)} in the results folder. The paths are those of this computer; an export never '
-               'replaces an earlier one.')
+    # F43: one short line, the rest behind the help icon (a long caption widened the popover)
+    st.caption(f'A CSV table and a file list, in the folder {plain(EXPORTS_DIR)} of the results folder.',
+               help=f'Writes the ranked photos of "{plain(name)}" as a CSV table (rank, path, score, crop, mark) and '
+                    'as a text file with one path per line, e.g. for a cataloging program. The paths are those of '
+                    'this computer; an export never replaces an earlier one.')
     key = 'export_matches_' + widget_id(name)
     only = st.checkbox('Only photos marked as match', key=key, disabled=marks_error is not None,
                        help='Only the photos of this list marked as match. Photos marked as match in an earlier '

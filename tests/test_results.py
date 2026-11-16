@@ -152,6 +152,15 @@ def test_the_popover_more_of_a_card_closes_after_its_action():
     assert 'st.session_state[key] = False' in closing
 
 
+def test_the_popover_export_and_copy_has_a_fixed_width():
+    # F43: its content has a fixed width, so the export caption no longer widens it
+    functions = app_functions()
+    [popover] = [node for node in ast.walk(functions['show_profile_results']) if isinstance(node, ast.With)
+                 and ast.unparse(node.items[0].context_expr).startswith("st.popover('Export and copy'")]
+    assert [ast.unparse(item.context_expr) for item in popover.items[1:]] == [
+        'st.container(width=EXPORT_POPOVER_WIDTH)']
+
+
 def test_the_results_have_a_pager_below_the_grid():
     # F29: a second pager below the grid; in the profile results with "Go to the first undecided photo"
     functions = app_functions()
