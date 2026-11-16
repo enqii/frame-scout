@@ -371,7 +371,7 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   else means it could not run.
 - **Uninstall** (`Uninstall-FrameScout.bat [--dry-run]`, P5 part B): runs with the private
   `.python` (not with `.venv`'s Python, which cannot delete itself; without `.python` it only
-  names the folders to delete by hand), refuses while a search runs,
+  names the folders to delete by hand), refuses while a search runs, the app holds its start lock,
   the environment's Python is in use or `settings.json` is unreadable, lists what it deletes and
   what it keeps (`USER_DATA`: photos, references, results with marks, profiles and backup,
   settings, `run.log`, `.tmp/eval`) and the caches outside the folder (listed, never deleted),
@@ -389,9 +389,15 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   exit code 3 of `install_torch.py` means low disk space (a signal kill exits with 128 + n).
   Known limits: x86_64 with glibc only; in a folder installed on the other system, the installer
   replaces its `.python` and `.venv` without a warning; a browser that `framescout_start.py`
-  starts inherits `XDG_CACHE_HOME`/`TMPDIR` (as on Windows `TMP`/`TEMP`); the Python scripts' messages, the driver minimums, the uninstall order
-  (`UNINSTALL_FIRST`) and the check's test for another folder's private Python (`home` ends in
-  `.python/bin`, not `.python`) are still Windows-only (F47 part 3).
+  starts inherits `XDG_CACHE_HOME`/`TMPDIR` (as on Windows `TMP`/`TEMP`). The Python code
+  names the script of the system (`framescout_core.paths.script`: `.bat` on Windows, `.sh`
+  elsewhere) and shows paths in the system's form; `CUDA_BUILDS` holds a Windows and a Linux
+  driver minimum per build (in WSL2 nvidia-smi may report the Windows driver's number: not
+  verified, F48); the uninstall deletes `.venv/bin/python` and `.python/bin/python3` first, lists
+  `~/.config/Ultralytics` (`XDG_CONFIG_HOME`) and, since `.venv/bin/python` is a link to the
+  private Python that runs the uninstall itself, tells a running app by its start lock
+  (`app_running`, on Windows too); the check takes a `home` of `.python/bin` for the private
+  Python `.python`.
 
 ## Environment variables, caches and offline loading
 

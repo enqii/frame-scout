@@ -437,34 +437,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       optional key), then draw it in the review dialog. **Question:** a cache signature or a
       new column and a result format change (hold point). Affected: `framescout_engine.py`,
       `framescout_core`, `framescout_ui/review.py`, user guide. Found in F19. Size M.
-- [ ] `ready` **F47 – Linux support (WSL):** FrameScout installs and starts on Windows only (the four
-      `.bat` files); the Python code already has POSIX branches (`fcntl` locks, `os.nice`,
-      `xdg-open`, `.venv/bin/python`), but nothing is runtime-tested on Linux. User decision
-      2026-11-16: Linux is supported, tried in WSL2; **one Python version for both platforms:
-      Linux downloads a private Python 3.14 into `.python` like Windows (no system `python3`)**,
-      from a standalone build (e.g. `python-build-standalone`) with a checksum; the new download
-      is approved by this decision. Sketch, three PRs (roadmap P47): (1) `ubuntu-latest` in the CI
-      matrix, fix what fails; (2) `.sh` scripts next to the four `.bat` files (same cache
-      variables, `.tmp`, `PIP_CONSTRAINT`, version file and leftover check, exit codes) with the
-      private Python and its checksum in `framescout_core/portable_python.py`; (3) Linux driver
-      minimums in `CUDA_BUILDS`, Linux paths in the uninstaller (`bin/python`, the Ultralytics
-      settings folder), messages that name the script of the platform. Affected: new `.sh`
-      scripts, `framescout_core/torch_build.py`, `uninstall.py`, `portable_python.py`, the
-      messages in `framescout_core/`, `framescout_ui/`, `install_torch.py`, `framescout_check.py`,
-      `framescout_uninstall.py`, `.github/workflows/tests.yml`, `requirements/constraints.txt`
-      (checked for `win_amd64` only; Linux wheels pull in unpinned packages), README, user guide,
-      `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`, `CLAUDE.md` ("How to run"). Risks:
-      `opencv-python` may need `libGL` on minimal systems; torch/`rawpy` wheels for Python 3.14
-      on Linux are unverified (if one is missing, the decision is revisited); `xdg-open` cannot
-      select a file (A19); a second set of scripts to keep in sync; in WSL, photos under `/mnt/c`
-      are much slower than in the Linux file system (say so in the guide). PRs 1 and 3 are "not
-      runtime-tested" until F48. Idea of 2026-11-14. Sizes S, M (`code-risky`), M. Part 1 done
-      2026-11-16 in PR #136 (CI on `ubuntu-latest`; only the storage check of "Clean up
-      storage" failed on Linux: a Windows-only `stat` constant and tests counting its stats).
-      Part 2 done 2026-11-16 in PR #137 (the four `.sh` scripts, Python 3.14.9 from
-      python-build-standalone, x86_64 glibc only; run in WSL2 up to the PyTorch step). For part
-      3, seen in that run: the check's test for the private Python of another folder misses
-      Linux, because `.venv/pyvenv.cfg`'s `home` is `.python/bin` there.
 - [ ] `hardware` **F48 – One full search in WSL2:** run the Linux scripts of F47 on the home PC
       (WSL2, Ubuntu): install, start, a full search with the CPU build, then with CUDA (needs the
       Windows NVIDIA driver; unverified) and uninstall; fix what shows up, record the result in
@@ -472,7 +444,11 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       one full search with the CPU build ran in WSL2 (Ubuntu) through the app: 4997 photos,
       3 profiles, 0 errors, about 5 minutes (lock and log timestamps), three HTML galleries
       written, results shown in the app. Still open: CUDA, `Check-FrameScout.sh`,
-      `Uninstall-FrameScout.sh`, opening a gallery in the browser.
+      `Uninstall-FrameScout.sh`, opening a gallery in the browser. For the CUDA run (F47 part
+      3): which driver number nvidia-smi reports in WSL2 (the Linux minimums of `CUDA_BUILDS`
+      are compared with it), and whether the Linux CUDA wheels pull in packages that
+      `requirements/constraints.txt` does not pin (e.g. `nvidia-*`, `triton`; the CPU
+      environment in WSL2 has only pinned packages).
 - [ ] `decision` **F49 – Choose which profiles a search runs:** a search always scores and exports
       every profile, so refining one profile replaces the other profiles' results too. Sketch: a
       checkbox "Include in the next search" per profile (default on), stored as a list of

@@ -45,8 +45,9 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] `.sh` scripts for install, start, check and uninstall with a private Python 3.14 and its
       checksum (F47 part 2; kind `code-risky`; new download approved 2026-11-16)
       (done 2026-11-16 in PR #137)
-- [ ] Linux driver minimums, uninstaller paths, platform-specific messages (F47 part 3; kind
+- [x] Linux driver minimums, uninstaller paths, platform-specific messages (F47 part 3; kind
       `code`; the run in WSL2 is F48, not scheduled)
+      (done 2026-11-16 in PR #139)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
