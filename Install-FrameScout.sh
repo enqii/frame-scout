@@ -64,6 +64,15 @@ private_python_works() {
 }
 
 download_python() {
+  # first, so that an existing .python is kept when the download cannot happen anyway
+  if [ "$(uname -m)" != x86_64 ]; then
+    failed "FrameScout's private Python for Linux is built for 64-bit x86 processors (x86_64);" \
+           "this computer has $(uname -m)."
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    failed "Downloading Python needs the program curl. Install it (e.g. sudo apt install curl)" \
+           "and run the installer again."
+  fi
   if [ -e .python ] || [ -L .python ]; then
     echo "The private Python in .python is incomplete or not Python $PYTHON_VERSION, so it is"
     echo "downloaded again."
@@ -72,14 +81,6 @@ download_python() {
       failed "The folder .python has to be downloaded again but cannot be deleted. Delete the" \
              "folder .python in this folder and run the installer again."
     fi
-  fi
-  if [ "$(uname -m)" != x86_64 ]; then
-    failed "FrameScout's private Python for Linux is built for 64-bit x86 processors (x86_64);" \
-           "this computer has $(uname -m)."
-  fi
-  if ! command -v curl >/dev/null 2>&1; then
-    failed "Downloading Python needs the program curl. Install it (e.g. sudo apt install curl)" \
-           "and run the installer again."
   fi
   echo "Downloading Python $PYTHON_VERSION (about 37 MB) from GitHub (python-build-standalone) ..."
   if ! curl -fL --retry 3 -o "$PYTHON_ARCHIVE" "$PYTHON_URL"; then
