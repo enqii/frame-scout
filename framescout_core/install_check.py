@@ -237,8 +237,9 @@ def check_writable(folder, label):
             pass
     except OSError as exc:
         return [CheckResult(name, False, f'{folder} cannot be written: {exc}.',
-                            'Move FrameScout to a folder you can write to (e.g. in your user folder, not in '
-                            'C:\\Program Files) and check that a virus scanner does not block it.')]
+                            'Move FrameScout to a folder you can write to (e.g. in your user folder'
+                            + (', not in C:\\Program Files' if os.name == 'nt' else '')
+                            + ') and check that a virus scanner does not block it.')]
     state = '' if Path(folder).is_dir() else ' (created on first use)'
     return [CheckResult(name, True, f'{folder} can be written{state}.', '')]
 
