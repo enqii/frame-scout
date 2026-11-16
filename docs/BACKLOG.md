@@ -343,6 +343,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       findings` comment and CI of the head commit, the orchestrator switches the label to
       `fs:ready` itself and reports. Found on 2026-11-16 in the retro of PR #131 (done by hand
       there). Size S, kind `docs`.
+- [ ] **I53 – A cleanup test fails when the temporary folder is a mount point:**
+      `tests/test_cleanup.py::test_a_root_that_stops_answering_during_the_pass_is_given_up`
+      expects the note to name the root `/` (`root_of` in the test), but on Linux the cleanup
+      names the mount point of the photos, and in WSL2 `/tmp` (pytest's `tmp_path`) is a
+      `tmpfs` of its own: the note names `/tmp`. The code is right, the test's `root_of` is not.
+      Sketch: take the root from the code under test (or the mount point) instead of `/`. Found
+      on 2026-11-16 when F47 part 2 ran the test suite in WSL2 (CI's `ubuntu-latest` passes).
+      Size S, kind `code`.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
@@ -453,6 +461,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       runtime-tested" until F48. Idea of 2026-11-14. Sizes S, M (`code-risky`), M. Part 1 done
       2026-11-16 in PR #136 (CI on `ubuntu-latest`; only the storage check of "Clean up
       storage" failed on Linux: a Windows-only `stat` constant and tests counting its stats).
+      Part 2 done 2026-11-16 in PR #137 (the four `.sh` scripts, Python 3.14.9 from
+      python-build-standalone, x86_64 glibc only; run in WSL2 up to the PyTorch step). For part
+      3, seen in that run: the check's test for the private Python of another folder misses
+      Linux, because `.venv/pyvenv.cfg`'s `home` is `.python/bin` there.
 - [ ] `hardware` **F48 – One full search in WSL2:** run the Linux scripts of F47 on the home PC
       (WSL2, Ubuntu): install, start, a full search with the CPU build, then with CUDA (needs the
       Windows NVIDIA driver; unverified) and uninstall; fix what shows up, record the result in

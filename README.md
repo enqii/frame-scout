@@ -21,6 +21,9 @@ shows them as a gallery.
 - Windows 10 (version 1803 or later) or Windows 11
 - An internet connection for the installation and the first search
 - No Python needed: the installer downloads its own copy
+- Linux (64-bit x86, e.g. Ubuntu in WSL2) is new and not tested with a full search yet: the
+  `.sh` scripts of the same names replace the `.bat` files, see
+  [Linux and WSL](docs/USER-GUIDE.md#linux-and-wsl)
 
 ## Installation
 

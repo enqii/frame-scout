@@ -84,7 +84,9 @@ The tests need neither torch nor a model download:
 ```
 
 GitHub runs them on Windows and Linux (Ubuntu) with Python 3.14 for every pull request and
-every push to `main` (`.github/workflows/tests.yml`).
+every push to `main` (`.github/workflows/tests.yml`). On Linux the paths are
+`.venv/bin/python` and `requirements/…`; the tests that run the `.bat` files run only on
+Windows, those that run the `.sh` scripts only on Linux.
 
 ## Contributing
 
@@ -157,10 +159,10 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `framescout_scoring/` | Scoring package, one file (`__init__.py`): prompt ensemble, scaling, weighting; numpy only |
 | `framescout_images.py` | Image decoding and thumbnails (Pillow, optional HEIF/RAW); no torch; used by the engine and the evaluation tool |
 | `framescout_eval.py`, `assets/framescout_eval_page.html` | Model evaluation tool (see above); not used by the app |
-| `framescout_uninstall.py`, `Uninstall-FrameScout.bat` | Uninstaller |
-| `framescout_check.py`, `Check-FrameScout.bat` | Read-only installation self-test (`framescout_core/install_check.py`) |
-| `install_torch.py`, `Install-FrameScout.bat`, `Start-FrameScout.bat` | Installation (CPU or CUDA build of PyTorch) and start on Windows |
-| `framescout-version-<X.Y.0>.txt` | Marks the version of the folder; both `.bat` files stop if there is more than one (I42); the triage PR renames it to the coming release |
+| `framescout_uninstall.py`, `Uninstall-FrameScout.bat`/`.sh` | Uninstaller |
+| `framescout_check.py`, `Check-FrameScout.bat`/`.sh` | Read-only installation self-test (`framescout_core/install_check.py`) |
+| `install_torch.py`, `Install-FrameScout.bat`/`.sh`, `Start-FrameScout.bat`/`.sh` | Installation (CPU or CUDA build of PyTorch) and start; the `.sh` scripts are the Linux counterparts of the `.bat` files (F47), `tests/test_linux_scripts.py` keeps them in step |
+| `framescout-version-<X.Y.0>.txt` | Marks the version of the folder; the install and start scripts stop if there is more than one (I42); the triage PR renames it to the coming release |
 | `assets/profiles.example.json` | Example search profiles; copied to `profiles.json` on the first start |
 | `requirements/requirements.txt`, `requirements/constraints.txt` | Dependencies (ranges, PyTorch pinned) and the exact versions of the verified runs |
 | `requirements/requirements-dev.txt`, `pytest.ini`, `tests/` | Development dependencies and the test suite (`pytest.ini` stays in the root: pytest finds its configuration only there) |

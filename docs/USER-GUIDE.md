@@ -98,6 +98,35 @@ so treat it as experimental. Person detection can find slightly different boxes 
 than on the CPU, so the order of near-equal matches may differ a little between devices. Under "Settings" the app shows whether PyTorch can use the
 GPU and offers "cuda" only then.
 
+### Linux and WSL
+
+On Linux, including Ubuntu in WSL2 on Windows, the four `.sh` scripts replace the `.bat`
+files of the same names and work the same way. Linux support is new: the scripts are tested
+in WSL2 up to the PyTorch step, but **no full search has run on Linux yet**. They need a 64-bit
+x86 computer with a common distribution (glibc, e.g. Ubuntu, Debian or Fedora), `bash`, `curl`
+and `tar`:
+
+```bash
+git clone https://github.com/enqii/frame-scout.git ~/FrameScout
+cd ~/FrameScout
+./Install-FrameScout.sh          # or: bash Install-FrameScout.sh [cpu|cuda]
+./Start-FrameScout.sh            # Ctrl+C stops the app
+./Check-FrameScout.sh
+./Uninstall-FrameScout.sh        # [--dry-run]
+```
+
+- The installer downloads the same Python 3.14.9 as on Windows, built by the
+  python-build-standalone project (python.org has no Linux build; about 37 MB, checked
+  against a fixed SHA-256), into `.python`.
+- If no browser opens, open <http://127.0.0.1:8501> yourself; in WSL2 the Windows browser
+  reaches it.
+- In WSL, put FrameScout and your photos into the Linux file system (e.g. `~/FrameScout`,
+  `~/photos`): photos under `/mnt/c` are much slower to read. A folder installed on Windows
+  cannot be used from WSL, nor the other way round; install into a folder of its own.
+- Messages of the installer's Python steps, the check and the uninstall still name the `.bat`
+  files: on Linux, run the `.sh` script of the same name.
+- GPU support in WSL2 needs the NVIDIA driver on Windows and is not tested.
+
 ## Using the app
 
 Start `Start-FrameScout.bat`; the browser opens <http://127.0.0.1:8501>. The app has one

@@ -28,14 +28,18 @@ call the app production-ready.
 - Publishing the export (E24/E26) in one CPU smoke run; RAW, HEIC and RAW+JPEG pairs in CPU
   smoke runs (PR #26).
 - Installer download of the private Python (P5 part C) and the uninstall, both under `.tmp`.
+- The four `.sh` scripts (F47) in WSL2 (Ubuntu, x86_64) in a folder with blanks, `!`, `&` and
+  parentheses, with a stand-in `install_torch.py`: the Python download with its checksum (and a
+  wrong one), `.venv`, a repaired `.python`, the check, the start up to the missing Streamlit, the
+  uninstall with its exit code 3; and the test suite with that private Python.
 - Stop, reload and a second browser tab during a search (A4/A5), once by hand.
 - The app with Streamlit `AppTest` (settings, profile forms, marks, cleanup, quick search,
   find similar) and in headless Edge (settings widgets, gallery, mark colors A49).
 
 **Not runtime-tested**
 - A fresh `Install-FrameScout.bat` with PyTorch on it, `cuda`/`cu126` installs, other or several
-  GPUs, other Python versions, macOS/Linux (on Linux only the unit tests run, in CI, F47), a
-  second machine.
+  GPUs, other Python versions, macOS, a second machine; on Linux the PyTorch and package
+  installation, the app and any search (F48).
 - The first download of a model into an empty cache and the fallback after an incomplete cache
   (E38); the time estimate (F12) of a live search; "Find similar" (F11) with real CLIP vectors
   and in a real browser; an export stopped during its writes; closing the
@@ -61,7 +65,7 @@ not run the frontend and cannot see CSS).
 | Shared logic | `framescout_core/` | one module per area, imported from the defining module (`__init__.py` is empty, I45); **standard library only** |
 | Scoring | `framescout_scoring/` | one file, `__init__.py` (a package, not a module, so that a leftover package folder of an older version cannot shadow it); **numpy only** |
 | Evaluation | `framescout_eval.py`, `assets/framescout_eval_page.html` | labelling and AP@k measurement of the search models |
-| Install and run | `Install-FrameScout.bat`, `install_torch.py`, `Start-FrameScout.bat`, `framescout_start.py`, `Check-FrameScout.bat`, `framescout_check.py`, `Uninstall-FrameScout.bat`, `framescout_uninstall.py` | see "Install, start, uninstall" |
+| Install and run | `Install-FrameScout.bat`, `install_torch.py`, `Start-FrameScout.bat`, `framescout_start.py`, `Check-FrameScout.bat`, `framescout_check.py`, `Uninstall-FrameScout.bat`, `framescout_uninstall.py`; the `.sh` scripts of the same names on Linux | see "Install, start, uninstall" |
 | Data | `requirements/`, `assets/profiles.example.json` | pins, examples |
 | Workflow | `.claude/skills/`, `.claude/settings.json`, `.github/` | see "Workflow permissions" |
 
@@ -373,10 +377,22 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   settings, `run.log`, `.tmp/eval`) and the caches outside the folder (listed, never deleted),
   and deletes after the answer `yes`. Exit code 3: everything deleted except the private Python
   the script runs with; the `.bat` removes it last. Program files themselves are not deleted.
+- **Linux** (F47): `Install-`, `Start-`, `Check-` and `Uninstall-FrameScout.sh` (bash, LF
+  endings by `.gitattributes`, mode 100755 in git) do what their `.bat` files do, with the same
+  exit codes; `tests/test_linux_scripts.py` checks the shared lines and runs them on Linux.
+  The private Python is python-build-standalone's `install_only_stripped` build of the same
+  version for x86_64 glibc Linux (`LINUX_PYTHON_URL`/`LINUX_PYTHON_SHA256` in
+  `framescout_core/portable_python.py`, checksum from the release's `SHA256SUMS`); its
+  interpreter is `.python/bin/python3`, the environment's `.venv/bin/python`. Temporary files go
+  to `TMPDIR=.tmp`. Differences: no `pause`, no retry of the move (no virus scanner holds the
+  files), and the architecture and `curl` are checked before the download. Known limits:
+  x86_64 with glibc only; the Python scripts' messages, the driver minimums, the uninstall order
+  (`UNINSTALL_FIRST`) and the check's test for another folder's private Python (`home` ends in
+  `.python/bin`, not `.python`) are still Windows-only (F47 part 3).
 
 ## Environment variables, caches and offline loading
 
-- The `.bat` files set `TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME` (only if not
+- The `.bat` files (and the `.sh` scripts, with `TMPDIR` for `TMP`/`TEMP`) set `TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`, `XDG_CACHE_HOME` (only if not
   defined: a user's value wins and the models are then downloaded there, A36) and `TMP`/`TEMP`/
   `PIP_CACHE_DIR` under the project folder, for an easy cleanup. A user's `XDG_CACHE_HOME` alone
   keeps `TORCH_HOME` and `HF_HOME` unset (torch and huggingface_hub derive them from it). The
