@@ -368,28 +368,37 @@ def test_a_root_probe_that_still_hangs_gets_no_second_thread(monkeypatch):
     assert calls == ['dead share', 'dead share']
 
 
-def no_mount_point_check(monkeypatch):
-    """Switch off the empty mount point check of Linux and macOS (E54).
+def count_photo_stats(monkeypatch):
+    """Record the photos that cleanup._missing stats, in the list that is returned.
 
-    It lists and stats the folder of gone photos and its parents once per folder, which the
-    tests that count the listings and stats of the photos themselves must not see (F47).
+    Only the photos (.jpg) are recorded: the empty mount point check of Linux and macOS
+    (E54) also stats the folder of gone photos and its parents, once per folder, and it
+    keeps running in the tests that count the stats of the photos (F47, review).
     """
     from framescout_core import cleanup
-    monkeypatch.setattr(cleanup, '_EMPTY_MOUNT_POINTS', False)
+    stated, real = [], cleanup._missing
+
+    def missing(path):
+        if str(path).endswith('.jpg'):
+            stated.append(path)
+        return real(path)
+
+    monkeypatch.setattr(cleanup, '_missing', missing)
+    return stated
 
 
 def test_a_folder_with_many_rows_is_listed_once(project, monkeypatch):
     # one listing per folder instead of one stat per photo (much faster on a network share)
-    from framescout_core import cleanup
     names = [f'IMG_{n}.jpg' for n in range(10)]
     for name in names[:8]:
         project.photo(name)
     project.cache([(project.photos / name, CURRENT) for name in names])
-    listed, stated = [], []
-    no_mount_point_check(monkeypatch)
-    real_listdir, real_missing = os.listdir, cleanup._missing
-    monkeypatch.setattr(os, 'listdir', lambda path: listed.append(path) or real_listdir(path))
-    monkeypatch.setattr(cleanup, '_missing', lambda path: stated.append(path) or real_missing(path))
+    from framescout_core import cleanup
+    listed = []
+    stated = count_photo_stats(monkeypatch)
+    # the listings of the photos, not the one of the empty mount point check (E54)
+    real_names = cleanup._folder_names
+    monkeypatch.setattr(cleanup, '_folder_names', lambda path: listed.append(path) or real_names(path))
     scan = project.scan()
     assert sorted(scan['cache_missing']['items']) == [(str(project.photos / n), CURRENT) for n in names[8:]]
     assert [os.path.normcase(p) for p in listed].count(os.path.normcase(str(project.photos))) == 1
@@ -405,10 +414,7 @@ def test_many_names_a_listing_does_not_hold_need_only_a_few_stats(project, monke
     names = [f'IMG_{n:02}.jpg' for n in range(30)]
     project.photo(names[0])
     project.cache([(project.photos / name, CURRENT) for name in names])
-    stated = []
-    no_mount_point_check(monkeypatch)
-    real = cleanup._missing
-    monkeypatch.setattr(cleanup, '_missing', lambda path: stated.append(path) or real(path))
+    stated = count_photo_stats(monkeypatch)
     assert project.scan()['cache_missing']['rows'] == 29
     assert len(stated) == 2 * cleanup._STAT_UP_TO  # the pass and the second look at the gone photos
     assert project.scan()['cache_missing']['names'] == [f'{project.photos} (29 photos)']
@@ -442,13 +448,9 @@ def test_a_listed_name_of_another_case_exists(project):
 
 
 def test_rows_of_a_whole_missing_folder_need_no_stat_each(project, monkeypatch):
-    from framescout_core import cleanup
     gone = project.base / 'renamed' / 'event'
     project.cache([(gone / f'IMG_{n}.jpg', CURRENT) for n in range(10)])
-    stated = []
-    no_mount_point_check(monkeypatch)
-    real = cleanup._missing
-    monkeypatch.setattr(cleanup, '_missing', lambda path: stated.append(path) or real(path))
+    stated = count_photo_stats(monkeypatch)
     assert project.scan()['cache_missing']['rows'] == 10
     assert stated == []
 
@@ -1474,13 +1476,9 @@ def test_the_read_only_uri_opens_a_unc_path(tmp_path):
 
 
 def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, monkeypatch):
-    import framescout_core.cleanup
     gone = project.photos / 'b.jpg'
     project.cache([(gone, CURRENT), (gone, OTHER), (gone, OLD)])
-    calls = []
-    no_mount_point_check(monkeypatch)
-    real = framescout_core.cleanup._missing
-    monkeypatch.setattr(framescout_core.cleanup, '_missing', lambda path: calls.append(path) or real(path))
+    calls = count_photo_stats(monkeypatch)
     assert project.scan()['cache_missing']['rows'] == 3
     assert calls == [str(gone)] * 2  # once in the pass, once more as it is gone
 
