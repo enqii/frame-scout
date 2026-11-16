@@ -105,7 +105,9 @@ for the user's explicit yes to both. Then:
 1. Branch `chore/triage-<YYYYMMDD>` from `origin/main`
    (`git switch --no-track -c …`), repo-local git identity (see `CLAUDE.md`).
 2. `docs/IDEAS.md`: add one line `Disposition: <take over → F<n> | discarded: <reason> |
-   parked: <reason>> (<date>)` under the idea's heading. Nothing else of earlier sections
+   parked: <reason>> (<date>)` under the idea's heading. For a taken-over or discarded idea also cut its text to the
+   heading and that line (the backlog item holds the text); a parked idea keeps its text.
+   Nothing else of earlier sections
    is edited.
 3. `docs/BACKLOG.md`: new items for taken-over ideas in group **F** (next free number: search
    both backlog files), with the text of the idea reduced to problem, sketch, affected
