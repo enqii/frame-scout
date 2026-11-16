@@ -40,7 +40,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-16 in PR #135)
 
 ### P47 – Linux (WSL) (added 2026-11-16; private Python 3.14 like Windows, user decision)
-- [ ] `ubuntu-latest` in the CI matrix and fix what fails (F47 part 1; kind `code`)
+- [x] `ubuntu-latest` in the CI matrix and fix what fails (F47 part 1; kind `code`)
+      (done 2026-11-16 in PR #136)
 - [ ] `.sh` scripts for install, start, check and uninstall with a private Python 3.14 and its
       checksum (F47 part 2; kind `code-risky`; new download approved 2026-11-16)
 - [ ] Linux driver minimums, uninstaller paths, platform-specific messages (F47 part 3; kind

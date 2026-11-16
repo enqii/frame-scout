@@ -34,7 +34,8 @@ call the app production-ready.
 
 **Not runtime-tested**
 - A fresh `Install-FrameScout.bat` with PyTorch on it, `cuda`/`cu126` installs, other or several
-  GPUs, other Python versions, macOS/Linux, a second machine.
+  GPUs, other Python versions, macOS/Linux (on Linux only the unit tests run, in CI, F47), a
+  second machine.
 - The first download of a model into an empty cache and the fallback after an incomplete cache
   (E38); the time estimate (F12) of a live search; "Find similar" (F11) with real CLIP vectors
   and in a real browser; an export stopped during its writes; closing the
@@ -440,7 +441,8 @@ matched). Personal overrides go into `.claude/settings.local.json` (gitignored).
 On GitHub (I8) the ruleset `protect main` blocks deleting and force-pushing the default branch,
 needs linear history and a pull request (rebase merges only, no approval required) and the
 `pytest (Windows, Python 3.14)` check (the job name in `tests.yml`: renaming the job means
-changing the ruleset by hand too). Admins may bypass it only when merging a pull request
+changing the ruleset by hand too); the `pytest (Linux, Python 3.14)` check (F47) is not required
+by the ruleset. Admins may bypass it only when merging a pull request
 (`gh pr merge --admin`, denied in `.claude/settings.json`), never with a direct push. Actions are
 limited to GitHub-owned actions pinned to a SHA, and workflows of outside contributors' pull
 requests need approval. Secret scanning with push protection, Dependabot alerts and private
