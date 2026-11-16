@@ -140,8 +140,7 @@ second review follows your fixes):
 3. Add a section "Review: addressed / declined" to the PR description listing each
    finding with its outcome, and post the same summary as a PR comment.
 4. Re-run the tests locally, wait quietly for CI on the latest push as above (every
-   check must pass; review fixes trigger a new run that may fail on another Python
-   version), then
+   check must pass), then
    `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:ready`.
 
 ## Hold points
