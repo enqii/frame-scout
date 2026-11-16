@@ -513,3 +513,137 @@ Single idea added by hand (no brainstorming run); not checked against the earlie
   keep in sync with the `.bat` files.
 - **Hold point:** product decision (distribution: a second supported platform); not
   runtime-testable without a Linux machine, CUDA on Linux not without an NVIDIA GPU there.
+
+## 2026-11-16
+
+Checked against `docs/ROADMAP.md`, `docs/BACKLOG.md`, `docs/BACKLOG-DONE.md` and the earlier
+ideas (keywords: selected profiles, include, upload, example image, history, recent, moved,
+relink, rename, orientation, resolution, screenshot, histogram, distribution, archive, backup,
+move to another PC).
+
+### 1. Choose which profiles a search runs
+- **Problem:** a search always scores and exports every profile. A user who refines one
+  profile (new text, another reference image) waits for all galleries to be rebuilt and
+  sees the other profiles' results replaced although nothing about them changed.
+- **Solution sketch:** a checkbox "Include in the next search" per profile (default on) and
+  a short note in the summary before the start ("3 of 7 profiles"). The choice is stored in
+  `settings.json` as a list of skipped profile names (not in `profiles.json`), so the profile
+  schema stays as it is; the engine already takes the profile file, so the app can pass a
+  filtered temporary profile file or a new `--only-profile` option. The results of skipped
+  profiles stay as they were (needs a rule for `results.json`: merge instead of replace).
+- **Affected:** `framescout_ui/profiles.py`, `framescout_ui/run.py`, `framescout_core/settings.py`,
+  `framescout_core/results.py` (merge), possibly `framescout_engine.py` (CLI option),
+  user guide, `docs/ARCHITECTURE.md` (`settings.json`, result file).
+- **Effort:** M.
+- **Risks:** results of different runs side by side (another folder or model for the
+  skipped profiles) must be visible per profile; interacts with F13 (keep previous results);
+  a renamed profile must not stay skipped by its old name.
+- **Hold point:** product decision (merge semantics of `results.json`); a new CLI option.
+
+### 2. Quick search with an example image
+- **Problem:** "Find similar" works only from a photo that is already a result card. A user
+  who has a single example picture (a screenshot, a photo from a phone, a product image)
+  has to create a profile with a reference image and run a full search to try it.
+- **Solution sketch:** an optional image upload next to the quick search text. The engine
+  embeds only the uploaded image (model load, no analysis of the photo folders) and ranks
+  the already analyzed photos as the quick search does, alone or combined with the text
+  through the existing reference weight. The upload lives in `results/quick/` and is
+  replaced by the next quick search; it is never copied into `references/`.
+- **Affected:** `framescout_ui/run.py` (quick search area), `framescout_core/quick.py`,
+  `framescout_engine.py` (quick search mode), user guide "Quick search", `docs/ARCHITECTURE.md`.
+- **Effort:** M.
+- **Risks:** the quick search no longer runs without a model load, so it gets slower and
+  needs the progress/stop handling of a run; HEIC/RAW uploads need the same decoders as the
+  photo folders; artwork-to-photo comparisons stay unreliable (say so in the caption).
+- **Hold point:** none (no new dependency, no cache change).
+
+### 3. Recent quick search texts
+- **Problem:** the quick search remembers only the last text. Users who compare a few
+  wordings ("red car", "red sports car at night") retype them, and a search worth keeping
+  is lost after the next one.
+- **Solution sketch:** keep the last 10 distinct quick search texts in a small JSON file in
+  `results/quick/` (written atomically; an unreadable file is ignored with a warning and
+  not replaced) and offer them as a selectbox above
+  the text field; one click fills the field. A button "Save as profile" creates a profile
+  from the current text through the locked profile save.
+- **Affected:** `framescout_core/quick.py`, `framescout_ui/run.py`, user guide, `docs/ARCHITECTURE.md`
+  (results contents; whether cleanup keeps the file).
+- **Effort:** S.
+- **Risks:** another file the cleanup has to know; "Save as profile" needs a free name
+  (taken names get a suffix) and must go through `ProfilesChangedError` handling (A13).
+- **Hold point:** none.
+
+### 4. Reuse analyses after the photo library moved
+- **Problem:** cache rows are keyed by the resolved path. Moving a photo library to a new
+  drive, renaming its top folder or a changed drive letter makes every photo "not analyzed",
+  and on a CPU-only PC the re-analysis of a large library takes hours.
+- **Solution sketch:** when a photo has no valid row, look for a row of the same signature
+  whose file no longer exists at its path and whose file name, size and modification
+  nanoseconds are equal, and copy its embeddings to the new path in the same transaction
+  (the old row stays until "Clean up storage"). The old file is gone, so a content check
+  would need a partial hash stored at analysis time (a cache format change); without it,
+  name + size + mtime_ns is the match rule. Marks are not moved (A21 stays closed). The log and the summary say "N analyses reused from moved photos".
+- **Affected:** `framescout_engine.py` (cache lookup), `framescout_core/cache_check.py` or a
+  new helper (tested on a temporary SQLite file), `docs/ARCHITECTURE.md` ("Feature cache").
+- **Effort:** M.
+- **Risks:** a wrong match (two different files with equal name, size and mtime_ns) gives a
+  photo another photo's embedding: very unlikely, but it is a silent wrong result; copying
+  that keeps the mtime is needed (Explorer moves keep it, some sync tools do not); the
+  lookup must stay fast on a cache with 100,000 rows (an index on size).
+- **Hold point:** cache behavior change (no invalidation, but a new way rows are filled);
+  needs a decision on the match rule.
+
+### 5. Filter results by photo size and orientation
+- **Problem:** large folders contain thumbnails, icons, screenshots and low-resolution web
+  images that can rank high but are useless, and users looking for a cover or a print often
+  want only portrait or only landscape photos. The results cannot be filtered by either.
+- **Solution sketch:** store the decoded width and height (after EXIF orientation) in the
+  cache row when a photo is analyzed (new nullable columns; old rows have none and pass every
+  filter until they are analyzed again). The results toolbar gets "Orientation: any /
+  portrait / landscape / square" and "Smallest edge at least: any / 800 / 1600 / 3000 px";
+  filtering happens at display time, like "Hide photos marked as no match".
+- **Affected:** `framescout_engine.py` (store dimensions), `results.json` (dimensions per
+  result) or a cache lookup in the app, `framescout_ui/results.py`, user guide "Results",
+  `docs/ARCHITECTURE.md` (cache, result file).
+- **Effort:** M.
+- **Risks:** filtered pages reflow like the A24 case; draft decoding (E2) gives the reduced
+  size, so the original size must be read from the header, not the decoded image; HTML
+  gallery parity (F33).
+- **Hold point:** cache/result format change (added columns and fields, no invalidation).
+
+### 6. Score distribution per profile
+- **Problem:** the result list is cut at "Maximum matches", and users cannot tell whether the
+  good matches end at place 20 or continue past place 150. They review until they get tired,
+  or raise "Maximum matches" blindly.
+- **Solution sketch:** a small chart above a profile's results with the scores of all searched
+  photos (the engine already computes them; write a compact histogram, e.g. 40 bins, into
+  `results.json`) and a marker where "Maximum matches" cuts the list. A caption explains that
+  the shape shows where scores drop off and that a score is a relative heuristic, never a
+  probability. Drawn with Streamlit's built-in chart (no new package).
+- **Affected:** `framescout_scoring` (bins), `framescout_engine.py` (`results.json`),
+  `framescout_ui/results.py`, user guide, `docs/ARCHITECTURE.md` (result file).
+- **Effort:** S–M.
+- **Risks:** users may read a gap in the curve as a certainty threshold (wording); the
+  results page is already dense (A50/A51, F24), so the chart should be collapsed by default.
+- **Hold point:** result format addition (a new field in `results.json`); UX decision.
+
+### 7. Archive all user data for a move or before uninstalling
+- **Problem:** the uninstaller keeps user data (I19) but leaves it in the FrameScout folder.
+  To move to a new PC or a fresh install, a user has to know which files matter
+  (`profiles.json`, `references/`, `settings.json`, `results/marks.json`, `results/exports/`)
+  and copy them by hand; F14 covers a single profile only.
+- **Solution sketch:** "Save my data" in the cleanup/maintenance area writes one ZIP (standard
+  library `zipfile`) with these files and a small manifest (format version, FrameScout
+  version) to a folder the user chooses, never inside a photo folder and never replacing a
+  file. "Restore" reads such a ZIP into an empty install only (refuses when `profiles.json`
+  already has profiles), validates profiles like `load_profiles` and rejects path traversal.
+  The cache and thumbnails are left out (they can be rebuilt; mention it). The uninstaller's
+  final message points to "Save my data".
+- **Affected:** new `framescout_core` module (tested with `tmp_path`), `framescout_ui/cleanup.py`
+  or a small maintenance section, `framescout_uninstall.py` (message), user guide,
+  `docs/ARCHITECTURE.md`.
+- **Effort:** M.
+- **Risks:** marks follow absolute photo paths (A21), so they only fit if the photos have the
+  same paths on the new PC (say so); restore must never overwrite user files; overlaps with
+  F14 (shared ZIP code) and A30 (backups).
+- **Hold point:** product decision (scope of restore); no new dependency.
