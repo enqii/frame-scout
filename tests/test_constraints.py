@@ -9,11 +9,11 @@ refreshed (pip install --dry-run --report), not here.
 """
 import ast
 import re
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
-from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_DIR, REQUIREMENTS_FILE, windows_path
+from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_DIR, REQUIREMENTS_FILE
 
 from app_source import app_tree
 
@@ -23,6 +23,11 @@ FOLDER = ROOT / REQUIREMENTS_DIR
 PIN = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)==(\d+(?:\.\d+)*(?:\.post\d+)?)$')
 REQUIREMENT = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)\s*((?:[<>=!]=?\s*[\w.]+\s*,?\s*)*)$')
 SPECIFIER = re.compile(r'^(==|!=|>=|<=|<|>)\s*(\d+(?:\.\d+)*)$')
+
+
+def windows_path(path):
+    """The relative path as the .bat files write it (requirements\\constraints.txt) on any system."""
+    return str(PureWindowsPath(path))
 
 
 def canonical(name):

@@ -13,7 +13,7 @@ from framescout_core.install_check import (CheckResult, check_disk_space,
                                            check_packages, check_torch, check_writable, installed_versions,
                                            requirement_names, venv_python, venv_site_packages)
 from framescout_core.models import DEFAULT_MODEL, MODELS
-from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script, windows_path
+from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script
 from framescout_core.signature import DEFAULT_YOLO_MODEL
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -207,12 +207,6 @@ def test_messages_name_the_scripts_and_files_of_this_system():
     [result] = check_packages(Path('missing'), CONSTRAINTS, 'numpy\n')
     shown = r'requirements\constraints.txt' if windows else 'requirements/constraints.txt'
     assert shown in result.fix and script('Install') in result.fix
-
-
-def test_the_batch_files_name_the_requirement_files_in_their_windows_form():
-    # the .bat checks of test_constraints.py compare with this form on any system
-    assert windows_path(CONSTRAINTS_FILE) == r'requirements\constraints.txt'
-    assert windows_path(REQUIREMENTS_FILE) == r'requirements\requirements.txt'
 
 
 def test_the_real_constraints_and_requirements_can_be_read(tmp_path):

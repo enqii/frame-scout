@@ -9,7 +9,7 @@ the name it has on this system (script, F47). WINDOWS is the one test for the pl
 Windows/Linux decisions of the package use (F47, review).
 """
 import os
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
 REQUIREMENTS_DIR = Path('requirements')
 REQUIREMENTS_FILE = REQUIREMENTS_DIR / 'requirements.txt'
@@ -29,8 +29,3 @@ SCRIPT_SUFFIX = '.bat' if WINDOWS else '.sh'
 def script(name, suffix=SCRIPT_SUFFIX):
     """The file name of the FrameScout script name ("Install", "Start", ...) on this system, e.g. Install-FrameScout.bat."""
     return f'{name}-FrameScout{suffix}'
-
-
-def windows_path(path):
-    """The relative path as Windows Explorer and cmd show it (requirements\\constraints.txt) on any system."""
-    return str(PureWindowsPath(path))
