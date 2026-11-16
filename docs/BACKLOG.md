@@ -391,15 +391,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       data and `NEVER_DELETED` stay). Found on 2026-11-12 in a simplification review, by
       sampling, not by reading every module.
       Triage 2026-11-15: stays open; list per module what would go, then decide.
-- [ ] `ready` **I45 – Flatten the package structure (simplification):** `framescout_core/__init__.py`
-      re-exports about 200 names by hand, and every new function has to be added there; import
-      from the modules instead (`from framescout_core.settings import …`) and keep
-      `__init__.py` nearly empty (the mixed-versions guard is gone since I42).
-      `framescout_scoring` (about 190 lines, numpy only) is an own package:
-      make it one module or a subpackage, keeping the rule "core is standard library only" as
-      a test. Do it together with I32 (entry points into a package), so the imports change
-      once. Found on 2026-11-12 in a simplification review.
-      Triage 2026-11-15: P43, after I42; I32 stays a separate decision.
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and

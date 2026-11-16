@@ -139,6 +139,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **I47 – Keep unneeded complexity out from the start (workflow)** – done 2026-11-15, [PR #120](https://github.com/enqii/frame-scout/pull/120)
 - [x] **I41 – Lighter PR workflow (simplification)** – done 2026-11-16, [PR #122](https://github.com/enqii/frame-scout/pull/122)
 - [x] **I42 – Replace the mixed-versions guard by something simpler (simplification)** – done 2026-11-16, [PR #123](https://github.com/enqii/frame-scout/pull/123)
+- [x] **I45 – Flatten the package structure (simplification)** – done 2026-11-16, [PR #126](https://github.com/enqii/frame-scout/pull/126)
 - [x] **I48 – Python caches in finished agent worktrees block `git worktree remove` (workflow)** – done 2026-11-14, [PR #107](https://github.com/enqii/frame-scout/pull/107)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))

@@ -64,7 +64,7 @@ also runs with the private Python (`.python\python.exe`).
   The output folder must neither be a listed folder nor contain one.
 - `--low-priority` lowers the engine process's priority (Windows: below normal, an
   inherited idle or below normal class is kept; elsewhere `os.nice(10)`) and keeps one or two
-  CPU cores out of the PyTorch threads (`framescout_core.torch_threads`, also for the person
+  CPU cores out of the PyTorch threads (`framescout_core.priority.torch_threads`, also for the person
   detector); the decoding threads are not reduced. The engine does it itself, so the app
   starts it the same way as a manual run. Its effect is not measured yet (E52).
 - Only one search at a time can use an output folder: the engine holds `<output>\run.lock`
@@ -153,8 +153,8 @@ Everything stays local; a model not yet in `.cache` is downloaded on its first u
 | `app.py` | Streamlit user interface: the page layout |
 | `framescout_ui/` | The areas of the user interface (settings, run, results, marks, copying/export, cleanup, profiles); imported only by `app.py`; needs streamlit. Tests that read the app's source use `tests/app_source.py` |
 | `framescout_engine.py` | Search engine as a standalone CLI |
-| `framescout_core/` | Shared helpers of app and engine, one module per area; standard library only |
-| `framescout_scoring/` | Scoring package (`ranking.py`, re-exported by `__init__.py`): prompt ensemble, scaling, weighting; numpy only |
+| `framescout_core/` | Shared helpers of app and engine, one module per area; import from the defining module (`from framescout_core.settings import read_settings`), `__init__.py` has no re-exports; standard library only |
+| `framescout_scoring/` | Scoring package, one file (`__init__.py`): prompt ensemble, scaling, weighting; numpy only |
 | `framescout_images.py` | Image decoding and thumbnails (Pillow, optional HEIF/RAW); no torch; used by the engine and the evaluation tool |
 | `framescout_eval.py`, `assets/framescout_eval_page.html` | Model evaluation tool (see above); not used by the app |
 | `framescout_uninstall.py`, `Uninstall-FrameScout.bat` | Uninstaller |

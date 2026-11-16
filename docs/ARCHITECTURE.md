@@ -57,15 +57,15 @@ not run the frontend and cannot see CSS).
 |---|---|---|
 | Frontend | `app.py`, `framescout_ui/` | Streamlit; `app.py` is page layout, the areas live in `framescout_ui/` (imported only by `app.py`) |
 | Engine | `framescout_engine.py`, `framescout_images.py` | CLI; models, decoding, person detection, cache, ranking, export; `framescout_images` is Pillow/HEIC/RAW decoding and thumbnails (no torch) |
-| Shared logic | `framescout_core/` | one module per area, re-exported by `__init__.py`; **standard library only** |
-| Scoring | `framescout_scoring/` | `ranking.py`; **numpy only** |
+| Shared logic | `framescout_core/` | one module per area, imported from the defining module (`__init__.py` is empty, I45); **standard library only** |
+| Scoring | `framescout_scoring/` | one file, `__init__.py` (a package, not a module, so that a leftover package folder of an older version cannot shadow it); **numpy only** |
 | Evaluation | `framescout_eval.py`, `assets/framescout_eval_page.html` | labelling and AP@k measurement of the search models |
 | Install and run | `Install-FrameScout.bat`, `install_torch.py`, `Start-FrameScout.bat`, `framescout_start.py`, `Check-FrameScout.bat`, `framescout_check.py`, `Uninstall-FrameScout.bat`, `framescout_uninstall.py` | see "Install, start, uninstall" |
 | Data | `requirements/`, `assets/profiles.example.json` | pins, examples |
 | Workflow | `.claude/skills/`, `.claude/settings.json`, `.github/` | see "Workflow permissions" |
 
 Frontend and engine are separate processes: the app spawns the engine with
-`framescout_core.engine_command`, redirects its output to `run.log` and only reads files the
+`framescout_core.settings.engine_command`, redirects its output to `run.log` and only reads files the
 engine writes. Only the engine imports torch (`system_info` in the Settings tab is the app's
 one exception).
 
@@ -81,7 +81,7 @@ files stay (harmless: a package wins over a leftover `framescout_core.py`/`frame
 of the same name), and going back to such a version over a newer folder is not detected.
 
 The engine and the evaluation tool import open_clip and Ultralytics only through
-`framescout_core.import_open_clip` / `import_detector_class` (tests check there is no direct
+`framescout_core.hub.import_open_clip` / `import_detector_class` (tests check there is no direct
 import), because both set environment variables that must precede the import (see
 "Environment variables, caches and offline loading").
 
@@ -89,7 +89,7 @@ import), because both set environment variables that must precede the import (se
 
 ### Models and prompts
 
-The search model comes from the registry `framescout_core.MODELS` (engine option `--model`,
+The search model comes from the registry `framescout_core.models.MODELS` (engine option `--model`,
 setting `model`). The default `vit-b-32-openai` is OpenCLIP `ViT-B-32-quickgelu` with the
 OpenAI weights (plain `ViT-B-32` would run them with GELU, E1). Optional and **not
 evaluated**: `vit-b-16-datacomp`, `vit-l-14-datacomp`, `vit-b-16-siglip` (needs
@@ -140,7 +140,7 @@ reused on the other. This is not a bug.
 ### Analysis
 
 Uncached photos are decoded, searched for persons and preprocessed in threads (`DECODE_THREADS`
-4, `DETECTION_DECODE_THREADS` 2 with detection; `framescout_core.prefetch` bounds the photos in
+4, `DETECTION_DECODE_THREADS` 2 with detection; `framescout_core.pipeline.prefetch` bounds the photos in
 memory), the crops of several photos are embedded in one forward pass of at most `--batch-size`
 crops (`group_batches`), and each group is committed to SQLite in one transaction
 (`store_group`; a failing group is stored photo by photo so only a failing photo counts as an
@@ -168,7 +168,7 @@ identification.
 
 `results/cache.sqlite3`, one row per resolved file path and signature, checked against
 modification nanoseconds and size; embeddings are float16. The signature
-(`framescout_core.feature_signature`) is made from the engine id of the model, whether person
+(`framescout_core.signature.feature_signature`) is made from the engine id of the model, whether person
 detection is on and, only then, the detector settings (`max_persons`, `person_confidence`,
 `--yolo-model`; open: E64) or, without detection, `DRAFT_DECODING`. Golden values for every model
 are pinned in `tests/test_signature.py`.
@@ -350,12 +350,12 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   keeps an installed CUDA build unless `cpu` is given explicitly, checks free disk space first
   (F3; exit code 3 = stopped by the user) and uses the standard library only.
 - **Pins:** `requirements/requirements.txt` has ranges without upper bounds, `torch`/`torchvision`
-  pinned to `framescout_core.TORCH_VERSION`/`TORCHVISION_VERSION` (a test checks both files).
+  pinned to `framescout_core.torch_build.TORCH_VERSION`/`TORCHVISION_VERSION` (a test checks both files).
   `requirements/constraints.txt` (I12) pins the whole dependency closure of the verified venv
   (sorted, no hashes, torch without a local label so `+cpu`/`+cu*` builds all satisfy it); only the
   installer uses it. Refreshing is manual, in a PR of its own (the file header explains the dry-run
   check); `tests/test_constraints.py` keeps it consistent.
-- **Start** (`Start-FrameScout.bat` → `framescout_start.py` → `framescout_core.launch`): sets the
+- **Start** (`Start-FrameScout.bat` → `framescout_start.py` → `framescout_core.app_instance.launch`): sets the
   cache variables, runs Streamlit **in its own process** so the app-instance lock
   (`.tmp/app-instance.lock`, an OS lock, never a pid) lives exactly as long as the app. A second
   start of the same folder opens the browser on the running app's port (`.tmp/app-instance.json`).

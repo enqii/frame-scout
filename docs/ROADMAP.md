@@ -42,7 +42,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       (I42; kind `code-risky`; decided 2026-11-15) (done 2026-11-16 in PR #123)
 
 ### P43 – Package structure (added 2026-11-15)
-- [ ] Flatten `framescout_core/__init__.py` and the `framescout_scoring` package (I45; after P42)
+- [x] Flatten `framescout_core/__init__.py` and the `framescout_scoring` package (I45; after P42)
+      (done 2026-11-16 in PR #126)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
