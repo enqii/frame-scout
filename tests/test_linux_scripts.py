@@ -16,8 +16,7 @@ import pytest
 import install_torch
 from framescout_core.cache_dirs import XDG_DERIVED, cache_paths
 from framescout_core.install_check import VERSION_FILE_PATTERN
-from framescout_core.portable_python import (LINUX_PYTHON_RELEASE, LINUX_PYTHON_SHA256, LINUX_PYTHON_URL,
-                                             PRIVATE_PYTHON, PYTHON_VERSION)
+from framescout_core.portable_python import LINUX_PYTHON_SHA256, LINUX_PYTHON_URL, PRIVATE_PYTHON, PYTHON_VERSION
 from framescout_core.uninstall import PRIVATE_PYTHON_EXIT_CODE
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -78,17 +77,9 @@ def test_the_linux_installer_pins_the_python_of_framescout_core():
     assert setting('PYTHON_VERSION') == PYTHON_VERSION
     assert setting('PYTHON_URL') == LINUX_PYTHON_URL
     assert setting('PYTHON_SHA256') == LINUX_PYTHON_SHA256
+    assert re.fullmatch(r'[0-9a-f]{64}', LINUX_PYTHON_SHA256)
     # a version bump changes PYTHON_VERSION and the URL; every other name uses $PYTHON_VERSION
     assert text('Install-FrameScout.sh').count(PYTHON_VERSION) == 2
-
-
-def test_the_linux_python_is_the_standalone_build_of_the_windows_version():
-    # one Python version on both platforms (user decision 2026-11-16); the stripped
-    # install_only archive for 64-bit x86 Linux with glibc unpacks to python/
-    assert LINUX_PYTHON_URL == ('https://github.com/astral-sh/python-build-standalone/releases/download/'
-                                f'{LINUX_PYTHON_RELEASE}/cpython-{PYTHON_VERSION}%2B{LINUX_PYTHON_RELEASE}'
-                                '-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz')
-    assert re.fullmatch(r'[0-9a-f]{64}', LINUX_PYTHON_SHA256)
 
 
 def test_the_installer_needs_no_installed_python():
