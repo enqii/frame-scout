@@ -20,37 +20,20 @@ if not "%TORCH_VARIANT%"=="" if /i not "%TORCH_VARIANT%"=="cpu" if /i not "%TORC
 rem lower case for install_torch.py
 if /i "%TORCH_VARIANT%"=="cpu" set "TORCH_VARIANT=cpu"
 if /i "%TORCH_VARIANT%"=="cuda" set "TORCH_VARIANT=cuda"
-rem I16: a ZIP of this version extracted over an older folder leaves the older single file
-rem framescout_core.py next to the folder framescout_core, which refuses to load next to it.
-rem This .bat is of the newer version, so the single file is the leftover. Start-FrameScout.bat
-rem has the same lines (a test compares them).
-rem A folder of that name is no leftover ("\*" exists only for a folder): del would ask and
-rem delete the files in it. /f deletes a read-only file; a file that stays (open in another
-rem program) stops here, as the app would not start next to it (review).
-if not exist "framescout_core.py" goto obsolete_done
-if exist "framescout_core.py\*" goto obsolete_done
-if not exist "framescout_core\__init__.py" goto obsolete_done
-echo Deleting framescout_core.py, a leftover of an older FrameScout version.
-del /f "framescout_core.py"
-if not exist "framescout_core.py" goto obsolete_done
-echo framescout_core.py could not be deleted. Close the programs that use it or delete it
-echo yourself, then run this file again.
+rem I42: each version has one framescout-version-<version>.txt. A ZIP extracted over the
+rem folder of another version leaves both files, and files of two versions must not run
+rem together: stop before anything is downloaded or installed. Start-FrameScout.bat has the
+rem same lines (a test compares them).
+set "VERSION_FILES=0"
+for %%F in (framescout-version-*.txt) do set /a VERSION_FILES+=1
+if %VERSION_FILES% leq 1 goto version_checked
+echo This folder holds files of two FrameScout versions (more than one
+echo framescout-version-*.txt), left when a ZIP is extracted over another version.
+echo Extract the ZIP of the version you want into a new, empty folder and run
+echo Install-FrameScout.bat there.
 pause
 exit /b 1
-:obsolete_done
-rem I36: the same for framescout_scoring.py, the single file before the package
-rem framescout_scoring (I30), which refuses to load next to it for older scripts.
-if not exist "framescout_scoring.py" goto obsolete_scoring_done
-if exist "framescout_scoring.py\*" goto obsolete_scoring_done
-if not exist "framescout_scoring\__init__.py" goto obsolete_scoring_done
-echo Deleting framescout_scoring.py, a leftover of an older FrameScout version.
-del /f "framescout_scoring.py"
-if not exist "framescout_scoring.py" goto obsolete_scoring_done
-echo framescout_scoring.py could not be deleted. Close the programs that use it or delete it
-echo yourself, then run this file again.
-pause
-exit /b 1
-:obsolete_scoring_done
+:version_checked
 set "PIP_CACHE_DIR=%CD%\.cache\pip"
 rem Model downloads and library settings go to .cache, unless the user set a variable
 rem (A36): as for a manual engine run, that one wins. With the user's XDG_CACHE_HOME, torch and

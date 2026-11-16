@@ -10,11 +10,6 @@ from pathlib import Path
 
 import streamlit as st
 
-# I35: a script of a version with the packages framescout_core and framescout_scoring, which
-# load for it next to an older version's leftover single files (framescout_core.layout); set
-# before the first FrameScout import. Streamlit runs this file as the module __main__.
-FRAMESCOUT_PACKAGES = True
-
 from framescout_core import (APP_TABS, CACHE_FILE, EXAMPLE_PROFILES_FILE, MODELS, PAGE_STYLE, QUICK_DIR, QUICK_QUERY_MAX,
                              RESULTS_FILE, RESULTS_TAB, cleanup_running, count_text, create_from_example, distinct_folders,
                              engine_command, finishing_minutes, gallery_thumbnails, join_scans, known_throughput,
