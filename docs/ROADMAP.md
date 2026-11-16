@@ -19,28 +19,6 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [~] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
-### P38 – Shrink the backlog archive (added 2026-11-15)
-- [x] Reduce `docs/BACKLOG-DONE.md` to one line per ID and adapt the "moved with its report"
-      rule (I40; kind `docs`) (done 2026-11-15 in PR #118)
-
-### P39 – Shrink the architecture document (added 2026-11-15)
-- [x] Cut `docs/ARCHITECTURE.md` to what the code cannot say (I39; kind `docs`)
-      (done 2026-11-15 in PR #119)
-
-### P40 – Rules against unneeded complexity (added 2026-11-15)
-- [x] Introduce the rules (a)–(e) in `CLAUDE.md`, the reviewer brief and the PR template (I47;
-      kind `docs`)
-      (done 2026-11-15 in PR #120)
-
-### P41 – Lighter PR workflow (added 2026-11-15)
-- [x] Fold the docs step into the implementer, reduce the labels, shorten the workflow texts
-      (I41; kind `docs`; workflow rule change, decided 2026-11-15)
-      (done 2026-11-16 in PR #122)
-
-### P42 – Mixed-versions guard (added 2026-11-15)
-- [x] Replace the guard by one version file checked by the installer and the start script
-      (I42; kind `code-risky`; decided 2026-11-15) (done 2026-11-16 in PR #123)
-
 ### P43 – Package structure (added 2026-11-15)
 - [ ] Flatten `framescout_core/__init__.py` and the `framescout_scoring` package (I45; after P42)
 
