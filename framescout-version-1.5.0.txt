@@ -1,0 +1,5 @@
+This file marks the FrameScout version of this folder; do not delete or rename it.
+
+A ZIP extracted over the folder of another FrameScout version leaves that version's file
+too. Install-FrameScout.bat and Start-FrameScout.bat stop when they find more than one
+framescout-version-*.txt: extract the ZIP into a new, empty folder instead.

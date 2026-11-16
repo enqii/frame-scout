@@ -9,14 +9,6 @@ underscore) are not re-exported: import or monkeypatch them on their defining mo
 The same holds for a public name that another module imports, e.g. read_profiles as
 used by the cleanup: patch framescout_core.cleanup.read_profiles.
 """
-from .layout import (CORE_PACKAGE, SCORING_PACKAGE, REPLACED_PACKAGES, OBSOLETE_CORE_FILE, LAYOUT_MARKER,
-    leftover_text, leftover_fix, mixed_versions_message, marked_script, refused_import, refuse_mixed_versions)
-
-# First of all (I16): next to framescout_core.py of an older version, the importing app.py
-# may be that older version's, which must not run against this core (unless it carries the
-# marker of a version with the package, I35).
-refuse_mixed_versions(__file__)
-
 from .paths import (REQUIREMENTS_DIR, REQUIREMENTS_FILE, CONSTRAINTS_FILE, ASSETS_DIR, EXAMPLE_PROFILES_FILE,
     EVAL_PAGE_FILE, windows_path)
 from .names import (AVIF_EXT, HEIF_EXT, RAW_EXT, EXT, SLUG_MAX_LENGTH, slugify, profile_slugs)
@@ -86,7 +78,7 @@ from .estimate import (RATE_WINDOW, RATE_MIN_PHOTOS, RATE_MIN_SECONDS, RATE_STAL
     FINISHING_STEPS, FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, AnalysisRate, StepSpeed, duration_text, finishing_minutes, gallery_thumbnails,
     known_throughput, remaining_text, remember_finishing, remember_throughput, run_throughput, start_summary,
     stored_finishing, stored_throughput)
-from .install_check import (VENV_DIR, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTALL,
+from .install_check import (VENV_DIR, TORCH_CHECK_TIMEOUT, TORCH_PROBE, REINSTALL, VERSION_FILE_PATTERN,
     CheckResult, venv_python, venv_site_packages, requirement_names, installed_versions, check_program_files, check_environment, check_packages, check_torch,
     check_writable, check_models, check_disk_space, check_installation, check_lines)
 from .cache_check import (CACHE_CHECK_LINES, CACHE_SIDE_FILES, cache_check_current, cache_error, cache_error_message,

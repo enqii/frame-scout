@@ -3,7 +3,7 @@
 After a Windows update, a moved folder or an interrupted installation, a search fails with a
 traceback in run.log, and nothing says whether to reinstall. Check-FrameScout.bat
 (framescout_check.py) and the app's AI settings tab run these checks and name one fix per
-problem: the program files are of one FrameScout version (I34), the Python environment
+problem: the program files are of one FrameScout version (I34, I42), the Python environment
 belongs to this folder, the installed package versions are those of requirements/constraints.txt, PyTorch imports (and finds the GPU for a CUDA build), .cache and
 results can be written, which model files are downloaded, and the free disk space.
 
@@ -27,7 +27,6 @@ from .cleanup import _reachable_roots, size_text
 from .devices import cuda_hint
 from .disk_space import SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _existing_folder, _reachable, downloaded_models
 from .hub import hub_cache_dir
-from .layout import REPLACED_PACKAGES, leftover_fix, leftover_text
 from .models import MODELS
 from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
 from .portable_python import PRIVATE_PYTHON
@@ -42,6 +41,8 @@ TORCH_PROBE = ('import json, torch; available = torch.cuda.is_available(); '
                'print(json.dumps({"torch": torch.__version__, "cuda": torch.version.cuda, "available": available, '
                '"gpu": torch.cuda.get_device_name(0) if available else None}))')
 REINSTALL = 'Close FrameScout and run Install-FrameScout.bat again.'
+# one per version in the FrameScout folder (I42); Install- and Start-FrameScout.bat count them too
+VERSION_FILE_PATTERN = 'framescout-version-*.txt'
 _PIN = re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)')
 _REQUIREMENT_NAME = re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)')
 
@@ -115,14 +116,15 @@ def _same_folder(first, second):
 
 
 def check_program_files(base):
-    """Are the program files in base of one FrameScout version (I34)? A single file next to its package is a leftover."""
+    """Are the program files in base of one FrameScout version (I34, I42)? More than one version file says no."""
     name = 'Program files'
-    found = [package for package in REPLACED_PACKAGES
-             if (Path(base) / f'{package}.py').is_file() and (Path(base) / package / '__init__.py').is_file()]
-    if not found:
-        return [CheckResult(name, True, 'No leftovers of another FrameScout version.', '')]
-    return [CheckResult(name, False, f'The FrameScout folder holds {leftover_text(package)}', leftover_fix(package))
-            for package in found]
+    found = sorted(path.name for path in Path(base).glob(VERSION_FILE_PATTERN))
+    if len(found) <= 1:
+        return [CheckResult(name, True, 'Files of one FrameScout version.', '')]
+    return [CheckResult(name, False, f'The FrameScout folder holds the version files {", ".join(found)}: files of '
+                        'two FrameScout versions, left when a ZIP is extracted over another version.',
+                        'Extract the ZIP of the version you want into a new, empty folder and run '
+                        'Install-FrameScout.bat there.')]
 
 
 def check_environment(base):
