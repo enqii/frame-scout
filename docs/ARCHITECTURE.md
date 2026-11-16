@@ -58,7 +58,7 @@ not run the frontend and cannot see CSS).
 | Frontend | `app.py`, `framescout_ui/` | Streamlit; `app.py` is page layout, the areas live in `framescout_ui/` (imported only by `app.py`) |
 | Engine | `framescout_engine.py`, `framescout_images.py` | CLI; models, decoding, person detection, cache, ranking, export; `framescout_images` is Pillow/HEIC/RAW decoding and thumbnails (no torch) |
 | Shared logic | `framescout_core/` | one module per area, re-exported by `__init__.py`; **standard library only** |
-| Scoring | `framescout_scoring/` | `ranking.py`, `layout.py`; **numpy only** |
+| Scoring | `framescout_scoring/` | `ranking.py`; **numpy only** |
 | Evaluation | `framescout_eval.py`, `assets/framescout_eval_page.html` | labelling and AP@k measurement of the search models |
 | Install and run | `Install-FrameScout.bat`, `install_torch.py`, `Start-FrameScout.bat`, `framescout_start.py`, `Check-FrameScout.bat`, `framescout_check.py`, `Uninstall-FrameScout.bat`, `framescout_uninstall.py` | see "Install, start, uninstall" |
 | Data | `requirements/`, `assets/profiles.example.json` | pins, examples |
@@ -67,10 +67,15 @@ not run the frontend and cannot see CSS).
 Frontend and engine are separate processes: the app spawns the engine with
 `framescout_core.engine_command`, redirects its output to `run.log` and only reads files the
 engine writes. Only the engine imports torch (`system_info` in the Settings tab is the app's
-one exception). A new root script that imports FrameScout code sets `FRAMESCOUT_PACKAGES = True`
-before its first FrameScout import and joins `ENTRY_POINTS` in `tests/test_layout.py` (I35); the
-batch files delete a leftover `framescout_core.py`/`framescout_scoring.py` of older versions
-(I16/I36) when the package folder exists.
+one exception).
+
+Each version ships one `framescout-version-<X.Y.0>.txt` in the root (I42; the triage PR names it
+after the coming release). A ZIP extracted over another version's folder leaves both files:
+`Install-FrameScout.bat` and `Start-FrameScout.bat` stop before any Python runs when they find
+more than one, and the installation check reports it ("Program files"). Known limit: versions
+before I42 have neither the file nor the check. After an update over such a folder its leftover
+files stay (harmless: a package wins over a leftover `framescout_core.py`/`framescout_scoring.py`
+of the same name), and going back to such a version over a newer folder is not detected.
 
 The engine and the evaluation tool import open_clip and Ultralytics only through
 `framescout_core.import_open_clip` / `import_detector_class` (tests check there is no direct
