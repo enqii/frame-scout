@@ -10,8 +10,10 @@ for %%F in (framescout-version-*.txt) do set /a VERSION_FILES+=1
 if %VERSION_FILES% leq 1 goto version_checked
 echo This folder holds files of two FrameScout versions (more than one
 echo framescout-version-*.txt), left when a ZIP is extracted over another version.
-echo Extract the ZIP of the version you want into a new, empty folder and run
-echo Install-FrameScout.bat there.
+echo Extract the ZIP of the version you want into a new, empty folder and copy your
+echo data from this folder into it: profiles.json, settings.json and the folders photos,
+echo references, results and .cache (downloaded models, so they are not downloaded
+echo again). Then run Install-FrameScout.bat there.
 pause
 exit /b 1
 :version_checked
