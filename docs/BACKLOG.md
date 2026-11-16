@@ -445,8 +445,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       3 profiles, 0 errors, about 5 minutes (lock and log timestamps), three HTML galleries
       written, results shown in the app. Still open: CUDA, `Check-FrameScout.sh`,
       `Uninstall-FrameScout.sh`, opening a gallery in the browser. For the CUDA run (F47 part
-      3): which driver number nvidia-smi reports in WSL2 (the Linux minimums of `CUDA_BUILDS`
-      are compared with it), and whether the Linux CUDA wheels pull in packages that
+      3): that nvidia-smi in WSL2 reports the Windows driver's number (WSL is compared with
+      the Windows minimums of `CUDA_BUILDS`), and whether the Linux CUDA wheels pull in packages that
       `requirements/constraints.txt` does not pin (e.g. `nvidia-*`, `triton`; the CPU
       environment in WSL2 has only pinned packages).
 - [ ] `decision` **F49 – Choose which profiles a search runs:** a search always scores and exports

@@ -369,7 +369,7 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   an app started by hand holds no lock (F26).
 - **Check** (`Check-FrameScout.bat`, F15): read-only; exit 0 no problem, 2 problems found, anything
   else means it could not run.
-- **Uninstall** (`Uninstall-FrameScout.bat [--dry-run]`, P5 part B): runs with the private
+- **Uninstall** (`Uninstall-FrameScout.bat [--dry-run]`, on Linux `.sh`, P5 part B): runs with the private
   `.python` (not with `.venv`'s Python, which cannot delete itself; without `.python` it only
   names the folders to delete by hand), refuses while a search runs, the app holds its start lock,
   the environment's Python is in use or `settings.json` is unreadable, lists what it deletes and
@@ -391,13 +391,15 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   replaces its `.python` and `.venv` without a warning; a browser that `framescout_start.py`
   starts inherits `XDG_CACHE_HOME`/`TMPDIR` (as on Windows `TMP`/`TEMP`). The Python code
   names the script of the system (`framescout_core.paths.script`: `.bat` on Windows, `.sh`
-  elsewhere) and shows paths in the system's form; `CUDA_BUILDS` holds a Windows and a Linux
-  driver minimum per build (in WSL2 nvidia-smi may report the Windows driver's number: not
-  verified, F48); the uninstall deletes `.venv/bin/python` and `.python/bin/python3` first, lists
-  `~/.config/Ultralytics` (`XDG_CONFIG_HOME`) and, since `.venv/bin/python` is a link to the
-  private Python that runs the uninstall itself, tells a running app by its start lock
-  (`app_running`, on Windows too); the check takes a `home` of `.python/bin` for the private
-  Python `.python`.
+  elsewhere; `paths.WINDOWS` is the one platform test of these decisions) and shows paths in
+  the system's form; `CUDA_BUILDS` holds a Windows and a Linux driver minimum per build, and
+  WSL (a kernel release with `microsoft`) uses the Windows ones, since its nvidia-smi reports the
+  Windows host's driver (`reports_windows_driver`; not verified on a GPU, F48); the uninstall
+  deletes `.venv/bin/python` and `.python/bin/python3` first, lists `~/.config/Ultralytics`
+  (`XDG_CONFIG_HOME`) and, since `.venv/bin/python` is a link to the private Python that runs
+  the uninstall itself, tells a running app by its start lock (`app_running`, on Windows too;
+  a lock that only looks held gets the start script's way out, `stale_lock_hint`); the check
+  takes a `home` of `.python/bin` for the private Python `.python`.
 
 ## Environment variables, caches and offline loading
 
