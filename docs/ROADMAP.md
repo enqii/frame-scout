@@ -19,9 +19,26 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [~] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
-### P43 – Package structure (added 2026-11-15)
-- [x] Flatten `framescout_core/__init__.py` and the `framescout_scoring` package (I45; after P42)
-      (done 2026-11-16 in PR #126)
+### P44 – Simplify (added 2026-11-16)
+- [ ] Support Python 3.14 only: one CI job, no version fallbacks, shorter docs (I50; kind `code`)
+- [ ] Delete or shorten outdated documents: `docs/UI-REVIEW.md`, the closed ideas in
+      `docs/IDEAS.md` (I51; kind `docs`; adapts the rule in `CLAUDE.md` → "Triage")
+
+### P45 – Workflow (added 2026-11-16)
+- [ ] Subagents read their brief themselves instead of the orchestrator copying it (I49; kind `docs`)
+
+### P46 – Interface follow-ups (added 2026-11-16)
+- [ ] Reasons for the other disabled run buttons (F37; kind `code`)
+- [ ] Hygiene bundle: pre-search count of partner photos, long captions, popover "More" closes,
+      narrower popover "Export and copy" (A48, A51, F41, F43; kind `code`)
+- [ ] Second browser pass over the parts not looked at; findings become backlog items (A52; kind `docs`)
+
+### P47 – Linux (WSL) (added 2026-11-16; private Python 3.14 like Windows, user decision)
+- [ ] `ubuntu-latest` in the CI matrix and fix what fails (F47 part 1; kind `code`)
+- [ ] `.sh` scripts for install, start, check and uninstall with a private Python 3.14 and its
+      checksum (F47 part 2; kind `code-risky`; new download approved 2026-11-16)
+- [ ] Linux driver minimums, uninstaller paths, platform-specific messages (F47 part 3; kind
+      `code`; the run in WSL2 is F48, not scheduled)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new

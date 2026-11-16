@@ -261,3 +261,7 @@ decision in PR #14):
 ### P42 – Mixed-versions guard (added 2026-11-15)
 - [x] Replace the guard by one version file checked by the installer and the start script
       (I42; kind `code-risky`; decided 2026-11-15) (done 2026-11-16 in PR #123)
+
+### P43 – Package structure (added 2026-11-15)
+- [x] Flatten `framescout_core/__init__.py` and the `framescout_scoring` package (I45; after P42)
+      (done 2026-11-16 in PR #126)
