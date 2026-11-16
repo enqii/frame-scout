@@ -25,6 +25,7 @@ import os
 import sys
 from pathlib import Path
 
+from framescout_core.app_instance import stale_lock_hint
 from framescout_core.cleanup import size_text
 from framescout_core.paths import script
 from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, app_running, outside_leftovers, programs_in_use,
@@ -62,7 +63,8 @@ def _blocked(root, out, confirmed=False):
         out('A search is running. Stop it (or wait for its end), close FrameScout and run the uninstall again.')
         return True
     if app_running(root):
-        out(f'FrameScout is still running. Close the window of {script("Start")}, then run the uninstall again.')
+        out(f'FrameScout is still running. Close the window of {script("Start")}, then run the uninstall again. '
+            + stale_lock_hint('run the uninstall again'))
         return True
     busy = programs_in_use(root, clear_read_only=confirmed)
     if busy:

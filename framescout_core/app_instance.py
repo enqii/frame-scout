@@ -150,6 +150,14 @@ def _wait_for_running(instance, answers, wait, clock, sleep):
         sleep(_POLL)
 
 
+def stale_lock_hint(then):
+    """The way out when the start lock only looks held (e.g. a file a virus scanner keeps open,
+    review); then names what to run afterwards. A lock a running app holds cannot be deleted
+    on Windows, so the advice is safe there."""
+    return (f'If no FrameScout window of this folder is open, delete the file {Path(INSTANCE_DIR) / INSTANCE_LOCK} '
+            f'in the FrameScout folder, then {then}.')
+
+
 def launch(folder, run_app, open_browser, out=print, ports=APP_PORTS, free=port_free, answers=port_answers,
            wait=INSTANCE_WAIT, clock=time.monotonic, sleep=time.sleep):
     """Start the app of the project folder, or open the browser on the one that runs; return an exit code.
@@ -159,11 +167,8 @@ def launch(folder, run_app, open_browser, out=print, ports=APP_PORTS, free=port_
     or if the folder's running app does not answer within wait seconds, nothing starts (1).
     """
     instance = AppInstance(folder)
-    # a lock that only looks held (e.g. a file a virus scanner keeps open) has a way out (review);
-    # a lock a running app holds cannot be deleted on Windows, so the advice is safe
     lock_name = Path(INSTANCE_DIR) / INSTANCE_LOCK
-    way_out = (f'If no FrameScout window of this folder is open, delete the file {lock_name} in the '
-               f'FrameScout folder, then run {script("Start")} again.')
+    way_out = stale_lock_hint(f'run {script("Start")} again')
     while True:
         try:
             if instance.claim(clock, sleep):
