@@ -195,22 +195,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       dependency (hold point). Found on 2026-11-12 in a simplification review.
       Triage 2026-11-13: decided separately and later; the UI rebuild P32–P37 stays within
       Streamlit. **Question:** Streamlit or a local server with an HTML frontend.
-- [ ] `minor` **A48 – The summary before a search counts photos that never get a cache row as "to analyze":**
-      `start_summary` of a search takes the photos with a cache row of their own
-      (`quick_scope`'s first count). A JPEG/HEIC searched through its RAW file or another
-      partner of its shot (E30, E53) never gets a row of its own, so "N to analyze" (and its
-      duration) stays above zero after every search; the summary of "Analyze photos now"
-      counts these partners as analyzed since the review of PR #100. A photo that fails to
-      decode every time has no row either and is counted as "to analyze" in both summaries;
-      the app cannot know that without a record of failed photos. Options: count the partners
-      as analyzed for the search's summary too (the disk space estimate then follows), and
-      name failed photos of the last run, e.g. from its status counts. Found in the review of
-      PR #100, finding 6.
-- [ ] `minor` **A51 – Long explanatory captions:** "Analyze ahead" (about 100 words), the quick
-      search and the AI settings explain everything in one grey block. Sketch: one short
-      sentence, the rest behind a help tooltip or a "More" expander; the required English-only
-      hint (E3) stays (it is correct and required, but a permanent info box on top of the profile
-      tab, also for users who already read it). Affected: `app.py`, user guide. Size S.
 - [ ] `ready` **A52 – Second browser pass for the parts not looked at:** the pass of 2026-11-13
       did not cover the dark theme, narrow windows, "Find similar", the contents of "Clean up
       storage", profiles with reference images and real photos (person crops, long runs), and
@@ -406,18 +390,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       the installer ships it; check first) and whether a dialog opened by the server process
       is acceptable. Affected: `app.py`, user guide. Found in the browser pass of 2026-11-13.
       Size S.
-- [ ] `minor` **F41 – Close the popover "More" after its action:** a click on "Open photo",
-      "Show in folder" or "Find similar" reruns the page, and Streamlit 1.66.1 keeps the
-      popover open (as documented; checked in headless Edge in the F30 review), so it covers the
-      cards below until the user clicks elsewhere. Sketch: `st.popover(key=..., on_change=...)`
-      tracks its state, and the buttons' callbacks set it closed; costs a rerun per open/close.
-      Affected: `framescout_ui/results.py`. Found in the PR #114 review. Size S. The popover
-      "Export and copy" of the results toolbar (F29) must stay open: its folder box, "Copy"
-      and "Export" are used one after another (PR #115 review).
-- [ ] `minor` **F43 – A narrower popover "Export and copy":** the popover is about 700 px wide
-      (set by the caption of the export) and scrolls inside on a window 889 px high. A shorter
-      export caption or a fixed width could help. Affected: `framescout_ui/copy_export.py`,
-      `framescout_ui/results.py`. Found in F29. Size S.
 - [ ] `decision` **F45 – The best crop outlined in the large preview:** this part of F19 is not
       done, because neither the results nor the feature cache store a crop's box (the engine
       computes it in `crops_for` and keeps only label and embedding). Sketch: store the person
