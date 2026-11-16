@@ -186,6 +186,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **F37 – Reasons for the other disabled run buttons** – done 2026-11-16, [PR #133](https://github.com/enqii/frame-scout/pull/133)
 - [x] **F41 – Close the popover "More" after its action** – done 2026-11-16, [PR #134](https://github.com/enqii/frame-scout/pull/134)
 - [x] **F43 – A narrower popover "Export and copy"** – done 2026-11-16, [PR #134](https://github.com/enqii/frame-scout/pull/134)
+- [x] **F47 – Linux support (WSL)** – done 2026-11-16, [PR #136](https://github.com/enqii/frame-scout/pull/136), [PR #137](https://github.com/enqii/frame-scout/pull/137), [PR #139](https://github.com/enqii/frame-scout/pull/139)
 - [x] **F21 – Warn about cloud-only photos before a search** – closed 2026-11-16 in the triage, not done: needs a real OneDrive folder and an open default; the idea stays in `docs/IDEAS.md`
 - [x] **F23 – Optional desktop and Start menu shortcut, removed by the uninstaller** – closed 2026-11-16 in the triage, not done: would be the first file written outside the project folder; the idea stays in `docs/IDEAS.md`
 - [x] **F25 – Closest search text in the result list export** – closed 2026-11-16 in the triage, not done: not asked for

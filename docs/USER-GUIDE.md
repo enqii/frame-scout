@@ -127,9 +127,8 @@ cd ~/FrameScout
 - The app's temporary files and caches go to `.tmp` and `.cache`; a browser that the start
   script opens (when none runs yet) may put its own there too. Close it before you run the
   uninstaller.
-- Messages of the installer's Python steps, the check and the uninstall still name the `.bat`
-  files: on Linux, run the `.sh` script of the same name.
-- GPU support in WSL2 needs the NVIDIA driver on Windows and is not tested.
+- GPU support in WSL2 needs the NVIDIA driver on Windows and is not tested; the installer
+  checks the driver against the minimums of NVIDIA's Linux drivers.
 
 ## Using the app
 
@@ -592,7 +591,8 @@ private Python in `.python`; without it, it names the folders to delete by hand.
   the project folder.
 - **Outside the project folder:** copied matches stay. Caches that FrameScout wrote into
   your user profile when it ran without the `.bat` files (PyTorch, Hugging Face,
-  `%APPDATA%\Ultralytics`) are only listed, since other programs may use them.
+  `%APPDATA%\Ultralytics`, on Linux `~/.config/Ultralytics`) are only listed, since other
+  programs may use them.
 
 Afterwards, delete the project folder yourself to remove FrameScout completely. A Python
 you installed yourself stays in place.
