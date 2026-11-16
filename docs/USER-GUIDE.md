@@ -128,7 +128,8 @@ cd ~/FrameScout
   script opens (when none runs yet) may put its own there too. Close it before you run the
   uninstaller.
 - GPU support in WSL2 needs the NVIDIA driver on Windows and is not tested; the installer
-  checks the driver against the minimums of NVIDIA's Linux drivers.
+  checks that Windows driver against the Windows minimums above (on other Linux systems,
+  against those of NVIDIA's Linux drivers).
 
 ## Using the app
 
@@ -578,19 +579,21 @@ Person detection helps with people in group photos; turn it off for other motifs
 
 ## Uninstalling details
 
-`Uninstall-FrameScout.bat` (`--dry-run` only shows the lists) lists what it deletes and
-keeps, and deletes only after you type `yes`. Close FrameScout first; the script refuses
-while a search or the app runs, or when `settings.json` cannot be read. It runs with the
-private Python in `.python`; without it, it names the folders to delete by hand.
+`Uninstall-FrameScout.bat` (on Linux `Uninstall-FrameScout.sh`; `--dry-run` only shows the
+lists) lists what it deletes and keeps, and deletes only after you type `yes`. Close
+FrameScout first; the script refuses while a search or the app runs, or when `settings.json`
+cannot be read (if no FrameScout window is open but it still says the app runs, delete
+`.tmp/app-instance.lock`). It runs with the private Python in `.python`; without it, it names
+the folders to delete by hand.
 
 - **Deleted:** `.venv`, `.python`, `.cache` (model weights and pip cache), `.tmp` (except
-  `.tmp\eval`), `.pytest_cache` and the `__pycache__` folders.
-- **Kept:** `photos\`, `references\`, `results\` (with `marks.json`), `profiles.json` and
+  `.tmp/eval`), `.pytest_cache` and the `__pycache__` folders.
+- **Kept:** `photos/`, `references/`, `results/` (with `marks.json`), `profiles.json` and
   its backup, `settings.json`, `run.log`, the evaluation labels and the program files. A
   photo or copy folder from your settings is never deleted, also not when it lies inside
   the project folder.
 - **Outside the project folder:** copied matches stay. Caches that FrameScout wrote into
-  your user profile when it ran without the `.bat` files (PyTorch, Hugging Face,
+  your user profile when it ran without the FrameScout scripts (PyTorch, Hugging Face,
   `%APPDATA%\Ultralytics`, on Linux `~/.config/Ultralytics`) are only listed, since other
   programs may use them.
 
