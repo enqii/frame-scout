@@ -260,3 +260,6 @@ def test_the_app_disables_the_buttons_without_a_profile_by_their_reasons():
     assert "quick_blocked = button_blocked_text('Quick search', needs, active, cleaning)" in search
     assert 'disabled=bool(quick_blocked) or' in search
     assert 'st.caption(plain(analyze_blocked))' in search and 'st.caption(plain(quick_blocked))' in search
+    # the reason comes on top of the analysis count and the quick search's scope line, it hides
+    # neither (review)
+    assert 'elif analysis_text' not in search and 'elif quick_counts' not in search

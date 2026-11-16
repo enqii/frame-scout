@@ -282,7 +282,7 @@ with search_tab:
     analyze_now = st.button('Analyze photos now', disabled=bool(analyze_blocked))
     if analyze_blocked:
         st.caption(plain(analyze_blocked))
-    elif analysis_text:
+    if analysis_text:  # also while blocked, e.g. by the search model (review)
         st.info(analysis_text)
     if analysis_space and not active:
         st.warning(analysis_space)
@@ -317,7 +317,7 @@ with search_tab:
                                             (quick_counts is not None and not (quick_counts[0] or quick_counts[2])))
     if quick_blocked:
         st.caption(plain(quick_blocked))
-    elif quick_counts is not None:
+    if quick_counts is not None:  # also while blocked, e.g. by the search model (review)
         st.caption(quick_scope_text(len(photo_scan.paths), *quick_counts))
     if quick_start:
         query = ' '.join(str(st.session_state.get('quick_query') or '').split())
