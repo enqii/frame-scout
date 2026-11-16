@@ -20,7 +20,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
 ### P44 – Simplify (added 2026-11-16)
-- [ ] Support Python 3.14 only: one CI job, no version fallbacks, shorter docs (I50; kind `code`)
+- [x] Support Python 3.14 only: one CI job, no version fallbacks, shorter docs (I50; kind `code`)
+      (done 2026-11-16 in PR #129)
 - [ ] Delete or shorten outdated documents: `docs/UI-REVIEW.md`, the closed ideas in
       `docs/IDEAS.md` (I51; kind `docs`; adapts the rule in `CLAUDE.md` → "Triage")
 

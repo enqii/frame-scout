@@ -332,21 +332,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       In the same PR, correct the stale size in the implementer brief ("`docs/BACKLOG.md`
       (open items, 39 KB)", now about 49 KB) or drop the number. Found on 2026-11-16 in a
       workflow context review.
-- [ ] `ready` **I50 – Support one Python version only (simplification):** the installer always
-      downloads a private Python 3.14 into `.python` (P5), but a `.venv` of an earlier
-      installer built on an installed Python 3.12 or 3.13 is still carried along: the CI
-      matrix runs three jobs (3.12, 3.13, 3.14), `Uninstall-FrameScout.bat` falls back to the
-      `py` launcher for 3.14/3.13/3.12, `requirements/constraints.txt` asks for a dry-run
-      per version, and `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md` and
-      `docs/ARCHITECTURE.md` describe it. That is compatibility with a state that was never
-      released (I47). Support 3.14 only: one CI job, no version fallback, shorter docs (Linux, F47, also uses a
-      private Python 3.14, decided 2026-11-16, so this holds for both platforms).
-      Consequence: a folder that still has such an old `.venv` needs one more run of
-      `Install-FrameScout.bat`. Decided 2026-11-16 by the user: no handling of such a
-      `.venv` at all (no detection, rebuild or message), because there are no other users
-      yet and the user's own installation runs on 3.14. Check first what else accepts
-      3.12/3.13 (`Install-FrameScout.bat`, `framescout_core/install_check.py`). Found on 2026-11-16 in
-      a simplification review by sampling.
 - [ ] `ready` **I51 – Delete or shorten outdated documents (simplification):**
       `docs/UI-REVIEW.md` (about 16 KB) says of itself that it is a record of the old
       interface and not kept current, `README.md` still links it as "not implemented"
