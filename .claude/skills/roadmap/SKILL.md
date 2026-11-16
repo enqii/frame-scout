@@ -50,9 +50,8 @@ Run these as separate, plain commands from the main checkout:
    uncommitted or unpushed work. Also list stale local branches
    (`git branch --list "worktree-agent-*"` without a worktree, merged PR branches) and
    clean them up as in section 4 (and step 6 of "Merge").
-6. For a PR labeled `fs:in-progress`, check for the docs handoff marker:
-   `gh pr view <n> --json comments --jq '(.comments[-1].body // "") | startswith("Docs pending")'`
-   (`true` = the last comment is the implementer's "Docs pending:" handoff).
+6. For a PR labeled `fs:in-progress`, read its draft state and whether the reviewer finished:
+   `gh pr view <n> --json isDraft,comments --jq '{draft: .isDraft, reviewed: ([.comments[].body | startswith("Review complete")] | any)}'`.
 7. If you spawned a subagent in this session that is still running, its notification
    has not arrived yet: **wait**, do not spawn a second agent for the same PR.
 
@@ -66,12 +65,11 @@ Check the rows top to bottom; the first match decides.
 | State | Next step |
 |---|---|
 | Local worktree with uncommitted or unpushed changes | Report path, branch and the changes to the user. **Never discard.** Ask how to proceed (e.g. let an implementer commit and push them). |
-| More than one open roadmap PR, or a PR with several `fs:*` labels | Inconsistent – report to the user and ask. |
+| More than one open roadmap PR | Inconsistent – report to the user and ask. |
 | No open roadmap PR | Take the next unchecked roadmap item → spawn an **implementer** (mode `new`). If no item is left, report that the roadmap is done. |
-| PR labeled `fs:in-progress`, last comment starts with `Docs pending` (step 6) | Code and tests are committed; spawn a fresh **implementer** (mode `docs-update`, kind `docs` model/effort) on the existing branch. |
-| PR labeled `fs:in-progress`, otherwise | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
-| PR labeled `fs:needs-review` | Spawn a fresh **reviewer**. If its report says "not posted" / "nothing posted", or the label is still `fs:needs-review` after it ended, apply "Review posting check" below; never spawn a second reviewer. |
-| PR labeled `fs:review-done` | First check that the findings are on the PR ("Review posting check" below). Then spawn a **fresh** implementer (mode `address-review`) for all unanswered review comments; never continue the previous implementer with `SendMessage` (I17). Afterwards the PR goes to `fs:ready`: there is **no second review round**. |
+| PR labeled `fs:in-progress`, draft | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
+| PR labeled `fs:in-progress`, not draft, not reviewed (step 6) | Spawn a fresh **reviewer**. If its report says "not posted" / "nothing posted", or no `Review complete` comment exists after it ended, apply "Review posting check" below; never spawn a second reviewer. |
+| PR labeled `fs:in-progress`, not draft, reviewed | First check that the findings are on the PR ("Review posting check" below). Then spawn a **fresh** implementer (mode `address-review`) for all unanswered review comments; never continue the previous implementer with `SendMessage`. Afterwards the PR goes to `fs:ready`: there is **no second review round**. |
 | PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>` for the head commit `headRefOid`, open risks) and **wait for explicit merge approval**. Base the report on the implementer's final report and `gh pr view <n> --json title,body,headRefOid`; do not read the diff or comment threads yourself. Before reporting, run the worktree cleanup (section 4) so that no agent worktree holds the PR branch, and end the report with the commands for the user's manual test in the main checkout: `git fetch origin`, `git switch <branch>`, and `git switch main` again before the merge (I38). |
 
 An open PR without any `fs:*` label is not a roadmap PR; mention it but do not act on it.
@@ -118,10 +116,6 @@ Agent(
 )
 ```
 
-Mode `docs-update` always uses the `docs` row (`sonnet`, `medium`), whatever the kind of
-the item: it only edits Markdown from a diff. Its brief is the same file; pass the
-commit SHAs from the "Docs pending" comment in `{ANSWERS}`.
-
 **Reviewer** – fresh context, no isolation needed (it does not change code); `effort`
 is always `"medium"`, `model` is `"opus"` for `code-risky` and `"sonnet"` otherwise:
 
@@ -141,7 +135,7 @@ not continue silently.
 Placeholders:
 - `{ITEM}` – the roadmap line verbatim (e.g. `(1) pytest scaffold + shared module … (A3, A9, part of I2)`).
 - `{IDS}` – backlog IDs of the item (e.g. `A3, A9, I2`).
-- `{MODE}` – `new` | `continue` | `docs-update` | `address-review` | `answer`.
+- `{MODE}` – `new` | `continue` | `address-review` | `answer`.
 - `{BRANCH}` – suggested branch `<type>/<id>-<short>` for `new`; the PR's head branch otherwise.
 - `{PR}` – PR number, or `none` for mode `new`.
 - `{ANSWERS}` – the user's answers to earlier hold-point questions, verbatim, or `none`.
@@ -189,7 +183,7 @@ points in `CLAUDE.md`):
    (`gh pr comment <n> --body-file <file>`), so the decision is recorded on GitHub.
 3. Spawn a new implementer with mode `answer` and the answers in `{ANSWERS}` (verbatim);
    continue a still-alive implementer with `SendMessage` only if it has not yet passed
-   its code phase, and never for `address-review` or `docs-update`.
+   its code phase, and never for `address-review`.
 
 ## 6. Merge (only on explicit user approval)
 
@@ -277,18 +271,17 @@ main checkout instead (flags checked with `claude --help`, Claude Code 2.1.304):
 claude -p "/code-review <level> <n> --comment" --model <reviewer model> --effort medium
 ```
 
-Run it only once per PR. Then check the posting as below and set the label yourself:
-`gh pr edit <n> --remove-label fs:needs-review --add-label fs:review-done`.
+Run it only once per PR. Then check the posting as below and post the `Review complete` comment yourself.
 
 ## Review posting check
 
 A reviewer report saying "not posted" / "nothing posted" is never treated as done, and
-neither is a PR labeled `fs:review-done` without findings on it. Check
+neither is a `Review complete` comment without the findings on it. Check
 `gh api repos/enqii/frame-scout/pulls/<n>/comments --jq length` and
 `gh pr view <n> --json comments --jq '.comments | length'`. If the findings are not there,
 post the findings from the reviewer's report yourself, one comment per finding, as the
 reviewer brief describes (step 2: inline on `file:line`, else a general comment
-`Finding <n> – <file>:<line>`), and set `fs:review-done`. Do not rerun `/code-review` (one review round).
+`Finding <n> – <file>:<line>`), then post `Review complete: <n> findings`. Do not rerun `/code-review` (one review round).
 
 The orchestrator is stateless: if the report is gone (new session), read the findings from
 the reviewer's output file when its path is known. Otherwise ask the user to choose between

@@ -11,7 +11,7 @@ merits.
 
 **You must not modify code**, create commits, push, merge, or change the PR description.
 Your only write actions are the review comments (posted by `/code-review` or, if it posted
-nothing, by you as below) and the label change.
+nothing, by you as below) and the closing `Review complete` comment.
 
 **Leave the main checkout as you found it:** do not run `gh pr checkout`, `git switch` or
 `git checkout` there (a PR checkout left it on a detached HEAD after the review of PR #109).
@@ -56,9 +56,9 @@ must run code from the PR, use a separate worktree and remove it before you retu
    (a refused inline post is reposted at once as a general `Finding <n> – <file>:<line>`
    comment, see step 2) and count again. Never swap the label while the count does not match,
    and never report a finding as posted that you did not see on the PR.
-   Then swap the state label:
-   `gh pr edit {PR} --remove-label fs:needs-review --add-label fs:review-done`
-   (if `gh` is not on `PATH`, use the path given in `CLAUDE.md` → "Git and commits").
+   Then post the closing comment (`gh pr comment {PR} --body "Review complete: <N> findings"`;
+   if `gh` is not on `PATH`, use the path given in `CLAUDE.md` → "Git and commits"). The label
+   stays `fs:in-progress`.
 4. Return a short summary to the orchestrator: number of findings by severity, one line
    per finding (file:line – issue), whether any finding looks like a blocker, and where the
    comments are (inline, or your own per-finding comments). Do not paste the full review.
