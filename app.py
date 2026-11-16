@@ -262,13 +262,15 @@ with search_tab:
     # are written; it runs like a search (run lock, status, stop button, low priority). Next
     # to Start since F28, so that start, progress and Stop are in one place
     st.subheader('Analyze ahead')
-    st.caption('Analyzing the photos is the slow part of a first search. "Analyze photos now" analyzes the photos '
-               'of the listed folders with the current AI settings and keeps the analyses in the cache, without '
-               'searching: no search profile is needed, and the results of the last search stay as they are. '
-               'A later search with the same search model and person detection settings only ranks these photos, '
-               'and the quick search can search them; after a change of these settings, the photos are analyzed '
-               'again. Its progress is shown below and "■ Stop search" stops it; "Keep the PC responsive" applies '
-               'to it as to a search.')
+    # A51: one short sentence, the rest behind the help icon
+    st.caption('Analyzes the photos now, e.g. overnight, so that a later search only has to rank them.',
+               help='Analyzing the photos is the slow part of a first search. "Analyze photos now" analyzes the '
+                    'photos of the listed folders with the current AI settings and keeps the analyses in the cache, '
+                    'without searching: no search profile is needed, and the results of the last search stay as '
+                    'they are. A later search with the same search model and person detection settings only ranks '
+                    'these photos, and the quick search can search them; after a change of these settings, the '
+                    'photos are analyzed again. Its progress is shown below and "■ Stop search" stops it; "Keep the '
+                    'PC responsive" applies to it as to a search.')
     st.caption(f"Current settings: search model {MODELS[settings['model']].label} · person detection "
                f"{'on' if settings['person_detection'] else 'off'}.")
     if st.session_state.get('analyze_notice'):
@@ -291,12 +293,14 @@ with search_tab:
     # F10: one search text over the photos already analyzed, without a profile and without
     # analyzing; its result goes to results/quick/, the profiles' results and marks stay
     st.subheader('Quick search')
-    st.caption('Try a search text without creating a search profile. Only the photos already analyzed with the '
-               'current AI settings are searched; nothing new is analyzed, so it is fast. Its result replaces the '
-               f'previous quick search (folder {QUICK_DIR} in the results folder); the results and marks of your '
-               f'search profiles stay as they are. Search texts are in English. Its result appears in the tab '
-               f'"{RESULTS_TAB}", as an entry next to your search profiles; "Find similar" on a result card searches the same way by the image similarity with '
-               'that photo, and its result appears there too.')
+    st.caption('Try a search text without a search profile, over the photos already analyzed: fast, nothing new '
+               'is analyzed.',
+               help='Only the photos already analyzed with the current AI settings are searched. Its result '
+                    f'replaces the previous quick search (folder {QUICK_DIR} in the results folder); the results '
+                    'and marks of your search profiles stay as they are. Search texts are in English. Its result '
+                    f'appears in the tab "{RESULTS_TAB}", as an entry next to your search profiles; "Find similar" '
+                    'on a result card searches the same way by the image similarity with that photo, and its '
+                    'result appears there too.')
     # F34: the text stays in the field; Streamlit emptied it in the run after the click, in
     # which the field is disabled while the search runs. Only then: a value put into the key
     # resets the field in the browser, which would drop a text typed but not searched for yet
