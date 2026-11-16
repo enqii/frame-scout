@@ -1,7 +1,9 @@
 # Reviewer brief (template)
 
-The orchestrator fills in the `{PLACEHOLDERS}` and passes everything below the line as
-the reviewer's prompt.
+The orchestrator does not copy this file. It spawns the reviewer with a short prompt that
+gives the placeholder values and tells it to read this brief and follow it. The reviewer
+reads everything below the line and substitutes the values from its prompt for the
+`{PLACEHOLDERS}` (`{PR}`, `{ITEM}`, `{REVIEW_LEVEL}`).
 
 ---
 
