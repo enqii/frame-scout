@@ -170,8 +170,9 @@ that a later search only has to rank them. The section shows the current search 
 person detection setting, how many photos are analyzed with them already and, if an earlier
 search measured a speed, a rough duration. A JPEG or HEIC whose shot is analyzed through its RAW
 file (or another file of the shot) counts as analyzed. Press **Analyze photos now** to start; the
-button is disabled while a search, an analysis or a cleanup runs and when the model package is
-missing. It stays available when the count says all photos are analyzed: the count is the one
+button is disabled while a search, an analysis or a cleanup runs, when none of the listed photo
+folders exists and when the search model cannot be used; a line below it says which and in which
+tab to fix it (it needs no search profile). It stays available when the count says all photos are analyzed: the count is the one
 from the last "Recount", while the analysis reads the folders again and also finds photos added
 since. If the drive of the results may run short of space, a warning is shown here too.
 Analyses only help a search with
@@ -282,7 +283,9 @@ thumbnails.
 profile: type a search text in English (up to 300 characters) and press "Quick search". It
 searches only the photos already analyzed with the current AI settings (the caption says
 "N of M photos analyzed and searched"; a photo whose same picture in another format, such as the RAW file, is searched is not counted as missing), so it is fast and loads no person detector or analysis;
-it is not available while no photo is analyzed, while a search runs or without photo folders.
+it is not available while no photo is analyzed, while a search runs, without an existing photo
+folder or when the search model cannot be used; a line below the field says which (and in which tab
+to fix it).
 The result goes to `results/quick/` and appears in the tab "Results" as the last entry of the selector "Results of", next to your search
 profiles, and is selected at once (the same cards, 48 per page, "More" per photo, the gallery and the folder), with the
 photo folders it searched and a note if you have chosen other folders since. A new quick

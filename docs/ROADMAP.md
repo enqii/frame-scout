@@ -31,7 +31,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-16 in PR #131)
 
 ### P46 – Interface follow-ups (added 2026-11-16)
-- [ ] Reasons for the other disabled run buttons (F37; kind `code`)
+- [x] Reasons for the other disabled run buttons (F37; kind `code`)
+      (done 2026-11-16 in PR #133)
 - [ ] Hygiene bundle: pre-search count of partner photos, long captions, popover "More" closes,
       narrower popover "Export and copy" (A48, A51, F41, F43; kind `code`)
 - [ ] Second browser pass over the parts not looked at; findings become backlog items (A52; kind `docs`)

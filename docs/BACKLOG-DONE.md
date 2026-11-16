@@ -180,6 +180,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **F34 – The quick search result is an entry of the results selector** – done 2026-11-13, [PR #113](https://github.com/enqii/frame-scout/pull/113)
 - [x] **F38 – Keep the page of a profile gallery when another results entry is shown** – done 2026-11-14, [PR #113](https://github.com/enqii/frame-scout/pull/113)
 - [x] **F39 – A width limit for the form tabs** – done 2026-11-15, [PR #114](https://github.com/enqii/frame-scout/pull/114)
+- [x] **F37 – Reasons for the other disabled run buttons** – done 2026-11-16, [PR #133](https://github.com/enqii/frame-scout/pull/133)
 - [x] **F21 – Warn about cloud-only photos before a search** – closed 2026-11-16 in the triage, not done: needs a real OneDrive folder and an open default; the idea stays in `docs/IDEAS.md`
 - [x] **F23 – Optional desktop and Start menu shortcut, removed by the uninstaller** – closed 2026-11-16 in the triage, not done: would be the first file written outside the project folder; the idea stays in `docs/IDEAS.md`
 - [x] **F25 – Closest search text in the result list export** – closed 2026-11-16 in the triage, not done: not asked for
