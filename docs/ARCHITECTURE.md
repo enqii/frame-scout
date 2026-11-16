@@ -365,7 +365,8 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
 - **Check** (`Check-FrameScout.bat`, F15): read-only; exit 0 no problem, 2 problems found, anything
   else means it could not run.
 - **Uninstall** (`Uninstall-FrameScout.bat [--dry-run]`, P5 part B): runs with the private
-  `.python` (not with `.venv`'s Python, which cannot delete itself), refuses while a search runs,
+  `.python` (not with `.venv`'s Python, which cannot delete itself; without `.python` it only
+  names the folders to delete by hand), refuses while a search runs,
   the environment's Python is in use or `settings.json` is unreadable, lists what it deletes and
   what it keeps (`USER_DATA`: photos, references, results with marks, profiles and backup,
   settings, `run.log`, `.tmp/eval`) and the caches outside the folder (listed, never deleted),
@@ -438,7 +439,8 @@ matched). Personal overrides go into `.claude/settings.local.json` (gitignored).
 
 On GitHub (I8) the ruleset `protect main` blocks deleting and force-pushing the default branch,
 needs linear history and a pull request (rebase merges only, no approval required) and the
-`pytest (Windows, Python 3.14)` check. Admins may bypass it only when merging a pull request
+`pytest (Windows, Python 3.14)` check (the job name in `tests.yml`: renaming the job means
+changing the ruleset by hand too). Admins may bypass it only when merging a pull request
 (`gh pr merge --admin`, denied in `.claude/settings.json`), never with a direct push. Actions are
 limited to GitHub-owned actions pinned to a SHA, and workflows of outside contributors' pull
 requests need approval. Secret scanning with push protection, Dependabot alerts and private
