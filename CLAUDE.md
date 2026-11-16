@@ -31,6 +31,7 @@ Current baseline: **v1.1, prototype**, with a Streamlit frontend and a separate 
 3. Double-click `Start-FrameScout.bat`; local browser URL `http://127.0.0.1:8501` (the next free port up to 8510 if it is busy).
 4. In the app, choose an existing local folder (including subfolders), configure search profiles, review AI settings, start the search and open HTML results from `results/`.
 5. ZIP/downloaded online albums need to be separately downloaded/extracted by the user; FrameScout itself has no online-service integration.
+6. Linux (x86_64, e.g. WSL2): the `.sh` scripts of the same names (F47); a change to a `.bat` file needs the same change in its `.sh` script (`tests/test_linux_scripts.py`). No full search has run on Linux yet (F48).
 
 Manual commands for development (after installation):
 ```powershell
