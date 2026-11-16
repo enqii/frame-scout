@@ -24,14 +24,9 @@ concurrency:
 
 jobs:
   pytest:
-    name: pytest (Windows, Python ${{ matrix.python-version }})
+    name: pytest (Windows, Python 3.14)
     runs-on: windows-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        # The versions Install-FrameScout.bat accepts.
-        python-version: ['3.12', '3.13', '3.14']
     steps:
       # Actions are pinned to commit SHAs because tags can be moved. When updating,
       # change the SHA and its version comment together (see docs/BACKLOG.md I9).
@@ -39,7 +34,8 @@ jobs:
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: ${{ matrix.python-version }}
+          # The version of the private Python that Install-FrameScout.bat downloads (I50).
+          python-version: '3.14'
           cache: pip
           cache-dependency-path: requirements/requirements-dev.txt
 
