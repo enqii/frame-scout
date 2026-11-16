@@ -5,7 +5,8 @@ files) and assets/ (files the programs read). Every program, message and test bu
 paths from the constants here, so a later move changes one place. Relative to the FrameScout
 folder; a leaf module (no other FrameScout import), so any module of the package can use it.
 Messages for the user name a path as this system shows it (str of the Path) and a script by
-the name it has on this system (script, F47).
+the name it has on this system (script, F47). WINDOWS is the one test for the platform the
+Windows/Linux decisions of the package use (F47, review).
 """
 import os
 from pathlib import Path, PureWindowsPath
@@ -18,9 +19,11 @@ EXAMPLE_PROFILES_FILE = ASSETS_DIR / 'profiles.example.json'
 EVAL_PAGE_FILE = ASSETS_DIR / 'framescout_eval_page.html'
 
 
+# Windows (the .bat files, the environment's Scripts folder) or else Linux
+WINDOWS = os.name == 'nt'
 # the scripts the user runs (Install-, Start-, Check-, Uninstall-FrameScout): .bat files on
 # Windows, .sh scripts of the same names on Linux (F47)
-SCRIPT_SUFFIX = '.bat' if os.name == 'nt' else '.sh'
+SCRIPT_SUFFIX = '.bat' if WINDOWS else '.sh'
 
 
 def script(name, suffix=SCRIPT_SUFFIX):
