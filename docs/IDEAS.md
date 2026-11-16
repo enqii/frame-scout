@@ -488,6 +488,7 @@ Disposition: take over → F24; roadmap P28 (2026-11-12)
 Single idea added by hand (no brainstorming run); not checked against the earlier ideas.
 
 ### 1. Linux support
+Disposition: take over → F47 (and F48); roadmap P47 (2026-11-16)
 - **Problem:** FrameScout installs and starts only on Windows: the four `.bat` files are
   the only supported way, and nothing is runtime-tested on Linux. The Python code already
   has POSIX branches (file locks with `fcntl`, `os.nice`, `xdg-open` for "Open"/"Folder",
@@ -522,6 +523,7 @@ relink, rename, orientation, resolution, screenshot, histogram, distribution, ar
 move to another PC).
 
 ### 1. Choose which profiles a search runs
+Disposition: take over → F49; tag decision (2026-11-16)
 - **Problem:** a search always scores and exports every profile. A user who refines one
   profile (new text, another reference image) waits for all galleries to be rebuilt and
   sees the other profiles' results replaced although nothing about them changed.
@@ -541,6 +543,7 @@ move to another PC).
 - **Hold point:** product decision (merge semantics of `results.json`); a new CLI option.
 
 ### 2. Quick search with an example image
+Disposition: take over → F50; tag ready, not on the roadmap (2026-11-16)
 - **Problem:** "Find similar" works only from a photo that is already a result card. A user
   who has a single example picture (a screenshot, a photo from a phone, a product image)
   has to create a profile with a reference image and run a full search to try it.
@@ -558,6 +561,7 @@ move to another PC).
 - **Hold point:** none (no new dependency, no cache change).
 
 ### 3. Recent quick search texts
+Disposition: take over → F51; tag ready, not on the roadmap (2026-11-16)
 - **Problem:** the quick search remembers only the last text. Users who compare a few
   wordings ("red car", "red sports car at night") retype them, and a search worth keeping
   is lost after the next one.
@@ -574,6 +578,7 @@ move to another PC).
 - **Hold point:** none.
 
 ### 4. Reuse analyses after the photo library moved
+Disposition: take over → F52; tag decision (2026-11-16)
 - **Problem:** cache rows are keyed by the resolved path. Moving a photo library to a new
   drive, renaming its top folder or a changed drive letter makes every photo "not analyzed",
   and on a CPU-only PC the re-analysis of a large library takes hours.
@@ -594,6 +599,7 @@ move to another PC).
   needs a decision on the match rule.
 
 ### 5. Filter results by photo size and orientation
+Disposition: parked: new cache columns and reflowing pages for a rare need (I47) (2026-11-16)
 - **Problem:** large folders contain thumbnails, icons, screenshots and low-resolution web
   images that can rank high but are useless, and users looking for a cover or a print often
   want only portrait or only landscape photos. The results cannot be filtered by either.
@@ -612,6 +618,7 @@ move to another PC).
 - **Hold point:** cache/result format change (added columns and fields, no invalidation).
 
 ### 6. Score distribution per profile
+Disposition: take over → F53; tag decision (2026-11-16)
 - **Problem:** the result list is cut at "Maximum matches", and users cannot tell whether the
   good matches end at place 20 or continue past place 150. They review until they get tired,
   or raise "Maximum matches" blindly.
@@ -628,6 +635,7 @@ move to another PC).
 - **Hold point:** result format addition (a new field in `results.json`); UX decision.
 
 ### 7. Archive all user data for a move or before uninstalling
+Disposition: parked: overlaps I19 and F14, decide those first (2026-11-16)
 - **Problem:** the uninstaller keeps user data (I19) but leaves it in the FrameScout folder.
   To move to a new PC or a fresh install, a user has to know which files matter
   (`profiles.json`, `references/`, `settings.json`, `results/marks.json`, `results/exports/`)

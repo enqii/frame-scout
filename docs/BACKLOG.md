@@ -339,7 +339,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `py` launcher for 3.14/3.13/3.12, `requirements/constraints.txt` asks for a dry-run
       per version, and `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md` and
       `docs/ARCHITECTURE.md` describe it. That is compatibility with a state that was never
-      released (I47). Support 3.14 only: one CI job, no version fallback, shorter docs.
+      released (I47). Support 3.14 only: one CI job, no version fallback, shorter docs (Linux, F47, also uses a
+      private Python 3.14, decided 2026-11-16, so this holds for both platforms).
       Consequence: a folder that still has such an old `.venv` needs one more run of
       `Install-FrameScout.bat`. Decided 2026-11-16 by the user: no handling of such a
       `.venv` at all (no detection, rebuild or message), because there are no other users
@@ -461,3 +462,75 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       optional key), then draw it in the review dialog. **Question:** a cache signature or a
       new column and a result format change (hold point). Affected: `framescout_engine.py`,
       `framescout_core`, `framescout_ui/review.py`, user guide. Found in F19. Size M.
+- [ ] `ready` **F47 – Linux support (WSL):** FrameScout installs and starts on Windows only (the four
+      `.bat` files); the Python code already has POSIX branches (`fcntl` locks, `os.nice`,
+      `xdg-open`, `.venv/bin/python`), but nothing is runtime-tested on Linux. User decision
+      2026-11-16: Linux is supported, tried in WSL2; **one Python version for both platforms:
+      Linux downloads a private Python 3.14 into `.python` like Windows (no system `python3`)**,
+      from a standalone build (e.g. `python-build-standalone`) with a checksum; the new download
+      is approved by this decision. Sketch, three PRs (roadmap P47): (1) `ubuntu-latest` in the CI
+      matrix, fix what fails; (2) `.sh` scripts next to the four `.bat` files (same cache
+      variables, `.tmp`, `PIP_CONSTRAINT`, version file and leftover check, exit codes) with the
+      private Python and its checksum in `framescout_core/portable_python.py`; (3) Linux driver
+      minimums in `CUDA_BUILDS`, Linux paths in the uninstaller (`bin/python`, the Ultralytics
+      settings folder), messages that name the script of the platform. Affected: new `.sh`
+      scripts, `framescout_core/torch_build.py`, `uninstall.py`, `portable_python.py`, the
+      messages in `framescout_core/`, `framescout_ui/`, `install_torch.py`, `framescout_check.py`,
+      `framescout_uninstall.py`, `.github/workflows/tests.yml`, `requirements/constraints.txt`
+      (checked for `win_amd64` only; Linux wheels pull in unpinned packages), README, user guide,
+      `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`, `CLAUDE.md` ("How to run"). Risks:
+      `opencv-python` may need `libGL` on minimal systems; torch/`rawpy` wheels for Python 3.14
+      on Linux are unverified (if one is missing, the decision is revisited); `xdg-open` cannot
+      select a file (A19); a second set of scripts to keep in sync; in WSL, photos under `/mnt/c`
+      are much slower than in the Linux file system (say so in the guide). PRs 1 and 3 are "not
+      runtime-tested" until F48. Idea of 2026-11-14. Sizes S, M (`code-risky`), M.
+- [ ] `hardware` **F48 – One full search in WSL2:** run the Linux scripts of F47 on the home PC
+      (WSL2, Ubuntu): install, start, a full search with the CPU build, then with CUDA (needs the
+      Windows NVIDIA driver; unverified) and uninstall; fix what shows up, record the result in
+      `docs/ARCHITECTURE.md` → "Verified status". Needs F47 PR 2 first.
+- [ ] `decision` **F49 – Choose which profiles a search runs:** a search always scores and exports
+      every profile, so refining one profile replaces the other profiles' results too. Sketch: a
+      checkbox "Include in the next search" per profile (default on), stored as a list of
+      skipped profile names in `settings.json` (not `profiles.json`), a note in the summary before
+      the start, the engine gets a filtered profile file or `--only-profile`; the results of
+      skipped profiles stay, so `results.json` needs a merge rule. Affected:
+      `framescout_ui/profiles.py`, `framescout_ui/run.py`, `framescout_core/settings.py`,
+      `framescout_core/results.py`, maybe `framescout_engine.py`, user guide, ARCHITECTURE.
+      Risks: results of different runs side by side must be visible per profile; interacts with
+      F13; a renamed profile must not stay skipped. **Question:** merge semantics of `results.json`
+      and a new CLI option. Size M. Idea of 2026-11-16.
+- [ ] `ready` **F50 – Quick search with an example image:** "Find similar" works only from a result
+      card, so a single outside example picture needs a profile and a full search. Sketch: an
+      optional image upload next to the quick search text; the engine embeds only that image
+      (model load, no analysis of the folders) and ranks the analyzed photos, alone or with the
+      text through the reference weight; the upload lives in `results/quick/`, replaced by the next
+      quick search, never copied into `references/`. Affected: `framescout_ui/run.py`,
+      `framescout_core/quick.py`, `framescout_engine.py`, user guide, ARCHITECTURE. Risks: the quick
+      search then needs a model load and the progress/stop handling of a run; HEIC/RAW uploads need
+      the decoders; artwork-to-photo comparisons stay unreliable (caption). Size M. Idea of
+      2026-11-16; not on the roadmap by user decision.
+- [ ] `ready` **F51 – Recent quick search texts:** the quick search remembers only the last text.
+      Sketch: keep the last 10 distinct texts in a small JSON file in `results/quick/` (atomic
+      write; an unreadable file is ignored with a warning, never replaced), a selectbox above the
+      text field, and "Save as profile" through the locked profile save (`ProfilesChangedError`,
+      A13; a taken name gets a suffix). Affected: `framescout_core/quick.py`, `framescout_ui/run.py`,
+      user guide, ARCHITECTURE (does cleanup keep the file). Size S. Idea of 2026-11-16; not on the
+      roadmap by user decision.
+- [ ] `decision` **F52 – Reuse analyses after the photo library moved:** cache rows are keyed by the
+      resolved path, so a new drive, a renamed top folder or a changed drive letter makes every
+      photo "not analyzed" (hours on a CPU-only PC). Sketch: for a photo without a valid row, copy
+      the embeddings of a row of the same signature whose file is gone and whose name, size and
+      `mtime_ns` are equal (old row stays until "Clean up storage"; marks are not moved, A21);
+      the log says "N analyses reused from moved photos". Affected: `framescout_engine.py`, a
+      helper tested on a temporary SQLite file, ARCHITECTURE ("Feature cache"). Risks: a wrong
+      match silently gives a photo another photo's embedding; needs mtime-keeping copies; an index
+      on size for 100,000 rows. **Question:** the match rule (a content hash would change the
+      cache format). Size M. Idea of 2026-11-16.
+- [ ] `decision` **F53 – Score distribution per profile:** users cannot tell whether good matches
+      end at place 20 or continue past 150. Sketch: a collapsed small chart above a profile's
+      results with a compact histogram (about 40 bins, written into `results.json` by the engine)
+      and a marker at "Maximum matches"; the caption says scores are relative heuristics, never
+      probabilities; Streamlit's built-in chart. Affected: `framescout_scoring`,
+      `framescout_engine.py`, `framescout_ui/results.py`, user guide, ARCHITECTURE. Risks: a gap
+      in the curve read as a certainty threshold; the results page is dense (A50/A51).
+      **Question:** result format addition and the UX. Size S–M. Idea of 2026-11-16.
