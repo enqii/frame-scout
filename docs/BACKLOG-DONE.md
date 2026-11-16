@@ -104,6 +104,8 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **A45 – The mark colors in the gallery caption are not checked in a browser** – done 2026-11-13; closed in the triage, no code change: the browser pass found that the colors do not apply with Streamlit 1.66.1; the fix is A49.
 - [x] **A46 – Split `app.py` into modules (simplification)** – done 2026-11-13, [PR #106](https://github.com/enqii/frame-scout/pull/106)
 - [x] **A49 – The mark colors do not apply (replaces A45)** – done 2026-11-13, [PR #105](https://github.com/enqii/frame-scout/pull/105)
+- [x] **A48 – The summary before a search counts partner photos as "to analyze"** – done 2026-11-16, [PR #134](https://github.com/enqii/frame-scout/pull/134)
+- [x] **A51 – Long explanatory captions** – done 2026-11-16, [PR #134](https://github.com/enqii/frame-scout/pull/134)
 - [x] **A15 – Reference folder and gallery file can get different suffixes** – closed 2026-11-16 in the triage, not done: nothing breaks
 - [x] **A18 – ZIP export** – closed 2026-11-16 in the triage, not done: user decision: copying the matches covers the purpose; a new idea if wanted again
 - [x] **A30 – Only one backup generation of `profiles.json`** – closed 2026-11-16 in the triage, not done: user decision (PR #6 and A13): one backup
@@ -181,6 +183,8 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **F38 – Keep the page of a profile gallery when another results entry is shown** – done 2026-11-14, [PR #113](https://github.com/enqii/frame-scout/pull/113)
 - [x] **F39 – A width limit for the form tabs** – done 2026-11-15, [PR #114](https://github.com/enqii/frame-scout/pull/114)
 - [x] **F37 – Reasons for the other disabled run buttons** – done 2026-11-16, [PR #133](https://github.com/enqii/frame-scout/pull/133)
+- [x] **F41 – Close the popover "More" after its action** – done 2026-11-16, [PR #134](https://github.com/enqii/frame-scout/pull/134)
+- [x] **F43 – A narrower popover "Export and copy"** – done 2026-11-16, [PR #134](https://github.com/enqii/frame-scout/pull/134)
 - [x] **F21 – Warn about cloud-only photos before a search** – closed 2026-11-16 in the triage, not done: needs a real OneDrive folder and an open default; the idea stays in `docs/IDEAS.md`
 - [x] **F23 – Optional desktop and Start menu shortcut, removed by the uninstaller** – closed 2026-11-16 in the triage, not done: would be the first file written outside the project folder; the idea stays in `docs/IDEAS.md`
 - [x] **F25 – Closest search text in the result list export** – closed 2026-11-16 in the triage, not done: not asked for

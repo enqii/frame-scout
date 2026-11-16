@@ -315,14 +315,16 @@ and landscape photos alike), and the cards use the whole window width (cards 250
 per row as fit; the other tabs stay at most 1,300 px wide). A card shows rank, score and the best-matching part
 ("Full image" or "Person 1", …), the detail line and the file name; a long line ends with "…" and
 shows its whole text when you hover over it. The buttons **Match** and **No** mark the photo;
-**More** opens a menu with "Open photo", "Show in folder" and "Find similar". A click on the
+**More** opens a menu with "Open photo", "Show in folder" and "Find similar"; the menu closes
+after each of them. A click on the
 photo itself opens it large in a dialog (see "Reviewing one photo at a time").
 
 Above the photos sits one row: the selector "Results of", the counts of the profile ("12 match
 · 30 no match · 58 undecided"; hover over them for how to mark), the checkbox **Hide no match**,
 the page box, the button **Review one by one** (see "Reviewing one photo at a time") and the menu
 **Export and copy**. The menu holds "Open gallery in browser", "Download HTML (without
-thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export list" (see below). The quick search result has the same row with the menu **Gallery and folder**.
+thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export list" (see below); it
+stays open, so you can use them one after another. The quick search result has the same row with the menu **Gallery and folder**.
 Below the row come one caption about the search and only the notes that apply (another search
 model, a profile changed, renamed or deleted since the search, the state of the other profiles,
 an unreadable `marks.json`), then the messages of copying and exporting. Below the photos
