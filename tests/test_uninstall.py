@@ -303,6 +303,17 @@ def test_the_private_python_goes_first(project, monkeypatch):
     assert (project / '.python' / 'Lib' / 'os.py').exists()
 
 
+def test_the_linux_pythons_go_first(project, monkeypatch):
+    # F47: the installer's checks on Linux look for .venv/bin/python and .python/bin/python3
+    write(project / '.venv' / 'bin' / 'python')
+    write(project / '.python' / 'bin' / 'python3')
+    monkeypatch.setattr(uninstall_module, '_remove_tree', lambda path, failures: None)
+    remove_items([item for item in plan(project)[0] if item.path.name in ('.venv', '.python')])
+    assert not (project / '.venv' / 'bin' / 'python').exists()
+    assert not (project / '.python' / 'bin' / 'python3').exists()
+    assert (project / '.python' / 'Lib' / 'os.py').exists()
+
+
 def test_failures_are_reported_and_the_rest_is_removed(project, monkeypatch):
     original = os.remove
 
@@ -470,9 +481,21 @@ def test_caches_in_the_user_profile_are_listed(project, tmp_path):
     home = tmp_path / 'home'
     write(home / '.cache' / 'huggingface' / 'hub' / 'model.bin', b'h' * 7)
     write(home / 'AppData' / 'Roaming' / 'Ultralytics' / 'settings.json')
-    found = outside_leftovers(project, {}, home)
+    found = outside_leftovers(project, {}, home, windows=True)
     assert [(path, size) for path, _, size in found] == [(home / '.cache' / 'huggingface', 7),
                                                        (home / 'AppData' / 'Roaming' / 'Ultralytics', 1)]
+
+
+def test_the_ultralytics_settings_on_linux_are_listed(project, tmp_path):
+    # F47: Ultralytics keeps its settings in ~/.config/Ultralytics on Linux (XDG_CONFIG_HOME)
+    home = tmp_path / 'home'
+    write(home / '.config' / 'Ultralytics' / 'settings.json')
+    write(home / 'AppData' / 'Roaming' / 'Ultralytics' / 'settings.json')
+    assert [path for path, _, _ in outside_leftovers(project, {}, home, windows=False)] == [
+        home / '.config' / 'Ultralytics']
+    config = write(tmp_path / 'config' / 'Ultralytics' / 'settings.json').parent.parent
+    found = outside_leftovers(project, {'XDG_CONFIG_HOME': str(config)}, home, windows=False)
+    assert [path for path, _, _ in found] == [config / 'Ultralytics']
 
 
 def test_cache_variables_are_followed_but_not_into_the_project(project, tmp_path):
@@ -534,6 +557,18 @@ def test_a_running_search_stops_the_uninstall(project, tmp_path):
     finally:
         lock.release()
     assert code == 1 and 'search is running' in text and questions == []
+    assert (project / '.venv').exists()
+
+
+def test_a_running_app_stops_the_uninstall(project, tmp_path):
+    # F47: on Linux the environment's Python cannot tell that FrameScout runs, its start lock can
+    lock = RunLock(project / '.tmp' / 'app-instance.lock')
+    assert lock.acquire(timeout=1)
+    try:
+        code, text, questions = run(project, tmp_path, 'yes')
+    finally:
+        lock.release()
+    assert code == 1 and 'FrameScout is still running' in text and questions == []
     assert (project / '.venv').exists()
 
 

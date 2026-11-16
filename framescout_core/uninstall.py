@@ -14,6 +14,7 @@ import stat
 from dataclasses import dataclass
 from pathlib import Path
 
+from .app_instance import INSTANCE_DIR, INSTANCE_LOCK
 from .copying import COPY_FOLDERS_KEY, _inside
 from .locks import lock_held
 from .portable_python import PRIVATE_PYTHON
@@ -51,14 +52,16 @@ USER_DATA = (
     ('run.log', 'log of the last search'),
     ('.tmp/eval', 'collections of the evaluation tool with your labels'),
 )
-# files deleted before the rest of their folder: without its python.exe, an environment or
-# private Python whose removal stopped halfway never looks complete, and the installer
-# creates a new one
-UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe'),
-                   PRIVATE_PYTHON: ('python.exe', 'pythonw.exe')}
+# files deleted before the rest of their folder: without its python.exe (on Linux bin/python
+# and bin/python3, F47), an environment or private Python whose removal stopped halfway never
+# looks complete, and the installer creates a new one
+UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe', 'bin/python'),
+                   PRIVATE_PYTHON: ('python.exe', 'pythonw.exe', 'bin/python3')}
 # programs of the environment that run while the app or a search runs: Windows does not let
-# anyone open them for writing then, which tells that FrameScout still runs
-ENVIRONMENT_PROGRAMS = tuple(f'.venv/{name}' for name in UNINSTALL_FIRST['.venv'])
+# anyone open them for writing then, which tells that FrameScout still runs. On Linux the
+# environment's Python is a link to the private Python, which runs the uninstall itself:
+# there the app's start lock tells it (app_running, F47)
+ENVIRONMENT_PROGRAMS = ('.venv/Scripts/python.exe', '.venv/Scripts/pythonw.exe')
 # exit code of framescout_uninstall.py when it deleted everything but the private Python it
 # runs with: Uninstall-FrameScout.bat deletes that one after the script has ended (I20).
 # 0 and 1 are the script's other results, 2 is argparse's usage error.
@@ -235,20 +238,24 @@ def user_data(root):
     return [(root / relative, label) for relative, label in USER_DATA if os.path.lexists(root / relative)]
 
 
-def outside_leftovers(root, environ, home):
+def outside_leftovers(root, environ, home, windows=os.name == 'nt'):
     """Return (path, what it is, size) of folders outside root that model downloads and
-    Ultralytics may have filled when FrameScout ran without its .bat files (I10).
+    Ultralytics may have filled when FrameScout ran without its scripts (I10).
 
     They are shared with other programs, so the uninstall only lists them. environ is the
-    environment the uninstall runs in (the .bat files do not set these variables for it).
+    environment the uninstall runs in (the scripts do not set these variables for it);
+    windows: Ultralytics' settings folder of Windows, otherwise that of Linux (F47).
     """
     root, home = Path(root), Path(home)
     cache = Path(environ['XDG_CACHE_HOME']) if environ.get('XDG_CACHE_HOME') else home / '.cache'
-    appdata = Path(environ['APPDATA']) if environ.get('APPDATA') else home / 'AppData' / 'Roaming'
+    if windows:
+        config = Path(environ['APPDATA']) if environ.get('APPDATA') else home / 'AppData' / 'Roaming'
+    else:
+        config = Path(environ['XDG_CONFIG_HOME']) if environ.get('XDG_CONFIG_HOME') else home / '.config'
     candidates = (
         (environ.get('TORCH_HOME') or cache / 'torch', 'PyTorch cache (model weights)'),
         (environ.get('HF_HOME') or cache / 'huggingface', 'Hugging Face cache (CLIP model weights)'),
-        (environ.get('YOLO_CONFIG_DIR') or appdata / 'Ultralytics', 'Ultralytics settings'),
+        (environ.get('YOLO_CONFIG_DIR') or config / 'Ultralytics', 'Ultralytics settings'),
     )
     found = []
     for path, label in candidates:
@@ -261,6 +268,11 @@ def outside_leftovers(root, environ, home):
 def search_running(root):
     """Return True if a search holds the run lock of the app's results folder."""
     return lock_held(Path(root) / 'results' / RUN_LOCK)
+
+
+def app_running(root):
+    """Return True if an app started with the start script of root holds its start lock (F47)."""
+    return lock_held(Path(root) / INSTANCE_DIR / INSTANCE_LOCK)
 
 
 def _held_open(path):
