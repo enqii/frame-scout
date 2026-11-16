@@ -9,20 +9,21 @@ from framescout_core.review import (REVIEW_PHOTO_KEY, REVIEW_PREVIEW_SIZE, REVIE
                                     next_undecided, review_index, review_position, review_shown, review_state_text)
 from framescout_images import render_preview
 
-from .common import MARKS, PROFILES, file_key, open_photo, plain
+from .common import MARKS, PROFILES, close_popover, file_key, open_photo, plain
 from .marks import load_marks
 
 
-def find_similar_button(card, key, disabled):
+def find_similar_button(card, key, disabled, close=None):
     """The button "Find similar" of a gallery card and of the review dialog (F11, F19).
 
     A fragment cannot start the engine (start_engine reruns the whole page), so the click
     stores the photo and the part shown on the card and reruns the page, which starts it;
     it closes the review dialog first. A missing model package does not disable it: it
     loads no model (review). disabled: while a search runs or no photo folder exists (the
-    page run's state).
+    page run's state). close: the key of the popover it is in, closed by the click (F41).
     """
     if st.button('Find similar', key=key, width='stretch', disabled=disabled,
+                 on_click=close_popover if close else None, args=(close,),
                  help='Finds photos similar to this one (the part named on the card) among the photos analyzed with '
                       'the current AI settings, without analyzing anything. The result replaces the last quick '
                       'search.'):

@@ -125,6 +125,17 @@ def gallery_action(action, path, what):
         st.session_state.gallery_notice = f'{what} could not be opened: {exc}'
 
 
+def close_popover(key, action=None, *args):
+    """on_click of a button in the popover with key: close it, then run action(*args) if given (F41).
+
+    Streamlit (1.66.1) keeps a popover open after a click in it reruns the page; one that
+    tracks its state (on_change set) closes when its key is set to False before it is drawn.
+    """
+    st.session_state[key] = False
+    if action:
+        action(*args)
+
+
 def open_photo(path):
     # only an existing image file: never start a program named in results.json
     gallery_action(open_path, openable_photo(path), f'The photo {path}')

@@ -12,8 +12,9 @@ from framescout_core.quick import (QUICK_DIR, QUICK_GALLERY, quick_entry_label, 
 from framescout_core.results import (GALLERY_PAGE_SIZE, card_text, has_closest_line, page_cards, page_count,
                                      profile_fingerprints, profile_state, query_summary, read_results)
 
-from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, file_key, open_gallery, open_photo,
-                     open_quick_folder, open_quick_gallery, open_results_folder, plain, show_photo, widget_id)
+from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, close_popover, file_key, open_gallery,
+                     open_photo, open_quick_folder, open_quick_gallery, open_results_folder, plain, show_photo,
+                     widget_id)
 
 from .marks import MARK_LABELS, load_marks, marks_backup_offer, restore_marks_backup, set_mark
 from .copy_export import show_copy, show_export
@@ -113,13 +114,19 @@ def draw_cards(cards, thumbs, key, find_disabled, with_closest, profile=None, ca
                                              args=(profile, card['path'], mark_key), disabled=not can_mark,
                                              label_visibility='collapsed',
                                              help='Neither pressed: undecided. A second click takes the mark back.')
+                    # F41: closed by each of its buttons, so it does not cover the cards below;
+                    # tracking its state costs a rerun per open and close
+                    more_key = 'more_' + photo_id
                     with st.popover('More', help='Open the photo or show it in its folder, with the programs of the '
-                                                 'computer FrameScout runs on, or find similar photos.'):
-                        st.button('Open photo', key=f"{prefix}open_{card['rank']}", on_click=open_photo,
-                                  args=(card['path'],), width='stretch', help='Opens the photo in your image viewer.')
-                        st.button('Show in folder', key=f"{prefix}reveal_{card['rank']}", on_click=show_photo,
-                                  args=(card['path'],), width='stretch', help='Shows the photo in its folder.')
-                        find_similar_button(card, f"{prefix}similar_{card['rank']}", find_disabled)
+                                                 'computer FrameScout runs on, or find similar photos.',
+                                    key=more_key, on_change='rerun'):
+                        st.button('Open photo', key=f"{prefix}open_{card['rank']}", on_click=close_popover,
+                                  args=(more_key, open_photo, card['path']), width='stretch',
+                                  help='Opens the photo in your image viewer.')
+                        st.button('Show in folder', key=f"{prefix}reveal_{card['rank']}", on_click=close_popover,
+                                  args=(more_key, show_photo, card['path']), width='stretch',
+                                  help='Shows the photo in its folder.')
+                        find_similar_button(card, f"{prefix}similar_{card['rank']}", find_disabled, close=more_key)
 
 
 def bottom_pager(key, page, pages, prefix, progress=None):

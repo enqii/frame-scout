@@ -127,6 +127,31 @@ def test_the_results_have_one_toolbar_row_above_the_photos():
     assert "st.selectbox(f'Page (of {pages})'" in row and "st.popover('Gallery and folder'" in row
 
 
+def test_the_popover_more_of_a_card_closes_after_its_action():
+    # F41: Streamlit keeps a popover open after a button in it reruns the page; "More" tracks
+    # its state under a key, and each of its buttons closes it in its callback
+    functions = app_functions()
+    [more] = [node for node in ast.walk(functions['draw_cards']) if isinstance(node, ast.With)
+              and ast.unparse(node.items[0].context_expr).startswith("st.popover('More'")]
+    keywords = {k.arg: ast.unparse(k.value) for k in more.items[0].context_expr.keywords}
+    assert keywords['on_change'] == "'rerun'" and keywords['key'] == 'more_key'
+    calls = [node for node in ast.walk(more) if isinstance(node, ast.Call)]
+    for label, action in (('Open photo', 'open_photo'), ('Show in folder', 'show_photo')):
+        [button] = [c for c in calls if ast.unparse(c.func) == 'st.button' and ast.unparse(c.args[0]) == repr(label)]
+        found = {k.arg: ast.unparse(k.value) for k in button.keywords}
+        assert found['on_click'] == 'close_popover'
+        assert found['args'] == f"(more_key, {action}, card['path'])"
+    [similar] = [c for c in calls if ast.unparse(c.func) == 'find_similar_button']
+    assert {k.arg: ast.unparse(k.value) for k in similar.keywords} == {'close': 'more_key'}
+    button = ast.unparse(functions['find_similar_button'])
+    assert 'on_click=close_popover if close else None' in button and 'args=(close,)' in button
+    # the popover "Export and copy" stays open: its buttons are used one after another
+    [export] = with_blocks(functions['show_profile_results'], "st.popover('Export and copy'")
+    assert 'close_popover' not in export
+    closing = ast.unparse(functions['close_popover'])
+    assert 'st.session_state[key] = False' in closing
+
+
 def test_the_results_have_a_pager_below_the_grid():
     # F29: a second pager below the grid; in the profile results with "Go to the first undecided photo"
     functions = app_functions()
