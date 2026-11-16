@@ -370,15 +370,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       unpacked size of the CUDA build of PyTorch and pip's peak space use are not measured;
       `TORCH_INSTALL_SPACE['cuda']` (3 GB download, 6 GB installed) is an estimate. Measure on
       the home PC and correct it; could go into the rest of I11. Found in F3 (PR #64).
-- [ ] `ready` **I42 – Replace the mixed-versions guard by something simpler (simplification):**
-      `framescout_core/layout.py`, `framescout_scoring/layout.py`, the `FRAMESCOUT_PACKAGES`
-      marker in six entry points and about 500 lines of `tests/test_layout.py` (I16, I35, I36)
-      only protect against extracting a ZIP over another version's folder. Options: the
-      installer and the start script refuse a folder that holds files of another version (one
-      version file); or the user guide says "extract into an empty folder" and the `.bat`
-      files keep deleting the two known leftover files. Removes a gotcha from `CLAUDE.md`.
-      Decide which protection stays. Found on 2026-11-12 in a simplification review.
-      Triage 2026-11-15: decided: one version file checked by the installer and the start script.
 - [ ] `decision` **I43 – Drop legacy names with one migration (simplification, breaking):** the prototype
       has no release yet but carries compatibility code for its own earlier states: the crop
       label `Gesamtbild` in old cache rows, the thumbnail folder `results/vorschaubilder/`,
@@ -403,8 +394,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 - [ ] `ready` **I45 – Flatten the package structure (simplification):** `framescout_core/__init__.py`
       re-exports about 200 names by hand, and every new function has to be added there; import
       from the modules instead (`from framescout_core.settings import …`) and keep
-      `__init__.py` nearly empty (the mixed-versions guard depends on I42).
-      `framescout_scoring` (about 190 lines, numpy only) is an own package with an own guard:
+      `__init__.py` nearly empty (the mixed-versions guard is gone since I42).
+      `framescout_scoring` (about 190 lines, numpy only) is an own package:
       make it one module or a subpackage, keeping the rule "core is standard library only" as
       a test. Do it together with I32 (entry points into a package), so the imports change
       once. Found on 2026-11-12 in a simplification review.
