@@ -5,8 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (NEVER_DELETED, ProfilesChangedError, RunLock, UnknownProfileError, load_profiles,
-                             profiles_changed_notice, read_profiles, read_profiles_versioned, require_profile, save_profiles)
+from framescout_core.cleanup import NEVER_DELETED
+from framescout_core.locks import RunLock
+from framescout_core.profiles import (ProfilesChangedError, UnknownProfileError, load_profiles, profiles_changed_notice,
+                                      read_profiles, read_profiles_versioned, require_profile, save_profiles)
 
 
 def write(path, data, encoding='utf-8'):

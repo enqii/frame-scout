@@ -8,7 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from framescout_core import RUN_STATUS, cache_paths, default_cache_env, engine_cache_env, read_status
+from framescout_core.cache_dirs import cache_paths, default_cache_env, engine_cache_env
+from framescout_core.run_status import RUN_STATUS, read_status
 
 from app_source import app_tree
 
@@ -507,7 +508,7 @@ def test_an_analysis_stops_before_scoring_and_export():
 
 
 def test_the_status_of_an_analysis_says_so_from_its_first_phase():
-    # F18: the app names it an analysis, not a search (framescout_core.analysis_only)
+    # F18: the app names it an analysis, not a search (framescout_core.run_status.analysis_only)
     main = next(node for node in ast.walk(ast.parse(ENGINE.read_text(encoding='utf-8')))
                 if isinstance(node, ast.FunctionDef) and node.name == 'main')
     # the reporter is told the run kind once, so every write carries it (review)

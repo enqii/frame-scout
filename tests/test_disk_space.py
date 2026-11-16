@@ -7,10 +7,12 @@ from pathlib import Path
 import pytest
 
 from framescout_core import disk_space
-from framescout_core import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, MODELS, OTHER_PACKAGES_SPACE, SPACE_RESERVE, THUMBNAIL_BYTES,
-                             TORCH_INSTALL_SPACE, LowSpace, analyzed_paths, analyzed_photos, app_search_needs, download_bytes,
-                             downloaded_models, eval_run_needs, low_space, low_space_lines,
-                             search_space_bytes, search_space_needs, torch_install_needs)
+from framescout_core.disk_space import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD, LowSpace, OTHER_PACKAGES_SPACE,
+                                        SPACE_RESERVE, THUMBNAIL_BYTES, TORCH_INSTALL_SPACE, analyzed_paths,
+                                        analyzed_photos, app_search_needs, download_bytes, downloaded_models,
+                                        eval_run_needs, low_space, low_space_lines, search_space_bytes,
+                                        search_space_needs, torch_install_needs)
+from framescout_core.models import MODELS
 
 MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text (review)
 Usage = namedtuple('Usage', 'total used free')

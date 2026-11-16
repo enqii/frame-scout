@@ -7,7 +7,7 @@ import unicodedata
 # Supported image file extensions (lowercase, with leading dot). Pillow reads the first
 # ones itself, AVIF if its build has libavif (the wheels since Pillow 11.3); HEIC/HEIF
 # needs pillow-heif and camera RAW rawpy (E25). Files of a decoder that is missing are
-# skipped (framescout_core.supported_extensions).
+# skipped (framescout_core.photos.supported_extensions).
 AVIF_EXT = frozenset({'.avif'})
 HEIF_EXT = frozenset({'.heic', '.heif'})
 RAW_EXT = frozenset({'.dng', '.cr2', '.cr3', '.nef', '.arw', '.orf', '.rw2', '.raf', '.pef', '.srw'})

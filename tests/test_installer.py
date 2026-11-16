@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from framescout_core import PRIVATE_PYTHON, PYTHON_SHA256, PYTHON_URL, PYTHON_VERSION
+from framescout_core.portable_python import PRIVATE_PYTHON, PYTHON_SHA256, PYTHON_URL, PYTHON_VERSION
 
 ROOT = Path(__file__).resolve().parent.parent
 

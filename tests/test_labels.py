@@ -1,7 +1,7 @@
-"""Crop labels shown in the HTML gallery (framescout_core.crop_label)."""
+"""Crop labels shown in the HTML gallery (framescout_core.thumbnails.crop_label)."""
 import pytest
 
-from framescout_core import FULL_IMAGE_LABEL, crop_label
+from framescout_core.thumbnails import FULL_IMAGE_LABEL, crop_label
 
 
 def test_full_image_label_is_english():

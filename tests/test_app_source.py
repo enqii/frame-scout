@@ -10,7 +10,6 @@ import symtable
 
 import pytest
 
-import framescout_core
 from app_source import APP, ROOT, UI_PACKAGE, app_files
 
 UI = UI_PACKAGE.name
@@ -54,13 +53,6 @@ def test_the_app_has_its_modules():
 @app_file
 def test_every_global_name_of_the_app_is_defined_or_imported(path):
     assert undefined_globals(path) == set()
-
-
-@app_file
-def test_every_name_the_app_imports_from_framescout_core_exists(path):
-    missing = [name for module, level, name in imports_from(path)
-               if not level and module == 'framescout_core' and not hasattr(framescout_core, name)]
-    assert missing == []
 
 
 @app_file

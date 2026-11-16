@@ -1,10 +1,11 @@
-"""Profile loading, validation and prompt generation (framescout_core.load_profiles)."""
+"""Profile loading, validation and prompt generation (framescout_core.profiles.load_profiles)."""
 import json
 
 import numpy as np
 import pytest
 
-from framescout_core import like_profile, load_profiles, query_labels, quick_profile
+from framescout_core.profiles import load_profiles, query_labels
+from framescout_core.quick import like_profile, quick_profile
 from framescout_scoring import text_queries
 
 GENERIC = ['A photograph of {t}.', 'An image showing {t}.', 'A detailed photo of {t}.',

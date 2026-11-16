@@ -2,7 +2,7 @@
 
 The app reads the progress from the status file instead (test_run_status.py, A5).
 """
-from framescout_core import progress_line
+from framescout_core.pipeline import progress_line
 
 
 def test_progress_line_format():

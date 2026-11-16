@@ -2,7 +2,7 @@
 import ast
 
 from app_source import UI_PACKAGE
-from framescout_core import AI_DETAIL_SETTINGS, AI_SETTINGS, PERSON_DETECTION_SETTINGS
+from framescout_core.settings import AI_DETAIL_SETTINGS, AI_SETTINGS, PERSON_DETECTION_SETTINGS
 
 SETTINGS_UI = UI_PACKAGE / 'settings.py'
 DETAILS_LABEL = 'Person detection and reference images'

@@ -37,13 +37,19 @@ from urllib.parse import unquote, urlsplit
 
 import numpy as np
 
-from framescout_core import (DEFAULT_REFERENCE_WEIGHT, DEFAULT_YOLO_MODEL, DEVICES, EVAL_K, EVAL_PAGE_FILE,
-                             LABELS_FORMAT, MODEL_KEYS, MODELS, SKIP_LOG_LIMIT, available_decoders, average_precision, build_pool,
-                             cache_folder_paths, changed_motifs, collection_name_problem, distinct_folders,
-                             ensure_thumbnail, eval_run_needs, find_yolo_weights, hub_cache_dir, load_profiles,
-                             low_space, low_space_lines, model_problem, motif, read_document, read_label_file,
-                             read_profiles, read_scores, record_motif, save_labels, scan_folders, set_label,
-                             supported_extensions, thumbnail_name, write_document)
+from framescout_core.cache_dirs import cache_folder_paths, find_yolo_weights
+from framescout_core.disk_space import eval_run_needs, low_space, low_space_lines
+from framescout_core.evaluation import (EVAL_K, LABELS_FORMAT, average_precision, build_pool, changed_motifs,
+                                        collection_name_problem, motif, read_document, read_label_file, read_scores,
+                                        record_motif, save_labels, set_label, write_document)
+from framescout_core.hub import hub_cache_dir
+from framescout_core.models import MODELS, MODEL_KEYS, model_problem
+from framescout_core.paths import EVAL_PAGE_FILE
+from framescout_core.photos import available_decoders, distinct_folders, scan_folders, supported_extensions
+from framescout_core.profiles import load_profiles, read_profiles
+from framescout_core.settings import DEFAULT_REFERENCE_WEIGHT, DEVICES
+from framescout_core.signature import DEFAULT_YOLO_MODEL
+from framescout_core.thumbnails import SKIP_LOG_LIMIT, ensure_thumbnail, thumbnail_name
 from framescout_scoring import rank_photos
 
 ROOT = Path(__file__).resolve().parent

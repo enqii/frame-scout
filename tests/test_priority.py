@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE, MAX_TORCH_THREADS,
-                             lower_priority, torch_threads)
+from framescout_core.priority import (BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, LOW_PRIORITY_NICE,
+                                      MAX_TORCH_THREADS, lower_priority, torch_threads)
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -86,7 +86,7 @@ def test_the_priority_of_the_own_process_is_really_lowered():
     else:
         check = 'import os; print(os.nice(0))'
         expected = str(min(19, os.nice(0) + LOW_PRIORITY_NICE))
-    code = f'from framescout_core import lower_priority; assert lower_priority() is None; {check}'
+    code = f'from framescout_core.priority import lower_priority; assert lower_priority() is None; {check}'
     result = subprocess.run([sys.executable, '-c', code], cwd=str(REPO), capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == expected
@@ -97,7 +97,7 @@ def test_an_idle_priority_process_stays_idle():
     # started at IDLE_PRIORITY_CLASS, as by "start /low": --low-priority must not raise it (review)
     check = ('import ctypes; k = ctypes.WinDLL("kernel32"); k.GetCurrentProcess.restype = ctypes.c_void_p; '
              'k.GetPriorityClass.argtypes = (ctypes.c_void_p,); print(k.GetPriorityClass(k.GetCurrentProcess()))')
-    code = f'from framescout_core import lower_priority; assert lower_priority() is None; {check}'
+    code = f'from framescout_core.priority import lower_priority; assert lower_priority() is None; {check}'
     result = subprocess.run([sys.executable, '-c', code], cwd=str(REPO), capture_output=True, text=True, timeout=60,
                             creationflags=IDLE_PRIORITY_CLASS)
     assert result.returncode == 0, result.stderr

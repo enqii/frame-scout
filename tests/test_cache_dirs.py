@@ -8,10 +8,12 @@ from pathlib import Path, PureWindowsPath
 
 import pytest
 
-from framescout_core import (DEFAULT_MODEL, DEFAULT_YOLO_MODEL, MODELS, cache_folder_paths, cache_paths,
-                             default_cache_env, detector_weights_line, engine_cache_env, find_yolo_weights,
-                             hub_cache_dir,
-                             open_clip_cache_dir, yolo_weights, XDG_DERIVED)
+from framescout_core.cache_dirs import (XDG_DERIVED, cache_folder_paths, cache_paths, default_cache_env,
+                                        detector_weights_line, engine_cache_env, find_yolo_weights, open_clip_cache_dir,
+                                        yolo_weights)
+from framescout_core.hub import hub_cache_dir
+from framescout_core.models import DEFAULT_MODEL, MODELS
+from framescout_core.signature import DEFAULT_YOLO_MODEL
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -69,8 +71,11 @@ def test_default_cache_env_leaves_torch_and_hugging_face_to_an_xdg_cache_home_a_
 
 def test_importing_framescout_core_imports_no_third_party_module():
     # review: the engine calls default_cache_env after importing framescout_core, which is safe
-    # only while framescout_core loads nothing that reads the cache variables on import
-    script = ('import sys\nbefore = set(sys.modules)\nimport framescout_core\n'
+    # only while framescout_core loads nothing that reads the cache variables on import; this
+    # also keeps the package standard library only (all of its modules are imported, I45)
+    script = ('import importlib, pkgutil, sys\nbefore = set(sys.modules)\nimport framescout_core\n'
+              'for info in pkgutil.iter_modules(framescout_core.__path__):\n'
+              '    importlib.import_module("framescout_core." + info.name)\n'
               'new = {m.split(".")[0] for m in set(sys.modules) - before}\n'
               'print(sorted(new - set(sys.stdlib_module_names) - {"framescout_core"}))')
     result = subprocess.run([sys.executable, '-c', script], cwd=ROOT, capture_output=True, text=True, timeout=120)

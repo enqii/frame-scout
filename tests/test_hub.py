@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (HUB_QUIET_ENV, MODELS, OFFLINE_VARIABLES, hub_cache_dir, hub_file_cached, hub_go_online,
-                             hub_file_error, import_open_clip, load_with_hub_fallback, model_cached)
+from framescout_core.hub import (HUB_QUIET_ENV, OFFLINE_VARIABLES, hub_cache_dir, hub_file_cached, hub_file_error,
+                                 hub_go_online, import_open_clip, load_with_hub_fallback, model_cached)
+from framescout_core.models import MODELS
 
 DEFAULT = MODELS['vit-b-32-openai']
 SIGLIP = MODELS['vit-b-16-siglip']
@@ -195,7 +196,8 @@ def test_the_real_huggingface_hub_follows_the_offline_switch(tmp_path):
         for name in {OFFLINE_VARIABLES!r} + ('HF_HUB_DISABLE_SYMLINKS_WARNING',):
             os.environ.pop(name, None)
         from huggingface_hub import constants
-        from framescout_core import MODELS, import_open_clip, hub_go_online
+        from framescout_core.hub import hub_go_online, import_open_clip
+        from framescout_core.models import MODELS
         assert not constants.is_offline_mode()
         model = MODELS['vit-b-32-openai']
         _, offline = import_open_clip(os.environ, lambda name: types.SimpleNamespace(), model,

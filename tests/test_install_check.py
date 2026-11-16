@@ -7,13 +7,14 @@ from pathlib import Path
 
 import pytest
 
-import framescout_core
 from framescout_core import install_check
-from framescout_core import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
 from framescout_core.install_check import (CheckResult, check_disk_space,
                                            check_environment, check_installation, check_lines, check_models,
                                            check_packages, check_torch, check_writable, installed_versions,
                                            requirement_names, venv_python, venv_site_packages)
+from framescout_core.models import DEFAULT_MODEL, MODELS
+from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
+from framescout_core.signature import DEFAULT_YOLO_MODEL
 
 ROOT = Path(__file__).resolve().parent.parent
 Usage = namedtuple('Usage', 'total used free')
@@ -292,17 +293,17 @@ def test_folder_that_cannot_be_written_is_a_problem(tmp_path, monkeypatch):
 # --- model weights and disk space -----------------------------------------------------------
 
 def test_models_lists_what_is_downloaded_as_information(tmp_path, monkeypatch):
-    key = framescout_core.DEFAULT_MODEL
+    key = DEFAULT_MODEL
     monkeypatch.setattr(install_check, 'downloaded_models', lambda base, environ: {key})
     [result] = check_models(tmp_path, {})
     assert result.ok is None
-    assert framescout_core.MODELS[key].label in result.text
+    assert MODELS[key].label in result.text
     assert 'person detection' in result.text and 'Not downloaded yet' in result.text
 
 
 def test_models_names_cached_person_detector(tmp_path, monkeypatch):
     monkeypatch.setattr(install_check, 'downloaded_models', lambda base, environ: set())
-    weights = tmp_path / '.cache' / 'ultralytics' / framescout_core.DEFAULT_YOLO_MODEL
+    weights = tmp_path / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
     weights.parent.mkdir(parents=True)
     weights.write_bytes(b'')
     [result] = check_models(tmp_path, {})

@@ -17,7 +17,7 @@ import os
 import sys
 from pathlib import Path
 
-from framescout_core import check_installation, check_lines
+from framescout_core.install_check import check_installation, check_lines
 
 ROOT = Path(__file__).resolve().parent
 # not 1: Python exits with 1 on an uncaught exception, and Check-FrameScout.bat must tell a

@@ -4,9 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (EVAL_K, LABELS_FORMAT, SCORES_FORMAT, average_precision, build_pool, changed_motifs,
-                             collection_name_problem, motif, read_document, read_label_file, read_labels, read_scores,
-                             record_motif, save_labels, scores_document, set_label, write_document, write_scores)
+from framescout_core.evaluation import (EVAL_K, LABELS_FORMAT, SCORES_FORMAT, average_precision, build_pool,
+                                        changed_motifs, collection_name_problem, motif, read_document, read_label_file,
+                                        read_labels, read_scores, record_motif, save_labels, scores_document, set_label,
+                                        write_document, write_scores)
 
 
 def sample_document():

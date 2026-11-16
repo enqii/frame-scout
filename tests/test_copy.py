@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (UnknownProfileError, copy_photos, copy_summary_text, copy_target, default_copy_folder,
-                             default_settings, forget_copy_folder, lock_held, read_copy_folders, read_settings,
-                             rename_copy_folder, save_copy_folder, save_settings)
+from framescout_core.copying import (copy_photos, copy_summary_text, copy_target, default_copy_folder,
+                                     forget_copy_folder, read_copy_folders, rename_copy_folder, save_copy_folder)
+from framescout_core.locks import lock_held
+from framescout_core.profiles import UnknownProfileError
+from framescout_core.settings import default_settings, read_settings, save_settings
 
 
 def photo(path, data=b'photo'):
@@ -265,7 +267,7 @@ def test_a_target_folder_is_saved_only_for_a_profile_of_the_profiles_file(tmp_pa
 
 def test_a_name_that_cannot_be_created_moves_on_to_the_next(tmp_path, monkeypatch):
     # e.g. a dangling symbolic link: exists() is False, but the name is taken (review: no endless loop)
-    import framescout_core
+    import framescout_core.copying
     publish = framescout_core.copying._publish_new
 
     def refuse_first(tmp, target):

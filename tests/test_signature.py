@@ -1,8 +1,8 @@
 """CLIP model choice and the feature cache signature (E1)."""
 import pytest
 
-from framescout_core import (DEFAULT_MODEL, ENGINE, MODEL_ENGINES, MODEL_KEYS, MODELS, engine_id,
-                             feature_signature)
+from framescout_core.models import DEFAULT_MODEL, MODELS, MODEL_KEYS
+from framescout_core.signature import ENGINE, MODEL_ENGINES, engine_id, feature_signature
 
 DEFAULTS = dict(person_detection=True, max_persons=12, person_confidence=.3, yolo_model='yolo11n.pt')
 # Signature of the default settings in v1.1 (ENGINE v4, GELU embeddings)

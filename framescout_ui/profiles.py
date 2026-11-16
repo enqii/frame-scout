@@ -3,10 +3,12 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (MARKS_FILE, MARK_MATCH, ProfilesChangedError, count_text, delete_marks,
-                             finish_reference_move, forget_copy_folder, profiles_changed_notice, reference_folder,
-                             rename_copy_folder, rename_marks, save_profiles, stage_reference_move,
-                             undo_reference_move, update_backup_references, write_new_file)
+from framescout_core.cleanup import count_text
+from framescout_core.copying import forget_copy_folder, rename_copy_folder
+from framescout_core.marks import MARKS_FILE, MARK_MATCH, delete_marks, rename_marks
+from framescout_core.profiles import ProfilesChangedError, profiles_changed_notice, save_profiles
+from framescout_core.references import (finish_reference_move, reference_folder, stage_reference_move,
+                                        undo_reference_move, update_backup_references, write_new_file)
 
 from .common import BASE, MARKS, PROFILES, REFS, RESULTS, SETTINGS, plain, supported, upload_types, version_key
 from .marks import load_marks

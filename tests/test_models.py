@@ -3,8 +3,8 @@ import re
 
 import pytest
 
-from framescout_core import (DEFAULT_MODEL, MODEL_KEYS, MODELS, SearchModel, missing_packages, model_label,
-                             model_problem, results_model)
+from framescout_core.models import (DEFAULT_MODEL, MODELS, MODEL_KEYS, SearchModel, missing_packages, model_label,
+                                    model_problem, results_model)
 
 
 def test_the_default_is_openai_clip_vit_b_32_with_quickgelu():
@@ -161,7 +161,7 @@ def test_the_hub_repositories_match_the_open_clip_config(key):
     open_clip = open_clip_or_skip()
     from open_clip.pretrained import get_pretrained_cfg
     model = MODELS[key]
-    # a trailing "/" means open_clip's default weights file names (framescout_core.WEIGHTS_FILES)
+    # a trailing "/" means open_clip's default weights file names (framescout_core.hub.WEIGHTS_FILES)
     assert get_pretrained_cfg(model.name, model.pretrained)['hf_hub'] == model.weights_repo + '/'
     assert open_clip.get_model_config(model.name)['text_cfg'].get('hf_tokenizer_name', '') == model.tokenizer_repo
 
@@ -169,5 +169,5 @@ def test_the_hub_repositories_match_the_open_clip_config(key):
 def test_the_weights_file_names_are_the_ones_of_open_clip():
     open_clip_or_skip()
     from open_clip.constants import HF_SAFE_WEIGHTS_NAME, HF_WEIGHTS_NAME
-    from framescout_core import WEIGHTS_FILES
+    from framescout_core.hub import WEIGHTS_FILES
     assert WEIGHTS_FILES == (HF_SAFE_WEIGHTS_NAME, HF_WEIGHTS_NAME)

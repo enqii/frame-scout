@@ -83,7 +83,7 @@ def run_with_pillow(script, *args):
 OUTCOME = ('import os, random, sys\n'
            'from PIL import Image\n'
            'import framescout_images\n'
-           'from framescout_core import TruncatedImageError\n'
+           'from framescout_core.photos import TruncatedImageError\n'
            'def outcome(path, **options):\n'
            '    try:\n'
            '        return framescout_images.open_image(path, **options).size\n'

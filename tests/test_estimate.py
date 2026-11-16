@@ -3,11 +3,11 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from framescout_core import (FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, RATE_MIN_PHOTOS, RATE_MIN_SECONDS,
-                             RATE_STALE, RATE_WINDOW, THROUGHPUT_KEPT, THROUGHPUT_MIN_SECONDS, AnalysisRate, StepSpeed, duration_text,
-                             finishing_minutes,
-                             gallery_thumbnails, known_throughput, remaining_text, remember_finishing,
-                             remember_throughput, run_throughput, start_summary, stored_finishing, stored_throughput)
+from framescout_core.estimate import (AnalysisRate, FINISHING_MIN_ITEMS, FINISHING_MIN_SECONDS, RATE_MIN_PHOTOS,
+                                      RATE_MIN_SECONDS, RATE_STALE, RATE_WINDOW, StepSpeed, THROUGHPUT_KEPT,
+                                      THROUGHPUT_MIN_SECONDS, duration_text, finishing_minutes, gallery_thumbnails,
+                                      known_throughput, remaining_text, remember_finishing, remember_throughput,
+                                      run_throughput, start_summary, stored_finishing, stored_throughput)
 
 
 # --- AnalysisRate: photos per minute of the analysis, measured in the engine ---

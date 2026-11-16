@@ -6,9 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (AI_SETTINGS, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEVICES, MODEL_KEYS, MODELS,
-                             SETTING_RANGES, SETTINGS_FILE, changed_from_defaults, default_settings, folder_lines,
-                             read_settings, reconcile_settings, save_settings, setting_text)
+from framescout_core.models import DEFAULT_MODEL, MODELS, MODEL_KEYS
+from framescout_core.settings import (AI_SETTINGS, DEFAULT_REFERENCE_WEIGHT, DEVICES, SETTINGS_FILE, SETTING_RANGES,
+                                      changed_from_defaults, default_settings, folder_lines, read_settings,
+                                      reconcile_settings, save_settings, setting_text)
 
 
 @pytest.fixture
@@ -45,7 +46,7 @@ def test_keep_the_pc_responsive_is_an_ai_setting_off_by_default(tmp_path, defaul
 
 
 def test_the_search_model_is_a_registry_key(tmp_path, defaults):
-    # E22: a key of framescout_core.MODELS, like the engine's --model; an older settings.json
+    # E22: a key of framescout_core.models.MODELS, like the engine's --model; an older settings.json
     # without it uses the default model
     assert defaults['model'] == DEFAULT_MODEL
     path = write(tmp_path / 'settings.json', {'model': 'vit-l-14-datacomp'})

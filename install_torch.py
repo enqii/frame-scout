@@ -6,7 +6,7 @@ Install-FrameScout.bat runs it with the project venv before requirements/require
 
 - cpu: the CPU build; replaces an installed CUDA build.
 - cuda: the CUDA build that suits the GPU and driver nvidia-smi reports
-  (framescout_core.cuda_build). If none does, an installed CUDA build is kept, otherwise
+  (framescout_core.torch_build.cuda_build). If none does, an installed CUDA build is kept, otherwise
   the CPU build is installed.
 - no argument: an installed CUDA build is kept (re-running the installer, e.g. after an
   update, never drops GPU support); otherwise, if nvidia-smi finds an NVIDIA driver, it
@@ -27,10 +27,12 @@ import tempfile
 from importlib import metadata
 from pathlib import Path
 
-from framescout_core import (CUDA_BUILDS, REQUIREMENTS_FILE, cuda_build, driver_text, installed_build_matches,
-                             installed_cuda_build, low_space, low_space_lines, parse_gpu_query, requirement_names, torch_index_url,
-                             torch_install_needs,
-                             torch_requirements, unsupported_gpus)
+from framescout_core.disk_space import low_space, low_space_lines, torch_install_needs
+from framescout_core.install_check import requirement_names
+from framescout_core.paths import REQUIREMENTS_FILE
+from framescout_core.torch_build import (CUDA_BUILDS, cuda_build, driver_text, installed_build_matches,
+                                         installed_cuda_build, parse_gpu_query, torch_index_url, torch_requirements,
+                                         unsupported_gpus)
 
 KNOWN_CUDA_BUILDS = {build for build, *_ in CUDA_BUILDS}
 PYPI_INDEX = 'https://pypi.org/simple'

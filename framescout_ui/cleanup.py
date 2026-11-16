@@ -1,9 +1,10 @@
 """The expander "Clean up storage": the storage cleanup and the cache check (E7, E11, F1, A46)."""
 import streamlit as st
 
-from framescout_core import (CACHE_CATEGORIES, CACHE_FILE, CLEANUP_CATEGORIES, DEFAULT_YOLO_MODEL,
-                             cache_check_current, check_cache, clean_up, cleanup_summary_text, count_text,
-                             feature_signature, scan_cleanup, set_cache_aside, size_text)
+from framescout_core.cache_check import cache_check_current, check_cache, set_cache_aside
+from framescout_core.cleanup import (CACHE_CATEGORIES, CLEANUP_CATEGORIES, clean_up, cleanup_summary_text, count_text,
+                                     scan_cleanup, size_text)
+from framescout_core.signature import CACHE_FILE, DEFAULT_YOLO_MODEL, feature_signature
 
 from .common import PROFILES, REFS, RESULTS, plain
 from .run import engine_alive

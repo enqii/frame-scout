@@ -3,8 +3,9 @@ import json
 import math
 import sqlite3
 
-from framescout_core import (DEFAULT_YOLO_MODEL, ENGINE, SETTING_RANGES, classify_signatures, engine_id,
-                             feature_signature, known_signatures, prepare_cache)
+from framescout_core.settings import SETTING_RANGES
+from framescout_core.signature import (DEFAULT_YOLO_MODEL, ENGINE, classify_signatures, engine_id, feature_signature,
+                                       known_signatures, prepare_cache)
 
 DEFAULTS = dict(person_detection=True, max_persons=12, person_confidence=.3, yolo_model=DEFAULT_YOLO_MODEL)
 

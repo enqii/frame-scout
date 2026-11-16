@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from framescout_core import (ULTRALYTICS_ENV, cuda_hint, cuda_status, detection_options, device_choices,
-                             import_detector_class)
+from framescout_core.devices import (ULTRALYTICS_ENV, cuda_hint, cuda_status, detection_options, device_choices,
+                                     import_detector_class)
 
 
 def test_cuda_is_offered_only_when_pytorch_can_use_it():

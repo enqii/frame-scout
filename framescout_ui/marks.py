@@ -4,8 +4,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (MARKS_BACKUP, MARKS_FILE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, count_text,
-                             marks_restore_offer, read_marks, restore_marks, save_marks)
+from framescout_core.cleanup import count_text
+from framescout_core.marks import (MARKS_BACKUP, MARKS_FILE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, marks_restore_offer,
+                                   read_marks, restore_marks, save_marks)
 
 from .common import MARKS, PROFILES, version_key
 
