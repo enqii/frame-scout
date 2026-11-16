@@ -320,6 +320,13 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
       Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
+- [ ] `ready` **I52 – State machine row for a review with 0 findings (workflow):** the
+      `/roadmap` state machine (`.claude/skills/roadmap/SKILL.md` section 2) has no row for
+      "`fs:in-progress`, not draft, reviewed, 0 findings": it says to spawn an `address-review`
+      implementer, which has nothing to answer. Add a row: after checking the `Review complete: 0
+      findings` comment and CI of the head commit, the orchestrator switches the label to
+      `fs:ready` itself and reports. Found on 2026-11-16 in the retro of PR #131 (done by hand
+      there). Size S, kind `docs`.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
