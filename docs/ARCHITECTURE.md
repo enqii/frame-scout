@@ -70,10 +70,13 @@ engine writes. Only the engine imports torch (`system_info` in the Settings tab 
 one exception).
 
 Each version ships one `framescout-version-<X.Y.0>.txt` in the root (I42; the triage PR names it
-after the coming release). A ZIP extracted over another version's folder leaves both files:
+after the release the user chose for the round). A ZIP extracted over another version's folder leaves both files:
 `Install-FrameScout.bat` and `Start-FrameScout.bat` stop before any Python runs when they find
-more than one, and the installation check reports it ("Program files"). Known limit: versions
-before I42 have neither the file nor the check. After an update over such a folder its leftover
+more than one, and the installation check reports it ("Program files"); the message names the
+user data to copy into the new folder. Known limits: the name changes once per release round,
+so a release and the snapshots of `main` until the next release carry the same file and are not
+told apart. The `.bat` files skip a hidden version file, the check counts it. Versions before
+I42 have neither the file nor the check. After an update over such a folder its leftover
 files stay (harmless: a package wins over a leftover `framescout_core.py`/`framescout_scoring.py`
 of the same name), and going back to such a version over a newer folder is not detected.
 

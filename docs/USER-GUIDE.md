@@ -20,10 +20,15 @@ downloads all packages again, several GB with CUDA). If the installation fails t
 delete `.python` and run it once more.
 
 When you update from a ZIP, extract it into a fresh folder instead of over an old one,
-so no files of earlier versions stay behind. Each version has one file
+so no files of earlier versions stay behind. Before you run `Install-FrameScout.bat`
+there, copy your data from the old folder: `profiles.json`, `settings.json` and the
+folders `photos`, `references` and `results` (galleries, analysis cache, marks). Copy
+`.cache` too, so the models are not downloaded again; `.venv` and `.python` cannot be
+copied, the installer creates them anew. Each version has one file
 `framescout-version-<version>.txt`; if a folder holds more than one (a ZIP extracted over
 another version's folder), `Install-FrameScout.bat` and `Start-FrameScout.bat` stop and ask
-you to extract the ZIP into a new, empty folder.
+you to do just that. The file name changes once per release, so the check does not tell a
+release and the downloads of the main branch until the next release apart.
 
 ### Checking the installation
 
@@ -36,7 +41,7 @@ of what to do for each problem:
 
 - **Program files:** no files of two FrameScout versions in the folder (more than one
   `framescout-version-*.txt` after extracting a ZIP over another version's folder). The fix:
-  extract the ZIP into a new, empty folder.
+  extract the ZIP into a new, empty folder and copy your data into it (see above).
 - **Python environment:** `.venv` belongs to this folder and its Python still exists. After
   a moved or copied folder, delete `.venv` and run `Install-FrameScout.bat`; if the Python is
   missing, run the installer, which repairs it.
