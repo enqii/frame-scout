@@ -305,7 +305,8 @@ def _is_link(info):
     """
     if stat.S_ISLNK(info.st_mode):
         return True
-    return os.name == 'nt' and getattr(info, 'st_reparse_tag', 0) == stat.IO_REPARSE_TAG_MOUNT_POINT
+    tag = getattr(stat, 'IO_REPARSE_TAG_MOUNT_POINT', None)
+    return tag is not None and getattr(info, 'st_reparse_tag', 0) == tag
 
 
 def _dead_link(folder):
