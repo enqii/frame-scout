@@ -1,4 +1,5 @@
 """Choosing the PyTorch build (CPU or CUDA) for install_torch.py, and checking the installed one."""
+import os
 
 
 # PyTorch version the installer installs (I3), the version of the verified end-to-end run.
@@ -8,11 +9,16 @@ TORCHVISION_VERSION = '0.29.1'
 TORCH_INDEX = 'https://download.pytorch.org/whl/'
 # CUDA builds of PyTorch the installer chooses from, newest first (A7):
 # (build, oldest compute capability, first unsupported compute capability, oldest Windows
-# driver). From the CUDA 12.6/13.0 release notes and PyTorch's build targets as known when
-# this was written; not verified on a GPU (the development PC has none). CUDA 13 dropped
-# Maxwell, Pascal and Volta (< 7.5); the CUDA 12.6 build ends before Blackwell (10.0).
-CUDA_BUILDS = (('cu130', (7, 5), None, (580,)),
-               ('cu126', (5, 0), (10, 0), (528, 33)))
+# driver, oldest Linux driver). From the CUDA 12.6/13.0 release notes ("minor version
+# compatibility": CUDA 12.x from 528.33 on Windows, 525.60.13 on Linux; CUDA 13.x from 580)
+# and PyTorch's build targets as known when this was written; not verified on a GPU (the
+# development PC has none). CUDA 13 dropped Maxwell, Pascal and Volta (< 7.5); the CUDA 12.6
+# build ends before Blackwell (10.0). In WSL2, nvidia-smi may report the number of the
+# Windows driver; the Linux minimums are compared with it (not verified, F48).
+CUDA_BUILDS = (('cu130', (7, 5), None, (580,), (580,)),
+               ('cu126', (5, 0), (10, 0), (528, 33), (525, 60, 13)))
+# whether nvidia-smi reports a Windows driver: the driver minimums differ (F47)
+WINDOWS = os.name == 'nt'
 
 
 def _version(text):
@@ -41,37 +47,39 @@ def parse_gpu_query(text):
     return gpus
 
 
-def _supports(build, gpu):
+def _supports(build, gpu, windows):
     cc, version, _ = gpu
-    for name, oldest, unsupported, driver in CUDA_BUILDS:
+    for name, oldest, unsupported, windows_driver, linux_driver in CUDA_BUILDS:
         if name == build:
+            driver = windows_driver if windows else linux_driver
             return oldest <= cc and (unsupported is None or cc < unsupported) and version >= driver
     raise ValueError(f'unknown PyTorch build: {build}')
 
 
-def unsupported_gpus(build, gpus):
-    """Return the names of the gpus (as from parse_gpu_query) that build cannot use."""
-    return [gpu[2] for gpu in gpus if not _supports(build, gpu)]
+def unsupported_gpus(build, gpus, windows=WINDOWS):
+    """Return the names of the gpus (as from parse_gpu_query) that build cannot use (windows: see cuda_build)."""
+    return [gpu[2] for gpu in gpus if not _supports(build, gpu, windows)]
 
 
-def cuda_build(gpus):
+def cuda_build(gpus, windows=WINDOWS):
     """Return the CUDA build of PyTorch ("cu130", "cu126") to install for gpus.
 
     gpus as returned by parse_gpu_query. The newest build that supports every GPU is
     preferred, since CUDA can number the GPUs differently from nvidia-smi. Otherwise the
     newest build for the most capable GPU (highest compute capability) is used, so an old
     second card does not drop the PC to the CPU build (review); unsupported_gpus names the
-    GPUs that build cannot use. Raises ValueError with the reason if no build supports the
-    most capable GPU (GPU too old, or driver too old for it).
+    GPUs that build cannot use. windows: the driver minimums of Windows, otherwise those of
+    Linux. Raises ValueError with the reason if no build supports the most capable GPU (GPU
+    too old, or driver too old for it).
     """
     if not gpus:
         raise ValueError('no NVIDIA GPU found')
     for build, *_ in CUDA_BUILDS:
-        if all(_supports(build, gpu) for gpu in gpus):
+        if all(_supports(build, gpu, windows) for gpu in gpus):
             return build
     best = max(gpus, key=lambda gpu: gpu[0])
     for build, *_ in CUDA_BUILDS:
-        if _supports(build, best):
+        if _supports(build, best, windows):
             return build
     cc, version, name = best
     oldest = min(supported for _, supported, *_ in CUDA_BUILDS)

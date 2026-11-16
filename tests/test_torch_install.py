@@ -48,6 +48,19 @@ def test_older_driver_or_gpu_gets_cuda_12_6():
     assert cuda_build([gpu((5, 0), (528, 33))]) == 'cu126'   # Maxwell, the oldest of CUDA 12.6
 
 
+def test_the_driver_minimums_are_those_of_the_system():
+    # F47: NVIDIA's Linux drivers have other numbers than the Windows drivers; CUDA 12 runs
+    # from 528.33 on Windows and from 525.60.13 on Linux
+    linux_driver = gpu((8, 9), (525, 60, 13))
+    assert cuda_build([linux_driver], windows=False) == 'cu126'
+    with pytest.raises(ValueError, match='driver may help'):
+        cuda_build([linux_driver], windows=True)
+    with pytest.raises(ValueError, match='driver may help'):
+        cuda_build([gpu((8, 9), (525, 60, 12))], windows=False)
+    assert cuda_build([gpu((8, 9), (580, 65, 6))], windows=False) == 'cu130'
+    assert unsupported_gpus('cu130', [gpu((8, 9), (575, 64))], windows=False) == ['GPU']
+
+
 def test_no_build_for_unsupported_combinations():
     for gpus in ([gpu((3, 7), (581, 57))],      # Kepler: no current PyTorch build
                  [gpu((8, 9), (512, 95))],      # driver too old for CUDA 12
