@@ -54,7 +54,7 @@ must run code from the PR, use a separate worktree and remove it before you retu
    a review with an empty body and no inline comments (left behind by a failed post) must not
    remain; if one does, report it to the orchestrator. If a finding is missing, repost it now
    (a refused inline post is reposted at once as a general `Finding <n> – <file>:<line>`
-   comment, see step 2) and count again. Never swap the label while the count does not match,
+   comment, see step 2) and count again. Never post `Review complete` while the count does not match,
    and never report a finding as posted that you did not see on the PR.
    Then post the closing comment (`gh pr comment {PR} --body "Review complete: <N> findings"`;
    if `gh` is not on `PATH`, use the path given in `CLAUDE.md` → "Git and commits"). The label
