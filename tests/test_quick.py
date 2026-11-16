@@ -441,17 +441,21 @@ def test_the_app_starts_both_searches_through_engine_command():
                 and node.value in ('--profiles', '--analyze-only')]
 
 
-def test_the_app_counts_partners_as_analyzed_for_an_analysis():
+def test_the_app_counts_partners_as_analyzed_for_a_search_and_an_analysis():
     # F18 review: a partner searched through another file of its shot never gets a row of its
-    # own, so "Analyze photos now" must not keep calling it "to analyze"
+    # own, so "Analyze photos now" must not keep calling it "to analyze"; A48: nor the
+    # summary of a search, and its disk space estimate follows
     tree = app_tree()
-    [summary] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
-                 and getattr(node.func, 'id', None) == 'start_summary'
-                 and any(k.arg == 'analysis_only' for k in node.keywords)]
-    done = ast.unparse(summary.args[1])
+    summaries = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                 and getattr(node.func, 'id', None) == 'start_summary']
+    warnings = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                and getattr(node.func, 'id', None) == 'low_space_warning']
+    assert len(summaries) == 2 and len(warnings) == 2
+    counts = {ast.unparse(call.args[1]) for call in summaries} | {ast.unparse(call.args[5]) for call in warnings}
+    [done] = counts
     [assigned] = [node for node in ast.walk(tree) if isinstance(node, ast.Assign)
                   and any(isinstance(t, ast.Name) and t.id == done for t in node.targets)]
-    assert ast.unparse(assigned.value) == 'analyzed + quick_counts[2]'
+    assert ast.unparse(assigned.value) == 'quick_counts[0] + quick_counts[2]'
 
 
 def test_the_app_warns_of_low_disk_space_next_to_analyze_photos_now():
@@ -461,7 +465,7 @@ def test_the_app_warns_of_low_disk_space_next_to_analyze_photos_now():
               and getattr(node.func, 'id', None) == 'low_space_warning'
               and any(k.arg == 'analysis' for k in node.keywords)]
     assert ast.unparse(call.args[2]) == '0'  # no profile: no gallery thumbnails
-    assert ast.unparse(call.args[5]) == 'analysis_done'
+    assert ast.unparse(call.args[5]) == 'analyzed'
     # since F28 next to its button in the search tab, as the search's own warning
     [area] = [node for node in page_tree().body if isinstance(node, ast.With)
               and ast.unparse(node.items[0].context_expr) == 'search_tab']

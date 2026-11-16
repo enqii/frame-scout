@@ -252,7 +252,9 @@ described as such, not as a search run. If no photo needed a new analysis, the p
 some could not be analyzed, see the log". Only one search or analysis runs at a time.
 
 Before a search the "Search" tab summarizes what it will do: how many photos were found, how many
-are already analyzed with the current settings and how many remain to analyze. If an earlier
+are already analyzed with the current settings and how many remain to analyze (a JPEG or HEIC
+whose shot is analyzed through its RAW file counts as analyzed, as for "Analyze ahead"; a photo
+that cannot be decoded at all stays "to analyze"). If an earlier
 search with the same settings (search model, person detection) ran on the same device, it also
 gives a rough duration for the analysis, plus an upper bound for scoring and writing the
 galleries if earlier searches measured those; otherwise it says the search shows how long it
