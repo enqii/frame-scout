@@ -82,6 +82,29 @@ def test_environment_using_the_private_python_of_another_folder_is_a_problem(tmp
     assert '.venv' in result.fix and script('Install') in result.fix
 
 
+def make_linux_python(folder):
+    """A private Python as on Linux: pyvenv.cfg's home is its bin folder with python3 (F47)."""
+    (folder / 'bin').mkdir(parents=True)
+    (folder / 'bin' / 'python3').write_bytes(b'')
+    return folder / 'bin'
+
+
+def test_environment_with_the_linux_private_python_of_this_folder_is_fine(tmp_path):
+    make_venv(tmp_path, make_linux_python(tmp_path / '.python'))
+    [result] = check_environment(tmp_path)
+    assert result.ok is True
+
+
+def test_environment_using_the_linux_private_python_of_another_folder_is_a_problem(tmp_path):
+    # F47: on Linux, home is .python/bin, not .python
+    base = tmp_path / 'copy'
+    make_linux_python(base / '.python')
+    make_venv(base, make_linux_python(tmp_path / 'original' / '.python'))
+    [result] = check_environment(base)
+    assert result.ok is False
+    assert str(tmp_path / 'original' / '.python' / 'bin') in result.text
+
+
 def link_folder(link, target):
     """A directory symlink, or on Windows without that privilege a junction; skip if neither can be made."""
     try:

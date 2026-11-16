@@ -146,7 +146,9 @@ def check_environment(base):
         return [CheckResult(name, False, f'The Python that .venv was created with is missing ({home}): the '
                             'FrameScout folder was moved, or that Python was deleted or uninstalled.',
                             f'Run {script("Install")}; it repairs the environment. Or move the folder back.')]
-    if home.name.lower() == PRIVATE_PYTHON and not _same_folder(home, private):
+    # Windows names the private Python's folder itself, Linux its bin folder (F47)
+    folder = home.parent if home.name == 'bin' else home
+    if folder.name.lower() == PRIVATE_PYTHON and not _same_folder(folder, private):
         return [CheckResult(name, False, f'.venv uses the private Python of another folder ({home}): the FrameScout '
                             'folder was copied or moved, and it stops working when that folder is deleted.',
                             f'Delete the folder {VENV_DIR} in this folder, then run {script("Install")}.')]
