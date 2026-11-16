@@ -54,15 +54,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       348 s on CUDA (486 s on CPU), without 93 s on CUDA, so detection dominates a CUDA run
       and is the GPU bottleneck. Deferred from the roadmap item "YOLO on
       GPU" (PR #8, user decision).
-- [ ] `parked` **E19 – The detection settings in the cache signature are listed by hand:**
-      `feature_signature` hashes `max_persons`, `person_confidence` and `yolo_model`, but
-      not the YOLO input size (`DETECTION_IMAGE_SIZE`, 640) or the other fixed
-      `detection_options`; changing them needs a manual `ENGINE` bump (a comment and the
-      golden test of `detection_options` ask for it). Deriving the signature from
-      `detection_options` (without device and verbose) removes that step, but changes the
-      signature value and so re-analyzes every photo once → do it with the next `ENGINE`
-      bump. The device stays out on purpose: CPU and CUDA give slightly different numbers
-      for CLIP as well, and the cache has always been shared between devices (PR #8 review).
 - [ ] `hardware` **E20 – Search quality is measured on one collection only:** the evaluation of E4/E5
       (PR #11) used about 5,000 studio photos of cosplays from one convention, five
       text-only profiles (Joker, Harley Quinn, 2B, Group photo, Sword) and three with
@@ -147,12 +138,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `yolo_weights`/the engine. Review of PR #42, finding 10. Since PR #89 (P20) the app still
       pre-creates `.cache/ultralytics` when it sets `YOLO_CONFIG_DIR` itself; a user's own
       `YOLO_CONFIG_DIR` is not pre-created by the app (Ultralytics creates its config folder on import).
-- [ ] `parked` **E45 – `publish_export` is not one step across files (minor):** a kill between the
-      renames (milliseconds) can still leave some galleries newer than `results.json`. A
-      rename that fails every retry (a file held open for over 2 s; the run then fails)
-      restores the files renamed before it, but if a restore fails too, they stay new.
-      Idea, if it ever matters: a versioned gallery subfolder that `results.json` names.
-      Found in PR #45.
 - [ ] `hardware` **E52 – The effect of `--low-priority` is not measured:** F4 lowers the engine's
       process priority and keeps one or two cores out of the PyTorch threads (`torch_threads`,
       also for the person detector), but neither the
@@ -161,11 +146,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       home PC together with E17 (P10 B); from the results adjust how many cores
       `torch_threads` leaves free, or also lower the decoding threads (E2), which are not
       reduced now. Found in F4 (PR #65).
-- [ ] `minor` **E55 – A model without `weights_repo` needs more than E39's download folder:**
-      such a model would also fail `test_every_model_names_its_hub_repositories`, and
-      `model_cached`/the offline import (E16), the disk space estimate and "Check
-      installation" assume Hub files. Only needed when such a model is ever added. Found in
-      the PR of E39 (PR #74).
 - [ ] `hardware` **E58 – `FOLDER_TIMEOUT` is not measured on a slow folder:** the 30 s limit of
       the unbound check (E37) is not tested on a legitimately slow folder (e.g. many absent
       names, each confirmed by a `stat` on a slow share); such a folder is not checked (the safe
@@ -177,42 +157,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       embeddings of another detector. Option: put the resolved path or a hash of non-cache
       weights into the signature (cache invalidation for those runs: a hold point,
       `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched until decided). Split off from E60.
-- [ ] `minor` **E62 – Rows cached as black images for a truncated HEIC stay valid after E59:**
-      before E59 a truncated HEIC/HEIF that is not a RAW partner was analyzed as an all-black
-      image; its cache row has the file's modification time and size, so it stays current and
-      keeps being ranked (and searched by a quick search) until the file changes; "Clean up
-      storage" deletes it only with other settings than the current ones (`cache_old`,
-      `cache_other`, `cache_models`), never as a row of the current settings for a photo that
-      still exists. Options: leave it (rare: needs a truncated HEIC analyzed before E59),
-      detect black rows (e.g. compare with the embedding of a black image per model) and
-      analyze those photos again, or invalidate HEIF rows only
-      (cache invalidation: a hold point, `ENGINE_TEMPLATE`/`tests/test_signature.py` untouched
-      until decided). Review of PR #96, finding 2.
 
 ### App (`app.py`)
 
-- [ ] `parked` **A15 – Reference folder and gallery file can get different suffixes:**
-      `reference_folder` adds `-2`, `-3`, … when another profile's references occupy the
-      folder, `profile_slugs` adds them by profile order. The same profile can therefore
-      have `references/red-car-2/` but `red-car.html` (or the reverse). Nothing breaks,
-      but the names are harder to explain. Fix idea: derive the folder from
-      `profile_slugs` with a fallback for occupied folders – note that the order-based
-      slugs change when profiles are deleted or reordered, which would then move folders
-      (design decision, PR #6 review).
-- [ ] `parked` **A18 – ZIP export (formerly roadmap P4 (C)): open decision.** Asked in PR #14 and deferred to
-      P4 (C); removed from the roadmap on 2026-11-03 at the user's request, to be planned again later. **Deferred by the user on 2026-10-25** ("skip this feature for now"): copying
-      of P4 (B) already collects the photos; a ZIP only matters for sharing or archiving an
-      overview. The Q6 decision below (content a/b/c, one vs. two buttons) is still pending
-      and must be asked again when this item is picked up. Q6 – content: (a) the gallery HTML with its links rewritten to a
-      `thumbnails/` folder in the ZIP, plus those thumbnails, about 3 MB per 150 cards, as
-      a browser download; the links to the originals stay `file://` and work only on
-      this computer (recommended); (b) as (a) plus larger previews (~1200 px, ~250 KB
-      each, about 40 MB per 150 cards) so the ZIP can be viewed on another computer
-      (Pillow in the app; it is already a dependency); (c) as (a) plus the originals
-      (can be gigabytes, written to disk; copying of P4 (B) covers this). Scope: (a) two
-      buttons, all cards and marked only (recommended); (b) all cards only. It replaces
-      the app's "Download HTML (without thumbnails)". The HTML rendering would move from
-      the engine to `framescout_core` so the app can write a gallery of the marked photos.
 - [ ] `parked` **A19 – "Open" and "Folder" are checked on Windows only:** the gallery buttons of P4
       (A) open a photo with `os.startfile` and select it with the shell function
       `SHOpenFolderAndSelectItems` (checked on Windows 11 from the app in a browser,
@@ -228,14 +175,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       of photos similar to the rejects. This changes search quality, so it needs a local
       evaluation set first (hold point). Out of scope of P4 (B) (user decision on A17).
 
-- [ ] `parked` **A30 – Only one backup generation of `profiles.json`:** the user chose a single
-      `profiles.json.bak` in PR #6 and again in the PR of A13 (hold point), so the backup is
-      the state before the last save only and the next save replaces it. Options if more
-      are wanted: rotate N generations (`.bak` newest, then `.bak.1`, ...); timestamped
-      backups; a one-time copy before the v3 conversion. Consequences to handle then:
-      cleanup (E7, A14) must keep the reference images of all generations, and
-      `update_backup_references` (rename of the photo/reference folder) must rewrite all
-      of them. How many generations is a user decision. Split from A13.
 - [ ] `decision` **A35 – A drive letter now used by another disk counts as reachable:** e.g. a USB
       disk that got the letter of an earlier disk, or a network drive mapped to another
       share; the photos of the earlier disk then look unbound and are offered by "Cache
@@ -267,10 +206,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       as analyzed for the search's summary too (the disk space estimate then follows), and
       name failed photos of the last run, e.g. from its status counts. Found in the review of
       PR #100, finding 6.
-- [ ] `minor` **A50 – The profile tab is long:** "New search profile" sits below the list, and
-      every profile opens to a full form (four text fields, an uploader, a checkbox, two
-      buttons). Sketch: the new-profile form first or behind a button, compact profile rows.
-      Affected: `app.py`, user guide. `docs/UI-REVIEW.md` §3. Size S.
 - [ ] `minor` **A51 – Long explanatory captions:** "Analyze ahead" (about 100 words), the quick
       search and the AI settings explain everything in one grey block. Sketch: one short
       sentence, the rest behind a help tooltip or a "More" expander; the required English-only
@@ -279,37 +214,20 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       did not cover the dark theme, narrow windows, "Find similar", the contents of "Clean up
       storage", profiles with reference images and real photos (person crops, long runs), and
       the F27 state line next to the title at narrow widths (does it wrap, and does the header
-      jump when the 2 s update changes its length; PR #108 review). Do it
-      after P35, when the cards have changed, and add the findings as backlog items. Kind
-      `docs`. Size S.
+      jump when the 2 s update changes its length; PR #108 review). Also, with the real app
+      and a real keyboard (formerly F40, F44): marking (mark, take it back, page change,
+      reload); the review dialog of F19 (closing with Esc, the keys M, N, S, Left, Right, O);
+      the results toolbar in a narrow window and in the light theme; copy and export inside
+      the popover "Export and copy" with their notices. Add the findings as backlog items.
+      Kind `docs`. Size S.
 
 ### Installation / project
 
-- [ ] `parked` **I2 – Tests are incomplete (umbrella; parked: tests are added with each item):** (partly done 2026-10-21: `pytest` scaffold and tests for
-      `framescout_core` – slugs, `EXT`, profile loading/validation, prompt generation.
-      CI done 2026-10-21: `.github/workflows/tests.yml` runs `pytest` on Windows,
-      Python 3.12–3.14, without torch.
-      2026-10-21 (5): tests for reading/saving `profiles.json`, reference folders and
-      export thumbnails.
-      2026-10-21 (E2): tests for the analysis pipeline helpers (batching, prefetching,
-      draft size, when progress lines are due); the engine's decoding with `Image.draft`
-      is not unit-tested, since CI installs no Pillow.
-      2026-10-21 (A7/I3/E14): tests for the choice of the PyTorch build, `install_torch.py`
-      (nvidia-smi and pip replaced) and the device choice of the app; the `.bat` file
-      itself is not tested in CI.
-      2026-10-21 (A4/A5): tests for the run lock (also released when its process is
-      killed), the status file and the app's run state.
-      2026-10-21 (A8): tests for reading and saving `settings.json`; the app's use of it
-      was checked with Streamlit's `AppTest` (not in CI) and, since `AppTest` does not run
-      the browser frontend and missed the jumping-back controls, with a script that
-      drives the real frontend in headless Microsoft Edge over the DevTools protocol
-      (kept outside the repo; not in CI).
-      2026-11-13 (A49): the mark colors were checked with such a script too (outside the
-      repo); their selector names are checked against the installed Streamlit bundle where
-      Streamlit is installed. A repeatable, committed browser check (script or a tool such
-      as Playwright, a new dependency) is still open.
-      Open: tests for cache signature/reuse and scoring; tests of `app.py` itself (e.g.
-      Streamlit's `AppTest`, which needs Streamlit in CI); a smoke test with real models.)
+- [ ] `parked` **I2 – Tests are incomplete (umbrella; parked: tests are added with each item):**
+      open are tests for cache signature reuse and scoring, tests of `app.py` itself (e.g.
+      Streamlit's `AppTest`, which needs Streamlit in CI), a repeatable, committed browser
+      check (a script or a tool such as Playwright, a new dependency), a test of the `.bat`
+      files and a smoke test with real models.
 - [ ] `decision` **I9 – CI action pins are updated by hand only:** `.github/workflows/tests.yml`
       pins `actions/checkout` and `actions/setup-python` to commit SHAs (with a version
       comment). That avoids moved tags, but security and runtime updates
@@ -410,7 +328,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
       Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
-- [ ] **I49 – Subagents read their brief themselves (workflow, context saving):** the
+- [ ] `ready` **I49 – Subagents read their brief themselves (workflow, context saving):** the
       `/roadmap` orchestrator reads `implementer-brief.md` (about 10.6 KB) or
       `reviewer-brief.md` (about 5.2 KB), fills in the placeholders and writes the whole text
       out again as the subagent prompt, about three times per PR. Pass only the placeholder
@@ -423,7 +341,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       In the same PR, correct the stale size in the implementer brief ("`docs/BACKLOG.md`
       (open items, 39 KB)", now about 49 KB) or drop the number. Found on 2026-11-16 in a
       workflow context review.
-- [ ] **I50 – Support one Python version only (simplification):** the installer always
+- [ ] `ready` **I50 – Support one Python version only (simplification):** the installer always
       downloads a private Python 3.14 into `.python` (P5), but a `.venv` of an earlier
       installer built on an installed Python 3.12 or 3.13 is still carried along: the CI
       matrix runs three jobs (3.12, 3.13, 3.14), `Uninstall-FrameScout.bat` falls back to the
@@ -432,16 +350,16 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `docs/ARCHITECTURE.md` describe it. That is compatibility with a state that was never
       released (I47). Support 3.14 only: one CI job, no version fallback, shorter docs.
       Consequence: a folder that still has such an old `.venv` needs one more run of
-      `Install-FrameScout.bat`; decide whether the installer rebuilds it or only says so
-      (hold point: installer behavior). Check first what else accepts 3.12/3.13
-      (`Install-FrameScout.bat`, `framescout_core/install_check.py`). Found on 2026-11-16 in
+      `Install-FrameScout.bat`. Decided 2026-11-16 by the user: no handling of such a
+      `.venv` at all (no detection, rebuild or message), because there are no other users
+      yet and the user's own installation runs on 3.14. Check first what else accepts
+      3.12/3.13 (`Install-FrameScout.bat`, `framescout_core/install_check.py`). Found on 2026-11-16 in
       a simplification review by sampling.
-- [ ] **I51 – Delete or shorten outdated documents (simplification):**
+- [ ] `ready` **I51 – Delete or shorten outdated documents (simplification):**
       `docs/UI-REVIEW.md` (about 16 KB) says of itself that it is a record of the old
       interface and not kept current, `README.md` still links it as "not implemented"
-      although F27 and F28 are, and two open backlog items point to its sections; delete it
-      (git keeps it), remove the README link and put the sentence each of the two items
-      needs into the item. `docs/IDEAS.md` (about 45 KB) keeps the full text of every idea
+      although F27 and F28 are, and the open backlog item A51 points to its section 4; delete it
+      (git keeps it), remove the README link and put the sentence A51 needs into the item. `docs/IDEAS.md` (about 45 KB) keeps the full text of every idea
       that already has a `Disposition:` line (24 on 2026-11-16); reduce those to one line
       each (title, disposition), as I40 did for `docs/BACKLOG-DONE.md`, and adapt the rule
       "earlier sections stay untouched" in `CLAUDE.md` → "Triage" and the `/triage` skill.
@@ -511,30 +429,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `..` member names, cap sizes and file counts, accept only `EXT` suffixes; reference images
       may show people (say so in the guide). **Question:** the contents of the new bundle format
       (no `profiles.json` schema change). Size M.
-- [ ] `parked` **F21 – Warn about cloud-only photos before a search:** photos in OneDrive-style
-      folders with files on demand are downloaded when read. Sketch: flag files with
-      `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`/`FILE_ATTRIBUTE_OFFLINE` during the scan, show a
-      count in the photo source tab and offer "Skip cloud-only photos" (`--skip-cloud-only`).
-      Affected: `framescout_core`, `framescout_engine.py`, `app.py`, `settings.json`, user
-      guide. Parked 2026-11-12: the default (warn or skip) is open and the behavior needs a
-      real OneDrive folder. Size S–M.
-- [ ] `parked` **F23 – Optional desktop and Start menu shortcut, removed by the uninstaller:**
-      the installer would ask and create a `.lnk` to `Start-FrameScout.bat` (PowerShell
-      `WScript.Shell`), record its path, and `framescout_uninstall.py` removes exactly that
-      one; `framescout_check.py` reports a broken one. Affected: `Install-FrameScout.bat`,
-      `framescout_uninstall.py`, `framescout_check.py`, `assets/`, README, user guide,
-      `docs/ARCHITECTURE.md`. Parked 2026-11-12: it would be the first file written outside
-      the project folder. Risks: redirected desktops need
-      `[Environment]::GetFolderPath('Desktop')`. Size S.
-- [ ] `minor` **F25 – Closest search text in the result list export:** the CSV of F5
-      (`EXPORT_COLUMNS`) has no column for the closest search text of F17 (`best_query` of a card).
-      Add an optional `closest_text` column, empty for a single text or older results. Affected:
-      `framescout_core` export, `app.py`, user guide. Found in F17. Size S.
-- [ ] `minor` **F26 – The app itself takes the instance lock of F22:** an app started with the
-      manual Streamlit command or by an older version holds no lock, so a later
-      `Start-FrameScout.bat` starts a second app of the same folder on the next free port. The app
-      could take the lock itself (e.g. via `st.cache_resource`). Affected: `app.py`,
-      `framescout_core/app_instance.py`, `docs/ARCHITECTURE.md`. Found in F22. Size S.
 - [ ] `decision` **F33 – HTML gallery parity with the app:** the gallery has a fixed dark theme,
       no marks, no paging and no way back to the navigation. **Options:** (a) light/dark by
       `prefers-color-scheme`, file name first, link to the top; (b) also show marks (baked in at
@@ -542,10 +436,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `framescout_engine.py`, user guide. F24 review §5. Size S–M.
       Triage 2026-11-13: not decided; assess again after F30, because in the browser pass the
       gallery (seven equal columns over the full width) was easier to scan than the app.
-- [ ] `parked` **F35 – Thumbnail size as a setting:** F30 fixes the cell size at about 250 px.
-      A setting (e.g. small, medium, large) would let the user trade overview for detail.
-      Parked 2026-11-13 by the user: a feature for later. Affected: `app.py`, `settings.json`
-      (a new key with a default), user guide. Size S.
 - [ ] `decision` **F36 – A folder dialog for the photo source:** the photo folders are a text
       area; the path has to be typed or pasted. Streamlit has no folder dialog. Sketch: a
       "Choose folder" button that opens the system dialog on the PC the app runs on.
@@ -561,12 +451,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `start_needs`/`start_blocked_text` of `framescout_core/app_state.py` without the
       profile need. Affected: `app.py`, `framescout_core/app_state.py`, user guide. Found in
       the PR #108 review. Size S.
-- [ ] `minor` **F40 – Check clicking "Match" and "No" in a browser:** the browser check of F30
-      used a harness that draws `draw_cards`; a click would have written the checkout's
-      `marks.json`. Look at the marking with the real app (mark, take the mark back, page change,
-      reload) in the next browser pass. Also check the review dialog of F19 there: closing it with
-      Esc (a synthetic Esc event did not close it in headless Edge; the X did) and its keys
-      (M, N, S, Left, Right, O) with a real keyboard. Found in F30 and F19. Size S.
 - [ ] `minor` **F41 – Close the popover "More" after its action:** a click on "Open photo",
       "Show in folder" or "Find similar" reruns the page, and Streamlit 1.66.1 keeps the
       popover open (as documented; checked in headless Edge in the F30 review), so it covers the
@@ -575,23 +459,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       Affected: `framescout_ui/results.py`. Found in the PR #114 review. Size S. The popover
       "Export and copy" of the results toolbar (F29) must stay open: its folder box, "Copy"
       and "Export" are used one after another (PR #115 review).
-- [ ] `minor` **F42 – Scroll to the first photo after the bottom pager:** after "Next page" or
-      "Previous page" below the grid the browser keeps its scroll position, so the user lands
-      at the bottom of the new page and scrolls up to its first photo (seen in headless Edge).
-      Streamlit has no scroll API; a fix needs a small JS component or another layout (e.g. the
-      pager only above the grid plus a "back to top" link). Affected:
-      `framescout_ui/results.py`. Found in F29. Size S.
 - [ ] `minor` **F43 – A narrower popover "Export and copy":** the popover is about 700 px wide
       (set by the caption of the export) and scrolls inside on a window 889 px high. A shorter
       export caption or a fixed width could help. Affected: `framescout_ui/copy_export.py`,
       `framescout_ui/results.py`. Found in F29. Size S.
-- [ ] `minor` **F44 – Check the results toolbar in a browser:** F29 was looked at only in
-      headless Edge at 1920 x 889 in the dark theme. In the next browser pass (with F40), check
-      the toolbar row in a narrow window (Streamlit's horizontal container wraps its elements
-      onto more rows by default; is the order still clear?), in the light theme, and clicking
-      copy and export inside the popover "Export and copy" (folder box, "Copy", "Export",
-      their notices below the toolbar). Affected: `framescout_ui/results.py`,
-      `framescout_ui/copy_export.py`. Found in the PR #115 review. Size S.
 - [ ] `decision` **F45 – The best crop outlined in the large preview:** this part of F19 is not
       done, because neither the results nor the feature cache store a crop's box (the engine
       computes it in `crops_for` and keeps only label and embedding). Sketch: store the person
@@ -599,7 +470,3 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       optional key), then draw it in the review dialog. **Question:** a cache signature or a
       new column and a result format change (hold point). Affected: `framescout_engine.py`,
       `framescout_core`, `framescout_ui/review.py`, user guide. Found in F19. Size M.
-- [ ] `minor` **F46 – Preview speed for large RAW/HEIC photos:** not measured in F19. The first
-      view of each photo decodes it, and only 8 previews are cached
-      (`render_preview` with `st.cache_data`). Possibly prefetch the next undecided photo.
-      Affected: `framescout_ui/review.py`, `framescout_images.py`. Found in F19. Size S.
