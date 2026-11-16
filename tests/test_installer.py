@@ -166,6 +166,10 @@ def test_an_existing_private_python_is_reused_only_if_complete_and_pinned():
 
 def test_the_python_check_accepts_only_the_pinned_version():
     code = re.search(r'-c "([^"]+)" %PYTHON_VERSION%', installer()).group(1)
+    # only the version comparison: the Python of the tests may lack ensurepip (Debian's
+    # system Python without python3-venv, F47); PYTHON_CHECK pins the imports
+    code = code.replace(', venv, ensurepip;', ';', 1)
+    assert 'ensurepip' not in code
     assert subprocess.run([sys.executable, '-I', '-c', code, platform.python_version()]).returncode == 0
     assert subprocess.run([sys.executable, '-I', '-c', code, '3.0.0']).returncode == 1
 
