@@ -370,15 +370,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       unpacked size of the CUDA build of PyTorch and pip's peak space use are not measured;
       `TORCH_INSTALL_SPACE['cuda']` (3 GB download, 6 GB installed) is an estimate. Measure on
       the home PC and correct it; could go into the rest of I11. Found in F3 (PR #64).
-- [ ] `ready` **I41 – Lighter PR workflow (simplification):** four state labels, fresh agents per
-      phase and a separate docs agent are heavy for a one-person project. After I39/I40
-      decide: fold the docs update back into the implementer (the reason for I17 was the
-      context size, mostly caused by the docs), reduce the labels to two (`fs:in-progress`,
-      `fs:ready`), and shorten `CLAUDE.md` → "PR workflow", `.claude/skills/roadmap/SKILL.md`
-      and the briefs (together about 50 KB). Keep: one PR per item, one review round, merge
-      only after approval, user data protection. Workflow rule change, so a user decision.
-      Found on 2026-11-12 in a simplification review.
-      Triage 2026-11-15: decided yes (P41, after I39/I40/I47).
 - [ ] `ready` **I42 – Replace the mixed-versions guard by something simpler (simplification):**
       `framescout_core/layout.py`, `framescout_scoring/layout.py`, the `FRAMESCOUT_PACKAGES`
       marker in six entry points and about 500 lines of `tests/test_layout.py` (I16, I35, I36)
