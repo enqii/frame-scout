@@ -440,9 +440,10 @@ matched). Personal overrides go into `.claude/settings.local.json` (gitignored).
 
 On GitHub (I8) the ruleset `protect main` blocks deleting and force-pushing the default branch,
 needs linear history and a pull request (rebase merges only, no approval required) and the
-`pytest (Windows, Python 3.14)` check (the job name in `tests.yml`: renaming the job means
-changing the ruleset by hand too); the `pytest (Linux, Python 3.14)` check (F47) is not required
-by the ruleset. Admins may bypass it only when merging a pull request
+`pytest (Windows, Python 3.14)` check (the job name in `tests.yml`, built from the matrix label
+`Windows`: renaming the job or that label means changing the ruleset by hand too); the
+`pytest (Linux, Python 3.14)` check (F47) is not required by the ruleset, so GitHub would merge
+with it red, but the PR workflow merges only with all checks green. Admins may bypass it only when merging a pull request
 (`gh pr merge --admin`, denied in `.claude/settings.json`), never with a direct push. Actions are
 limited to GitHub-owned actions pinned to a SHA, and workflows of outside contributors' pull
 requests need approval. Secret scanning with push protection, Dependabot alerts and private
