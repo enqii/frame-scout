@@ -298,8 +298,14 @@ def _gone_in(folder, members):
 
 
 def _is_link(info):
-    """Whether the lstat result info is a symbolic link, a junction or a volume mount point."""
-    return stat.S_ISLNK(info.st_mode) or getattr(info, 'st_reparse_tag', 0) == stat.IO_REPARSE_TAG_MOUNT_POINT
+    """Whether the lstat result info is a symbolic link, a junction or a volume mount point.
+
+    Junctions and volume mount points exist on Windows only; the stat module defines their
+    reparse tag only there.
+    """
+    if stat.S_ISLNK(info.st_mode):
+        return True
+    return os.name == 'nt' and getattr(info, 'st_reparse_tag', 0) == stat.IO_REPARSE_TAG_MOUNT_POINT
 
 
 def _dead_link(folder):
