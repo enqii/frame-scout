@@ -385,8 +385,11 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   `framescout_core/portable_python.py`, checksum from the release's `SHA256SUMS`); its
   interpreter is `.python/bin/python3`, the environment's `.venv/bin/python`. Temporary files go
   to `TMPDIR=.tmp`. Differences: no `pause`, no retry of the move (no virus scanner holds the
-  files), and the architecture and `curl` are checked before the download. Known limits:
-  x86_64 with glibc only; the Python scripts' messages, the driver minimums, the uninstall order
+  files), the architecture and `curl` are checked before an old `.python` is deleted, and only
+  exit code 3 of `install_torch.py` means low disk space (a signal kill exits with 128 + n).
+  Known limits: x86_64 with glibc only; in a folder installed on the other system, the installer
+  replaces its `.python` and `.venv` without a warning; a browser that `framescout_start.py`
+  starts inherits `XDG_CACHE_HOME`/`TMPDIR` (as on Windows `TMP`/`TEMP`); the Python scripts' messages, the driver minimums, the uninstall order
   (`UNINSTALL_FIRST`) and the check's test for another folder's private Python (`home` ends in
   `.python/bin`, not `.python`) are still Windows-only (F47 part 3).
 

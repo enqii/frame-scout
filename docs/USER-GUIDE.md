@@ -122,7 +122,11 @@ cd ~/FrameScout
   reaches it.
 - In WSL, put FrameScout and your photos into the Linux file system (e.g. `~/FrameScout`,
   `~/photos`): photos under `/mnt/c` are much slower to read. A folder installed on Windows
-  cannot be used from WSL, nor the other way round; install into a folder of its own.
+  cannot be used from WSL, nor the other way round; install into a folder of its own. The
+  installer of one system replaces the `.python` and `.venv` of the other in the same folder.
+- The app's temporary files and caches go to `.tmp` and `.cache`; a browser that the start
+  script opens (when none runs yet) may put its own there too. Close it before you run the
+  uninstaller.
 - Messages of the installer's Python steps, the check and the uninstall still name the `.bat`
   files: on Linux, run the `.sh` script of the same name.
 - GPU support in WSL2 needs the NVIDIA driver on Windows and is not tested.
