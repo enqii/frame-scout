@@ -9,8 +9,7 @@ are in [DEVELOPMENT.md](DEVELOPMENT.md).
 `Install-FrameScout.bat` downloads python.org's Python 3.14.9 (about 33 MB, checked
 against a fixed SHA-256) into the folder `.python`, creates an isolated `.venv` with it
 and installs the dependencies in the fixed versions of `requirements/constraints.txt`. An installed
-Python is not needed and not used. A working `.venv` is kept, also one from an earlier
-installer (Python 3.12 to 3.14 installed on the PC). Running the installer again repairs
+Python is not needed and not used. A working `.venv` is kept. Running the installer again repairs
 an environment that no longer starts or lacks pip, and downloads the private Python again
 if it is incomplete or another version.
 
@@ -543,8 +542,7 @@ Person detection helps with people in group photos; turn it off for other motifs
 `Uninstall-FrameScout.bat` (`--dry-run` only shows the lists) lists what it deletes and
 keeps, and deletes only after you type `yes`. Close FrameScout first; the script refuses
 while a search or the app runs, or when `settings.json` cannot be read. It runs with the
-private Python in `.python`; for an installation of an older installer it uses the Python
-that created `.venv` or the `py` launcher, and says so if it finds none.
+private Python in `.python`; without it, it names the folders to delete by hand.
 
 - **Deleted:** `.venv`, `.python`, `.cache` (model weights and pip cache), `.tmp` (except
   `.tmp\eval`), `.pytest_cache` and the `__pycache__` folders.

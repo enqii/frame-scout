@@ -58,12 +58,11 @@ set "PYTHON_ZIP=.tmp\python-3.14.9-amd64.zip"
 set "PYTHON_UNPACKED=.tmp\python-3.14.9"
 set "VENV_BROKEN="
 if not exist ".venv\Scripts\python.exe" goto python
-rem An existing environment that starts and has pip is kept, also one that an older
-rem installer created with an installed Python (no migration).
+rem An existing environment that starts and has pip is kept.
 ".venv\Scripts\python.exe" -I -c "import pip" >nul 2>&1
 if not errorlevel 1 goto packages
 set "VENV_BROKEN=1"
-rem Its Python is gone (.python deleted, the folder moved, an installed Python removed) or
+rem Its Python is gone (.python deleted, the folder moved) or
 rem venv stopped before pip was installed (review). Below it is used again if it works with
 rem the private Python, otherwise it is created again.
 echo The Python environment in .venv does not work: its Python or pip is missing. The

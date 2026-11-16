@@ -3,8 +3,7 @@
 Install-FrameScout.bat downloads python.org's full Windows package (a ZIP, not the
 installer) into .tmp, checks its SHA-256, extracts it to PRIVATE_PYTHON in the FrameScout
 folder and creates .venv with it, so no Python has to be installed on the PC. The .bat
-holds the same values; a test keeps them in sync. An environment that an older installer
-created with an installed Python is kept as it is.
+holds the same values; a test keeps them in sync.
 """
 
 

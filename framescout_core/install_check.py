@@ -129,7 +129,7 @@ def check_program_files(base):
 
 
 def check_environment(base):
-    """Check that .venv exists and its Python is there and belongs to this folder (or is an installed Python)."""
+    """Check that .venv exists and its Python is there and is not the private Python of another folder."""
     name = 'Python environment'
     base = Path(base)
     if not venv_python(base).is_file():
@@ -150,10 +150,7 @@ def check_environment(base):
         return [CheckResult(name, False, f'.venv uses the private Python of another folder ({home}): the FrameScout '
                             'folder was copied or moved, and it stops working when that folder is deleted.',
                             f'Delete the folder {VENV_DIR} in this folder, then run Install-FrameScout.bat.')]
-    if home.name.lower() == PRIVATE_PYTHON:
-        return [CheckResult(name, True, 'The environment in .venv uses the private Python of this folder.', '')]
-    return [CheckResult(name, True, f'The environment in .venv uses the installed Python in {home} (made by an older '
-                        'installer).', '')]
+    return [CheckResult(name, True, f'The environment in .venv uses the Python in {home}.', '')]
 
 
 def check_packages(site_packages, constraints_text, requirements_text):
