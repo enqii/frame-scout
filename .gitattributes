@@ -2,3 +2,5 @@
 # cmd.exe expects CRLF line endings in batch files
 *.bat text eol=crlf
 *.cmd text eol=crlf
+# bash stops at the CR of CRLF line endings, also in a Windows clone used from WSL (F47)
+*.sh text eol=lf
