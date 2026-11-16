@@ -320,19 +320,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
       Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
-- [ ] `ready` **I49 – Subagents read their brief themselves (workflow, context saving):** the
-      `/roadmap` orchestrator reads `implementer-brief.md` (about 10.6 KB) or
-      `reviewer-brief.md` (about 5.2 KB), fills in the placeholders and writes the whole text
-      out again as the subagent prompt, about three times per PR. Pass only the placeholder
-      values (`{ITEM}`, `{IDS}`, `{MODE}`, `{BRANCH}`, `{PR}`, `{ANSWERS}`, `{KIND}`,
-      `{REVIEW_LEVEL}`) and the instruction to read the brief in `.claude/skills/roadmap/`
-      and follow it; the file exists in the subagent's worktree and in the main checkout.
-      Estimated saving per PR (from file sizes, not measured): about 7,000 output tokens and
-      the same amount of orchestrator context. Change `SKILL.md` → "Spawning subagents" and
-      the head of both briefs (values come from the prompt instead of filled placeholders).
-      In the same PR, correct the stale size in the implementer brief ("`docs/BACKLOG.md`
-      (open items, 39 KB)", now about 49 KB) or drop the number. Found on 2026-11-16 in a
-      workflow context review.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
