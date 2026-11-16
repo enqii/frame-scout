@@ -485,7 +485,7 @@ def test_cache_variables_are_followed_but_not_into_the_project(project, tmp_path
 # --- main: the dialog ---
 
 def run(project, tmp_path, answer=None, argv=(), interpreter=None):
-    """Run the dialog; by default with a Python outside the project, like the py launcher's."""
+    """Run the dialog; by default with a Python outside the project, e.g. one started by hand."""
     lines, questions = [], []
 
     def ask(question):
@@ -642,9 +642,21 @@ def test_the_uninstaller_runs_the_script_with_the_private_python_only():
     assert [line for line in commands if '.venv' in line or line.startswith(('py ', 'for '))] == []
 
 
-def base_python_folder():
-    # the folder of a complete Python, standing in for the private Python
-    return Path(getattr(sys, '_base_executable', sys.executable)).parent
+def private_python_copy(folder):
+    """A .python in folder that stands in for the private Python: copies of the test run's python.exe and DLLs.
+
+    Never a link to the test run's Python: after exit code 3 the .bat deletes .python\\python.exe,
+    and through a junction that would be the python.exe running the tests (review).
+    """
+    import shutil
+    base = Path(getattr(sys, '_base_executable', sys.executable)).parent
+    python = folder / PRIVATE_PYTHON
+    python.mkdir()
+    for path in [base / 'python.exe', *base.glob('*.dll')]:
+        shutil.copy2(path, python)
+    # sys.path from this file: the standard library of the test run's Python, no Lib in the copy
+    (python / 'python._pth').write_text(f'{base / "Lib"}\n{base / "DLLs"}\n', encoding='utf-8')
+    return python
 
 
 def run_uninstaller(folder, *args):
@@ -664,21 +676,12 @@ def run_uninstaller(folder, *args):
                           capture_output=True, text=True, encoding='utf-8', errors='replace')
 
 
-def junction_to(link, target):
-    import _winapi
-    try:
-        _winapi.CreateJunction(str(target), str(link))
-    except OSError as error:
-        pytest.skip(f'cannot create a junction here: {error}')
-    return link
-
-
 @windows_only
 def test_the_uninstaller_runs_the_script_with_the_private_python(tmp_path):
     # a folder path with blanks, "!", "&" and parentheses
     folder = tmp_path / 'Fo!to (x86) & co'
     folder.mkdir()
-    python = junction_to(folder / PRIVATE_PYTHON, base_python_folder())
+    python = private_python_copy(folder)
     result = run_uninstaller(folder, '--dry-run')
     assert f"STAND-IN {python}\\python.exe ['--dry-run'] 1 1 1" in result.stdout, result.stdout + result.stderr
     assert result.returncode == 5  # the script's exit code is passed on
