@@ -572,7 +572,6 @@ def test_the_private_python_running_the_script_is_left_for_the_batch_file(projec
     assert not (project / '.venv').exists() and not (project / '.cache').exists()
     assert_user_data_kept(project)
     assert 'deletes it when this script has ended' in text
-    assert 'installed separately' not in text
 
 
 def test_the_private_python_is_listed_as_deleted_last(project, tmp_path):
@@ -609,18 +608,9 @@ def test_a_skipped_private_python_is_not_left_for_the_batch_file(project, tmp_pa
 
 
 def test_the_private_python_is_deleted_when_another_python_runs_the_script(project, tmp_path):
-    # e.g. the py launcher, when .python lost its python.exe
-    code, text, _ = run(project, tmp_path, 'yes')
+    # e.g. a Python started by hand
+    code, _, _ = run(project, tmp_path, 'yes')
     assert code == 0 and not (project / PRIVATE_PYTHON).exists()
-    assert 'installed separately' not in text
-
-
-def test_an_installed_python_is_named_as_kept(project, tmp_path):
-    # installations of older installers used an installed Python, which stays
-    import shutil
-    shutil.rmtree(project / PRIVATE_PYTHON)
-    code, text, _ = run(project, tmp_path, 'yes')
-    assert code == 0 and 'Python itself was installed separately and stays' in text
 
 
 def test_a_photo_folder_holding_the_project_stops_the_uninstall(project, tmp_path):
@@ -643,63 +633,22 @@ def uninstaller():
     return (ROOT / 'Uninstall-FrameScout.bat').read_text(encoding='utf-8')
 
 
-def test_the_uninstaller_runs_the_script_outside_the_environment():
+def test_the_uninstaller_runs_the_script_with_the_private_python_only():
     commands = batch_commands(uninstaller())
     runs = [line for line in commands if 'framescout_uninstall.py' in line]
-    assert len(runs) == 3 and all(line.endswith(' -B -E -s framescout_uninstall.py %*') for line in runs)
-    # installations of older installers: the Python that created .venv, else the py launcher
-    assert runs[0].startswith('"%BASE_PYTHON%" ')
-    assert runs[1].startswith('py -')
-    assert runs[2].startswith(f'"{PRIVATE_PYTHON}\\python.exe" ')
-    # .venv's Python cannot delete itself; .venv is only read for the Python that created it
-    assert [line for line in commands if '.venv' in line and 'pyvenv.cfg' not in line] == []
-
-
-def test_the_uninstaller_prefers_the_private_python():
-    commands = batch_commands(uninstaller())
-    first = commands.index(f'if exist "{PRIVATE_PYTHON}\\python.exe" goto private')
-    assert first < min(i for i, line in enumerate(commands) if line.startswith(('for ', 'py ', '"%BASE_PYTHON%"')))
-
-
-def test_the_python_that_created_the_environment_comes_before_the_py_launcher():
-    # I4: an installed Python without the py launcher (e.g. installed without it) is found too
-    commands = batch_commands(uninstaller())
-    base = next(i for i, line in enumerate(commands) if line.startswith('"%BASE_PYTHON%" -B '))
-    launcher = next(i for i, line in enumerate(commands) if line.startswith('for %%V in '))
-    assert base < launcher
-
-
-def base_python_check():
-    match = re.search(r'^"%BASE_PYTHON%" -I -c "([^"]+)" >nul 2>&1$', uninstaller(), re.MULTILINE)
-    assert match
-    return match.group(1)
-
-
-def test_the_python_that_created_the_environment_is_checked_before_it_runs_the_script():
-    commands = batch_commands(uninstaller())
-    check = next(i for i, line in enumerate(commands) if line.startswith('"%BASE_PYTHON%" -I -c '))
-    assert commands[check + 1] == 'if errorlevel 1 goto launcher'
-    assert commands[check + 2].startswith('"%BASE_PYTHON%" -B ')
-
-
-def test_the_check_accepts_the_python_versions_of_the_tests():
-    # the tests run on 3.12 to 3.14 like the installers before P5 part C
-    import subprocess
-    assert subprocess.run([sys.executable, '-I', '-c', base_python_check()]).returncode == 0
-    assert '(3, 12)' in base_python_check()
+    assert runs == [f'"{PRIVATE_PYTHON}\\python.exe" -B -E -s framescout_uninstall.py %*']
+    assert commands.index(f'if exist "{PRIVATE_PYTHON}\\python.exe" goto private') < commands.index(runs[0])
+    # .venv's Python cannot delete itself; no other Python is looked for (I50)
+    assert [line for line in commands if '.venv' in line or line.startswith(('py ', 'for '))] == []
 
 
 def base_python_folder():
-    # the folder that pyvenv.cfg names as "home": the Python that created a venv
+    # the folder of a complete Python, standing in for the private Python
     return Path(getattr(sys, '_base_executable', sys.executable)).parent
 
 
-def run_uninstaller(folder, *args, path=None, code_page=None):
-    """Run a copy of the .bat with a stand-in framescout_uninstall.py that reports how it ran.
-
-    With `code_page`, it runs in a console of its own (no window) switched to that code page,
-    and the console's code page afterwards is printed (chcp).
-    """
+def run_uninstaller(folder, *args):
+    """Run a copy of the .bat with a stand-in framescout_uninstall.py that reports how it ran."""
     import shutil
     import subprocess
     shutil.copy(ROOT / 'Uninstall-FrameScout.bat', folder)
@@ -710,25 +659,9 @@ def run_uninstaller(folder, *args, path=None, code_page=None):
         'print("STAND-IN", sys.executable, sys.argv[1:], sys.flags.dont_write_bytecode,'
         ' sys.flags.ignore_environment, sys.flags.no_user_site)\n'
         'sys.exit(5)\n', encoding='utf-8')
-    env = dict(os.environ)
-    if path is not None:
-        env['PATH'] = path
     # relative to the current directory (cmd may not search it), so no quoting of the folder path
-    command = ['cmd.exe', '/d', '/c', '.\\Uninstall-FrameScout.bat', *args]
-    flags = 0
-    if code_page is not None:
-        command = ['cmd.exe', '/d', '/c', ' '.join([f'chcp {code_page} >nul &', *command[3:], '& chcp'])]
-        # its own console: the code page of the console pytest runs in stays as it is
-        flags = subprocess.CREATE_NO_WINDOW
-    return subprocess.run(command, cwd=folder, input='\n\n', capture_output=True, text=True, encoding='utf-8',
-                          errors='replace', env=env, creationflags=flags)
-
-
-def environment_of(folder, home):
-    # as venv writes it on Windows: CRLF line ends, "home" first
-    write(folder / '.venv' / 'pyvenv.cfg',
-          f'home = {home}\r\ninclude-system-site-packages = false\r\nversion = 3.14.0\r\n'
-          f'executable = {home}\\python.exe\r\n'.encode())
+    return subprocess.run(['cmd.exe', '/d', '/c', '.\\Uninstall-FrameScout.bat', *args], cwd=folder, input='\n\n',
+                          capture_output=True, text=True, encoding='utf-8', errors='replace')
 
 
 def junction_to(link, target):
@@ -741,57 +674,27 @@ def junction_to(link, target):
 
 
 @windows_only
-def test_the_uninstaller_runs_with_the_python_that_created_the_environment(tmp_path):
-    # I4: an installation of an older installer, no private Python; works without the py launcher
-    folder = tmp_path / 'Fo!to (old) & co'
+def test_the_uninstaller_runs_the_script_with_the_private_python(tmp_path):
+    # a folder path with blanks, "!", "&" and parentheses
+    folder = tmp_path / 'Fo!to (x86) & co'
     folder.mkdir()
-    # a home folder with blanks, "!", "&" and parentheses, like "C:\Program Files (x86)\..."
-    home = junction_to(tmp_path / 'Py thon (x86) & !', base_python_folder())
-    environment_of(folder, home)
-    result = run_uninstaller(folder, '--dry-run', path=os.path.join(os.environ['SystemRoot'], 'System32'))
-    assert f"STAND-IN {home}\\python.exe ['--dry-run'] 1 1 1" in result.stdout, result.stdout + result.stderr
+    python = junction_to(folder / PRIVATE_PYTHON, base_python_folder())
+    result = run_uninstaller(folder, '--dry-run')
+    assert f"STAND-IN {python}\\python.exe ['--dry-run'] 1 1 1" in result.stdout, result.stdout + result.stderr
     assert result.returncode == 5  # the script's exit code is passed on
-
-
-def test_the_utf_8_code_page_is_used_for_reading_pyvenv_cfg_only():
-    commands = batch_commands(uninstaller())
-    switch = commands.index('if defined OLD_CP chcp 65001 >nul')
-    restore = commands.index('if defined OLD_CP chcp %OLD_CP% >nul')
-    # nothing between them can leave the console in UTF-8
-    assert restore == switch + 2 and 'pyvenv.cfg' in commands[switch + 1]
-    assert not any(word in commands[switch + 1].lower() for word in ('goto', 'exit'))
+    assert (python / 'python.exe').is_file()  # deleted only after exit code 3
 
 
 @windows_only
-def test_the_uninstaller_reads_a_home_with_non_ascii_characters(tmp_path):
-    # venv writes pyvenv.cfg as UTF-8, but for /f reads in the console's code page, e.g. 850, so a
-    # per-user Python of "Jürgen" was not found (review); the code page is restored afterwards
-    folder = tmp_path / 'Fo!to (old) & co'
+def test_the_uninstaller_names_the_manual_steps_without_the_private_python(tmp_path):
+    folder = tmp_path / 'Fo!to (x86) & co'
     folder.mkdir()
-    home = junction_to(tmp_path / 'Jürgen 写真 (x86) & !', base_python_folder())
-    environment_of(folder, home)
-    result = run_uninstaller(folder, '--dry-run', path=os.path.join(os.environ['SystemRoot'], 'System32'),
-                             code_page=850)
-    assert f"STAND-IN {home}\\python.exe ['--dry-run'] 1 1 1" in result.stdout, result.stdout + result.stderr
-    assert result.stdout.rstrip().splitlines()[-1].rstrip('.').endswith(' 850')
-
-
-@windows_only
-def test_the_uninstaller_names_the_manual_steps_without_any_python(tmp_path):
-    # the Python that created .venv is gone and the py launcher is not on PATH
-    folder = tmp_path / 'Fo!to (old) & co'
-    folder.mkdir()
-    environment_of(folder, tmp_path / 'gone')
-    result = run_uninstaller(folder, path=os.path.join(os.environ['SystemRoot'], 'System32'))
+    result = run_uninstaller(folder)
     assert 'STAND-IN' not in result.stdout and result.returncode == 1
-    assert 'No Python 3.12 or newer found' in result.stdout
+    assert 'There is no private Python in .python' in result.stdout
     assert 'delete the folders .venv' in result.stdout
     # the whole folder path, and its "& co" is not run as a command (review)
-    assert f'.tmp in "{folder}"' in result.stdout and result.stderr == ''
-    # the misleading messages of I4 and of its first fix are gone: a Python older than 3.12 or a
-    # missing .venv is no Python that "is gone" (review)
-    assert 'Python 3.12 to 3.14 not found' not in result.stdout
-    assert ' is gone' not in result.stdout and 'pyvenv.cfg names no usable Python' in result.stdout
+    assert f'{PRIVATE_PYTHON}, .cache and .tmp in "{folder}"' in result.stdout and result.stderr == ''
 
 
 def test_the_uninstaller_deletes_the_private_python_only_after_the_script_asked_for_it():
@@ -818,25 +721,12 @@ def test_the_uninstaller_reports_a_private_python_it_could_not_delete():
     assert 'set "EXIT_CODE=1"' in commands[remove + 1:]
 
 
-def test_the_uninstaller_falls_back_to_the_python_versions_of_older_installers():
-    # installers before P5 part C created .venv with an installed Python 3.14, 3.13 or 3.12
-    assert re.search(r'for %%V in \(([\d. ]+)\) do', uninstaller()).group(1) == '3.14 3.13 3.12'
-
-
-def test_the_manual_steps_name_the_private_python():
-    # a .python left without python.exe falls back to the py launcher, which PCs without an
-    # installed Python lack (review)
-    text = uninstaller()
-    manual = text[text.index('if defined PYTHON_VERSION goto installed'):text.index(':installed')]
-    assert f'{PRIVATE_PYTHON},' in manual
-
-
 def test_the_folder_path_is_never_used_inside_a_block():
-    # a ")" in the folder path or in the home of pyvenv.cfg would end the block early
+    # a ")" in the folder path would end the block early
     depth = 0
     for line in batch_commands(uninstaller()):
         if depth and not line.startswith(')'):
-            assert '%CD%' not in line and '%~dp0' not in line and '%BASE_PYTHON%' not in line, line
+            assert '%CD%' not in line and '%~dp0' not in line, line
         if line.endswith('(') or line.startswith(')'):
             depth += line.count('(') - line.count(')')
 
