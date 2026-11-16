@@ -172,8 +172,8 @@ search measured a speed, a rough duration. A JPEG or HEIC whose shot is analyzed
 file (or another file of the shot) counts as analyzed. Press **Analyze photos now** to start; the
 button is disabled while a search, an analysis or a cleanup runs, when none of the listed photo
 folders exists and when the search model cannot be used; a line below it says which and in which
-tab to fix it (it needs no search profile). It stays available when the count says all photos are analyzed: the count is the one
-from the last "Recount", while the analysis reads the folders again and also finds photos added
+tab to fix it (it needs no search profile). It stays available when the count says all photos
+are analyzed: the count is the one from the last "Recount", while the analysis reads the folders again and also finds photos added
 since. If the drive of the results may run short of space, a warning is shown here too.
 Analyses only help a search with
 the same search model and person detection settings: after a change of these, the photos are
