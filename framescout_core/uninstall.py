@@ -17,6 +17,7 @@ from pathlib import Path
 from .app_instance import INSTANCE_DIR, INSTANCE_LOCK
 from .copying import COPY_FOLDERS_KEY, _inside
 from .locks import lock_held
+from .paths import WINDOWS
 from .portable_python import PRIVATE_PYTHON
 from .run_status import RUN_LOCK
 from .settings import (LEGACY_PHOTO_FOLDER, SETTINGS_FILE, _read_settings_file, _setting_value, _with_folder_list,
@@ -238,7 +239,7 @@ def user_data(root):
     return [(root / relative, label) for relative, label in USER_DATA if os.path.lexists(root / relative)]
 
 
-def outside_leftovers(root, environ, home, windows=os.name == 'nt'):
+def outside_leftovers(root, environ, home, windows=WINDOWS):
     """Return (path, what it is, size) of folders outside root that model downloads and
     Ultralytics may have filled when FrameScout ran without its scripts (I10).
 

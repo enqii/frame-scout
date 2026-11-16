@@ -28,7 +28,7 @@ from .devices import cuda_hint
 from .disk_space import SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _existing_folder, _reachable, downloaded_models
 from .hub import hub_cache_dir
 from .models import MODELS
-from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script
+from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, WINDOWS, script
 from .portable_python import PRIVATE_PYTHON
 from .signature import DEFAULT_YOLO_MODEL
 
@@ -58,13 +58,13 @@ class CheckResult(NamedTuple):
 def venv_python(base):
     """The Python of the environment in base (.venv/Scripts/python.exe on Windows)."""
     venv = Path(base) / VENV_DIR
-    return venv / 'Scripts' / 'python.exe' if os.name == 'nt' else venv / 'bin' / 'python'
+    return venv / 'Scripts' / 'python.exe' if WINDOWS else venv / 'bin' / 'python'
 
 
 def venv_site_packages(base):
     """The folder the environment in base installs its packages into."""
     venv = Path(base) / VENV_DIR
-    if os.name == 'nt':
+    if WINDOWS:
         return venv / 'Lib' / 'site-packages'
     found = sorted(venv.glob('lib/python3*/site-packages'))
     return found[-1] if found else venv / 'lib' / 'site-packages'
@@ -238,7 +238,7 @@ def check_writable(folder, label):
     except OSError as exc:
         return [CheckResult(name, False, f'{folder} cannot be written: {exc}.',
                             'Move FrameScout to a folder you can write to (e.g. in your user folder'
-                            + (', not in C:\\Program Files' if os.name == 'nt' else '')
+                            + (', not in C:\\Program Files' if WINDOWS else '')
                             + ') and check that a virus scanner does not block it.')]
     state = '' if Path(folder).is_dir() else ' (created on first use)'
     return [CheckResult(name, True, f'{folder} can be written{state}.', '')]
