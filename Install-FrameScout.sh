@@ -49,8 +49,8 @@ mkdir -p .tmp || exit 1
 PYTHON_VERSION="3.14.9"
 PYTHON_URL="https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.14.9%2B20261021-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
 PYTHON_SHA256="561e91c1cadf30e84aec94d1917384ae3267e5f3e6e135e51fd1578bb19f4064"
-PYTHON_ARCHIVE=".tmp/python-3.14.9-linux.tar.gz"
-PYTHON_UNPACKED=".tmp/python-3.14.9"
+PYTHON_ARCHIVE=".tmp/python-$PYTHON_VERSION-linux.tar.gz"
+PYTHON_UNPACKED=".tmp/python-$PYTHON_VERSION"
 
 failed() {
   for line in "$@"; do echo "$line"; done

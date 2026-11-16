@@ -78,6 +78,8 @@ def test_the_linux_installer_pins_the_python_of_framescout_core():
     assert setting('PYTHON_VERSION') == PYTHON_VERSION
     assert setting('PYTHON_URL') == LINUX_PYTHON_URL
     assert setting('PYTHON_SHA256') == LINUX_PYTHON_SHA256
+    # a version bump changes PYTHON_VERSION and the URL; every other name uses $PYTHON_VERSION
+    assert text('Install-FrameScout.sh').count(PYTHON_VERSION) == 2
 
 
 def test_the_linux_python_is_the_standalone_build_of_the_windows_version():
