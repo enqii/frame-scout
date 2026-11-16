@@ -233,6 +233,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (cards, marks, dialog, popover), the popover "Export and copy" at 420 px, copy and
       export notices. Photo set: 12 generated images, not real photos; the narrow widths
       were an iframe of that width in Chrome. Kind `docs`.
+- [ ] **A59 – The popover button "More" of a result card is taller than "Match" and "No
+      match":** the three buttons of a card's action row differ in height; the same height
+      would look tidier. Reported by the user in chat, not measured in the browser. Found
+      after the pass of A52.
 
 ### Installation / project
 
