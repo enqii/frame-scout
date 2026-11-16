@@ -10,7 +10,8 @@ from framescout_core.disk_space import LowSpace, torch_install_needs
 from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script
 from framescout_core.torch_build import (TORCHVISION_VERSION, TORCH_VERSION, cuda_build, driver_text,
                                          installed_build_matches, installed_cuda_build, parse_gpu_query,
-                                         torch_index_url, torch_requirements, unsupported_gpus)
+                                         reports_windows_driver, torch_index_url, torch_requirements,
+                                         unsupported_gpus)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -59,6 +60,15 @@ def test_the_driver_minimums_are_those_of_the_system():
         cuda_build([gpu((8, 9), (525, 60, 12))], windows=False)
     assert cuda_build([gpu((8, 9), (580, 65, 6))], windows=False) == 'cu130'
     assert unsupported_gpus('cu130', [gpu((8, 9), (575, 64))], windows=False) == ['GPU']
+
+
+def test_wsl_compares_the_driver_with_the_windows_minimums():
+    # review: in WSL2, nvidia-smi reports the driver of the Windows host, so a Windows driver
+    # 525.60.13 to 528.32 must not pass the Linux minimum of CUDA 12
+    assert reports_windows_driver(True, '10') is True
+    assert reports_windows_driver(False, '6.6.87.2-microsoft-standard-WSL2') is True
+    assert reports_windows_driver(False, '4.4.0-19041-Microsoft') is True   # WSL1
+    assert reports_windows_driver(False, '6.8.0-45-generic') is False
 
 
 def test_no_build_for_unsupported_combinations():
