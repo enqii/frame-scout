@@ -450,7 +450,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       on Linux are unverified (if one is missing, the decision is revisited); `xdg-open` cannot
       select a file (A19); a second set of scripts to keep in sync; in WSL, photos under `/mnt/c`
       are much slower than in the Linux file system (say so in the guide). PRs 1 and 3 are "not
-      runtime-tested" until F48. Idea of 2026-11-14. Sizes S, M (`code-risky`), M.
+      runtime-tested" until F48. Idea of 2026-11-14. Sizes S, M (`code-risky`), M. Part 1 done
+      2026-11-16 in PR #136 (CI on `ubuntu-latest`; only the storage check of "Clean up
+      storage" failed on Linux: a Windows-only `stat` constant and tests counting its stats).
 - [ ] `hardware` **F48 – One full search in WSL2:** run the Linux scripts of F47 on the home PC
       (WSL2, Ubuntu): install, start, a full search with the CPU build, then with CUDA (needs the
       Windows NVIDIA driver; unverified) and uninstall; fix what shows up, record the result in

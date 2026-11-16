@@ -83,7 +83,7 @@ The tests need neither torch nor a model download:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-GitHub runs them on Windows with Python 3.14 for every pull request and
+GitHub runs them on Windows and Linux (Ubuntu) with Python 3.14 for every pull request and
 every push to `main` (`.github/workflows/tests.yml`).
 
 ## Contributing
