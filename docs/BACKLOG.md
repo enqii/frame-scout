@@ -468,7 +468,11 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 - [ ] `hardware` **F48 – One full search in WSL2:** run the Linux scripts of F47 on the home PC
       (WSL2, Ubuntu): install, start, a full search with the CPU build, then with CUDA (needs the
       Windows NVIDIA driver; unverified) and uninstall; fix what shows up, record the result in
-      `docs/ARCHITECTURE.md` → "Verified status". Needs F47 PR 2 first.
+      `docs/ARCHITECTURE.md` → "Verified status". Needs F47 PR 2 first. Progress 2026-11-16:
+      one full search with the CPU build ran in WSL2 (Ubuntu) through the app: 4997 photos,
+      3 profiles, 0 errors, about 5 minutes (lock and log timestamps), three HTML galleries
+      written, results shown in the app. Still open: CUDA, `Check-FrameScout.sh`,
+      `Uninstall-FrameScout.sh`, opening a gallery in the browser.
 - [ ] `decision` **F49 – Choose which profiles a search runs:** a search always scores and exports
       every profile, so refining one profile replaces the other profiles' results too. Sketch: a
       checkbox "Include in the next search" per profile (default on), stored as a list of
