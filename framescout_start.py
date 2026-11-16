@@ -4,7 +4,7 @@
 
 Runs the app with Streamlit on 127.0.0.1, port 8501, or the next free one of 8502-8510 if
 another program holds it. If the app of this folder already runs (in another window), it
-opens the browser on that one instead of starting a second app (framescout_core.launch).
+opens the browser on that one instead of starting a second app (framescout_core.app_instance.launch).
 Streamlit runs in this process, so the lock that marks the running app is held exactly as
 long as the app runs.
 """
@@ -12,7 +12,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from framescout_core import launch, streamlit_args
+from framescout_core.app_instance import launch, streamlit_args
 
 ROOT = Path(__file__).resolve().parent
 

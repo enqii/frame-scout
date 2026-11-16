@@ -6,10 +6,14 @@ import time
 
 import pytest
 
-import framescout_core
-from framescout_core import (CACHE_FILE, CACHE_SIDE_FILES, DEFAULT_YOLO_MODEL, MARKS_FILE, RUN_LOCK, RUN_STATUS,
-                             RunLock, cache_check_current, cache_error, cache_error_message, cache_read_warning,
-                             check_cache, cleanup_running, prepare_cache, set_cache_aside)
+import framescout_core.cache_check
+from framescout_core.cache_check import (CACHE_SIDE_FILES, cache_check_current, cache_error, cache_error_message,
+                                         cache_read_warning, check_cache, set_cache_aside)
+from framescout_core.cleanup import cleanup_running
+from framescout_core.locks import RunLock
+from framescout_core.marks import MARKS_FILE
+from framescout_core.run_status import RUN_LOCK, RUN_STATUS
+from framescout_core.signature import CACHE_FILE, DEFAULT_YOLO_MODEL, prepare_cache
 
 # 2026-11-02 12:30:45 local time
 NOW = time.mktime((2026, 11, 2, 12, 30, 45, 0, 0, -1))
@@ -75,7 +79,7 @@ def test_damaged_pages_are_found(tmp_path):
     damage(cache)
     result = check_cache(tmp_path, no_engine)
     assert result['state'] == 'damaged' and result['details']
-    assert len(result['details']) <= framescout_core.CACHE_CHECK_LINES
+    assert len(result['details']) <= framescout_core.cache_check.CACHE_CHECK_LINES
 
 
 def test_an_error_that_is_no_damage_leaves_the_cache_unchecked(tmp_path, monkeypatch):

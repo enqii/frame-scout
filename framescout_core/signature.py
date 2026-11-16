@@ -9,7 +9,7 @@ from .settings import SETTING_RANGES, SETTING_STEPS
 
 
 # The OpenCLIP model and weights of every search model, the default too, are only in
-# framescout_core.MODELS (E22): no second copy that code could load instead of --model.
+# framescout_core.models.MODELS (E22): no second copy that code could load instead of --model.
 # The engine version of a search model, part of the feature cache signature: change the
 # template whenever cached embeddings become incompatible (preprocessing or crops; other
 # weights are another registry entry). v4 was ViT-B-32 with GELU.

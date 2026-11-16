@@ -6,9 +6,11 @@ from pathlib import Path
 import pytest
 
 import install_torch
-from framescout_core import (CONSTRAINTS_FILE, REQUIREMENTS_FILE, TORCH_VERSION, TORCHVISION_VERSION, LowSpace, cuda_build, driver_text,
-                             installed_build_matches, installed_cuda_build, parse_gpu_query, torch_index_url,
-                             torch_install_needs, torch_requirements, unsupported_gpus)
+from framescout_core.disk_space import LowSpace, torch_install_needs
+from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE
+from framescout_core.torch_build import (TORCHVISION_VERSION, TORCH_VERSION, cuda_build, driver_text,
+                                         installed_build_matches, installed_cuda_build, parse_gpu_query,
+                                         torch_index_url, torch_requirements, unsupported_gpus)
 
 ROOT = Path(__file__).resolve().parent.parent
 

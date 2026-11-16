@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import VERSION_FILE_PATTERN, check_program_files
+from framescout_core.install_check import VERSION_FILE_PATTERN, check_program_files
 
 ROOT = Path(__file__).resolve().parent.parent
 windows_only = pytest.mark.skipif(sys.platform != 'win32', reason='runs a .bat file')

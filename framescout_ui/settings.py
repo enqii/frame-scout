@@ -6,10 +6,13 @@ import time
 import psutil
 import streamlit as st
 
-from framescout_core import (AI_DETAIL_SETTINGS, AI_SETTINGS, DEFAULT_MODEL, DEFAULT_REFERENCE_WEIGHT, DEVICES, MODELS, MODEL_KEYS,
-                             SETTING_RANGES, SETTING_STEPS, changed_from_defaults, check_installation, cuda_status,
-                             default_settings, device_choices, downloaded_models, folder_lines, model_label,
-                             model_problem, read_settings, reconcile_settings, save_settings, setting_text)
+from framescout_core.devices import cuda_status, device_choices
+from framescout_core.disk_space import downloaded_models
+from framescout_core.install_check import check_installation
+from framescout_core.models import DEFAULT_MODEL, MODELS, MODEL_KEYS, model_label, model_problem
+from framescout_core.settings import (AI_DETAIL_SETTINGS, AI_SETTINGS, DEFAULT_REFERENCE_WEIGHT, DEVICES,
+                                      SETTING_RANGES, SETTING_STEPS, changed_from_defaults, default_settings,
+                                      folder_lines, read_settings, reconcile_settings, save_settings, setting_text)
 
 from .common import BASE, LOW_SPACE_TTL, SETTINGS, plain
 
@@ -93,7 +96,7 @@ def reset_ai_settings():
 # Settings (A8): settings.json is read on every rerun, so a reload, a restart, another tab
 # or session shows the saved settings. The widgets have keys and get the saved values
 # through their session state; passing them as value= would give a widget a new identity
-# after every save and drop the next change (review). framescout_core.reconcile_settings
+# after every save and drop the next change (review). framescout_core.settings.reconcile_settings
 # tells a change made in this session (saved; the latest action wins) from a value another
 # session saved (shown here).
 def sync_settings():

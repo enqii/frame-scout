@@ -15,7 +15,7 @@ RAW_PARTNER_EXT = frozenset({'.jpg', '.jpeg'}) | HEIF_EXT
 # The engine uses the JPEG preview a RAW file embeds if its longer edge has at least this
 # many pixels, and otherwise decodes the sensor data at half size (E25). Some cameras
 # embed only a small thumbnail, too small for person crops and the gallery. Changing it
-# changes the embeddings of RAW photos: bump framescout_core.ENGINE then.
+# changes the embeddings of RAW photos: bump framescout_core.signature.ENGINE then.
 RAW_PREVIEW_MIN_EDGE = 1024
 # LibRaw's sizes.flip (3: rotate 180°, 5: rotate 90° counterclockwise, 6: rotate 90°
 # clockwise to make the image upright) as the PIL Image.Transpose method that does it.

@@ -6,9 +6,13 @@ from pathlib import Path
 
 import pytest
 
-import framescout_core
-from framescout_core import (DEFAULT_MODEL, RunLock, clean_up, finish_reference_move, read_profiles, save_profiles,
-                             scan_cleanup, stage_reference_move, undo_reference_move, update_backup_references)
+import framescout_core.references
+from framescout_core.cleanup import clean_up, scan_cleanup
+from framescout_core.locks import RunLock
+from framescout_core.models import DEFAULT_MODEL
+from framescout_core.profiles import read_profiles, save_profiles
+from framescout_core.references import (finish_reference_move, stage_reference_move, undo_reference_move,
+                                        update_backup_references)
 
 
 @pytest.fixture

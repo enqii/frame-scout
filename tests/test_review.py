@@ -2,9 +2,9 @@
 import ast
 import re
 
-from framescout_core import (CARD_STYLE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, PHOTO_KEY_PREFIX, PREVIEW_KEY_PREFIX,
-                             REVIEW_PREVIEW_SIZE, REVIEW_STYLE, first_undecided, next_undecided, review_index,
-                             review_position, review_shown, review_state_text)
+from framescout_core.marks import CARD_STYLE, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, PHOTO_KEY_PREFIX, PREVIEW_KEY_PREFIX
+from framescout_core.review import (REVIEW_PREVIEW_SIZE, REVIEW_STYLE, first_undecided, next_undecided, review_index,
+                                    review_position, review_shown, review_state_text)
 
 from app_source import app_tree, page_tree
 

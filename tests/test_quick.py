@@ -6,13 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (FULL_IMAGE_LABEL, QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, PhotoScan, auto_cleanup,
-                             engine_command, generic_prompts, like_crop, like_labels_fit, like_profile, like_scan_path,
-                             quick_folders_differ,
-                             quick_note,
-                             quick_entry_label, quick_photos, quick_result_id, quick_profile, quick_scope, quick_scope_text,
-                             read_results, results_choice, results_document,
-                             publish_export, result_card, scan_cleanup)
+from framescout_core.cleanup import auto_cleanup, scan_cleanup
+from framescout_core.photos import PhotoScan
+from framescout_core.profiles import generic_prompts
+from framescout_core.quick import (QUICK_DIR, QUICK_GALLERY, QUICK_QUERY_MAX, like_crop, like_labels_fit, like_profile,
+                                   like_scan_path, quick_entry_label, quick_folders_differ, quick_note, quick_photos,
+                                   quick_profile, quick_result_id, quick_scope, quick_scope_text, results_choice)
+from framescout_core.results import publish_export, read_results, result_card, results_document
+from framescout_core.settings import engine_command
+from framescout_core.thumbnails import FULL_IMAGE_LABEL
 
 from app_source import app_tree, page_tree
 

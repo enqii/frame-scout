@@ -7,10 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (QUERY_NOTE, RESULTS_FILE, RESULTS_FORMAT, card_text, closest_query, has_closest_line, load_profiles, open_command, openable_photo, page_count,
-                             page_cards, profile_fingerprints, profile_state, publish_export, query_caption,
-                             query_summary, read_results, result_card, results_document, reveal_command,
-                             search_fingerprint)
+from framescout_core.profiles import load_profiles
+from framescout_core.results import (QUERY_NOTE, RESULTS_FILE, RESULTS_FORMAT, card_text, closest_query,
+                                     has_closest_line, open_command, openable_photo, page_cards, page_count,
+                                     profile_fingerprints, profile_state, publish_export, query_caption, query_summary,
+                                     read_results, result_card, results_document, reveal_command, search_fingerprint)
 
 from app_source import app_tree
 

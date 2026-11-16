@@ -8,9 +8,12 @@ import numpy as np
 import pytest
 
 import framescout_eval as ev
-from framescout_core import (DEFAULT_MODEL, EVAL_PAGE_FILE, MODEL_KEYS, MODELS, LowSpace, cache_folder_paths, download_bytes,
-                             motif, read_label_file, read_labels, search_space_bytes, save_labels, scores_document, thumbnail_name,
-                             write_scores)
+from framescout_core.cache_dirs import cache_folder_paths
+from framescout_core.disk_space import LowSpace, download_bytes, search_space_bytes
+from framescout_core.evaluation import motif, read_label_file, read_labels, save_labels, scores_document, write_scores
+from framescout_core.models import DEFAULT_MODEL, MODELS, MODEL_KEYS
+from framescout_core.paths import EVAL_PAGE_FILE
+from framescout_core.thumbnails import thumbnail_name
 from framescout_scoring import rank_photos
 
 PHOTOS = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg', 'e.jpg']

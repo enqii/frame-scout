@@ -15,8 +15,10 @@ from pathlib import Path
 
 from PIL import Image, ImageFile, ImageOps
 
-from framescout_core import (DRAFT_REDUCING_GAP, RAW_EXT, TruncatedImageError, available_decoders, jpeg_scans_missing,
-                             missing_decoder, raw_preview_transpose, raw_preview_usable)
+from framescout_core.names import RAW_EXT
+from framescout_core.photos import (TruncatedImageError, available_decoders, jpeg_scans_missing, missing_decoder,
+                                    raw_preview_transpose, raw_preview_usable)
+from framescout_core.pipeline import DRAFT_REDUCING_GAP
 
 # pillow-heif and rawpy are in requirements.txt; an older installation without them still
 # runs and skips those photos with a note. The app checks the same way (available_decoders),

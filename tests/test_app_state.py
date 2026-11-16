@@ -2,8 +2,10 @@
 import ast
 
 from app_source import app_files, page_tree
-from framescout_core import (APP_TABS, FORM_TAB_MAX_WIDTH, NOTHING_NEW, PAGE_STYLE, RESULTS_TAB, RUN_TAB, START_NEEDS_TAB, results_running_text,
-                             start_blocked_text, start_needs, start_needs_line, state_line)
+from framescout_core.app_state import (APP_TABS, FORM_TAB_MAX_WIDTH, PAGE_STYLE, RESULTS_TAB, RUN_TAB, START_NEEDS_TAB,
+                                       results_running_text, start_blocked_text, start_needs, start_needs_line,
+                                       state_line)
+from framescout_core.run_status import NOTHING_NEW
 
 POINTER = 'progress and Stop in the tab "Search"'
 

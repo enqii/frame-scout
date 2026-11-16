@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from framescout_core import reference_folder, write_new_file
+from framescout_core.references import reference_folder, write_new_file
 
 
 def test_first_file_gets_number_one_and_the_folder_is_created(tmp_path):

@@ -3,7 +3,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 
 import pytest
 
-from framescout_core import Lazy, draft_size, group_batches, prefetch, progress_due, store_group
+from framescout_core.pipeline import Lazy, draft_size, group_batches, prefetch, progress_due, store_group
 
 
 # --- group_batches: crops of several photos go through CLIP together ---

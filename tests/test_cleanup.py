@@ -8,10 +8,17 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (CACHE_FILE, DEFAULT_MODEL, DEFAULT_YOLO_MODEL, ENGINE, EXPORTS_DIR, MARKS_FILE, RESULTS_FILE,
-                             RUN_LOCK, RUN_STATUS, RunLock, auto_cleanup, clean_up, cleanup_summary_text, engine_id,
-                             export_result_list, feature_signature, prepare_cache, project_temp_cleanup,
-                             publish_export, result_card, results_document, save_profiles, scan_cleanup, size_text)
+from framescout_core.cleanup import (auto_cleanup, clean_up, cleanup_summary_text, project_temp_cleanup, scan_cleanup,
+                                     size_text)
+from framescout_core.exporting import EXPORTS_DIR, export_result_list
+from framescout_core.locks import RunLock
+from framescout_core.marks import MARKS_FILE
+from framescout_core.models import DEFAULT_MODEL
+from framescout_core.profiles import save_profiles
+from framescout_core.results import RESULTS_FILE, publish_export, result_card, results_document
+from framescout_core.run_status import RUN_LOCK, RUN_STATUS
+from framescout_core.signature import (CACHE_FILE, DEFAULT_YOLO_MODEL, ENGINE, engine_id, feature_signature,
+                                       prepare_cache)
 
 CURRENT = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL)
 OTHER = feature_signature(True, 5, .5, DEFAULT_YOLO_MODEL)
@@ -838,7 +845,7 @@ def test_deleting_unbound_marks_removes_only_those_entries(project):
     assert len(scan['marks_unbound']['items']) == 3
     project.photo('c.jpg')  # back since the scan: its mark stays
     late = project.photos / 'd.jpg'  # unbound, but not shown by the scan
-    from framescout_core import save_marks
+    from framescout_core.marks import save_marks
     save_marks(project.results / MARKS_FILE, 'Dog', {str(late): 'no-match'})
     summary = project.clean(scan, {'marks_unbound'})
     assert summary['marks'] == 2 and summary['files'] == 0
@@ -927,7 +934,7 @@ def test_deleting_marks_of_deleted_profiles_keeps_a_profile_created_since(projec
     scan = project.scan()
     assert len(scan['marks_profiles']['items']) == 3
     project.set_profiles([{'name': 'Red car', 'reference_images': []}, {'name': 'Cat', 'reference_images': []}])
-    from framescout_core import save_marks
+    from framescout_core.marks import save_marks
     save_marks(project.results / MARKS_FILE, 'Dog', {'c.jpg': 'match'})  # not shown by the scan
     summary = project.clean(scan, {'marks_profiles'})
     assert summary['marks'] == 2 and summary['files'] == 0
@@ -1216,7 +1223,7 @@ def test_the_cleanup_is_refused_while_a_search_is_being_started(project):
 
 
 def test_a_search_cannot_take_the_lock_during_the_cleanup(project, monkeypatch):
-    import framescout_core
+    import framescout_core.cleanup
     project.thumb(T1)
     scan = project.scan()
     held = []
@@ -1454,7 +1461,7 @@ def test_the_read_only_uri_opens_a_unc_path(tmp_path):
 
 
 def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, monkeypatch):
-    import framescout_core
+    import framescout_core.cleanup
     gone = project.photos / 'b.jpg'
     project.cache([(gone, CURRENT), (gone, OTHER), (gone, OLD)])
     calls = []
@@ -1466,7 +1473,7 @@ def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, mo
 
 def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):
     # review: profiles.json was parsed twice and every gallery scanned twice per scan
-    import framescout_core
+    import framescout_core.cleanup
     project.page('cat.html', 'Cat', [T2])
     project.page('red-car.html', 'Red car', [T1])
     calls = []
@@ -1480,7 +1487,7 @@ def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):
 
 def test_an_error_in_one_step_keeps_the_summary_of_what_was_deleted(project, monkeypatch):
     # review: a PermissionError while listing a folder must not lose the count of what is gone
-    import framescout_core
+    import framescout_core.cleanup
     project.thumb(T1)
     (project.refs / 'old.jpg').write_bytes(b'image')
     project.cache([(project.photos / 'gone.jpg', OLD)])
@@ -1501,18 +1508,18 @@ def test_an_error_in_one_step_keeps_the_summary_of_what_was_deleted(project, mon
 
 def test_cleanup_running_while_clean_up_holds_the_lock(project, monkeypatch):
     # other tabs (threads of the same process) tell the cleanup from a search by it (review)
-    import framescout_core
+    import framescout_core.cleanup
     project.thumb(T1)
     scan = project.scan()
     seen = []
     real = framescout_core.cleanup._remove_file
 
     def remove(path, summary):
-        seen.append(framescout_core.cleanup_running(project.results))
+        seen.append(framescout_core.cleanup.cleanup_running(project.results))
         return real(path, summary)
 
     monkeypatch.setattr(framescout_core.cleanup, '_remove_file', remove)
-    assert not framescout_core.cleanup_running(project.results)
+    assert not framescout_core.cleanup.cleanup_running(project.results)
     project.clean(scan, {'thumbnails'})
     assert seen == [True]
-    assert not framescout_core.cleanup_running(project.results)
+    assert not framescout_core.cleanup.cleanup_running(project.results)

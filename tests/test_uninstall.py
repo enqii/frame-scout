@@ -12,9 +12,11 @@ from pathlib import Path
 import pytest
 
 import framescout_uninstall
-from framescout_core import (ENVIRONMENT_PROGRAMS, PRIVATE_PYTHON, PRIVATE_PYTHON_EXIT_CODE, RunLock,
-                             outside_leftovers, programs_in_use, protected_folders, remove_items, running_python,
-                             search_running, uninstall_plan, user_data)
+from framescout_core.locks import RunLock
+from framescout_core.portable_python import PRIVATE_PYTHON
+from framescout_core.uninstall import (ENVIRONMENT_PROGRAMS, PRIVATE_PYTHON_EXIT_CODE, outside_leftovers,
+                                       programs_in_use, protected_folders, remove_items, running_python, search_running,
+                                       uninstall_plan, user_data)
 from framescout_core import uninstall as uninstall_module
 
 ROOT = Path(__file__).resolve().parent.parent

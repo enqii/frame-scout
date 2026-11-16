@@ -8,12 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (jpeg_scans_missing, ALL_DECODERS, AVIF_EXT, EXT, HEIF_EXT, RAW_EXT, RAW_FLIP_TRANSPOSE,
-                             RAW_PREVIEW_MIN_EDGE, Decoders, PhotoScan, RawFallback, available_decoders, distinct_folders,
-                             folder_labels, join_scans, missing_decoder, missing_folders_message,
-                             output_folder_problem, photo_name, raw_fallbacks, remembered_scans, raw_preview_transpose, raw_preview_usable, scan_each_folder, scan_folders, scan_photos,
-                             skipped_lines,
-                             supported_extensions)
+from framescout_core.names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
+from framescout_core.photos import (ALL_DECODERS, Decoders, PhotoScan, RAW_FLIP_TRANSPOSE, RAW_PREVIEW_MIN_EDGE,
+                                    RawFallback, available_decoders, distinct_folders, folder_labels, join_scans,
+                                    jpeg_scans_missing, missing_decoder, missing_folders_message, output_folder_problem,
+                                    photo_name, raw_fallbacks, raw_preview_transpose, raw_preview_usable,
+                                    remembered_scans, scan_each_folder, scan_folders, scan_photos, skipped_lines,
+                                    supported_extensions)
 
 NO_HEIF = Decoders(avif=True, heif=False, raw=True)
 NO_RAW = Decoders(avif=True, heif=True, raw=False)

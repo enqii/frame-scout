@@ -7,8 +7,10 @@ from pathlib import Path
 import pytest
 
 import framescout_core.exporting as exporting
-from framescout_core import (EXPORT_COLUMNS, EXPORTS_DIR, MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, export_cards, export_csv, export_file_list, export_name, export_result_list,
-                             result_card, unlisted_paths)
+from framescout_core.exporting import (EXPORTS_DIR, EXPORT_COLUMNS, export_cards, export_csv, export_file_list,
+                                       export_name, export_result_list, unlisted_paths)
+from framescout_core.marks import MARK_MATCH, MARK_NO_MATCH, MARK_OPEN
+from framescout_core.results import result_card
 
 NOW = datetime(2026, 11, 3, 14, 5, 9)
 

@@ -4,7 +4,7 @@ import unicodedata
 
 import pytest
 
-from framescout_core import EXT, SLUG_MAX_LENGTH, profile_slugs, slugify
+from framescout_core.names import EXT, SLUG_MAX_LENGTH, profile_slugs, slugify
 
 
 @pytest.mark.parametrize('name, slug', [

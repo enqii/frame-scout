@@ -10,9 +10,15 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core import (EXAMPLE_PROFILES_FILE, EXPORTS_DIR, MARKS_FILE, QUICK_DIR, QUICK_GALLERY, RESULTS_FILE,
-                             RUN_LOCK, RUN_STATUS, SETTINGS_FILE, available_decoders, open_command, openable_photo,
-                             project_temp_cleanup, reveal_command, supported_extensions)
+from framescout_core.cleanup import project_temp_cleanup
+from framescout_core.exporting import EXPORTS_DIR
+from framescout_core.marks import MARKS_FILE
+from framescout_core.paths import EXAMPLE_PROFILES_FILE
+from framescout_core.photos import available_decoders, supported_extensions
+from framescout_core.quick import QUICK_DIR, QUICK_GALLERY
+from framescout_core.results import RESULTS_FILE, open_command, openable_photo, reveal_command
+from framescout_core.run_status import RUN_LOCK, RUN_STATUS
+from framescout_core.settings import SETTINGS_FILE
 
 
 # the project folder: app.py's folder, one above this package

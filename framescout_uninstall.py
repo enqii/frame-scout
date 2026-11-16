@@ -26,9 +26,10 @@ import os
 import sys
 from pathlib import Path
 
-from framescout_core import (PRIVATE_PYTHON, PRIVATE_PYTHON_EXIT_CODE, outside_leftovers, programs_in_use,
-                             protected_folders, remove_items, running_python, search_running, size_text,
-                             uninstall_plan, user_data)
+from framescout_core.cleanup import size_text
+from framescout_core.portable_python import PRIVATE_PYTHON
+from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, outside_leftovers, programs_in_use, protected_folders,
+                                       remove_items, running_python, search_running, uninstall_plan, user_data)
 
 ROOT = Path(__file__).resolve().parent
 # failed paths shown; the rest is counted

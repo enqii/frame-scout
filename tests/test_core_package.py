@@ -1,61 +1,43 @@
-"""The packages framescout_core (I15) and framescout_scoring (I30) re-export the public names of their modules."""
+"""Imports from framescout_core go to the module that defines a name (I45): no re-export list."""
 import ast
 import importlib
-import inspect
 import pkgutil
-
-import pytest
+from pathlib import Path
 
 import framescout_core
-import framescout_scoring
 
-# the re-export list of framescout_scoring is short and kept by hand too (review of I30)
-packages = pytest.mark.parametrize('package', [framescout_core, framescout_scoring], ids=lambda p: p.__name__)
-
-
-def area_modules(package=framescout_core):
-    return [importlib.import_module(f'{package.__name__}.{info.name}')
-            for info in pkgutil.iter_modules(package.__path__) if not info.name.startswith('_')]
+ROOT = Path(__file__).resolve().parent.parent
+# the repository's own Python files: the scripts, the packages and the tests
+SOURCES = [*ROOT.glob('*.py'), *ROOT.glob('framescout_*/*.py'), *ROOT.glob('tests/*.py')]
 
 
-def defined_names(module):
-    """Public names a module defines itself (functions, classes, assignments), not imports."""
-    names = set()
-    for node in ast.parse(inspect.getsource(module)).body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            names.add(node.name)
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            for target in node.targets if isinstance(node, ast.Assign) else [node.target]:
-                names.update(n.id for n in ast.walk(target) if isinstance(n, ast.Name))
-    return {name for name in names if not name.startswith('_')}
+def area_modules():
+    return {info.name for info in pkgutil.iter_modules(framescout_core.__path__)}
 
 
 def test_there_are_area_modules():
     assert len(area_modules()) >= 10
 
 
-@packages
-def test_every_public_name_of_an_area_module_is_re_exported(package):
-    # app.py and the engine import from the package, but the tests never import them and CI
-    # only compiles them, so a name missing in __init__.py would only fail at the app start
-    missing = sorted(f'{module.__name__}.{name}' for module in area_modules(package) for name in defined_names(module)
-                     if getattr(package, name, None) is not getattr(module, name))
+def test_the_package_file_holds_no_code():
+    # a name imported here again would start a second, hand-kept re-export list
+    body = ast.parse((ROOT / 'framescout_core' / '__init__.py').read_text(encoding='utf-8')).body
+    assert len(body) == 1 and isinstance(body[0], ast.Expr)  # the docstring
+
+
+def test_every_name_imported_from_framescout_core_exists():
+    # app.py and the engine need streamlit or torch, which CI does not install: CI only
+    # compiles them, so a wrong module or name would only fail when they run
+    missing = []
+    for path in SOURCES:
+        for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+            if not isinstance(node, ast.ImportFrom) or node.level or not (node.module or '').startswith('framescout_core'):
+                continue
+            module = importlib.import_module(node.module)
+            for alias in node.names:
+                # from the package itself only its modules ("from framescout_core import cleanup")
+                found = (alias.name in area_modules() if node.module == 'framescout_core'
+                         else hasattr(module, alias.name))
+                if not found:
+                    missing.append(f'{path.relative_to(ROOT).as_posix()}: {node.module}.{alias.name}')
     assert missing == []
-
-
-@packages
-def test_private_helpers_are_not_re_exported(package):
-    # a monkeypatch of a private helper on the package would not reach the calling module
-    # (the submodule _common itself is bound on the package by the import system)
-    leaked = sorted(name for name, value in vars(package).items()
-                    if name.startswith('_') and not name.startswith('__') and not inspect.ismodule(value))
-    assert leaked == []
-
-
-@packages
-def test_no_module_alias_of_another_package_is_left_in_the_package(package):
-    # e.g. "import os as _os" in __init__.py (review): only the package's own submodules are bound
-    aliases = sorted(name for name, value in vars(package).items()
-                     if not name.startswith('__') and inspect.ismodule(value)
-                     and not value.__name__.startswith(f'{package.__name__}.'))
-    assert aliases == []

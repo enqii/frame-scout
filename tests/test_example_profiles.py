@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
-import framescout_core
-from framescout_core import EXAMPLE_PROFILES_FILE, create_from_example, load_profiles
+import framescout_core.profiles
+from framescout_core.paths import EXAMPLE_PROFILES_FILE
+from framescout_core.profiles import create_from_example, load_profiles
 
 from app_source import app_tree
 

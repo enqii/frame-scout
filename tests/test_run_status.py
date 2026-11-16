@@ -9,10 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import (ALL_ANALYZED, FINAL_PHASES, LOADING_DETECTOR, NOTHING_NEW, analysis_only,
-                             analysis_result_text, run_name, RUN_LOCK, RUN_STATUS, RunLock, StatusReporter, final_status, lock_held,
-                             nothing_new_message, read_status, run_active, started_in_time, status_fraction, status_text,
-                             stopped_status, write_status)
+from framescout_core.locks import RunLock, lock_held
+from framescout_core.run_status import (ALL_ANALYZED, FINAL_PHASES, LOADING_DETECTOR, NOTHING_NEW, RUN_LOCK, RUN_STATUS,
+                                        StatusReporter, analysis_only, analysis_result_text, final_status,
+                                        nothing_new_message, read_status, run_active, run_name, started_in_time,
+                                        status_fraction, status_text, stopped_status, write_status)
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -105,7 +106,7 @@ def test_acquire_twice_keeps_one_lock(tmp_path):
 HOLD_LOCK = '''
 import sys, time
 from pathlib import Path
-from framescout_core import RunLock
+from framescout_core.locks import RunLock
 lock = RunLock(Path(sys.argv[1]))
 print('locked' if lock.acquire() else 'busy', flush=True)
 time.sleep(60)

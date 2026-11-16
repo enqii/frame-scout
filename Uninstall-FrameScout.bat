@@ -12,7 +12,7 @@ rem "home" in .venv\pyvenv.cfg, so no py launcher is needed (I4), else the py la
 rem the versions of those installers), never with .venv's own Python, which
 rem cannot delete itself while it runs. The private Python cannot delete itself either: the
 rem script deletes everything else and ends with exit code 3
-rem (framescout_core.PRIVATE_PYTHON_EXIT_CODE) only after "yes", never in a dry run or when
+rem (framescout_core.uninstall.PRIVATE_PYTHON_EXIT_CODE) only after "yes", never in a dry run or when
 rem .python is not to be deleted; then this file deletes .python (I20).
 rem No cache or TMP variables are set here: .tmp is deleted, and the script reports the
 rem user's caches.

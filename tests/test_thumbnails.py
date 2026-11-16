@@ -1,10 +1,9 @@
-"""Gallery thumbnails of the HTML export (framescout_core.ensure_thumbnail, E6)."""
+"""Gallery thumbnails of the HTML export (framescout_core.thumbnails.ensure_thumbnail, E6)."""
 import os
 import shutil
 from pathlib import Path
 
-import framescout_core
-from framescout_core import SkippedPhotos, ensure_thumbnail, gallery_cards, thumbnail_name
+from framescout_core.thumbnails import SkippedPhotos, ensure_thumbnail, gallery_cards, thumbnail_name
 
 
 def make_photo(folder, name='photo.jpg', mtime_ns=1_700_000_000_000_000_000):

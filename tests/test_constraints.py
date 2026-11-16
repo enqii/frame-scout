@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from framescout_core import CONSTRAINTS_FILE, REQUIREMENTS_DIR, REQUIREMENTS_FILE, windows_path
+from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_DIR, REQUIREMENTS_FILE, windows_path
 
 from app_source import app_tree
 

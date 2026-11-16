@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-import framescout_core as core
-from framescout_core import (APP_HOST, APP_PORTS, INSTANCE_DIR, INSTANCE_FILE, INSTANCE_LOCK, AppInstance, RunLock,
-                             app_url, free_port, launch, port_answers, port_free, streamlit_args)
+from framescout_core.app_instance import (APP_HOST, APP_PORTS, AppInstance, INSTANCE_DIR, INSTANCE_FILE, INSTANCE_LOCK,
+                                          app_url, free_port, launch, port_answers, port_free, streamlit_args)
+from framescout_core.locks import RunLock, lock_held
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -74,7 +74,7 @@ class Launch:
 
     def run_app(self, port):
         # while the app runs, the folder's instance is held and names its port
-        assert core.lock_held(self.folder / INSTANCE_DIR / INSTANCE_LOCK)
+        assert lock_held(self.folder / INSTANCE_DIR / INSTANCE_LOCK)
         self.ran.append((port, json.loads((self.folder / INSTANCE_DIR / INSTANCE_FILE).read_text(encoding='utf-8'))))
         return self.result
 
@@ -93,7 +93,7 @@ def test_a_first_start_runs_the_app_on_8501(tmp_path):
     assert start.opened == [] and start.lines == []
     # a clean exit leaves no instance file and no lock behind
     assert not (tmp_path / INSTANCE_DIR / INSTANCE_FILE).exists()
-    assert not core.lock_held(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
+    assert not lock_held(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
 
 
 def test_the_exit_code_of_the_app_is_returned(tmp_path):
@@ -113,7 +113,7 @@ def test_all_ports_busy_stops_with_a_message(tmp_path):
     assert start() == 1
     assert start.ran == [] and start.opened == []
     assert any('8501' in line and '8510' in line for line in start.lines), start.lines
-    assert not core.lock_held(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
+    assert not lock_held(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
 
 
 def hold_instance(folder, port):
@@ -293,5 +293,5 @@ def test_ctrl_c_while_the_app_runs_gives_the_lock_back(tmp_path):
     start.run_app = interrupted
     with pytest.raises(KeyboardInterrupt):
         start()
-    assert not core.lock_held(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
+    assert not lock_held(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
     assert not (tmp_path / INSTANCE_DIR / INSTANCE_FILE).exists()
