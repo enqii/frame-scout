@@ -43,7 +43,7 @@ call the app production-ready.
 - The search quality of the three optional models (none is evaluated beyond the first AP@40
   values, E32).
 
-CI (`.github/workflows/tests.yml`, Windows, Python 3.12/3.13/3.14) runs `pytest` and a
+CI (`.github/workflows/tests.yml`, Windows, Python 3.14 only, I50) runs `pytest` and a
 `compileall` check from `requirements/requirements-dev.txt` only and fails if torch is
 installed: tests must not need torch, Pillow or model downloads. Tests that need Pillow
 (`tests/test_images.py`) or Streamlit's frontend bundle run only locally. `app.py` and
@@ -437,8 +437,8 @@ are **not** a security boundary (`git -C . push`, `sh -c …` or an absolute pat
 matched). Personal overrides go into `.claude/settings.local.json` (gitignored).
 
 On GitHub (I8) the ruleset `protect main` blocks deleting and force-pushing the default branch,
-needs linear history and a pull request (rebase merges only, no approval required) and the three
-`pytest (Windows, Python 3.1x)` checks. Admins may bypass it only when merging a pull request
+needs linear history and a pull request (rebase merges only, no approval required) and the
+`pytest (Windows, Python 3.14)` check. Admins may bypass it only when merging a pull request
 (`gh pr merge --admin`, denied in `.claude/settings.json`), never with a direct push. Actions are
 limited to GitHub-owned actions pinned to a SHA, and workflows of outside contributors' pull
 requests need approval. Secret scanning with push protection, Dependabot alerts and private

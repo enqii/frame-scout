@@ -11,11 +11,11 @@
 # TORCH_VERSION and TORCHVISION_VERSION in framescout_core/torch_build.py (a test checks it,
 # and that every requirement has a pin it allows).
 # Source: the project venv of the verified runs (Python 3.14, Windows; a CPU engine run with
-# these versions); Python 3.12 and 3.13 are only checked by the dry-run below. Refresh the
+# these versions). Refresh the
 # pins by hand in a change of their own: update and test the venv, write the closure of
 # requirements.txt here, then check
-# - with pip install --dry-run --ignore-installed --report r.json --python-version 3.12 (to
-#   3.14) --platform win_amd64 --only-binary=:all: -r requirements\requirements.txt
+# - with pip install --dry-run --ignore-installed --report r.json --python-version 3.14
+#   --platform win_amd64 --only-binary=:all: -r requirements\requirements.txt
 #   -c requirements\constraints.txt (in the FrameScout folder) that every resolved package is pinned and has a Windows wheel (this resolves torch from
 #   PyPI, whose Windows wheels are CPU builds);
 # - for the CUDA builds that the Requires-Dist lines of the wheels' metadata on the PyTorch
