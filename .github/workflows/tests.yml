@@ -34,7 +34,7 @@ jobs:
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          # The version of the private Python that Install-FrameScout.bat downloads (I50).
+          # The minor version of the private Python that Install-FrameScout.bat downloads (I50).
           python-version: '3.14'
           cache: pip
           cache-dependency-path: requirements/requirements-dev.txt
