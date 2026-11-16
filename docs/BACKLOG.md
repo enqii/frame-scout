@@ -423,6 +423,29 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       In the same PR, correct the stale size in the implementer brief ("`docs/BACKLOG.md`
       (open items, 39 KB)", now about 49 KB) or drop the number. Found on 2026-11-16 in a
       workflow context review.
+- [ ] **I50 – Support one Python version only (simplification):** the installer always
+      downloads a private Python 3.14 into `.python` (P5), but a `.venv` of an earlier
+      installer built on an installed Python 3.12 or 3.13 is still carried along: the CI
+      matrix runs three jobs (3.12, 3.13, 3.14), `Uninstall-FrameScout.bat` falls back to the
+      `py` launcher for 3.14/3.13/3.12, `requirements/constraints.txt` asks for a dry-run
+      per version, and `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md` and
+      `docs/ARCHITECTURE.md` describe it. That is compatibility with a state that was never
+      released (I47). Support 3.14 only: one CI job, no version fallback, shorter docs.
+      Consequence: a folder that still has such an old `.venv` needs one more run of
+      `Install-FrameScout.bat`; decide whether the installer rebuilds it or only says so
+      (hold point: installer behavior). Check first what else accepts 3.12/3.13
+      (`Install-FrameScout.bat`, `framescout_core/install_check.py`). Found on 2026-11-16 in
+      a simplification review by sampling.
+- [ ] **I51 – Delete or shorten outdated documents (simplification):**
+      `docs/UI-REVIEW.md` (about 16 KB) says of itself that it is a record of the old
+      interface and not kept current, `README.md` still links it as "not implemented"
+      although F27 and F28 are, and two open backlog items point to its sections; delete it
+      (git keeps it), remove the README link and put the sentence each of the two items
+      needs into the item. `docs/IDEAS.md` (about 45 KB) keeps the full text of every idea
+      that already has a `Disposition:` line (24 on 2026-11-16); reduce those to one line
+      each (title, disposition), as I40 did for `docs/BACKLOG-DONE.md`, and adapt the rule
+      "earlier sections stay untouched" in `CLAUDE.md` → "Triage" and the `/triage` skill.
+      Kind `docs`. Found on 2026-11-16 in a simplification review.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
