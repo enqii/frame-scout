@@ -14,7 +14,7 @@ import stat
 from dataclasses import dataclass
 from pathlib import Path
 
-from .app_instance import INSTANCE_DIR, INSTANCE_LOCK
+from .app_instance import AppInstance
 from .copying import COPY_FOLDERS_KEY, _inside
 from .locks import lock_held
 from .paths import WINDOWS
@@ -273,7 +273,7 @@ def search_running(root):
 
 def app_running(root):
     """Return True if an app started with the start script of root holds its start lock (F47)."""
-    return lock_held(Path(root) / INSTANCE_DIR / INSTANCE_LOCK)
+    return AppInstance(root).running()
 
 
 def _held_open(path):
