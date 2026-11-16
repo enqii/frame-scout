@@ -45,7 +45,7 @@ def project(tmp_path):
     write(root / 'yolo11n.pt', b'y' * 50)
     write(root / '__pycache__' / 'app.cpython-314.pyc')
     write(root / 'framescout_core' / '__pycache__' / 'names.cpython-314.pyc')
-    write(root / 'framescout_scoring' / '__pycache__' / 'ranking.cpython-314.pyc')
+    write(root / 'framescout_scoring' / '__pycache__' / '__init__.cpython-314.pyc')
     # the user's data
     write(root / 'photos' / 'IMG_0001.jpg', b'photo')
     write(root / 'references' / 'hero' / 'ref.jpg', b'ref')
