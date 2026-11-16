@@ -1,8 +1,7 @@
 """FrameScout uninstall (P5): deletes what the installer and FrameScout create again.
 
-Uninstall-FrameScout.bat runs it with the Python that created the environment, never with
-the environment's own Python (.venv), which could not delete itself while it runs: the
-installer's private Python (.python), or for an older installation an installed Python. The
+Uninstall-FrameScout.bat runs it with the installer's private Python (.python), never with
+the environment's own Python (.venv), which could not delete itself while it runs. The
 private Python cannot delete itself either: when it runs the script, the script deletes
 everything else and ends with PRIVATE_PYTHON_EXIT_CODE, and the .bat deletes .python (I20).
 
@@ -27,7 +26,6 @@ import sys
 from pathlib import Path
 
 from framescout_core.cleanup import size_text
-from framescout_core.portable_python import PRIVATE_PYTHON
 from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, outside_leftovers, programs_in_use, protected_folders,
                                        remove_items, running_python, search_running, uninstall_plan, user_data)
 
@@ -89,8 +87,6 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
             'Fix the file or move it out of this folder, then run the uninstall again.')
         return 1
     items, skipped = uninstall_plan(root, protected)
-    # an installer before P5 part C used an installed Python, which stays
-    private = os.path.lexists(root / PRIVATE_PYTHON)
     # the private Python that runs this script: deleted by Uninstall-FrameScout.bat afterwards
     last = running_python(items, root, interpreter)
     if items:
@@ -152,8 +148,7 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
     if last:
         out(f'The private Python ({_name(last.path, root)}, {size_text(last.size)}) runs this script: '
             'Uninstall-FrameScout.bat deletes it when this script has ended.')
-    out(f'To remove FrameScout completely, back up the data you want to keep and delete the folder {root}.'
-        + ('' if private else ' Python itself was installed separately and stays.'))
+    out(f'To remove FrameScout completely, back up the data you want to keep and delete the folder {root}.')
     return PRIVATE_PYTHON_EXIT_CODE if last else 0
 
 
