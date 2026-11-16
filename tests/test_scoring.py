@@ -1,9 +1,27 @@
 """Prompt ensemble and per-profile score normalization (framescout_scoring, E4, E5)."""
+import ast
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from framescout_scoring import (MIN_SCORES, Match, best_matches, best_scores, photo_scores, rank_photos, rank_similar, score_caption,
                                 spread, text_queries)
+
+SCORING = Path(__file__).resolve().parent.parent / 'framescout_scoring'
+
+
+def test_the_scoring_package_imports_only_numpy_and_the_standard_library():
+    # no other FrameScout module, torch or Pillow (CLAUDE.md: numpy only); relative imports stay inside
+    for path in SCORING.glob('*.py'):
+        imported = set()
+        for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+            if isinstance(node, ast.Import):
+                imported.update(alias.name.split('.')[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and not node.level:
+                imported.add(node.module.split('.')[0])
+        assert imported - sys.stdlib_module_names - {'numpy'} == set(), path.name
 
 
 def unit(*rows):
