@@ -1,4 +1,5 @@
 """The app's device choices and CUDA hints, and the engine's person detector options and import."""
+from .paths import script
 
 
 def device_choices(cuda_available):
@@ -14,8 +15,8 @@ def cuda_hint(torch_cuda):
     a new build only after a restart (review).
     """
     if torch_cuda is None:
-        return 'For an NVIDIA GPU, close FrameScout, run Install-FrameScout.bat cuda and start FrameScout again.'
-    return ('Update the NVIDIA driver, or close FrameScout, run Install-FrameScout.bat cuda (it picks the build '
+        return f'For an NVIDIA GPU, close FrameScout, run {script("Install")} cuda and start FrameScout again.'
+    return (f'Update the NVIDIA driver, or close FrameScout, run {script("Install")} cuda (it picks the build '
             'for the installed driver) and start FrameScout again.')
 
 

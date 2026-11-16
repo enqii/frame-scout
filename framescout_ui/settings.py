@@ -10,6 +10,7 @@ from framescout_core.devices import cuda_status, device_choices
 from framescout_core.disk_space import downloaded_models
 from framescout_core.install_check import check_installation
 from framescout_core.models import DEFAULT_MODEL, MODELS, MODEL_KEYS, model_label, model_problem
+from framescout_core.paths import script
 from framescout_core.settings import (AI_DETAIL_SETTINGS, AI_SETTINGS, DEFAULT_REFERENCE_WEIGHT, DEVICES,
                                       SETTING_RANGES, SETTING_STEPS, changed_from_defaults, default_settings,
                                       folder_lines, read_settings, reconcile_settings, save_settings, setting_text)
@@ -271,7 +272,7 @@ def show_ai_settings(settings, seen, shown, active):
     with st.expander('Check installation'):
         st.caption('Checks the Python environment, the package versions, PyTorch (and the GPU for a CUDA build), '
                    'whether .cache and results can be written, the downloaded model files and the free disk space. '
-                   'It changes nothing. Check-FrameScout.bat runs the same check when the app does not start.')
+                   f'It changes nothing. {script("Check")} runs the same check when the app does not start.')
         if st.button('Check installation'):
             with st.spinner('Checking the installation ...'):
                 st.session_state['install_check'] = check_installation(BASE, dict(os.environ))

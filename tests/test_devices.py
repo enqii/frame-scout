@@ -6,6 +6,7 @@ import pytest
 
 from framescout_core.devices import (ULTRALYTICS_ENV, cuda_hint, cuda_status, detection_options, device_choices,
                                      import_detector_class)
+from framescout_core.paths import script
 
 
 def test_cuda_is_offered_only_when_pytorch_can_use_it():
@@ -35,7 +36,7 @@ def test_cuda_hint_says_to_close_and_restart_frame_scout():
     # only sees the new build after a restart
     for build in (None, '13.0'):
         hint = cuda_hint(build)
-        assert 'Install-FrameScout.bat cuda' in hint
+        assert f'{script("Install")} cuda' in hint
         assert 'close FrameScout' in hint and 'start FrameScout again' in hint
     assert 'driver' in cuda_hint('13.0')
 

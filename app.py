@@ -15,7 +15,7 @@ from framescout_core.app_state import (APP_TABS, PAGE_STYLE, RESULTS_TAB, button
 from framescout_core.cleanup import cleanup_running, count_text
 from framescout_core.estimate import finishing_minutes, gallery_thumbnails, known_throughput, start_summary
 from framescout_core.models import MODELS
-from framescout_core.paths import EXAMPLE_PROFILES_FILE, windows_path
+from framescout_core.paths import EXAMPLE_PROFILES_FILE
 from framescout_core.photos import distinct_folders, join_scans, remembered_scans, skipped_lines
 from framescout_core.profiles import create_from_example, read_profiles_versioned
 from framescout_core.quick import QUICK_DIR, QUICK_QUERY_MAX, quick_scope_text
@@ -57,7 +57,7 @@ clean_project_folder()
 try:
     create_from_example(PROFILES, EXAMPLE_PROFILES)  # first start only; never overwrites
 except OSError as exc:  # e.g. a read-only project folder
-    st.error(f'Could not create profiles.json from {windows_path(EXAMPLE_PROFILES_FILE)}: {exc}. '
+    st.error(f'Could not create profiles.json from {EXAMPLE_PROFILES_FILE}: {exc}. '
              'Check that the project folder is writable.')
     st.stop()
 try:

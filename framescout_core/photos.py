@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from .names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
+from .paths import script
 
 
 # A RAW file is skipped when a photo of the same name with one of these extensions is in
@@ -41,7 +42,7 @@ Decoders = collections.namedtuple('Decoders', 'avif heif raw')
 ALL_DECODERS = Decoders(True, True, True)
 # per decoder: its extensions, the name of its files in the log, why they are skipped and
 # what helps
-_INSTALL_HINT = 'Run Install-FrameScout.bat again to install it.'
+_INSTALL_HINT = f'Run {script("Install")} again to install it.'
 _DECODER_FORMATS = (
     ('avif', AVIF_EXT, 'AVIF', 'this Pillow build cannot read AVIF',
      'The Pillow wheels from PyPI (version 11.3 or later) can.'),

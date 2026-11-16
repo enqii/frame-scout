@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from framescout_core.names import AVIF_EXT, EXT, HEIF_EXT, RAW_EXT
+from framescout_core.paths import script
 from framescout_core.photos import (ALL_DECODERS, Decoders, PhotoScan, RAW_FLIP_TRANSPOSE, RAW_PREVIEW_MIN_EDGE,
                                     RawFallback, available_decoders, distinct_folders, folder_labels, join_scans,
                                     jpeg_scans_missing, missing_decoder, missing_folders_message, output_folder_problem,
@@ -94,12 +95,12 @@ def test_missing_decoder():
         assert missing_decoder(suffix, NONE) is None
     assert missing_decoder('.heic', ALL_DECODERS) is None
     heif = missing_decoder('.HEIF', NO_HEIF)
-    assert 'pillow-heif' in heif and 'HEIC' in heif and 'Install-FrameScout.bat' in heif
+    assert 'pillow-heif' in heif and 'HEIC' in heif and script('Install') in heif
     raw = missing_decoder('.cr3', NO_RAW)
-    assert 'rawpy' in raw and 'RAW' in raw and 'Install-FrameScout.bat' in raw
+    assert 'rawpy' in raw and 'RAW' in raw and script('Install') in raw
     avif = missing_decoder('.avif', NO_AVIF)
     # re-running the installer would not replace an installed Pillow build without AVIF
-    assert 'Pillow' in avif and 'AVIF' in avif and 'Install-FrameScout.bat' not in avif
+    assert 'Pillow' in avif and 'AVIF' in avif and script('Install') not in avif
     assert missing_decoder('.cr3', NO_HEIF) is None
 
 

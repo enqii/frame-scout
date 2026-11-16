@@ -4,8 +4,10 @@ I31 moved the loose files of the root folder into requirements/ (the installer's
 files) and assets/ (files the programs read). Every program, message and test builds these
 paths from the constants here, so a later move changes one place. Relative to the FrameScout
 folder; a leaf module (no other FrameScout import), so any module of the package can use it.
-Messages for the user name a path in its Windows form (windows_path).
+Messages for the user name a path as this system shows it (str of the Path) and a script by
+the name it has on this system (script, F47).
 """
+import os
 from pathlib import Path, PureWindowsPath
 
 REQUIREMENTS_DIR = Path('requirements')
@@ -14,6 +16,16 @@ CONSTRAINTS_FILE = REQUIREMENTS_DIR / 'constraints.txt'
 ASSETS_DIR = Path('assets')
 EXAMPLE_PROFILES_FILE = ASSETS_DIR / 'profiles.example.json'
 EVAL_PAGE_FILE = ASSETS_DIR / 'framescout_eval_page.html'
+
+
+# the scripts the user runs (Install-, Start-, Check-, Uninstall-FrameScout): .bat files on
+# Windows, .sh scripts of the same names on Linux (F47)
+SCRIPT_SUFFIX = '.bat' if os.name == 'nt' else '.sh'
+
+
+def script(name, suffix=SCRIPT_SUFFIX):
+    """The file name of the FrameScout script name ("Install", "Start", ...) on this system, e.g. Install-FrameScout.bat."""
+    return f'{name}-FrameScout{suffix}'
 
 
 def windows_path(path):

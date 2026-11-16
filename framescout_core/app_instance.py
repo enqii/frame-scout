@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ._common import _publish_via_temp, _retry
 from .locks import RunLock, lock_held
+from .paths import script
 
 # the only address the app listens on and the browser opens: never a wider one
 APP_HOST = '127.0.0.1'
@@ -162,7 +163,7 @@ def launch(folder, run_app, open_browser, out=print, ports=APP_PORTS, free=port_
     # a lock a running app holds cannot be deleted on Windows, so the advice is safe
     lock_name = Path(INSTANCE_DIR) / INSTANCE_LOCK
     way_out = (f'If no FrameScout window of this folder is open, delete the file {lock_name} in the '
-               'FrameScout folder, then run Start-FrameScout.bat again.')
+               f'FrameScout folder, then run {script("Start")} again.')
     while True:
         try:
             if instance.claim(clock, sleep):
@@ -178,14 +179,14 @@ def launch(folder, run_app, open_browser, out=print, ports=APP_PORTS, free=port_
             return 0
         if instance.running():
             out('FrameScout already runs from this folder in another window, but does not answer. '
-                f'Close that window (or wait until it has started), then run Start-FrameScout.bat again. {way_out}')
+                f'Close that window (or wait until it has started), then run {script("Start")} again. {way_out}')
             return 1
         # the other app ended meanwhile: this start takes over
     try:
         port = free_port(ports, free)
         if port is None:
             out(f'Ports {ports[0]} to {ports[-1]} are all in use by other programs, so FrameScout cannot start. '
-                'Close one of them, then run Start-FrameScout.bat again.')
+                f'Close one of them, then run {script("Start")} again.')
             return 1
         if port != ports[0]:
             out(f'Port {ports[0]} is in use by another program. FrameScout uses port {port}: {app_url(port)}')

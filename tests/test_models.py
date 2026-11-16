@@ -5,6 +5,7 @@ import pytest
 
 from framescout_core.models import (DEFAULT_MODEL, MODELS, MODEL_KEYS, SearchModel, missing_packages, model_label,
                                     model_problem, results_model)
+from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script
 
 
 def test_the_default_is_openai_clip_vit_b_32_with_quickgelu():
@@ -81,9 +82,9 @@ def test_missing_packages_and_problem():
     assert missing_packages('vit-b-16-siglip', all_installed) == []
     assert missing_packages(DEFAULT_MODEL, none_installed) == []
     problem = model_problem('vit-b-16-siglip', none_installed)
-    assert 'transformers' in problem and 'Install-FrameScout.bat' in problem
+    assert 'transformers' in problem and script('Install') in problem
     # a manual install keeps the pinned versions (I12 review)
-    assert r'pip install -r requirements\requirements.txt -c requirements\constraints.txt' in problem
+    assert f'pip install -r {REQUIREMENTS_FILE} -c {CONSTRAINTS_FILE}' in problem
     assert model_problem('vit-b-16-siglip', all_installed) is None
     assert model_problem(DEFAULT_MODEL, none_installed) is None
 

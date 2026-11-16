@@ -13,7 +13,7 @@ from framescout_core.install_check import (CheckResult, check_disk_space,
                                            check_packages, check_torch, check_writable, installed_versions,
                                            requirement_names, venv_python, venv_site_packages)
 from framescout_core.models import DEFAULT_MODEL, MODELS
-from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
+from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script, windows_path
 from framescout_core.signature import DEFAULT_YOLO_MODEL
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -58,7 +58,7 @@ def test_environment_of_this_folder_with_its_private_python_is_fine(tmp_path):
 def test_missing_environment_says_to_run_the_installer(tmp_path):
     [result] = check_environment(tmp_path)
     assert result.ok is False
-    assert 'Install-FrameScout.bat' in result.fix
+    assert script('Install') in result.fix
 
 
 def test_environment_whose_python_is_gone_names_a_moved_folder(tmp_path):
@@ -67,7 +67,7 @@ def test_environment_whose_python_is_gone_names_a_moved_folder(tmp_path):
     [result] = check_environment(tmp_path)
     assert result.ok is False
     assert 'moved' in result.text
-    assert 'Install-FrameScout.bat' in result.fix
+    assert script('Install') in result.fix
 
 
 def test_environment_using_the_private_python_of_another_folder_is_a_problem(tmp_path):
@@ -79,7 +79,7 @@ def test_environment_using_the_private_python_of_another_folder_is_a_problem(tmp
     [result] = check_environment(base)
     assert result.ok is False
     assert str(tmp_path / 'original' / '.python') in result.text
-    assert '.venv' in result.fix and 'Install-FrameScout.bat' in result.fix
+    assert '.venv' in result.fix and script('Install') in result.fix
 
 
 def link_folder(link, target):
@@ -136,7 +136,7 @@ def test_packages_matching_the_constraints_are_fine(tmp_path):
     [result] = check_packages(tmp_path, CONSTRAINTS, REQUIREMENTS)
     assert result.ok is True
     # the file in its folder, as the user finds it (I31, review)
-    assert result.text.endswith(r'in the versions of requirements\constraints.txt.')
+    assert result.text.endswith(f'in the versions of {CONSTRAINTS_FILE}.')
 
 
 def test_plain_torch_version_of_pypi_counts_as_the_pin(tmp_path):
@@ -154,8 +154,8 @@ def test_other_versions_and_missing_packages_are_named(tmp_path):
     assert 'numpy 2.6.0 instead of 2.5.4' in result.text
     assert 'torch 2.13.0+cpu instead of 2.14.1' in result.text
     assert 'pillow' in result.text and 'missing' in result.text
-    assert 'Install-FrameScout.bat' in result.fix
-    assert result.fix.endswith(r'It installs the versions of requirements\constraints.txt.')
+    assert script('Install') in result.fix
+    assert result.fix.endswith(f'It installs the versions of {CONSTRAINTS_FILE}.')
 
 
 def test_missing_requirement_with_an_environment_marker_is_no_problem(tmp_path):
@@ -176,8 +176,18 @@ def test_requirement_names_skip_comments_markers_and_extras():
     assert requirement_names('# comment\n\nnumpy>=2 ; python_version>"3"\nfoo[bar]==1\n') == ['numpy', 'foo']
 
 
-def test_messages_name_the_requirement_files_as_windows_shows_them():
-    # on any system, since the messages are for Windows users (review)
+def test_messages_name_the_scripts_and_files_of_this_system():
+    # F47: the .bat files on Windows, the .sh scripts on Linux, and paths as the system shows them
+    windows = os.name == 'nt'
+    assert script('Install') == ('Install-FrameScout.bat' if windows else 'Install-FrameScout.sh')
+    assert script('Check', '.bat') == 'Check-FrameScout.bat' and script('Check', '.sh') == 'Check-FrameScout.sh'
+    [result] = check_packages(Path('missing'), CONSTRAINTS, 'numpy\n')
+    shown = r'requirements\constraints.txt' if windows else 'requirements/constraints.txt'
+    assert shown in result.fix and script('Install') in result.fix
+
+
+def test_the_batch_files_name_the_requirement_files_in_their_windows_form():
+    # the .bat checks of test_constraints.py compare with this form on any system
     assert windows_path(CONSTRAINTS_FILE) == r'requirements\constraints.txt'
     assert windows_path(REQUIREMENTS_FILE) == r'requirements\requirements.txt'
 
@@ -243,7 +253,7 @@ def test_cuda_build_without_a_usable_gpu_is_a_problem(tmp_path):
 def test_torch_that_does_not_import_is_a_problem(tmp_path, run):
     [result] = check_torch(tmp_path / 'python.exe', {}, '2.14.1+cpu', run=run)
     assert result.ok is False
-    assert 'Install-FrameScout.bat' in result.fix
+    assert script('Install') in result.fix
 
 
 def test_import_error_names_the_last_line_of_the_traceback(tmp_path):
