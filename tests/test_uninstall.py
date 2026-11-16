@@ -570,6 +570,11 @@ def test_a_running_app_stops_the_uninstall(project, tmp_path):
         lock.release()
     assert code == 1 and 'FrameScout is still running' in text and questions == []
     assert (project / '.venv').exists()
+    # review: a lock that only looks held (a file a virus scanner keeps open, or of another
+    # user) has the same way out as in the start script
+    lock_name = str(Path('.tmp') / 'app-instance.lock')
+    assert f'If no FrameScout window of this folder is open, delete the file {lock_name}' in text
+    assert 'then run the uninstall again.' in text
 
 
 def test_a_start_while_the_question_waits_stops_the_uninstall(project, tmp_path, monkeypatch):
