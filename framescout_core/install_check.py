@@ -123,8 +123,9 @@ def check_program_files(base):
         return [CheckResult(name, True, 'Files of one FrameScout version.', '')]
     return [CheckResult(name, False, f'The FrameScout folder holds the version files {", ".join(found)}: files of '
                         'two FrameScout versions, left when a ZIP is extracted over another version.',
-                        'Extract the ZIP of the version you want into a new, empty folder and run '
-                        'Install-FrameScout.bat there.')]
+                        'Extract the ZIP of the version you want into a new, empty folder, copy profiles.json, '
+                        'settings.json and the folders photos, references, results and .cache from this folder '
+                        'into it, then run Install-FrameScout.bat there.')]
 
 
 def check_environment(base):

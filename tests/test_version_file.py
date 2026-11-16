@@ -80,6 +80,8 @@ def test_start_stops_with_the_version_files_of_two_versions(tmp_path):
         (folder / f'framescout-version-{version}.txt').write_text('', encoding='utf-8')
     result = run_start(folder)
     assert 'two FrameScout versions' in result.stdout and 'new, empty folder' in result.stdout
+    # the user's data stays in this folder: the message names what to copy (review)
+    assert 'profiles.json, settings.json' in result.stdout
     assert 'run Install-FrameScout.bat first' not in result.stdout and result.returncode == 1
 
 
@@ -93,4 +95,4 @@ def test_the_check_reports_the_version_files_of_two_versions(tmp_path):
     [problem] = check_program_files(tmp_path)
     assert problem.ok is False
     assert 'framescout-version-1.5.0.txt' in problem.text and 'framescout-version-1.6.0.txt' in problem.text
-    assert 'new, empty folder' in problem.fix
+    assert 'new, empty folder' in problem.fix and 'profiles.json' in problem.fix
