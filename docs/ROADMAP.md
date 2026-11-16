@@ -22,7 +22,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 ### P44 – Simplify (added 2026-11-16)
 - [x] Support Python 3.14 only: one CI job, no version fallbacks, shorter docs (I50; kind `code`)
       (done 2026-11-16 in PR #129)
-- [ ] Delete or shorten outdated documents: `docs/UI-REVIEW.md`, the closed ideas in
+- [x] Delete or shorten outdated documents: `docs/UI-REVIEW.md`, the closed ideas in
       `docs/IDEAS.md` (I51; kind `docs`; adapts the rule in `CLAUDE.md` → "Triage")
 
 ### P45 – Workflow (added 2026-11-16)

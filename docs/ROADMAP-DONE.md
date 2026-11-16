@@ -205,7 +205,7 @@ decision in PR #14):
 ### P28 – UI/UX review (added 2026-11-12)
 - [x] Assess the whole user interface and write the findings down, no rebuild; follow-up PRs
       are decided afterwards (F24; kind `docs`; done 2026-11-13, findings in
-      [UI-REVIEW.md](UI-REVIEW.md), follow-ups F27–F33)
+      `UI-REVIEW.md`, deleted by I51, follow-ups F27–F33)
 
 ### P29 – Detector weights (added 2026-11-12)
 - [x] Log which detector weights file was loaded (E60)

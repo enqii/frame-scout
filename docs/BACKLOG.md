@@ -209,7 +209,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
 - [ ] `minor` **A51 – Long explanatory captions:** "Analyze ahead" (about 100 words), the quick
       search and the AI settings explain everything in one grey block. Sketch: one short
       sentence, the rest behind a help tooltip or a "More" expander; the required English-only
-      hint (E3) stays. Affected: `app.py`, user guide. `docs/UI-REVIEW.md` §4. Size S.
+      hint (E3) stays (it is correct and required, but a permanent info box on top of the profile
+      tab, also for users who already read it). Affected: `app.py`, user guide. Size S.
 - [ ] `ready` **A52 – Second browser pass for the parts not looked at:** the pass of 2026-11-13
       did not cover the dark theme, narrow windows, "Find similar", the contents of "Clean up
       storage", profiles with reference images and real photos (person crops, long runs), and
@@ -332,15 +333,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       In the same PR, correct the stale size in the implementer brief ("`docs/BACKLOG.md`
       (open items, 39 KB)", now about 49 KB) or drop the number. Found on 2026-11-16 in a
       workflow context review.
-- [ ] `ready` **I51 – Delete or shorten outdated documents (simplification):**
-      `docs/UI-REVIEW.md` (about 16 KB) says of itself that it is a record of the old
-      interface and not kept current, `README.md` still links it as "not implemented"
-      although F27 and F28 are, and the open backlog item A51 points to its section 4; delete it
-      (git keeps it), remove the README link and put the sentence A51 needs into the item. `docs/IDEAS.md` (about 45 KB) keeps the full text of every idea
-      that already has a `Disposition:` line (24 on 2026-11-16); reduce those to one line
-      each (title, disposition), as I40 did for `docs/BACKLOG-DONE.md`, and adapt the rule
-      "earlier sections stay untouched" in `CLAUDE.md` → "Triage" and the `/triage` skill.
-      Kind `docs`. Found on 2026-11-16 in a simplification review.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
