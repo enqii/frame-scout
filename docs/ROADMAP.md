@@ -24,6 +24,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-16 in PR #129)
 - [x] Delete or shorten outdated documents: `docs/UI-REVIEW.md`, the closed ideas in
       `docs/IDEAS.md` (I51; kind `docs`; adapts the rule in `CLAUDE.md` → "Triage")
+      (done 2026-11-16 in PR #130)
 
 ### P45 – Workflow (added 2026-11-16)
 - [ ] Subagents read their brief themselves instead of the orchestrator copying it (I49; kind `docs`)
