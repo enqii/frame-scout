@@ -29,7 +29,7 @@ from pathlib import Path
 
 from framescout_core.disk_space import low_space, low_space_lines, torch_install_needs
 from framescout_core.install_check import requirement_names
-from framescout_core.paths import REQUIREMENTS_FILE
+from framescout_core.paths import REQUIREMENTS_FILE, script
 from framescout_core.torch_build import (CUDA_BUILDS, cuda_build, driver_text, installed_build_matches,
                                          installed_cuda_build, parse_gpu_query, torch_index_url, torch_requirements,
                                          unsupported_gpus)
@@ -146,8 +146,8 @@ def choose_build(variant, current):
         return 'cpu'
     if variant is None and current in KNOWN_CUDA_BUILDS:
         print(f'PyTorch with CUDA support ({current}) is installed and kept. To pick the build for the '
-              'current GPU driver again, run Install-FrameScout.bat cuda; to switch to the CPU build, '
-              'run Install-FrameScout.bat cpu.', flush=True)
+              f'current GPU driver again, run {script("Install")} cuda; to switch to the CPU build, '
+              f'run {script("Install")} cpu.', flush=True)
         return current
     if variant == 'cuda' or current or (driver_found() and ask_gpu_support()):
         try:
@@ -159,7 +159,7 @@ def choose_build(variant, current):
             return current
         if current:
             print(f'The installed PyTorch {current} build is not replaced by the CPU build. To switch, run '
-                  'Install-FrameScout.bat cpu.', flush=True)
+                  f'{script("Install")} cpu.', flush=True)
             return None
         print('Installing PyTorch for the CPU instead.', flush=True)
     return 'cpu'

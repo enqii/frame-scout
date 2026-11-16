@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 from framescout_core.cleanup import size_text
+from framescout_core.paths import script
 from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, outside_leftovers, programs_in_use, protected_folders,
                                        remove_items, running_python, search_running, uninstall_plan, user_data)
 
@@ -112,7 +113,7 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
     leftovers = outside_leftovers(root, environ, home)
     if leftovers:
         out('')
-        out('Outside this folder, not deleted: runs without the FrameScout .bat files may have stored model '
+        out('Outside this folder, not deleted: runs without the FrameScout scripts may have stored model '
             'weights or settings here. Other programs may use them too; delete them yourself if nothing else '
             'needs them:')
         _rows(leftovers, root, out)
@@ -147,7 +148,7 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
     out(f'Done: {size_text(sum(item.size for item in now))} deleted.')
     if last:
         out(f'The private Python ({_name(last.path, root)}, {size_text(last.size)}) runs this script: '
-            'Uninstall-FrameScout.bat deletes it when this script has ended.')
+            f'{script("Uninstall")} deletes it when this script has ended.')
     out(f'To remove FrameScout completely, back up the data you want to keep and delete the folder {root}.')
     return PRIVATE_PYTHON_EXIT_CODE if last else 0
 

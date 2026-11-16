@@ -28,7 +28,7 @@ from .devices import cuda_hint
 from .disk_space import SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _existing_folder, _reachable, downloaded_models
 from .hub import hub_cache_dir
 from .models import MODELS
-from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, windows_path
+from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script
 from .portable_python import PRIVATE_PYTHON
 from .signature import DEFAULT_YOLO_MODEL
 
@@ -40,7 +40,7 @@ TORCH_CHECK_TIMEOUT = 180
 TORCH_PROBE = ('import json, torch; available = torch.cuda.is_available(); '
                'print(json.dumps({"torch": torch.__version__, "cuda": torch.version.cuda, "available": available, '
                '"gpu": torch.cuda.get_device_name(0) if available else None}))')
-REINSTALL = 'Close FrameScout and run Install-FrameScout.bat again.'
+REINSTALL = f'Close FrameScout and run {script("Install")} again.'
 # one per version in the FrameScout folder (I42); Install- and Start-FrameScout.bat count them too
 VERSION_FILE_PATTERN = 'framescout-version-*.txt'
 _PIN = re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)')
@@ -125,7 +125,7 @@ def check_program_files(base):
                         'two FrameScout versions, left when a ZIP is extracted over another version.',
                         'Extract the ZIP of the version you want into a new, empty folder, copy profiles.json, '
                         'settings.json and the folders photos, references, results and .cache from this folder '
-                        'into it, then run Install-FrameScout.bat there.')]
+                        f'into it, then run {script("Install")} there.')]
 
 
 def check_environment(base):
@@ -134,22 +134,22 @@ def check_environment(base):
     base = Path(base)
     if not venv_python(base).is_file():
         return [CheckResult(name, False, 'There is no Python environment in .venv.',
-                            'Run Install-FrameScout.bat.')]
+                            f'Run {script("Install")}.')]
     try:
         home = Path(_read_cfg(base / VENV_DIR / 'pyvenv.cfg')['home'])
     except (OSError, UnicodeDecodeError, KeyError) as exc:
         return [CheckResult(name, False, f'The file .venv/pyvenv.cfg cannot be read ({exc}).',
-                            f'Delete the folder {VENV_DIR} in this folder, then run Install-FrameScout.bat.')]
+                            f'Delete the folder {VENV_DIR} in this folder, then run {script("Install")}.')]
     private = base / PRIVATE_PYTHON
     pythons = [home / 'python.exe', home / 'python', home / 'python3']
     if not any(path.is_file() for path in pythons):
         return [CheckResult(name, False, f'The Python that .venv was created with is missing ({home}): the '
                             'FrameScout folder was moved, or that Python was deleted or uninstalled.',
-                            'Run Install-FrameScout.bat; it repairs the environment. Or move the folder back.')]
+                            f'Run {script("Install")}; it repairs the environment. Or move the folder back.')]
     if home.name.lower() == PRIVATE_PYTHON and not _same_folder(home, private):
         return [CheckResult(name, False, f'.venv uses the private Python of another folder ({home}): the FrameScout '
                             'folder was copied or moved, and it stops working when that folder is deleted.',
-                            f'Delete the folder {VENV_DIR} in this folder, then run Install-FrameScout.bat.')]
+                            f'Delete the folder {VENV_DIR} in this folder, then run {script("Install")}.')]
     return [CheckResult(name, True, f'The environment in .venv uses the Python in {home}.', '')]
 
 
@@ -176,11 +176,11 @@ def check_packages(site_packages, constraints_text, requirements_text):
              if package in installed and installed[package].partition('+')[0] != version]
     if not missing and not other:
         return [CheckResult(name, True, f'{len(installed)} packages installed, in the versions of '
-                            f'{windows_path(CONSTRAINTS_FILE)}.', '')]
+                            f'{CONSTRAINTS_FILE}.', '')]
     parts = ([f'missing: {", ".join(missing)}'] if missing else []) + (
         [f'other versions: {", ".join(other)}'] if other else [])
     return [CheckResult(name, False, 'Not as the installer installs them: ' + '; '.join(parts) + '.',
-                        f'{REINSTALL} It installs the versions of {windows_path(CONSTRAINTS_FILE)}.')]
+                        f'{REINSTALL} It installs the versions of {CONSTRAINTS_FILE}.')]
 
 
 def check_torch(python, environ, torch_version, run=subprocess.run, timeout=TORCH_CHECK_TIMEOUT, cwd=None):

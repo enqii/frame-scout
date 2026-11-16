@@ -7,7 +7,7 @@ import pytest
 
 import install_torch
 from framescout_core.disk_space import LowSpace, torch_install_needs
-from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE
+from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script
 from framescout_core.torch_build import (TORCHVISION_VERSION, TORCH_VERSION, cuda_build, driver_text,
                                          installed_build_matches, installed_cuda_build, parse_gpu_query,
                                          torch_index_url, torch_requirements, unsupported_gpus)
@@ -250,7 +250,7 @@ def test_installed_cuda_build_is_kept_without_an_argument(monkeypatch, capsys):
     assert install_torch.main([]) == 0
     assert ran.commands == []
     out = capsys.readouterr().out
-    assert 'already installed' in out and 'Install-FrameScout.bat cpu' in out
+    assert 'already installed' in out and f'{script("Install")} cpu' in out
 
 
 def test_explicit_cuda_keeps_the_installed_build_if_nvidia_smi_fails(monkeypatch, capsys):
