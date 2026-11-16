@@ -222,7 +222,6 @@ with search_tab:
         st.rerun()
     if st.session_state.get('run_notice'):
         st.warning(st.session_state.pop('run_notice'))
-    analyzed = None  # the photos analyzed with these settings: counted only while no search runs
     quick_counts = None  # quick_scope: (analyzed, not analyzed, partners) of a quick search, as the engine counts (E61)
     analysis_text = None  # what "Analyze photos now" would do (F18)
     analysis_space = None  # and its low disk space warning (review)
@@ -235,7 +234,10 @@ with search_tab:
         # analyzed collection kept the warning for good)
         quick_counts = cached_analyzed_photos(cache_key, cleanup_signature(settings),
                                               (tuple(map(str, existing)), counted_at), photo_scan)
-        analyzed = quick_counts[0]
+        # a JPEG/HEIC searched through another file of its shot (its RAW file, E30, or another
+        # partner) never gets a row of its own, however often it is analyzed: done for a search
+        # and an analysis, as for the quick search (F18 review, A48)
+        analyzed = quick_counts[0] + quick_counts[2]
         # what the search will do and, if an earlier search with these settings measured its
         # speed on this device, roughly how long its analysis takes (F12). "auto" picks CUDA
         # if PyTorch can use it; without the system details any device's record counts
@@ -247,11 +249,7 @@ with search_tab:
                                       gallery_thumbnails(len(photo_scan.paths), settings['top'], len(profiles)))
         per_minute = known_throughput(run_status, cleanup_signature(settings), chosen_device)
         st.info(start_summary(len(photo_scan.paths), analyzed, per_minute, finishing))
-        # a JPEG/HEIC searched through another file of its shot (its RAW file, E30, or another
-        # partner) never gets a row of its own, however often it is analyzed: done for the
-        # analysis, as for the quick search (review)
-        analysis_done = analyzed + quick_counts[2]
-        analysis_text = start_summary(len(photo_scan.paths), analysis_done, per_minute, analysis_only=True)
+        analysis_text = start_summary(len(photo_scan.paths), analyzed, per_minute, analysis_only=True)
         space_warning = low_space_warning(len(photo_scan.paths), settings['top'], len(profiles), settings['model'],
                                           settings['person_detection'], analyzed)
         if space_warning:
@@ -259,7 +257,7 @@ with search_tab:
         # the analysis writes the cache rows without gallery thumbnails (no profile): its own
         # warning, next to its button (review)
         analysis_space = low_space_warning(len(photo_scan.paths), settings['top'], 0, settings['model'],
-                                           settings['person_detection'], analysis_done, analysis=True)
+                                           settings['person_detection'], analyzed, analysis=True)
     # F18: the analysis of a search without the search, e.g. overnight before the profiles
     # are written; it runs like a search (run lock, status, stop button, low priority). Next
     # to Start since F28, so that start, progress and Stop are in one place

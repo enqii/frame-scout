@@ -165,8 +165,8 @@ def cached_analyzed_photos(cache_key, signature, scan_key, _scan):
     review).
 
     The quick search is counted as the engine counts it, with the RAW files analyzed in place
-    of their partner (E61); its first count is also the photos with a row of their own, which
-    the search's disk space estimate needs. The modification times and sizes are the scan's
+    of their partner (E61); its first and last count together are the photos a search or an
+    analysis need not analyze (A48). The modification times and sizes are the scan's
     (A44), so a photo edited after the count counts as analyzed until "Recount", as an added
     photo is missing until then (A27).
     """
