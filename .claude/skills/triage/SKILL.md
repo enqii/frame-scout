@@ -98,7 +98,9 @@ them without the text). Therefore:
 
 After the user has agreed to the plan: before creating any branch or PR, show the final
 plan as one table (ID, decision, tag, roadmap package) with the resulting number of open
-PRs and what is missing from the window, and wait for the user's explicit yes. Then:
+PRs and what is missing from the window, together with the version of this round's release
+(`gh release list --limit 1`; propose the last release's minor + 1, see section 4), and wait
+for the user's explicit yes to both. Then:
 
 1. Branch `chore/triage-<YYYYMMDD>` from `origin/main`
    (`git switch --no-track -c …`), repo-local git identity (see `CLAUDE.md`).
@@ -117,8 +119,8 @@ PRs and what is missing from the window, and wait for the user's explicit yes. T
    `docs/ROADMAP-DONE.md`. The next item must still be the first `- [ ]` line.
 6. Check the links and IDs: every ID named in `docs/ROADMAP.md` or `docs/ROADMAP-DONE.md`
    exists in `docs/BACKLOG.md` or `docs/BACKLOG-DONE.md`.
-6a. Version file (I42): `git mv` the root file `framescout-version-<X.Y.0>.txt` to the version
-   that step 4 will propose (last release's minor + 1), unless it already has that name.
+6a. Version file (I42): `git mv` the root file `framescout-version-<X.Y.0>.txt` to the release
+   version the user approved above, unless it already has that name.
 7. Commits: Conventional Commits, e.g. `docs(backlog): triage … (F1–F4)`, pushed after
    each commit (`git push -u origin chore/triage-<date>`). Stage files by name.
 8. Open a **non-draft PR** with the template `.github/pull_request_template.md`
@@ -135,9 +137,11 @@ A triage closes a round (the roadmap was worked off, then triaged), so each roun
 GitHub release. Only after the triage PR is merged and `main` is up to date:
 
 1. Find the last release: `gh release list --limit 1` (none yet: this is the first one).
-2. Propose the version to the user in German: SemVer `v<major>.<minor>.0`, the minor
-   number counts up once per round (the first release is `v1.1.0`, the current state named in `CLAUDE.md`). While `CLAUDE.md` calls the
-   project a prototype, the release is a **pre-release** (`--prerelease`).
+2. The version is the one the user approved in section 3, which the version file on `main`
+   carries: SemVer `v<major>.<minor>.0`, the minor number counts up once per round (the first
+   release was `v1.1.0`). Another version now needs the file renamed first (a small docs-only
+   PR like the triage PR). While `CLAUDE.md` calls the project a prototype, the release is a
+   **pre-release** (`--prerelease`).
 3. Draft the release notes from the commits and merged PRs since the last release
    (`gh release create … --generate-notes --notes-start-tag <last tag>` as a base, then
    shorten): changes grouped by feat/fix/docs, followed by the verified status from
@@ -154,5 +158,5 @@ GitHub release. Only after the triage PR is merged and `main` is up to date:
 - The user's decision always wins; never re-litigate an earlier one.
 - Never edit `CLAUDE.md` hold points or the PR workflow from here; propose a separate PR.
 - Never create GitHub issues; `docs/BACKLOG.md` is the single source of open work.
-- Keep your context lean: this skill needs `docs/ROADMAP.md`, `docs/BACKLOG.md` and `docs/IDEAS.md`
-  and nothing else. After the merge suggest `/clear`, then `/roadmap`.
+- Keep your context lean: this skill needs `docs/ROADMAP.md`, `docs/BACKLOG.md`, `docs/IDEAS.md`
+  and `gh release list --limit 1` (for the version), and nothing else. After the merge suggest `/clear`, then `/roadmap`.
