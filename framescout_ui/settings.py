@@ -170,7 +170,10 @@ def show_ai_settings(settings, seen, shown, active):
     st.selectbox(AI_LABELS['model'], MODEL_KEYS, format_func=lambda key: model_label(key, key in downloaded),
                  key=setting_key('model'), disabled=active,
                  help=default_help('model', 'The AI model that compares your search texts and reference images '
-                                            'with the photos.'))
+                                            'with the photos. A new search model analyzes every photo once more. '
+                                            'The cache keeps the analyses of each model side by side (about 10–15 '
+                                            'MB per model for 5,000 photos), so switching back needs no new '
+                                            'analysis.'))
     chosen_model = MODELS[settings['model']]
     if settings['model'] == DEFAULT_MODEL:
         st.caption("The default search model: the fastest one, and the one FrameScout's settings were tuned for.")
@@ -182,8 +185,6 @@ def show_ai_settings(settings, seen, shown, active):
                    + ('' if chosen_model.evaluated else
                       "It is not evaluated on FrameScout's searches yet: its results may be better or worse than "
                       "the default's, and the default weight of reference images was tuned for the default."))
-    st.caption('A new search model analyzes every photo once more. The cache keeps the analyses of each model '
-               'side by side (about 10–15 MB per model for 5,000 photos), so switching back needs no new analysis.')
     model_missing = model_problem(settings['model'])
     if model_missing:
         st.warning(model_missing)
