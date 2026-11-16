@@ -36,7 +36,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] Hygiene bundle: pre-search count of partner photos, long captions, popover "More" closes,
       narrower popover "Export and copy" (A48, A51, F41, F43; kind `code`)
       (done 2026-11-16 in PR #134)
-- [ ] Second browser pass over the parts not looked at; findings become backlog items (A52; kind `docs`)
+- [x] Second browser pass over the parts not looked at; findings become backlog items (A52; kind `docs`)
+      (done 2026-11-16 in PR #135)
 
 ### P47 – Linux (WSL) (added 2026-11-16; private Python 3.14 like Windows, user decision)
 - [ ] `ubuntu-latest` in the CI matrix and fix what fails (F47 part 1; kind `code`)

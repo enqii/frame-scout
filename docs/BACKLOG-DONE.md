@@ -106,6 +106,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **A49 – The mark colors do not apply (replaces A45)** – done 2026-11-13, [PR #105](https://github.com/enqii/frame-scout/pull/105)
 - [x] **A48 – The summary before a search counts partner photos as "to analyze"** – done 2026-11-16, [PR #134](https://github.com/enqii/frame-scout/pull/134)
 - [x] **A51 – Long explanatory captions** – done 2026-11-16, [PR #134](https://github.com/enqii/frame-scout/pull/134)
+- [x] **A52 – Second browser pass for the parts not looked at** – done 2026-11-16, [PR #135](https://github.com/enqii/frame-scout/pull/135); findings A53–A58
 - [x] **A15 – Reference folder and gallery file can get different suffixes** – closed 2026-11-16 in the triage, not done: nothing breaks
 - [x] **A18 – ZIP export** – closed 2026-11-16 in the triage, not done: user decision: copying the matches covers the purpose; a new idea if wanted again
 - [x] **A30 – Only one backup generation of `profiles.json`** – closed 2026-11-16 in the triage, not done: user decision (PR #6 and A13): one backup
