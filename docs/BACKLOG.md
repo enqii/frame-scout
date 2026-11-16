@@ -406,14 +406,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       the installer ships it; check first) and whether a dialog opened by the server process
       is acceptable. Affected: `app.py`, user guide. Found in the browser pass of 2026-11-13.
       Size S.
-- [ ] `ready` **F37 – Reasons for the other disabled run buttons:** F27 explains only why
-      Start is disabled. "Analyze photos now" (tab "Photo source") says why only while a run
-      is active or the model package is missing, not when no listed folder exists; the
-      "Quick search" button is disabled without a word when no folder exists or the model is
-      missing (its scope line explains only "nothing analyzed yet"). Sketch: reuse
-      `start_needs`/`start_blocked_text` of `framescout_core/app_state.py` without the
-      profile need. Affected: `app.py`, `framescout_core/app_state.py`, user guide. Found in
-      the PR #108 review. Size S.
 - [ ] `minor` **F41 – Close the popover "More" after its action:** a click on "Open photo",
       "Show in folder" or "Find similar" reruns the page, and Streamlit 1.66.1 keeps the
       popover open (as documented; checked in headless Edge in the F30 review), so it covers the
