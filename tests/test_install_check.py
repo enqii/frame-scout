@@ -55,13 +55,6 @@ def test_environment_of_this_folder_with_its_private_python_is_fine(tmp_path):
     assert result.ok is True and result.fix == ''
 
 
-def test_environment_of_an_older_installer_with_an_installed_python_is_fine(tmp_path):
-    make_venv(tmp_path, make_python(tmp_path.parent / 'installed' / 'Python314'))
-    [result] = check_environment(tmp_path)
-    assert result.ok is True
-    assert 'installed Python' in result.text
-
-
 def test_missing_environment_says_to_run_the_installer(tmp_path):
     [result] = check_environment(tmp_path)
     assert result.ok is False

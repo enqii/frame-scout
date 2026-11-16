@@ -123,7 +123,6 @@ def test_the_move_is_tried_again_while_a_virus_scanner_holds_the_new_files():
 
 
 def test_a_working_environment_is_kept_without_downloading_python():
-    # also one that an older installer created with an installed Python
     commands = batch_commands(installer())
     new = index(commands, r'^if not exist "\.venv\\Scripts\\python\.exe" goto python$')
     check = next(i for i, line in enumerate(commands) if re.match(VENV_CHECK, line))
