@@ -11,7 +11,6 @@ base branch `main`). You work in your own git worktree. Do **not** merge anythin
 - Roadmap item: {ITEM}
 - Backlog IDs: {IDS}
 - Mode: {MODE}  (`new` = start the item; `continue` = resume an existing PR;
-  `docs-update` = fresh agent for the documentation of finished code, see below;
   `address-review` = handle review comments; `answer` = continue after hold-point answers)
 - Branch: {BRANCH}
 - PR: {PR}
@@ -36,11 +35,6 @@ Read only what the item needs – every token you read is paid again on each lat
 - The code you are going to touch (search first, then read the relevant parts of large
   files such as `app.py` and `framescout_engine.py`; in the package `framescout_core/`
   read only the modules of the areas you touch).
-
-Mode `docs-update` reads only the PR text, the "Docs pending" comment, the code diff
-(`git diff origin/main...HEAD -- . ':!*.md'`) and the doc sections the diff touches
-(Grep `docs/ARCHITECTURE.md`, `README.md`, `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md`, `docs/BACKLOG.md` and `docs/BACKLOG-DONE.md` for the IDs); it does not
-read whole files or the code beyond the diff.
 
 For modes other than `new`, also read the PR description, its commits,
 `git diff origin/main...HEAD` and all PR comments (`gh pr view {PR} --comments`, review
@@ -109,13 +103,8 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
 - Keep the PR description current while you work (`gh pr edit {PR} --body-file <file>`).
 - Documentation (`docs/ROADMAP.md`, `docs/BACKLOG.md`, `docs/BACKLOG-DONE.md`, `README.md`, `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`, and `CLAUDE.md` only
   for rule changes; keep it short; out-of-scope findings as new backlog items, no GitHub
-  issues) belongs in the same PR. Kind `docs`: write it as part of the work. Kinds
-  `code`/`code-risky` in modes `new`/`continue`: **do not write it yourself** (your
-  context is large by now). After the last code and test commit is pushed and the tests
-  pass, post a PR comment starting with `Docs pending:` that lists the item, the backlog
-  IDs, the commit SHAs, behavior and compatibility changes, out-of-scope findings and which
-  docs to update (README, user guide, DEVELOPMENT, ARCHITECTURE sections, BACKLOG/ROADMAP check-offs: a finished item moves to `docs/BACKLOG-DONE.md` as one line (ID, title, date, PR link; the PR number of a `docs` item is known once its draft PR exists, so add the line after that; an item without a PR says "no PR" and keeps a short report in the line, never a placeholder or an invented number); new items). Leave the
-  label `fs:in-progress` and return; the orchestrator spawns the `docs-update` agent.
+  issues) belongs in the same PR and is written by you, after the code and tests: search the
+  doc sections you touch, do not read the files whole. A finished item moves to `docs/BACKLOG-DONE.md` as one line (ID, title, date, PR link; the PR number is known once the draft PR exists, so add the line after that; an item without a PR says "no PR" and keeps a short report in the line, never a placeholder or an invented number).
 - Before you return (every mode), delete your own smoke and scratch data under the
   worktree's `.tmp/` (gitignored leftovers make the orchestrator's worktree removal need
   `--force`, I38) and the Python caches you created (`__pycache__/`, `.pytest_cache/`,
@@ -126,18 +115,7 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   notification instead of polling.
 - When the definition of done (`CLAUDE.md` and the PR template) is met: first wait for
   CI as above – every check of the latest push must pass
-  (fix failures first) – then `gh pr ready {PR}` and
-  `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:needs-review`.
-
-## Documentation update (mode `docs-update`)
-
-You are a fresh agent on the existing branch. Read the "Docs pending:" comment and the
-code diff, update only the docs it names (plus anything the diff clearly changes), keep
-`docs/ROADMAP.md`/`docs/BACKLOG.md`/`docs/BACKLOG-DONE.md` check-offs and new IDs correct, commit (`docs: … (<IDs>)`), push, fill in the
-PR description (modified files, compatibility, tests executed vs. not executed – take the
-test results from the comment, do not rerun the code tests), wait for CI as below, then
-`gh pr ready {PR}` and `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:needs-review`.
-If the diff contradicts the comment or code looks wrong, report it instead of fixing code.
+  (fix failures first) – then `gh pr ready {PR}`. The label stays `fs:in-progress`.
 
 ## Addressing a review (mode `address-review`)
 
@@ -164,7 +142,7 @@ second review follows your fixes):
 4. Re-run the tests locally, wait quietly for CI on the latest push as above (every
    check must pass; review fixes trigger a new run that may fail on another Python
    version), then
-   `gh pr edit {PR} --remove-label fs:review-done --add-label fs:ready`.
+   `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:ready`.
 
 ## Hold points
 
