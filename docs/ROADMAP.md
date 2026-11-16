@@ -33,8 +33,9 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       (done 2026-11-15 in PR #120)
 
 ### P41 – Lighter PR workflow (added 2026-11-15)
-- [ ] Fold the docs step into the implementer, reduce the labels, shorten the workflow texts
+- [x] Fold the docs step into the implementer, reduce the labels, shorten the workflow texts
       (I41; kind `docs`; workflow rule change, decided 2026-11-15)
+      (done 2026-11-16 in PR #122)
 
 ### P42 – Mixed-versions guard (added 2026-11-15)
 - [ ] Replace the guard by one version file checked by the installer and the start script
