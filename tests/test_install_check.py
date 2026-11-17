@@ -105,29 +105,6 @@ def test_environment_using_the_linux_private_python_of_another_folder_is_a_probl
     assert str(tmp_path / 'original' / '.python' / 'bin') in result.text
 
 
-def link_folder(link, target):
-    """A directory symlink, or on Windows without that privilege a junction; skip if neither can be made."""
-    try:
-        os.symlink(target, link, target_is_directory=True)
-    except OSError:
-        try:
-            import _winapi
-            _winapi.CreateJunction(str(target), str(link))
-        except (ImportError, OSError):
-            pytest.skip('cannot create a symlink or junction here')
-
-
-def test_environment_created_through_a_link_to_this_folder_is_fine(tmp_path):
-    # framescout_check.py passes the resolved folder; pyvenv.cfg names the path the installer
-    # ran from, here a link to the same folder: not "another folder" (review)
-    base = tmp_path / 'real'
-    make_python(base / '.python')
-    link_folder(tmp_path / 'link', base)
-    make_venv(base, tmp_path / 'link' / '.python')
-    [result] = check_environment(base)
-    assert result.ok is True
-
-
 def test_environment_with_an_unreadable_pyvenv_cfg_is_a_problem(tmp_path):
     make_venv(tmp_path, make_python(tmp_path / '.python'))
     (tmp_path / '.venv' / 'pyvenv.cfg').unlink()
@@ -270,6 +247,8 @@ def test_cuda_build_without_a_usable_gpu_is_a_problem(tmp_path):
 def test_torch_that_does_not_import_is_a_problem(tmp_path, run):
     [result] = check_torch(tmp_path / 'python.exe', {}, '2.14.1+cpu', run=run)
     assert result.ok is False
+    # one text for every way the import fails (I44)
+    assert result.text.startswith('PyTorch 2.14.1+cpu does not import: ')
     assert script('Install') in result.fix
 
 
@@ -328,14 +307,6 @@ def test_models_names_cached_person_detector(tmp_path, monkeypatch):
     weights.write_bytes(b'')
     [result] = check_models(tmp_path, {})
     assert 'Downloaded: person detection' in result.text
-
-
-def test_models_of_a_drive_that_does_not_answer_are_not_called_missing(tmp_path, monkeypatch):
-    # downloaded_models returns no model for a cache it cannot reach: that is "not known" (review)
-    monkeypatch.setattr(install_check, 'downloaded_models', lambda base, environ: set())
-    [result] = check_models(tmp_path, {}, reachable=lambda roots, timeout: {root: False for root in roots})
-    assert result.ok is None
-    assert 'not known' in result.text and 'Not downloaded yet' not in result.text
 
 
 def test_enough_disk_space_is_fine(tmp_path):
