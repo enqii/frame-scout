@@ -36,8 +36,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 ### P53 – Rules and project history (added 2026-11-17)
 - [x] Rules in `CLAUDE.md` and the `/roadmap` briefs: no project history in code comments and
       docstrings, tests only for what is necessary (F54, F55; kind `docs`)
-- [ ] Remove the project history from `framescout_core/` and its tests (F54; kind `code`, no
-      behavior change)
+- [x] Remove the project history from `framescout_core/` and its tests (F54; kind `code`, no
+      behavior change) – 2026-11-17 ([#153](https://github.com/enqii/frame-scout/pull/153))
 - [ ] Remove the project history from the engine, images, scoring, evaluation tool and the other
       root files, and their tests (F54; kind `code`, no behavior change)
 - [ ] Remove the project history from `app.py` and `framescout_ui/`, and their tests (F54; kind
