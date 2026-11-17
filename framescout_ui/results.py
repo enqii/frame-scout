@@ -335,7 +335,7 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
         show_notice('marks_notice')
         if hidden:
             st.caption(hidden_text(hidden, len(shown), page < pages))
-    show_review(entry['cards'], THUMBS, name, can_mark, find_disabled)  # F19, while it is open
+    show_review(entry['cards'], THUMBS, name, can_mark, find_disabled)  # the review dialog, while it is open
     # a new container for every profile, page and card count: in a fragment rerun with fewer
     # cards (the shorter last page) the cards of the previous page stayed in the browser
     # (checked in Edge with Streamlit 1.66; a st.empty placeholder did not help)
