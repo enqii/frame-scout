@@ -1,12 +1,11 @@
-"""Image decoding of FrameScout: photos as upright RGB images, gallery thumbnails (E49) and previews (F19).
+"""Image decoding of FrameScout: photos as upright RGB images, gallery thumbnails and previews.
 
-Needs Pillow and, for AVIF, HEIC/HEIF and camera RAW photos, pillow-heif and rawpy (E25),
+Needs Pillow and, for AVIF, HEIC/HEIF and camera RAW photos, pillow-heif and rawpy,
 but neither torch nor numpy: the engine decodes photos with it, and the evaluation tool
 (framescout_eval.py pool) renders the thumbnails its labelling page lacks without loading
-the engine, its torch import and the engine's cache variables (E42); the app renders the
-large preview of its review dialog with it (F19). Importing it
-registers the HEIF decoder with Pillow and sets Pillow's limits for large and truncated
-files, for every program that imports it.
+the engine, its torch import and the engine's cache variables; the app renders the large
+preview of its review dialog with it. Importing it registers the HEIF decoder with Pillow
+and sets Pillow's limits for large and truncated files, for every program that imports it.
 """
 import io
 import threading
@@ -22,7 +21,7 @@ from framescout_core.pipeline import DRAFT_REDUCING_GAP
 
 # pillow-heif and rawpy are in requirements.txt; an older installation without them still
 # runs and skips those photos with a note. The app checks the same way (available_decoders),
-# so both agree (review).
+# so both agree.
 DECODERS = available_decoders()
 if DECODERS.heif:
     from pillow_heif import register_heif_opener
@@ -32,7 +31,7 @@ if DECODERS.raw:
 
 
 class _LenientUnlessStrict:
-    """The value of ImageFile.LOAD_TRUNCATED_IMAGES: true, except in a thread inside _strict() (E53).
+    """The value of ImageFile.LOAD_TRUNCATED_IMAGES: true, except in a thread inside _strict().
 
     Pillow (and pillow-heif) only ask for its truth value when they load an image, so a
     partner that must decode completely can be loaded strictly while the other decoding
@@ -68,7 +67,7 @@ Image.MAX_IMAGE_PIXELS = 160_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = _LOAD_TRUNCATED
 # the errors with which Pillow and pillow-heif reject image data they cannot decode
 _DECODE_ERRORS = (OSError, ValueError, SyntaxError, EOFError)
-# formats whose truncated images decode without any of their pixels (E59): always loaded
+# formats whose truncated images decode without any of their pixels: always loaded
 # strictly (_open); Pillow's own AVIF reader already rejects a truncated AVIF
 _STRICT_FORMATS = ('HEIF', 'AVIF')
 # the end of image marker of a JPEG, and the restart markers RST0-RST7 (_ends_only_its_marker)
@@ -86,16 +85,16 @@ def open_image(path, min_size=None, complete=False):
     """Open path as an upright RGB image.
 
     With min_size, a JPEG is decoded at 1/2, 1/4 or 1/8 scale (Image.draft) as long as
-    both edges stay at least min_size pixels long; other formats ignore it (E2). A camera
-    RAW file is read with open_raw (E25). A JPEG whose data ends early or is damaged decodes
-    with the missing part gray (LOAD_TRUNCATED_IMAGES); a truncated HEIC/HEIF raises (E59),
+    both edges stay at least min_size pixels long; other formats ignore it. A camera
+    RAW file is read with open_raw. A JPEG whose data ends early or is damaged decodes
+    with the missing part gray (LOAD_TRUNCATED_IMAGES); a truncated HEIC/HEIF raises,
     since it would decode all black. With complete, the image must
     decode completely (_open_complete): such a JPEG raises TruncatedImageError instead, so
-    that the engine analyzes the RAW file of its shot (E46, E53).
+    that the engine analyzes the RAW file of its shot.
     """
     suffix = Path(path).suffix.lower()
     # e.g. a HEIC reference image without pillow-heif: say why instead of a decoder error;
-    # other extensions are left to Pillow, as before (a reference image can be any format)
+    # other extensions are left to Pillow (a reference image can be any format)
     reason = missing_decoder(suffix, DECODERS)
     if reason:
         raise OSError(reason)
@@ -109,7 +108,7 @@ def open_image(path, min_size=None, complete=False):
 def _open(path, min_size=None):
     """Return (path as an upright RGB image, whether it is a JPEG whose data ended before its end marker).
 
-    A HEIF image (_STRICT_FORMATS) is always loaded strictly (E59): pillow-heif decodes a
+    A HEIF image (_STRICT_FORMATS) is always loaded strictly: pillow-heif decodes a
     truncated one all black where truncated images are allowed, which is no part of the photo.
     """
     with Image.open(path) as image:
@@ -125,14 +124,14 @@ def _open(path, min_size=None):
 
 
 def _open_complete(path, min_size=None):
-    """open_image of a photo that must decode completely (E46, E53, E57).
+    """open_image of a photo that must decode completely.
 
     Decoded strictly first (_strict): Pillow then raises for a JPEG whose data ends early
     and for one whose data libjpeg gives up on in the middle, which otherwise decode with a
-    gray part (E53), and pillow-heif for a truncated HEIC, which otherwise decodes all black.
+    gray part, and pillow-heif for a truncated HEIC, which otherwise decodes all black.
     If that fails, a JPEG that still decodes as far as its data goes raises
     TruncatedImageError (a retry can analyze it as far as it goes), unless it lacks only
-    its end marker (_ends_only_its_marker, E57): its image data is complete, so it is
+    its end marker (_ends_only_its_marker): its image data is complete, so it is
     returned. Any other file raises the error of the strict decoding.
     """
     try:
@@ -163,7 +162,7 @@ def _decoded(data, min_size):
 
 
 def _ends_only_its_marker(path, min_size=None):
-    """Whether the JPEG path, which ends before its end marker, holds all of its image data (E57).
+    """Whether the JPEG path, which ends before its end marker, holds all of its image data.
 
     Data that ends outside the image data of a scan, or before its scans cover the whole
     image (e.g. between two scans of a progressive JPEG), lacks scans (jpeg_scans_missing).
@@ -195,7 +194,7 @@ def _ends_only_its_marker(path, min_size=None):
 
 
 def open_raw(path, min_size=None):
-    """Open the camera RAW file path as an upright RGB image (E25).
+    """Open the camera RAW file path as an upright RGB image.
 
     The preview the camera embedded is used if it is large enough and can be read
     (raw_preview); otherwise the sensor data is decoded at half size with the camera's
@@ -214,7 +213,7 @@ def raw_preview(raw, min_size=None):
     A JPEG or bitmap preview is usable if its longer edge is long enough
     (raw_preview_usable); a JPEG preview is drafted with min_size like any JPEG. A preview
     that cannot be read (corrupt, truncated, unknown format) is not usable either, so the
-    caller falls back to the sensor data instead of failing the photo (review).
+    caller falls back to the sensor data instead of failing the photo.
     """
     try:
         thumb = raw.extract_thumb()
@@ -246,15 +245,15 @@ def raw_preview(raw, min_size=None):
 def render_thumbnail(path, target):
     """Write the gallery thumbnail of the photo path to target (a .jpg name).
 
-    Decoded at reduced scale like an unloaded image in Image.thumbnail (E2). The
-    evaluation tool renders the thumbnails its labelling page lacks with it (E35).
+    Decoded at reduced scale like an unloaded image in Image.thumbnail. The
+    evaluation tool renders the thumbnails its labelling page lacks with it.
     """
     im = open_image(path, DRAFT_REDUCING_GAP * THUMBNAIL_SIZE)
     im.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE)); im.save(target, quality=82)
 
 
 def render_preview(path, size):
-    """Return the large preview of the photo path as JPEG bytes, its longer edge at most size pixels (F19).
+    """Return the large preview of the photo path as JPEG bytes, its longer edge at most size pixels.
 
     For the app's review dialog: decoded at reduced scale like a thumbnail (render_thumbnail)
     and downscaled in memory, never enlarged and never written to a file.

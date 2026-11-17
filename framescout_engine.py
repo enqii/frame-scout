@@ -46,7 +46,7 @@ from framescout_core.signature import CACHE_FILE, DEFAULT_YOLO_MODEL, prepare_ca
 from framescout_core.thumbnails import FULL_IMAGE_LABEL, SkippedPhotos, crop_label, gallery_cards
 
 # torch reads the cache variables only when it uses them; huggingface_hub and Ultralytics,
-# which read them on import, are imported in main() after default_cache_env (E42)
+# which read them on import, are imported in main() after default_cache_env
 import numpy as np
 import torch
 # PIL.Image only for import_detector_class; importing framescout_images registers the
@@ -56,28 +56,28 @@ from PIL import Image
 from framescout_images import DECODERS, open_image, render_thumbnail
 from framescout_scoring import photo_scores, rank_photos, rank_similar, score_caption, text_queries
 
-# Photos are decoded in threads ahead of CLIP (E2). Pillow releases the GIL while it
+# Photos are decoded in threads ahead of CLIP. Pillow releases the GIL while it
 # decodes; more threads would mostly compete with PyTorch for the same CPU cores.
 DECODE_THREADS = min(4, os.cpu_count() or 1)
 # With person detection a thread holds a full-resolution photo until the detector, which
-# runs one photo at a time (E14), is done with it. Two threads let one photo be decoded
+# runs one photo at a time, is done with it. Two threads let one photo be decoded
 # while the other is in the detector, so at most two full-resolution photos are in
-# memory; more threads were not faster, they only wait there with a photo each (review).
+# memory; more threads were not faster, they only wait there with a photo each.
 DETECTION_DECODE_THREADS = 2
 # How long the engine waits for the run lock of the output folder. The app holds it for a
 # moment while it starts the engine or checks whether a search runs; a search that really
 # runs holds it for its whole duration.
 LOCK_TIMEOUT = 5
-# exit code when another search already uses the output folder (A4)
+# exit code when another search already uses the output folder
 EXIT_BUSY = 3
-# explanation of the numbers on the gallery cards (E5)
+# explanation of the numbers on the gallery cards
 SCORE_NOTE = ('"Score" says how far the best part of a photo lies above the average image part (whole photo or '
               'person) of this search, in its standard deviations; with reference images it is a weighted mix of '
               'the scaled text and image scores; '
               'the small numbers are its raw similarity with the text and the reference images.')
 RAW_NOTE = ('The scores could not be scaled (too few photos or no spread), so "Similarity" is the raw weighted similarity; '
             'the small numbers are its raw similarity with the text and the reference images.')
-# the same of "Find similar" (F11), which compares images only
+# the same of "Find similar", which compares images only
 LIKE_SCORE_NOTE = ('"Score" says how far the best part of a photo lies above the average image part (whole photo or '
                    'person) of this search, in its standard deviations, by its similarity with the chosen photo; '
                    'the small number is that raw image similarity.')
@@ -97,9 +97,9 @@ class Parser(argparse.ArgumentParser):
 def crops_for(image, detector, options, lock, threads=None):
     """Return [(label, image)]: the whole photo, then each person found with detector.predict(**options).
 
-    threads: the PyTorch thread count of a low-priority search (F4), set in this decoding
+    threads: the PyTorch thread count of a low-priority search, set in this decoding
     thread before and after the detector: Ultralytics sets its own count on its first
-    prediction on the CPU (min(8, CPU count - 1)), which would undo it (review).
+    prediction on the CPU (min(8, CPU count - 1)), which would undo it.
     """
     crops = [(FULL_IMAGE_LABEL, image)]
     if detector is None:
@@ -134,14 +134,13 @@ def unpack(blob):
 
 def main():
     # model downloads and library config files go to the project's .cache folder, as with the
-    # .bat files and the app, also for a manual run; a variable the user set is kept (I10,
-    # A36). Set here, not on import, so an importer's environment stays as it is (E42), and
-    # before import_open_clip and import_detector_class import the libraries that read them
-    # on import
+    # .bat files and the app, also for a manual run; a variable the user set is kept. Set
+    # here, not on import, so an importer's environment stays as it is, and before
+    # import_open_clip and import_detector_class import the libraries that read them on import
     default_cache_env(os.environ, Path(__file__).resolve().parent)
     # a character the encoding of a redirected stdout cannot hold (the ANSI code page on
     # Windows, e.g. cp932 for "·" in a model label, or a profile name) is escaped instead of
-    # ending the search; the app starts the engine with UTF-8 output (E22 review)
+    # ending the search; the app starts the engine with UTF-8 output
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, 'reconfigure'):
             stream.reconfigure(errors='backslashreplace')
@@ -152,36 +151,36 @@ def main():
     parser.add_argument('--character', action='append', default=[], metavar='NAME|CONTEXT|FEATURES',
                         help='inline search profile in English, can be repeated; e.g. "Red car|Vehicles|red paint, black roof"')
     parser.add_argument('--output', type=Path, default=Path('results'))
-    parser.add_argument('--device', choices=DEVICES, default='auto')  # the app offers the same (A8 review)
+    parser.add_argument('--device', choices=DEVICES, default='auto')  # the app offers the same
     parser.add_argument('--batch-size', type=int, default=8)
     parser.add_argument('--top', type=int, default=150)
     parser.add_argument('--no-person-detection', action='store_true')
     parser.add_argument('--max-persons', type=int, default=12)
     parser.add_argument('--person-confidence', type=float, default=.3)
     parser.add_argument('--yolo-model', default=DEFAULT_YOLO_MODEL)
-    # E22: the default is the evaluated one; another model analyzes every photo once more and
+    # the default is the evaluated one; another model analyzes every photo once more and
     # keeps its own cache entries
     parser.add_argument('--model', choices=MODEL_KEYS, default=DEFAULT_MODEL,
                         help='search model (CLIP); models other than the default are slower on a CPU, download '
                              'their weights on first use and are not evaluated yet')
     parser.add_argument('--reference-weight', type=float, default=DEFAULT_REFERENCE_WEIGHT,
                         help='weight of the reference image score (0..1); profiles without reference images use text only')
-    # F4: the app's "Keep the PC responsive"; little effect on a GPU run
+    # the app's "Keep the PC responsive"; little effect on a GPU run
     parser.add_argument('--low-priority', action='store_true',
                         help='run at a lower process priority, so other programs get the CPU first, and keep one or '
                              'two CPU cores out of the PyTorch threads; the search may take longer (the effect is not '
                              'measured yet)')
-    # E32: the input of the search-model evaluation (framescout_eval.py); not used by the app
+    # the input of the search-model evaluation (framescout_eval.py); not used by the app
     parser.add_argument('--scores-file', type=Path, default=None, metavar='JSON',
                         help='also write the raw text and reference similarity of every part of every photo '
                              'to this JSON file (for the evaluation tool framescout_eval.py)')
-    # F10: the app's "Quick search"; instead of --profiles and --character
+    # the app's "Quick search"; instead of --profiles and --character
     parser.add_argument('--quick-query', default=None, metavar='TEXT',
                         help='quick search for this English text without a search profile: only the photos already '
                              'analyzed with these settings are searched (nothing new is analyzed); the gallery and '
                              f'its {RESULTS_FILE} go to the folder "{QUICK_DIR}" in the output folder, the results '
                              'of the profiles stay as they are')
-    # F11: the app's "Find similar" on a result card; a quick search by an analyzed photo's
+    # the app's "Find similar" on a result card; a quick search by an analyzed photo's
     # cached vector instead of a text
     parser.add_argument('--like', type=Path, default=None, metavar='PHOTO',
                         help='find photos similar to this photo, which must be analyzed with these settings (it is '
@@ -191,40 +190,40 @@ def main():
     parser.add_argument('--like-part', default=None, metavar='PART',
                         help=f'with --like: the part of the photo to compare, as a gallery card names it, e.g. '
                              f'"Person 2" (default: "{FULL_IMAGE_LABEL}")')
-    # F18: the app's "Analyze photos now"; instead of --profiles and --character
+    # the app's "Analyze photos now"; instead of --profiles and --character
     parser.add_argument('--analyze-only', action='store_true',
                         help='only analyze the photos with the search model and person detection settings given, '
                              f'so that a later search with the same settings only ranks them: fills {CACHE_FILE} '
                              'in the output folder and stops without a search (no profiles; the galleries and '
                              f'{RESULTS_FILE} stay as they are)')
-    # the folders may come before, between or after the options, as one folder could (review)
+    # the folders may come before, between or after the options, as one folder could
     args = parser.parse_intermixed_args()
     if args.batch_size < 1 or args.top < 1 or args.max_persons < 1 or not (0 < args.person_confidence <= 1) or not (0 <= args.reference_weight <= 1):
         parser.error('Invalid value for batch-size, top, max-persons, person-confidence or reference-weight.')
     listed = [folder.resolve() for folder in args.folder]
     output = args.output.resolve()
-    # also refused: a photo folder inside the output folder, which the scan leaves out (review)
+    # also refused: a photo folder inside the output folder, which the scan leaves out
     problem = output_folder_problem(listed, output)
     if problem:
         parser.error(problem)
-    # a folder listed twice or inside another listed folder is searched once (A25)
+    # a folder listed twice or inside another listed folder is searched once
     roots, dropped = distinct_folders(listed)
     if not any(root.is_dir() for root in roots) and not output.is_dir():
         # nothing to report to: do not create an output folder (and its lock and status
         # files) for a mistyped call; an existing output folder, like the app's results
-        # folder, gets the error in its status file (review)
+        # folder, gets the error in its status file
         parser.error(missing_folders_message(roots))
     output.mkdir(parents=True, exist_ok=True)
     # one search per output folder: two would share cache.sqlite3 ("database is locked")
-    # and the app's run.log (A4)
+    # and the app's run.log
     lock = RunLock(output / RUN_LOCK)
     if not lock.acquire(timeout=LOCK_TIMEOUT):
         print(f'Another FrameScout search is already running with the output folder {output}. '
               'Wait until it has finished or stop it, then start again.', file=sys.stderr, flush=True)
         return EXIT_BUSY
-    # an analysis without a search says so from its first phase on, for the app (F18)
+    # an analysis without a search says so from its first phase on, for the app
     status = StatusReporter(output / RUN_STATUS, os.getpid(), analyze_only=args.analyze_only)
-    warnings = []  # of a search that finished, for its final status (E50, review)
+    warnings = []  # of a search that finished, for its final status
     try:
         status.update('scanning')
         code = search(args, parser, roots, dropped, output, status, warnings)
@@ -236,7 +235,7 @@ def main():
         raise
     except BaseException as exc:
         # a cache file that cannot be opened or written: what to do instead of SQLite's raw
-        # error and a traceback (E50); a row that cannot be read only leaves out its photo
+        # error and a traceback; a row that cannot be read only leaves out its photo
         damaged = cache_error_message(output / CACHE_FILE, exc)
         if damaged:
             print(damaged, file=sys.stderr, flush=True)
@@ -246,7 +245,7 @@ def main():
         status.finish('failed', 1, f'{type(exc).__name__}: {exc}')
         raise
     else:
-        # 0 finished, 130 interrupted, any other code failed (review)
+        # 0 finished, 130 interrupted, any other code failed
         phase, message = final_status(code, warnings, 'analysis' if args.analyze_only else 'search')
         status.finish(phase, code, message)
         return code
@@ -255,17 +254,16 @@ def main():
 
 
 def search(args, parser, roots, dropped, output, status, warnings):
-    """Run the search with the run lock of output held; report the phases to status (A5).
+    """Run the search with the run lock of output held; report the phases to status.
 
     roots: the photo folders to search (distinct_folders' kept list); dropped: the listed
     folders left out, with the reason, for the log. warnings gets the warnings of a search
-    that finished, for its final status (E50, review).
+    that finished, for its final status.
     """
     if args.low_priority:
-        # first, so that scanning and model loading run at the lower priority too (F4), and
-        # before any other thread starts: on Linux the niceness changes only the calling
-        # thread and the threads it starts later (review); the app's stop works by process
-        # id and is not affected
+        # first, so that scanning and model loading run at the lower priority too, and before
+        # any other thread starts: on Linux the niceness changes only the calling thread and
+        # the threads it starts later; the app's stop works by process id and is not affected
         problem = lower_priority()
         print('Low priority: on; other programs get the CPU first and the search uses fewer threads for the AI '
               'models, so it may take longer.' if problem is None else
@@ -274,18 +272,18 @@ def search(args, parser, roots, dropped, output, status, warnings):
         print(note, flush=True)
     # checked here, not before the lock, so the app's status names the error: a folder
     # can disappear between the click on Start and the engine start. A missing folder of
-    # several (e.g. on a disconnected drive) is left out with a note (A25).
+    # several (e.g. on a disconnected drive) is left out with a note.
     missing = [root for root in roots if not root.is_dir()]
     if len(missing) == len(roots):
         parser.error(missing_folders_message(roots))
     for root in missing:
         print(f'Photo folder not found, searched without it (e.g. a disconnected drive): {root}', flush=True)
     roots = [root for root in roots if root not in missing]
-    # a quick search (F10) scores the photos already analyzed for one text, without profiles;
-    # "Find similar" (F11) is one by the cached vector of one photo instead of a text
+    # a quick search scores the photos already analyzed for one text, without profiles;
+    # "Find similar" is one by the cached vector of one photo instead of a text
     like = args.like is not None
     quick = args.quick_query is not None or like
-    # an analysis without a search (F18) fills the cache like the analysis of a search, then
+    # an analysis without a search fills the cache like the analysis of a search, then
     # stops before scoring and export
     analyze_only = args.analyze_only
     if args.like_part is not None and not like:
@@ -320,23 +318,23 @@ def search(args, parser, roots, dropped, output, status, warnings):
         for ref in p['refs']:
             if not ref.is_file():
                 parser.error(f'Reference image not found: {ref}')
-    # e.g. SigLIP without transformers: say so before the photos are scanned (E22); "Find
-    # similar" loads no model and compares the photos analyzed with it before (F11 review)
+    # e.g. SigLIP without transformers: say so before the photos are scanned; "Find similar"
+    # loads no model and compares the photos analyzed with it before
     problem = None if like else model_problem(args.model)
     if problem:
         parser.error(problem)
     search_model = MODELS[args.model]
     scan = scan_folders(roots, supported_extensions(DECODERS), exclude=output)
     paths = scan.paths
-    # the RAW file of a JPEG/HEIC partner that cannot be decoded is analyzed instead (E30)
+    # the RAW file of a JPEG/HEIC partner that cannot be decoded is analyzed instead
     raw_fallback = RawFallback(scan)
     if like:
         # the cache row and the shot of "Find similar"'s photo are found by the path the scan
-        # names it by, also if it was given by another one to the same file (review)
+        # names it by, also if it was given by another one to the same file
         like_photo = like_scan_path(like_photo, [*paths, *scan.raw_pairs])
         profiles = [like_profile(like_photo, like_part)]
-    # files that are not analyzed are named, not skipped without a note (E25); a missing
-    # decoder is named only if the folder has files of it (review)
+    # files that are not analyzed are named, not skipped without a note; a missing decoder
+    # is named only if the folder has files of it
     for line in skipped_lines(scan, DECODERS):
         print(line, flush=True)
     if not paths:
@@ -344,7 +342,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
     device = ('cuda' if torch.cuda.is_available() else 'cpu') if args.device == 'auto' else args.device
     if device == 'cuda' and not torch.cuda.is_available():
         parser.error(f'CUDA is not available; use --device cpu. {cuda_hint(torch.version.cuda)}')
-    # fewer with --low-priority, so other programs keep a core (F4)
+    # fewer with --low-priority, so other programs keep a core
     cpu_threads = torch_threads(torch.get_num_threads(), args.low_priority)
     torch.set_num_threads(cpu_threads)
     person_detection = not args.no_person_detection
@@ -358,7 +356,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
 
     # photos whose cache row could not be read because the cache file itself is damaged or
     # unreadable: each is left out like a photo that fails, the search goes on (a damaged page
-    # may hit only a few rows), and its end points to "Check cache" (E50, review)
+    # may hit only a few rows), and its end points to "Check cache"
     unreadable = {}  # path -> its error
 
     def cache_trouble(path, exc):
@@ -384,29 +382,29 @@ def search(args, parser, roots, dropped, output, status, warnings):
         features /= np.maximum(np.linalg.norm(features, axis=1, keepdims=True), 1e-8)
         return stat, json.loads(record[2]), features
 
-    # opened before the model load, so that a damaged cache is reported at once (E50, E56),
+    # opened before the model load, so that a damaged cache is reported at once,
     # not after the seconds (or the first download) of loading the model
     con = sqlite3.connect(output / CACHE_FILE)
     try:
-        # also records which engine version and settings the signature stands for (E11)
+        # also records which engine version and settings the signature stands for
         signature = prepare_cache(con, person_detection, args.max_persons, args.person_confidence,
                                   args.yolo_model, model=args.model)
         if quick:
-            # nothing is analyzed (F10): only the photos with a current cache row are scored, a
-            # partner without one through the RAW file a full search analyzed in its place (E30);
+            # nothing is analyzed: only the photos with a current cache row are scored, a
+            # partner without one through the RAW file a full search analyzed in its place;
             # checked before the model load, so that a folder with nothing analyzed fails at once,
-            # not after the seconds (or the first download) of loading the model (review)
+            # not after the seconds (or the first download) of loading the model
             if like:
                 # the query of "Find similar" is the photo's cached vector of the part shown on its
-                # card; a photo without a current cache row is never analyzed for it (F11)
+                # card; a photo without a current cache row is never analyzed for it
                 try:
                     row = cached_features(like_photo)
                 except Exception as exc:
-                    if cache_error(exc):  # the cache file itself is damaged (E50)
+                    if cache_error(exc):  # the cache file itself is damaged
                         raise
                     row = None  # a broken row counts as none
                 # so is one whose labels and vectors do not match (as photo_scores checks the
-                # other photos), so like_crop's index always names a vector (review)
+                # other photos), so like_crop's index always names a vector
                 if row is None or not like_labels_fit(row[1], len(row[2])) or not np.isfinite(row[2]).all():
                     parser.error(f'This photo is not analyzed with these settings (or it changed since), so there is '
                                  f'nothing to compare with: {like_photo}. Start a search with profiles over its '
@@ -422,7 +420,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
                      'searched (a search with profiles analyzes them).' if not_analyzed else '.'),
                   flush=True)
             if not to_score:
-                if unreadable:  # the cache file itself is damaged (E50)
+                if unreadable:  # the cache file itself is damaged
                     raise next(iter(unreadable.values()))
                 if like:
                     parser.error('No other photo of these folders is analyzed with these settings yet, so there is '
@@ -430,7 +428,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 parser.error('None of these photos is analyzed with these settings yet, so the quick search has '
                              'nothing to search. Start a search with profiles first: it analyzes them.')
         if like:
-            # no model: the photos are compared by their cached vectors alone (F11)
+            # no model: the photos are compared by their cached vectors alone
             profile_vectors = {profiles[0]['name']: (like_vector[np.newaxis, :], None)}
             print(f'{len(paths)} photos; photos similar to {like_photo} ({like_part}); search model of the '
                   f'compared analyses: {search_model.label}', flush=True)
@@ -443,13 +441,13 @@ def search(args, parser, roots, dropped, output, status, warnings):
                   f'person detection (YOLO): {"off" if args.no_person_detection else device}', flush=True)
             print('Model weights are downloaded the first time a model is used.', flush=True)
             # imported here, offline once the model is cached: no Hugging Face Hub request per search
-            # and no symlink warning (E16, E31, E33); huggingface_hub reads the variables on import,
+            # and no symlink warning; huggingface_hub reads the variables on import,
             # and its constants are set too if anything imported it earlier
             open_clip, offline = import_open_clip(os.environ, importlib.import_module, search_model,
                                                   modules=sys.modules)
 
             def load_model():
-                # weights without a Hub repository go to .cache/clip, not ~/.cache/clip (E39)
+                # weights without a Hub repository go to .cache/clip, not ~/.cache/clip
                 model, _, preprocess = open_clip.create_model_and_transforms(
                     search_model.name, pretrained=search_model.pretrained, device=device,
                     cache_dir=open_clip_cache_dir(search_model, os.environ, Path(__file__).resolve().parent))
@@ -485,35 +483,35 @@ def search(args, parser, roots, dropped, output, status, warnings):
                             ref_vectors.append(embed_images([open_image(ref)])[0])
                         except Exception as exc:
                             parser.error(f'Reference image cannot be read ({ref}): {exc}')
-                    # the generated templates are averaged into one query, custom prompts stay apart (E4)
+                    # the generated templates are averaged into one query, custom prompts stay apart
                     profile_vectors[p['name']] = (text_queries(t.cpu().numpy(), p['generated']),
                                                   np.asarray(ref_vectors, dtype=np.float32) if ref_vectors else None)
     except BaseException:
         # a damaged cache, a model or a reference image that cannot be loaded: the cache
-        # file is not left open (and locked on Windows) until the process ends (review)
+        # file is not left open (and locked on Windows) until the process ends
         con.close()
         raise
 
-    # the registry's input size (tested against the OpenCLIP config) if the model does not name it
-    # whenever a model is loaded, as before F11; "Find similar" loads none and decodes no photo,
-    # only the analysis (never run in a quick search) needs them (review)
+    # the registry's input size (tested against the OpenCLIP config) if the model does not name
+    # it; only when a model is loaded: "Find similar" loads none and decodes no photo, and only
+    # the analysis (never run in a quick search) needs them
     if not like:
         image_size = getattr(model.visual, 'image_size', search_model.image_size)
         min_size = draft_size(max(image_size) if isinstance(image_size, (tuple, list)) else int(image_size),
                               person_detection)
     detect_lock = threading.Lock()
-    # the detector runs on the CLIP device (E14)
+    # the detector runs on the CLIP device
     detect_options = detection_options(device, args.max_persons, args.person_confidence)
 
     def prepare(path, detector):
-        """Decode, detect and preprocess one photo with detector (None: no detection); runs in a decoding thread (E2).
+        """Decode, detect and preprocess one photo with detector (None: no detection); runs in a decoding thread.
 
         The file is stat-ed right before it is decoded (not in the cache scan, which can be
         long before), so the stored modification time and size belong to the analyzed content.
         """
         stat = path.stat()
         # a JPEG next to a RAW file of its shot that is merely truncated fails, so that the
-        # RAW file is analyzed instead (E46)
+        # RAW file is analyzed instead
         crops = crops_for(open_image(path, min_size, complete=raw_fallback.strict(path)), detector, detect_options,
                           detect_lock, cpu_threads if args.low_priority else None)
         return stat, [label for label, _ in crops], torch.stack([preprocess(im) for _, im in crops])
@@ -524,16 +522,16 @@ def search(args, parser, roots, dropped, output, status, warnings):
         """Load the person detector (None without person detection).
 
         It loads in the middle of the analysis, after the cache scan: the phase stays
-        "analyzing" with its progress, the status message names the load (review).
+        "analyzing" with its progress, the status message names the load.
         """
         if not person_detection:
             return None
         status.update(message=LOADING_DETECTOR, force=True)
         print(f'{LOADING_DETECTOR} ...', flush=True)
-        # without Ultralytics' usage analytics and run-time pip installs (E27, E28)
+        # without Ultralytics' usage analytics and run-time pip installs
         YOLO = import_detector_class(os.environ, importlib.import_module, Image)
-        # downloaded into .cache on first use, not into the working folder (E9); the cache
-        # signature keeps the name as given, so the run log names the file loaded (E60)
+        # downloaded into .cache on first use, not into the working folder; the cache
+        # signature keeps the name as given, so the run log names the file loaded
         weights = yolo_weights(args.yolo_model, Path(__file__).resolve().parent, Path.cwd(), os.environ,
                                lambda text: print(text, flush=True))
         print(detector_weights_line(weights, Path.cwd()), flush=True)
@@ -542,11 +540,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
         return loaded
 
     # created on the first photo that is not in the cache: a repeat search on an analyzed
-    # folder ranks only, without the seconds (or the download) of loading YOLO (F2)
+    # folder ranks only, without the seconds (or the download) of loading YOLO
     detector = Lazy(load_detector)
 
     # the speed of the analysis of new photos: the app's "about 25 min left" (rate) and the
-    # duration it shows before the next search with these settings (throughput, F12)
+    # duration it shows before the next search with these settings (throughput)
     speed = AnalysisRate()
 
     def finished(new=0, cached=0, failed=0):
@@ -560,11 +558,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
         if new:
             speed.add(fresh, time.monotonic())
             measured['rate'] = speed.per_minute()
-            # a short run keeps the speed an earlier, longer one measured (review)
+            # a short run keeps the speed an earlier, longer one measured
             throughput = run_throughput(status.state['throughput'], signature, device, speed)
             if throughput is not None:
                 measured['throughput'] = throughput
-        # the status file is written at most once a second, the last photo always (A5)
+        # the status file is written at most once a second, the last photo always
         status.update(done=done, new=fresh, cached=reused, errors=errors, force=done == len(paths), **measured)
 
     def failed(path, exc):
@@ -572,7 +570,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
 
         A JPEG/HEIC with a RAW file of the same shot skipped for it is not counted yet: once
         all photos are done, its RAW file is analyzed instead if no photo of the shot was
-        analyzed (E30, review).
+        analyzed.
         """
         print(f'ERROR {path}: {exc}', flush=True)
         if not raw_fallback.defer(path, truncated=isinstance(exc, TruncatedImageError)):
@@ -622,16 +620,16 @@ def search(args, parser, roots, dropped, output, status, warnings):
         failed(item[0], exc)
 
     if not quick:
-        # thumbnails: what the galleries render at most, for the app's time left (F16)
+        # thumbnails: what the galleries render at most, for the app's time left
         status.update('analyzing', total=len(paths), thumbnails=gallery_thumbnails(len(paths), args.top, len(profiles)))
         try:
             todo = to_analyze(paths)
             # Photos are decoded (and searched for persons) in threads ahead of CLIP, and the
-            # crops of several photos are embedded together, batch_size at a time (E2).
+            # crops of several photos are embedded together, batch_size at a time.
             threads = DETECTION_DECODE_THREADS if person_detection else DECODE_THREADS
             # enough photos ahead for the next group while CLIP embeds the current one (a group
             # holds at most batch_size photos); finished photos wait as small preprocessed
-            # tensors, so memory grows with the batch size, not with the photo size (review)
+            # tensors, so memory grows with the batch size, not with the photo size
             ahead = max(2 * threads, args.batch_size + threads)
             pool = ThreadPoolExecutor(threads)
 
@@ -644,14 +642,14 @@ def search(args, parser, roots, dropped, output, status, warnings):
                                            size=lambda item: len(item[2])):
                     # after a failure the photos are stored one by one, so only a broken one fails;
                     # an error of the cache file itself stops the search at once: no photo could
-                    # be stored (E50, review)
+                    # be stored
                     finished(new=store_group(group, store, store_failed, fatal=cache_error))
 
             try:
                 analyze(todo)
                 # a JPEG/HEIC that failed is replaced by the RAW file of its shot, unless another
                 # photo of the shot was analyzed; the RAW file comes from the cache or is decoded
-                # in the decoding threads like any photo, and counts for the shot (E30, review)
+                # in the decoding threads like any photo, and counts for the shot
                 chosen, lost = raw_fallback.choose(analyzed)
                 for _ in lost:
                     finished(failed=1)
@@ -662,8 +660,8 @@ def search(args, parser, roots, dropped, output, status, warnings):
                     if analyzed(raw):
                         raw_fallback.use(partner, raw)
                 # a truncated JPEG whose RAW file failed too is analyzed as far as its data goes,
-                # as any truncated photo is; it counts for the shot (E46). One that waited for the
-                # RAW file another partner of its shot got stays a failure if that was analyzed (E53)
+                # as any truncated photo is; it counts for the shot. One that waited for the RAW
+                # file another partner of its shot got stays a failure if that was analyzed
                 retry, lost = raw_fallback.retry()
                 for _ in lost:
                     finished(failed=1)
@@ -672,9 +670,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
                           'photo instead.', flush=True)
                 analyze(to_analyze(retry))
                 if not detector.created:
-                    # no photo needed an analysis, e.g. all came from the cache (F2); an analysis
-                    # without a search ranks nothing either (F18), and says "all analyzed" only
-                    # if no photo failed (review)
+                    # no photo needed an analysis, e.g. all came from the cache; an analysis
+                    # without a search ranks nothing either, and says "all analyzed" only if no
+                    # photo failed
                     nothing_new = nothing_new_message(analyze_only, errors)
                     print(f'{nothing_new}.', flush=True)
                     status.update(message=nothing_new, force=True)
@@ -687,11 +685,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
 
     if analyze_only:
         # the analyses are in the cache; nothing is scored or exported, so results.json, the
-        # galleries, the marks and the quick search stay as they are (F18)
+        # galleries, the marks and the quick search stay as they are
         con.close()
         if unreadable:
             if not fresh and not reused:
-                # not a single row could be read: fail as a search does (E50)
+                # not a single row could be read: fail as a search does
                 raise next(iter(unreadable.values()))
             warning = cache_read_warning(output / CACHE_FILE, next(iter(unreadable.values())), len(unreadable),
                                          'analysis')
@@ -704,21 +702,21 @@ def search(args, parser, roots, dropped, output, status, warnings):
 
     print('Scoring the photos for each search profile ...', flush=True)
     if quick:
-        # the photos it scores; thumbnails, as for an analysis, for the app's time left (F16)
+        # the photos it scores; thumbnails, as for an analysis, for the app's time left
         status.update('scoring', total=len(to_score), thumbnails=gallery_thumbnails(len(to_score), args.top, 1))
     else:
         status.update('scoring', total=len(paths))
-        # a RAW file analyzed for its broken partner is scored and shown in its place (E30)
+        # a RAW file analyzed for its broken partner is scored and shown in its place
         to_score = raw_fallback.photos(paths)
     # first the per-crop text and reference scores of every photo, then per profile the
-    # normalization over all crops of this search and the combination (E4, E5)
+    # normalization over all crops of this search and the combination
     scored, crop_labels, mtimes = [], [], []
     text_scores = {p['name']: [] for p in profiles}
     visual_scores = {p['name']: [] for p in profiles}
-    # the names of each profile's text queries, in the order of Match.query (F17)
+    # the names of each profile's text queries, in the order of Match.query
     query_names = {p['name']: query_labels(p) for p in profiles}
     # per crop the index of its closest text, kept only where a card names it: a profile with
-    # several texts (F17; review: not for a single text or "Find similar")
+    # several texts (not a single text or "Find similar")
     best_queries = {name: [] for name, texts in query_names.items() if len(texts) > 1}
     scoring_started = time.monotonic()
     for number, path in enumerate(to_score, 1):
@@ -742,7 +740,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
             if name in photo_visual:
                 visual_scores[name].append(photo_visual[name])
     con.close()
-    # the speed of scoring, for the time left of later searches (F16)
+    # the speed of scoring, for the time left of later searches
     finishing = remember_finishing(status.state['finishing'], 'scoring', len(to_score),
                                    time.monotonic() - scoring_started)
     if finishing is not None:
@@ -750,11 +748,11 @@ def search(args, parser, roots, dropped, output, status, warnings):
     if unreadable and not scored:
         # not a single row could be read (e.g. the root page of the table is damaged): the
         # search stops as for a cache that cannot be opened, and the galleries of the previous
-        # search stay instead of being replaced by empty ones (E50, review)
+        # search stay instead of being replaced by empty ones
         raise next(iter(unreadable.values()))
     if args.scores_file:
         # the same per-crop scores rank_photos combines below, so the evaluation ranks as
-        # the galleries do, up to near-ties within the rounding to SCORE_DIGITS (E32)
+        # the galleries do, up to near-ties within the rounding to SCORE_DIGITS
         write_scores(args.scores_file.resolve(), scores_document(
             args.model, signature, list(zip(scored, mtimes, crop_labels)),
             [{'name': p['name'], 'prompts': p['prompts'], 'references': p['refs'],
@@ -766,8 +764,8 @@ def search(args, parser, roots, dropped, output, status, warnings):
     for p in profiles:
         name = p['name']
         has_refs = profile_vectors[name][1] is not None
-        # "Find similar" scores the image similarity with its photo alone (F11); each match of
-        # a search with texts names its closest text, which does not change the ranking (F17)
+        # "Find similar" scores the image similarity with its photo alone; each match of a
+        # search with texts names its closest text, which does not change the ranking
         normalized[name], matches = (rank_similar(text_scores[name]) if like else
                                      rank_photos(text_scores[name], visual_scores[name] if has_refs else None,
                                                  args.reference_weight, best=best_queries.get(name)))
@@ -777,13 +775,13 @@ def search(args, parser, roots, dropped, output, status, warnings):
         scores[name] = [(m, path, labels[m.crop]) for m, path, labels in zip(matches, scored, crop_labels)]
 
     # a quick search writes into its own folder with its own thumbnails, so the galleries,
-    # results.json and marks of the profiles stay as they are (F10)
+    # results.json and marks of the profiles stay as they are
     target = output / QUICK_DIR if quick else output
     thumbs = target / 'thumbnails'; thumbs.mkdir(parents=True, exist_ok=True)
     # thumbnail folder of older versions: thumbnails are copied from it instead of being
     # rendered again; it is never written (old galleries link it), and the cleanup removes
-    # its files once no gallery links them (E7). A quick search copies those of the profile
-    # galleries (F10)
+    # its files once no gallery links them. A quick search copies those of the profile
+    # galleries
     legacy_thumbs = output / ('thumbnails' if quick else 'vorschaubilder')
 
     def log(message):
@@ -792,9 +790,9 @@ def search(args, parser, roots, dropped, output, status, warnings):
     names = [p['name'] for p in profiles]
     galleries = {names[0]: QUICK_GALLERY} if quick else {name: slug + '.html'
                                                          for name, slug in zip(names, profile_slugs(names))}
-    # with several photo folders, a card names the photo's folder before its path in it (A25)
+    # with several photo folders, a card names the photo's folder before its path in it
     labels = folder_labels(roots)
-    # the folder the reference paths of profiles.json are relative to, as for the app (review)
+    # the folder the reference paths of profiles.json are relative to, as for the app
     profiles_base = args.profiles.resolve().parent if args.profiles else Path.cwd()
     nav = '<nav>' + ' · '.join(f'<a href="{quote(galleries[p["name"]])}">{html.escape(p["name"])}</a>' for p in profiles) + '</nav>'
     style = '''body{font:16px system-ui;background:#181818;color:#eee;margin:24px}a{color:#a9d2ff}
@@ -802,27 +800,27 @@ def search(args, parser, roots, dropped, output, status, warnings):
     article{background:#292929;padding:12px;border-radius:10px;overflow-wrap:anywhere}
     img{width:100%;height:250px;object-fit:contain;background:#111;border-radius:5px}
     small{color:#bbb}nav{margin-bottom:22px}'''
-    # the full ranking: a photo skipped in the export is replaced by the next one (E12)
+    # the full ranking: a photo skipped in the export is replaced by the next one
     rankings = {name: sorted(found, key=lambda x: x[0].score, reverse=True) for name, found in scores.items()}
     total_cards = sum(min(args.top, len(ranked)) for ranked in rankings.values())
     print('Writing the galleries ...', flush=True)
     status.update('exporting', total=total_cards)
-    # skips (and logs) photos deleted or unreadable since scoring instead of aborting (E6),
-    # each photo tried and logged once per export (review of E12)
+    # skips (and logs) photos deleted or unreadable since scoring instead of aborting, each
+    # photo tried and logged once per export
     skipped = SkippedPhotos(log)
     # the speed of rendering new thumbnails (not of reused or copied ones), for the time
-    # left of later searches (F16)
+    # left of later searches
     rendering = StepSpeed()
     render = rendering.timed(render_thumbnail)
     progress = 0
-    results = []  # the content of results.json: what each gallery shows (A12)
-    pages = []  # [(file name, HTML)]: published together with results.json at the end (E24)
+    results = []  # the content of results.json: what each gallery shows
+    pages = []  # [(file name, HTML)]: published together with results.json at the end
     for p in profiles:
         name = p['name']; ranked = rankings[name]
         cards, entries = [], []
 
         # progress counts every photo tried, also a skipped one (heartbeat), capped at the
-        # gallery's share of the total; a full gallery or an exhausted ranking reaches it (review)
+        # gallery's share of the total; a full gallery or an exhausted ranking reaches it
         def thumbnail(found, planned=progress + min(args.top, len(ranked))):
             nonlocal progress
             if progress < planned:
@@ -830,14 +828,14 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 status.update(done=progress, force=progress == total_cards)
             return skipped.thumbnail(found[1], thumbs, legacy_thumbs, render)
 
-        # ranks count only the cards shown, lower-ranked photos fill up to --top (E12)
+        # ranks count only the cards shown, lower-ranked photos fill up to --top
         for rank, (match, path, label), thumb_name in gallery_cards(ranked, args.top, thumbnail):
             uri = html.escape(path.as_uri(), quote=True)
-            relative = photo_name(path, roots, labels)  # once, for the HTML card and results.json (review)
+            relative = photo_name(path, roots, labels)  # once, for the HTML card and results.json
             rel = html.escape(relative)
             score, detail = score_caption(match, normalized[name])
             label = crop_label(label)
-            best_query = closest_query(match.query, query_names[name])  # F17
+            best_query = closest_query(match.query, query_names[name])
             entries.append(result_card(rank, path, relative, label, match.score, match.text, match.visual, score, detail,
                                        thumb_name, best_query=best_query))
             closest = f'<small>{html.escape(query_caption(best_query))}</small><br>' if best_query else ''
@@ -857,7 +855,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
         pages.append((gallery, page))
         results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': gallery,
                         'normalized': normalized[name], 'cards': entries,
-                        # the texts a card's best_query names, for the app's summary (F17)
+                        # the texts a card's best_query names, for the app's summary
                         **({'queries': query_names[name]} if query_names[name] else {})})
     if skipped.summary():
         log(skipped.summary())
@@ -865,7 +863,7 @@ def search(args, parser, roots, dropped, output, status, warnings):
     if finishing is not None:
         status.update(finishing=finishing)
     # results.json is published after all galleries, so the file always describes a complete
-    # export (A12); a run stopped before leaves the galleries of the previous search (E24)
+    # export; a run stopped before leaves the galleries of the previous search
     settings = {'device': device, 'batch_size': args.batch_size, 'top': args.top,
                 'person_detection': not args.no_person_detection, 'max_persons': args.max_persons,
                 'person_confidence': args.person_confidence, 'reference_weight': args.reference_weight,
@@ -873,15 +871,15 @@ def search(args, parser, roots, dropped, output, status, warnings):
     document = results_document(status.state['started'], datetime.now().astimezone().isoformat(timespec='seconds'),
                                 roots, settings, len(paths), results)
     if quick:
-        # what the app shows above the quick search's results (F10)
+        # what the app shows above the quick search's results
         document['quick'] = {'query': names[0], 'searched': len(scored), 'not_analyzed': len(not_analyzed)}
         if like:
-            # the photo and part of "Find similar" (F11)
+            # the photo and part of "Find similar"
             document['quick'].update(like=str(like_photo), part=like_part)
     publish_export(target, pages, document)
     for (gallery, _), p in zip(pages, profiles):
         print(f"{p['name']}: {target / gallery}", flush=True)
-    # the harmless part of the cleanup (E7, E13, E26): temporary thumbnails and other
+    # the harmless part of the cleanup: temporary thumbnails and other
     # temporary files of a stopped run, and thumbnails neither results.json nor any HTML file
     # in the output folder links (of a quick search: in its folder); the run lock is still
     # held, so no other search writes thumbnails meanwhile
