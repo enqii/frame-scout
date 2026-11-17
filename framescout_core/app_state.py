@@ -26,6 +26,25 @@ PAGE_STYLE = ('<style>.block-container{padding-top:2rem}.stButton button{border-
               f'[data-testid="stTabPanel"]:not(:last-child){{max-width:{FORM_TAB_MAX_WIDTH}px}}'
               f'[data-testid="stLayoutWrapper"]:has(> .st-key-{STATE_LINE_KEY})'
               f'{{flex-basis:{STATE_LINE_MIN_WIDTH}!important}}</style>')
+# Streamlit opens a tooltip while the mouse is over its element or the keyboard focus is in
+# it, and closes it when the focus leaves; after a dialog or popover gives the focus back to
+# its button, tooltips stay open, pile up and float over other tabs until the page is reloaded.
+# This script hides every open tooltip whose element is neither under the mouse nor
+# holds the keyboard focus (:focus-visible), and shows it again when it is. Streamlit
+# internals as above: the open tooltip has role="tooltip" and an id that its element names in
+# aria-describedby. Started once per page load: Streamlit may run the script on every page run
+TOOLTIP_SCRIPT = '''<script>
+if (!window.frameScoutTooltips) {
+  window.frameScoutTooltips = setInterval(() => {
+    for (const tip of document.querySelectorAll('[role="tooltip"][id]')) {
+      const owner = document.querySelector(`[aria-describedby~="${CSS.escape(tip.id)}"]`);
+      const wanted = tip.matches(':hover')
+        || (owner !== null && (owner.matches(':hover') || owner.querySelector(':focus-visible') !== null));
+      tip.style.visibility = wanted ? '' : 'hidden';
+    }
+  }, 250);
+}
+</script>'''
 
 
 def _plural(count, one, many):
