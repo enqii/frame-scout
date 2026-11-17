@@ -135,8 +135,8 @@ def main(argv=None, root=ROOT, ask=input, out=print, interpreter=sys.executable)
             out(f'  {path}: {exc}')
         if len(failures) > MAX_FAILURES_SHOWN:
             out(f'  … and {len(failures) - MAX_FAILURES_SHOWN} more')
-        out('Close FrameScout and other programs that use these files (a read-only file: clear its read-only '
-            'attribute), then run the uninstall again.')
+        out('Close FrameScout and other programs that use these files and make sure you may change them '
+            '(on Windows: clear a read-only attribute), then run the uninstall again.')
         return 1
     out(f'Done: {size_text(sum(item.size for item in now))} deleted.')
     if last:

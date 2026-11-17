@@ -1,11 +1,11 @@
-"""The uninstall script (P5): what Uninstall-FrameScout.bat deletes, keeps and only reports.
+"""The uninstall script (P5): what Uninstall-FrameScout.bat deletes and keeps.
 
 It deletes what the installer and FrameScout create again on their own (the Python
 environment, downloaded model weights, temporary and compiled files) and never the
 user's data: photos, reference images, results, profiles and settings stay, and so does
-everything outside the project folder. The private Python of the
-installer (P5 part C) is deleted too; when it runs the uninstall, Uninstall-FrameScout.bat
-deletes it after the script has ended (I20).
+everything outside the project folder. The private Python of the installer (P5 part C) is
+deleted too; when it runs the uninstall, Uninstall-FrameScout.bat deletes it after the
+script has ended (I20).
 """
 import errno
 import os
