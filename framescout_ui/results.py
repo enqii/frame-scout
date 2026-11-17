@@ -277,7 +277,9 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
                        'No match, or skip it, and the next undecided photo follows. A click on a photo opens it there '
                        'too.' + ('' if can_mark else ' The photos of this list cannot be marked here.'))
         # closed by each of its buttons, so it does not cover the notices below the toolbar;
-        # its content is drawn only while it is open
+        # its content is drawn only while it is open, so a widget in it keeps its value only
+        # through persist_state (the export's checkbox) or a value kept elsewhere and set
+        # again on each draw (the target folder, copy_folder_value)
         with st.popover('Export and copy', help='Open or download the gallery, copy the photos marked as match '
                                                 'to a folder or export the result list.',
                         key=EXPORT_POPOVER, on_change='rerun'), st.container(width=EXPORT_POPOVER_WIDTH):
