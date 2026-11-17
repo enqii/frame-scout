@@ -273,8 +273,9 @@ class _PathCheck:
     and is not empty (_filled); then one stat tells whether it is gone (_missing). Every
     other path is not checked, as its photo may only be offline: a disconnected drive or an
     offline share does not answer, and an unmounted one leaves its folder missing or, on
-    Linux/macOS, an empty mount point. A renamed or deleted folder looks the same, so its
-    photos are not offered either (known limit). A relative path is never gone.
+    Linux/macOS, an empty mount point. A renamed, deleted or emptied folder looks the same,
+    so its photos are not offered either (known limit; _unchecked_notes names the way out).
+    A relative path is never gone.
     """
 
     def __init__(self, root_timeout=ROOT_TIMEOUT):
@@ -312,8 +313,9 @@ def _unchecked_notes(count):
         return []
     return [f'{count_text(count, "photo", "photos")} {"was" if count == 1 else "were"} not checked: the drive or '
             'network share cannot be reached now, or the folder is missing or empty or cannot be listed (e.g. a '
-            'disconnected drive or an unmounted share; a renamed or deleted folder looks the same). Connect it and '
-            'scan again.']
+            'disconnected drive or an unmounted share; a renamed, deleted or emptied folder looks the same). Connect '
+            'the drive and scan again. If the photos of a folder are gone for good, put any file into that folder '
+            '(create it again if needed) and scan again.']
 
 
 def _read_only_uri(path):

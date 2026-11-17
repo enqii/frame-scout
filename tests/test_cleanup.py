@@ -245,8 +245,8 @@ def test_rows_of_photos_that_no_longer_exist_anywhere_are_unbound(project):
 def test_photos_of_a_missing_or_empty_folder_are_not_checked(project, monkeypatch):
     # I44 (simple rule, user decision 2026-11-17): a disconnected drive or an unmounted share
     # leaves the folder of its photos missing or empty (a mount point on Linux/macOS), so the
-    # photos may only be offline; a renamed or deleted folder looks the same and is not
-    # offered either. No photo of such a folder gets a stat, and one note counts them all.
+    # photos may only be offline; a renamed, deleted or emptied folder looks the same and is
+    # not offered either. No photo of such a folder gets a stat, and one note counts them all.
     empty = project.base / 'media' / 'DRIVE'
     empty.mkdir(parents=True)
     vanished = project.base / 'renamed folder'
@@ -261,11 +261,20 @@ def test_photos_of_a_missing_or_empty_folder_are_not_checked(project, monkeypatc
         assert category['items'] == [] and category['problem'] is None
         [note] = category['notes']
         assert note.startswith(count + ' not checked') and 'missing or empty' in note
+        # review: an emptied folder is named, and the way out for photos gone for good
+        assert 'emptied' in note and 'gone for good, put any file into that folder' in note
     # once the folder holds a photo again (the drive is back), its missing photos are unbound
     (empty / 'IMG_0.jpg').write_bytes(b'photo')
     category = project.scan()['cache_missing']
     assert sorted(category['items']) == [(str(empty / f'IMG_{n}.jpg'), CURRENT) for n in (1, 2)]
     assert category['notes'][0].startswith('2 photos were not checked')
+    # the way out the note names: a deleted folder created again with any file in it
+    vanished.mkdir()
+    (vanished / 'placeholder.txt').write_bytes(b'')
+    scan = project.scan()
+    assert scan['cache_missing']['notes'] == []
+    assert len(scan['cache_missing']['items']) == 4
+    assert scan['marks_unbound']['items'] == [('Red car', str(vanished / 'IMG_9.jpg'))]
 
 
 def unreachable(*roots):
