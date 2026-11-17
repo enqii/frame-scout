@@ -212,3 +212,4 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **A54 – The header is squeezed at window widths of about 680–1100 px** – done 2026-11-17, [PR #158](https://github.com/enqii/frame-scout/pull/158)
 - [x] **F9 – A CSV export that Excel opens in columns in every locale** – done 2026-11-17, [PR #159](https://github.com/enqii/frame-scout/pull/159)
 - [x] **F53 – Score distribution per profile** – done 2026-11-17, [PR #160](https://github.com/enqii/frame-scout/pull/160)
+- [x] **I19 – The uninstall script never deletes user data** – closed 2026-11-17 in the triage: superseded by I57 (the own uninstaller is removed; uninstalling means deleting the folder)
