@@ -159,6 +159,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **I52 – State machine row for a review with 0 findings (workflow)** – done 2026-11-17, [PR #141](https://github.com/enqii/frame-scout/pull/141)
 - [x] **I53 – A cleanup test fails when the temporary folder is a mount point** – done 2026-11-17, [PR #142](https://github.com/enqii/frame-scout/pull/142)
 - [x] **I54 – REST fallback for label changes when `gh pr edit` fails (workflow)** – done 2026-11-17, [PR #144](https://github.com/enqii/frame-scout/pull/144)
+- [x] **I55 – REST fallback for the PR description when `gh pr edit` fails (workflow)** – done 2026-11-17, [PR #147](https://github.com/enqii/frame-scout/pull/147)
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
