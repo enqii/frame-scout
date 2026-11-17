@@ -1,4 +1,4 @@
-"""Prompt ensemble and per-profile score normalization (framescout_scoring, E4, E5)."""
+"""Prompt ensemble and per-profile score normalization (framescout_scoring)."""
 import ast
 import sys
 from pathlib import Path
@@ -45,7 +45,7 @@ def test_only_custom_prompts_are_kept_as_they_are():
 
 def test_one_generic_template_no_longer_dominates():
     # crop a matches one template strongly and the others not at all; crop b matches all
-    # templates moderately: the maximum prefers a, the averaged ensemble prefers b (E4)
+    # templates moderately: the maximum prefers a, the averaged ensemble prefers b
     prompts = unit([1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0])
     crops = unit([0.9, 0, 0, 0.44], [0.5, 0.5, 0.5, 0.5])
     assert (crops @ prompts.T).max(axis=1).argmax() == 0
@@ -108,7 +108,7 @@ def test_text_and_visual_scores_are_normalized_separately_before_they_are_combin
 
 def test_the_wide_visual_scale_no_longer_outweighs_the_text_score():
     # photo 0: by far the best text score, an average visual score; photo 1: an average
-    # text score, a visual score that is high in raw terms but common in this folder (E5)
+    # text score, a visual score that is high in raw terms but common in this folder
     text = photos([.35], [.25]) + photos(*[[.25 + d] for d in (-.05, .05, -.05, .05, -.05, .05, -.05, .05)])
     visual = photos([.70], [.90]) + photos(*[[.70 + d] for d in (-.2, .2, -.2, .2, -.2, .2, -.2, .2)])
     weight = .35
@@ -150,7 +150,7 @@ def test_caption_of_a_normalized_score_names_the_raw_similarities():
 
 
 def test_rank_similar_scores_the_image_similarity_alone():
-    # F11: z-scored over all crops like a text-only profile, but the raw value is an image similarity
+    # z-scored over all crops like a text-only profile, but the raw value is an image similarity
     normalized, matches = rank_similar(VISUAL)
     assert normalized
     assert matches[1] == Match(pytest.approx(z(VISUAL, .90)), 0, None, pytest.approx(.90))
@@ -173,7 +173,7 @@ def test_caption_of_raw_scores_keeps_the_similarity():
 
 
 def test_spread_ignores_values_that_are_not_finite():
-    # one broken cache row must not change the scale of every other photo (review)
+    # one broken cache row must not change the scale of every other photo
     values = np.arange(1., 11.)
     mean, std = spread([values, np.array([np.nan, np.inf])])
     assert mean == pytest.approx(values.mean()) and std == pytest.approx(values.std())
@@ -182,7 +182,7 @@ def test_spread_ignores_values_that_are_not_finite():
 @pytest.mark.parametrize('weight', [0, 1])
 def test_a_channel_without_weight_does_not_block_the_normalization(weight):
     # weight 0: the reference images do not count, so their missing spread does not matter;
-    # weight 1: the same for the text (review)
+    # weight 1: the same for the text
     flat = [np.full(len(t), .6) for t in TEXT]
     text, visual = (TEXT, flat) if weight == 0 else (flat, VISUAL)
     normalized, matches = rank_photos(text, visual, weight)
@@ -202,7 +202,7 @@ def test_photo_scores_give_every_profile_its_crop_scores():
     np.testing.assert_allclose(text['Cat'], [np.sqrt(.5), np.sqrt(.5), 1], rtol=1e-6)
     assert list(visual) == ['Cat']
     np.testing.assert_allclose(visual['Cat'], [1, 0, np.sqrt(.5)], atol=1e-6)
-    # the query each crop's text score comes from (F17); an exact tie names the first
+    # the query each crop's text score comes from; an exact tie names the first
     assert best['Dog'].tolist() == [0, 1, 0] and best['Cat'].tolist() == [0, 0, 0]
 
 
@@ -213,7 +213,7 @@ def test_best_matches_name_the_query_of_the_best_score():
     assert indices.tolist() == [1, 2, 0]
     np.testing.assert_allclose(scores, (crops @ queries.T)[np.arange(3), indices], rtol=1e-6)
     np.testing.assert_allclose(best_scores(crops, queries), scores, rtol=1e-6)
-    # the text scores and best queries of photo_scores are the same (review: one source)
+    # the text scores and best queries of photo_scores are the same: they have one source
     text, _, best = photo_scores(crops, ['Full image', 'Person 1', 'Person 2'], {'P': (queries, None)})
     np.testing.assert_allclose(text['P'], scores, rtol=1e-6)
     assert best['P'].tolist() == indices.tolist()
@@ -224,7 +224,7 @@ BEST = [np.arange(len(t)) % 2 for t in TEXT]
 
 @pytest.mark.parametrize('visual', [None, VISUAL])
 def test_a_match_names_the_best_query_of_its_crop_without_changing_the_ranking(visual):
-    # F17: the query that gave the best crop its text score; scores and crops stay the same
+    # the query that gave the best crop its text score; scores and crops stay the same
     _, plain = rank_photos(TEXT, visual, .35)
     _, named = rank_photos(TEXT, visual, .35, best=BEST)
     assert [m._replace(query=None) for m in named] == plain
@@ -243,6 +243,6 @@ def test_a_match_without_queries_names_none():
     (np.array([[np.nan, 0.]], dtype=np.float32), ['Full image']),  # broken vector
 ])
 def test_photo_scores_reject_a_broken_cache_row(features, labels):
-    # the engine logs "CACHE ERROR" and skips the photo, as before E5 (review)
+    # the engine logs "CACHE ERROR" and skips the photo
     with pytest.raises(ValueError):
         photo_scores(features, labels, QUERIES)

@@ -1,7 +1,7 @@
-"""Relative links in the Markdown files of the repository point to existing files (I31).
+"""Relative links in the Markdown files of the repository point to existing files.
 
-I31 moved files out of the root folder (requirements/, assets/, docs/): a link that still
-names an old place would only show up as a dead link on GitHub. Web links and anchors within
+Files live in subfolders (requirements/, assets/, docs/): a link that still names a file in
+the root folder would only show up as a dead link on GitHub. Web links and anchors within
 the same page are not checked.
 """
 import os
@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 # [text](target) with an optional "title"; images too
 LINK = re.compile(r'\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)')
-# a reference definition "[label]: target" at the start of a line (review)
+# a reference definition "[label]: target" at the start of a line
 REFERENCE = re.compile(r'^ {0,3}\[[^\]]+\]:\s*<?([^\s>]+)>?', re.MULTILINE)
 # local folders that are not part of the repository (.gitignore) and git's own folder;
 # agent worktrees are whole other checkouts
@@ -21,7 +21,7 @@ WORKTREES = ROOT / '.claude' / 'worktrees'
 
 
 def markdown_files(root=ROOT):
-    """The Markdown files in every folder of the repository, without the SKIPPED local folders (review)."""
+    """The Markdown files in every folder of the repository, without the SKIPPED local folders."""
     files = []
     for folder, subfolders, names in os.walk(root):
         subfolders[:] = [name for name in subfolders if name not in SKIPPED and Path(folder, name) != WORKTREES]

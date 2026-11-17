@@ -1,4 +1,4 @@
-"""The shipped example profiles and creating profiles.json from them (I5, I7)."""
+"""The shipped example profiles and creating profiles.json from them."""
 import ast
 from pathlib import Path
 
@@ -41,7 +41,7 @@ def test_an_empty_existing_profiles_file_is_not_replaced_either(tmp_path):
 
 
 def test_the_example_is_not_read_when_the_profiles_file_exists(tmp_path):
-    # the app calls this on every Streamlit rerun (review); an unreadable "example"
+    # the app calls this on every Streamlit rerun; an unreadable "example"
     # (here a folder) must not even be opened once profiles.json exists
     target = tmp_path / 'profiles.json'
     target.write_text('{"profiles": []}', encoding='utf-8')
@@ -62,8 +62,8 @@ def test_no_temporary_file_is_left_behind(tmp_path):
 
 
 def test_the_target_never_exists_half_written(tmp_path, monkeypatch):
-    # the copy is complete before it appears under the final name (review: a crash or a
-    # parallel session must never see an empty profiles.json)
+    # the copy is complete before it appears under the final name: a crash or a
+    # parallel session must never see an empty profiles.json
     example = tmp_path / 'profiles.example.json'
     example.write_bytes(b'{"profiles": [{"name": "Red car"}]}')
     target = tmp_path / 'profiles.json'
@@ -121,10 +121,10 @@ def test_the_shipped_example_loads_and_is_general_purpose():
 
 def test_the_app_creates_profiles_json_from_the_shipped_example():
     # the app imports streamlit, so its path constant is read from the source (app.py or a
-    # module of framescout_ui, A46); compared as a syntax tree, so line breaks and spacing do
-    # not matter (review)
+    # module of framescout_ui); compared as a syntax tree, so line breaks and spacing do
+    # not matter
     [value] = [node.value for node in app_tree().body if isinstance(node, ast.Assign)
                and any(isinstance(t, ast.Name) and t.id == 'EXAMPLE_PROFILES' for t in node.targets)]
     assert ast.dump(value) == ast.dump(ast.parse('BASE / EXAMPLE_PROFILES_FILE', mode='eval').body)
-    # in assets/ since I31
+    # in assets/
     assert EXAMPLE == REPO / 'assets' / 'profiles.example.json' and EXAMPLE.is_file()

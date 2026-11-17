@@ -1,4 +1,4 @@
-"""The .sh scripts for Linux (F47): the counterparts of the four .bat files.
+"""The .sh scripts for Linux: the counterparts of the four .bat files.
 
 The scripts are checked as text on every platform; on Linux they also run in a copy of the
 folder with stand-ins for the Python scripts they start (nothing is downloaded or installed).
@@ -166,7 +166,7 @@ def test_the_packages_are_installed_with_the_constraints():
     pip = index(lines, r'^if ! \.venv/bin/python -m pip install --no-cache-dir -r requirements/requirements\.txt '
                        r'-c requirements/constraints\.txt; then$')
     assert constraint < torch < pip
-    # exit code 3 of install_torch.py: the user stopped on low disk space (F3), not a failure;
+    # exit code 3 of install_torch.py: the user stopped on low disk space, not a failure;
     # exactly 3, since a process killed by a signal (OOM killer, Ctrl+C) exits with 128 + n
     assert lines[torch + 1:torch + 4] == ['TORCH_RESULT=$?',
                                           f'if [ "$TORCH_RESULT" -eq {install_torch.STOPPED_EXIT_CODE} ]; then',
@@ -203,7 +203,7 @@ def cache_lines(name):
 
 
 def test_the_scripts_set_only_the_cache_variables_a_user_did_not_set():
-    # A36, as in the .bat files: a variable the user set wins; the lines of the variables
+    # as in the .bat files: a variable the user set wins; the lines of the variables
     # derived from XDG_CACHE_HOME come before the line that sets it
     expected = []
     for variable, path in cache_paths(ROOT).items():
