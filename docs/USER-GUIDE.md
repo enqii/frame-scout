@@ -518,14 +518,14 @@ confirm. Deleting is **permanent** (no Recycle Bin) and not possible while a sea
 
 Renaming or moving photos counts as new photos: they are analyzed again, and the old
 analyses and marks are listed as "unbound". This does not apply to the photos of a renamed or
-deleted folder (see the table).
+deleted folder, or of a folder whose photos were all moved or deleted (see the table).
 
 | Category | Selected after a scan | What it is |
 |---|---|---|
 | Temporary thumbnail files | yes | Left by a search stopped while writing the galleries |
 | Galleries of renamed or deleted profiles | yes | HTML galleries that belong neither to a current profile nor to the last search |
 | Thumbnails no gallery shows | yes | Thumbnails neither the last search nor a kept gallery shows |
-| Cache entries of unbound photos | no | Analyses of photos no longer at their path. A photo is checked only if its drive or network share can be reached and its folder still exists and is not empty. A disconnected drive or an unmounted share leaves the folder missing or empty, so its photos are not checked, and a note counts them (connect the drive and scan again). A renamed or deleted folder looks the same, so the analyses of its photos are not offered. If a drive letter now belongs to another disk, its photos look unbound too |
+| Cache entries of unbound photos | no | Analyses of photos no longer at their path. A photo is checked only if its drive or network share can be reached and its folder still exists and is not empty. A disconnected drive or an unmounted share leaves the folder missing or empty, so its photos are not checked, and a note counts them (connect the drive and scan again). A renamed, deleted or emptied folder looks the same, so the analyses of its photos are not offered; if they are gone for good, put any file into that folder (create it again if needed) and scan again. If a drive letter now belongs to another disk, or a mount point of an unmounted drive on Linux/macOS still holds a file, the photos of that drive look unbound too (check the folders the scan lists) |
 | Marks of unbound photos | no | Your marks of photos no longer at their path (only these marks, never `marks.json` itself; checked like the cache entries) |
 | Cache entries of older versions or unknown settings | yes | Analyses of an earlier FrameScout version or of command-line-only settings |
 | Cache entries of other AI settings | no | Analyses with other person detection settings; used again if you switch back |
