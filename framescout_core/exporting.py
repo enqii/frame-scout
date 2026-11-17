@@ -17,6 +17,11 @@ from .marks import MARK_MATCH, MARK_NO_MATCH
 # files that are not there.
 EXPORTS_DIR = 'exports'
 EXPORT_COLUMNS = ('rank', 'path', 'score', 'text_similarity', 'image_similarity', 'crop', 'mark')
+# the column separators the user can choose, by the name settings.json stores: Excel splits
+# a double-clicked CSV at the list separator of the system locale, "," in English and ";"
+# in German and other comma-decimal locales. The decimal point stays "." with either.
+EXPORT_SEPARATORS = {'comma': ',', 'semicolon': ';'}
+DEFAULT_EXPORT_SEPARATOR = 'comma'
 # the mark column: an open (or no) mark is an empty cell
 EXPORT_MARK_TEXT = {MARK_MATCH: 'match', MARK_NO_MATCH: 'no match'}
 # names tried for one export (name, name-2, name-3, ...) before it fails
@@ -41,11 +46,12 @@ def _number(value):
     return '' if value is None else f'{value:.4f}'
 
 
-def export_csv(cards, marks):
+def export_csv(cards, marks, separator=','):
     """Return the CSV table of cards (a header and one row per card, columns EXPORT_COLUMNS).
 
-    marks as for export_cards; None leaves the mark column empty. Comma-separated with
-    "\\r\\n" line ends and a "." as decimal point (RFC 4180), quoted where needed.
+    marks as for export_cards; None leaves the mark column empty. Cells separated by
+    separator (a value of EXPORT_SEPARATORS; "," is RFC 4180), "\\r\\n" line ends and a
+    "." as decimal point, quoted where needed (also a cell holding the separator).
     Cells are written unchanged, without a guard against spreadsheet formulas: the engine
     writes absolute paths (a drive letter, "\\\\" or "/" first) and the fixed crop labels
     "Full image" / "Person N", so no text cell starts with "=", "+", "-" or "@"; a score
@@ -53,7 +59,7 @@ def export_csv(cards, marks):
     path for a cataloging program.
     """
     out = io.StringIO(newline='')
-    writer = csv.writer(out)
+    writer = csv.writer(out, delimiter=separator)
     writer.writerow(EXPORT_COLUMNS)
     for card in cards:
         mark = EXPORT_MARK_TEXT.get((marks or {}).get(card['path']), '')
@@ -92,17 +98,14 @@ def _write_new(path, data):
     _publish_via_temp(path, lambda tmp: tmp.write_bytes(data), _publish_new)
 
 
-def export_result_list(results, slug, cards, marks, only_matches=False, now=None):
+def export_result_list(results, slug, cards, marks, only_matches=False, now=None, separator=','):
     """Write the result list of one profile to results/exports/; return (CSV path, file list path).
 
     results: the results folder; slug: the profile's file name part (its gallery's name
-    without .html); cards, marks, only_matches: as for export_cards. The CSV table
-    (export_csv) is UTF-8 with a byte order mark, so that Excel decodes non-ASCII paths as
-    UTF-8; the byte order mark does not set the delimiter: Excel splits a double-clicked CSV
-    at the list separator of the system locale, which is ";" in German and other
-    comma-decimal locales, so there the whole row lands in one column (the user guide points
-    to Data -> From Text/CSV). The file list (export_file_list) is UTF-8
-    without a byte order mark. Both get the same name
+    without .html); cards, marks, only_matches: as for export_cards; separator: as for
+    export_csv. The CSV table (export_csv) is UTF-8 with a byte order mark, so that Excel
+    decodes non-ASCII paths as UTF-8. The file list (export_file_list) is UTF-8 without a
+    byte order mark. Both get the same name
     (export_name, from now or the current time) plus "-2", "-3", ... while either name is
     taken: nothing is ever replaced. Raises ValueError if there is nothing to export
     (nothing is written then) and OSError if a file cannot be written.
@@ -113,7 +116,7 @@ def export_result_list(results, slug, cards, marks, only_matches=False, now=None
     folder = Path(results) / EXPORTS_DIR
     folder.mkdir(parents=True, exist_ok=True)
     base = export_name(slug, now or datetime.now(), only_matches)
-    table = export_csv(chosen, marks).encode('utf-8-sig')
+    table = export_csv(chosen, marks, separator).encode('utf-8-sig')
     listing = export_file_list(chosen).encode('utf-8')
     for n in range(1, EXPORT_MAX_NAMES + 1):
         name = base if n == 1 else f'{base}-{n}'

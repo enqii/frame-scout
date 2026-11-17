@@ -10,12 +10,14 @@ import streamlit as st
 from framescout_core.cleanup import count_text
 from framescout_core.copying import (copy_photos, copy_summary_text, copy_target, default_copy_folder,
                                      read_copy_folders, save_copy_folder)
-from framescout_core.exporting import EXPORTS_DIR, export_cards, export_result_list, unlisted_paths
+from framescout_core.exporting import (DEFAULT_EXPORT_SEPARATOR, EXPORTS_DIR, EXPORT_SEPARATORS, export_cards,
+                                       export_result_list, unlisted_paths)
 from framescout_core.marks import MARKS_FILE, MARK_MATCH, MARK_NO_MATCH, read_marks
 from framescout_core.profiles import UnknownProfileError
 
 from .common import (EXPORTS, MARKS, PROFILES, RESULTS, SETTINGS, close_popover, gallery_action, open_path,
                      pictures_folder, plain, version_key, widget_id)
+from .settings import setting_key
 
 
 @st.cache_data(show_spinner=False, max_entries=2)
@@ -105,6 +107,7 @@ def export_list(profile, gallery, cards, only_matches):
     finished meanwhile. The marks are read now: they belong to a photo path, not to a
     search, so another tab's later marks are the current ones for these photos too.
     Without readable marks the list of all photos is written with an empty mark column.
+    The separator is the one the popover's choice shows now (saved in settings.json).
     """
     try:
         marks = read_marks(MARKS).get(profile, {})
@@ -114,7 +117,9 @@ def export_list(profile, gallery, cards, only_matches):
             return
         marks = None
     try:
-        table, listing = export_result_list(RESULTS, Path(gallery).stem, cards, marks, only_matches)
+        separator = EXPORT_SEPARATORS[st.session_state.get(setting_key('export_separator'), DEFAULT_EXPORT_SEPARATOR)]
+        table, listing = export_result_list(RESULTS, Path(gallery).stem, cards, marks, only_matches,
+                                            separator=separator)
     except (OSError, ValueError) as exc:
         st.session_state.export_notice = ('warning', f'Nothing was exported: {exc}.')
         return
@@ -190,6 +195,12 @@ def show_export(name, entry, marks, marks_error, popover):
                        help='Only the photos of this list marked as match. Photos marked as match in an earlier '
                             'search that are not in this list are not exported: they have no rank or score here.')
     only = only and marks_error is None
+    # a setting (settings.json), synchronized by sync_settings like the AI settings
+    st.radio('Separator', list(EXPORT_SEPARATORS), key=setting_key('export_separator'), horizontal=True,
+             format_func=lambda name: f'{name} ({EXPORT_SEPARATORS[name]})',
+             help='The character between the columns of the CSV table. Excel opens a double-clicked CSV in columns '
+                  'only if it uses the list separator of your Windows region: comma in English, semicolon in German '
+                  'and other regions with a decimal comma. The scores keep a decimal point either way.')
     count = len(export_cards(entry['cards'], marks, only))
     if marks_error is not None:
         st.caption(f'{MARKS_FILE} cannot be read: the mark column of the list stays empty.')
