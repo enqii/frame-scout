@@ -336,10 +336,13 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   (`cleanup._PathCheck`, simple rule since I44) probes each drive or share root once in a thread
   with a timeout (`ROOT_TIMEOUT`). A photo is checked by one `stat` only if its root answers and
   its folder exists and is not empty. Every other photo is **not checked**: it is neither gone nor
-  offered, and one note counts these photos. Known limit: a renamed or deleted folder looks like an
-  unmounted drive, so its photos are never offered. A share that hangs during the scan stalls it
-  until the OS gives up. A drive letter reused by another disk counts as reachable (A35, open); the
-  scan therefore names folders with counts.
+  offered, and one note counts these photos. Known limits: a renamed, deleted or emptied folder
+  looks like an unmounted drive, so its photos are never offered (the note's way out: put any file
+  into the folder and scan again). A share that hangs during the scan stalls it until the OS gives
+  up, and a large folder on a slow share costs one `stat` per photo. A drive letter reused by
+  another disk counts as reachable, and so does an unmounted POSIX mount point that still holds
+  any entry, or that another disk is mounted on (A35, open); the scan therefore names folders with
+  counts.
 - Categories that need an unreadable file (`results.json`, `profiles.json`, `marks.json`, the
   cache) are not offered with the reason. `_remove_file` refuses every `NEVER_DELETED` name.
   Each step ends on its own error and goes to the summary's `skipped`.

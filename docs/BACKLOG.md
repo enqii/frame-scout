@@ -181,8 +181,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       them, and (user decision) neither category is selected by default any more. Idea:
       record the volume serial number (or mount) per root, which changes the cache or a
       side file (hold point). Found in the PR of E8. Since I44 (PR #146) the photos of a
-      missing or empty folder (e.g. an unmounted mount point) are not checked, so the POSIX
-      case is covered; the reused drive letter remains.
+      missing or empty folder are not checked, so the POSIX case of an empty or missing mount
+      point is covered. Remaining: the reused drive letter, another disk mounted at the same
+      mount point, and an unmounted mount point that still holds any entry (e.g. a marker
+      file or files a sync tool wrote there), which counts as filled (review of PR #146).
 - [ ] `decision` **A47 – Decide the frontend framework before distribution (simplification):** a large
       part of `app.py` works around Streamlit's rerun model (session-state keys for every
       widget, fragments, `cached_*` functions keyed by mtime/size, notices carried over
@@ -384,8 +386,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `disk_space.py`: simple rule as described. Roadmap P49 lines (cleanup, uninstall,
       install_check + disk_space); the item is done when the three PRs are merged.
       Cleanup done in PR #146 (2026-11-17): `cleanup.py` 1,309 → about 940 lines, its tests
-      1,543 → about 1,130. Known limit of the simple rule: the photos of a renamed or deleted
-      folder are never offered as unbound.
+      1,543 → about 1,130. Known limit of the simple rule: the photos of a renamed, deleted or
+      emptied folder are never offered as unbound (way out: put any file into the folder and
+      scan again).
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and
