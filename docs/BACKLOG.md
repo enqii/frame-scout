@@ -315,7 +315,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `profiles.json` schema and the CLI (hold point): decide per name. Found on 2026-11-12 in
       a simplification review.
       Triage 2026-11-15: stays open; better together with the release v1.1.0. **Question:** per name, migrate or keep.
-- [ ] `decision` **I44 – Reduce defensive handling of rare cases, starting with the storage cleanup
+- [ ] `ready` **I44 – Reduce defensive handling of rare cases, starting with the storage cleanup
       (simplification):** `framescout_core/cleanup.py` has about 1,300 lines and
       `tests/test_cleanup.py` about 1,500, more than the whole engine: reachability probes of
       drive roots in threads, hanging network shares, fstab mount points, dead links. A
@@ -380,6 +380,11 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       module and lettered option, remove or keep (the cleanup root and folder guards are the
       only options that give up protection near user data: a wrongly "unbound" row is only
       a cache row or mark, and deletion needs the user's confirmation).
+      **Decision 2026-11-17 (user): take every option as recommended.** `cleanup.py`: (a)-(f)
+      all go (e: one note). `uninstall.py`: (a), (b), (c) go. `install_check.py`: (a) drop the
+      probe, (b) one generic PyTorch text, (d) go; (c) `check_program_files` stays.
+      `disk_space.py`: simple rule as described. Roadmap P49 lines (cleanup, uninstall,
+      install_check + disk_space); the item is done when the three PRs are merged.
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and
