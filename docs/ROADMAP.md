@@ -25,7 +25,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 
 ### P49 – Simplify the rare-case handling (added 2026-11-17)
 - [x] List per module (`cleanup.py`, `uninstall.py`, `install_check.py`, `disk_space.py`) what
-      defensive handling would go; the user decides the removal afterwards (I44 step 1; kind `docs`) – 2026-11-17
+      defensive handling would go; the user decides the removal afterwards (I44 step 1; kind `docs`) – 2026-11-17 ([#143](https://github.com/enqii/frame-scout/pull/143))
 
 ### P50 – Interface follow-ups 2 (added 2026-11-17)
 - [ ] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a
