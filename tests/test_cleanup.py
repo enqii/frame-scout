@@ -506,11 +506,16 @@ def test_a_folder_whose_listing_hangs_is_not_checked(project, monkeypatch):
     assert len(category['notes']) == 1 and str(hanging) in category['notes'][0] and '6 photos' in category['notes'][0]
 
 
-def test_a_root_that_stops_answering_during_the_pass_is_given_up(project, monkeypatch):
-    # after a folder hangs, the root is probed again: a share that does not answer is not
-    # waited for once per folder
+@pytest.mark.parametrize('behind', ['root', 'link'])
+def test_a_root_that_stops_answering_during_the_pass_is_given_up(project, monkeypatch, behind):
+    # after a folder hangs, the root (or the link or mount point the folder is behind) is
+    # probed again: a share that does not answer is not waited for once per folder; the
+    # link is set here, not taken from the file system, since pytest's tmp_path can be on a
+    # mount point of its own (e.g. /tmp as a tmpfs in WSL2, I53)
     import threading
     from framescout_core import cleanup
+    above = root_of(project.photos) if behind == 'root' else str(project.photos)
+    monkeypatch.setattr(cleanup, '_link_above', lambda folder: above)
     folders = [project.photos / name for name in ('a', 'b', 'c')]
     project.cache([(folder / f'IMG_{n}.jpg', CURRENT) for folder in folders for n in range(6)])
     folders[0].mkdir()
@@ -525,12 +530,11 @@ def test_a_root_that_stops_answering_during_the_pass_is_given_up(project, monkey
         release.set()
     category = scan['cache_missing']
     assert category['items'] == []
-    # the folder that hung and the rest of its root, or of the mount point the photos are
-    # on (e.g. /tmp as a tmpfs of its own in WSL2, I53)
-    above = cleanup._link_above(str(folders[0]))
+    # the folder that hung and the rest of its root or link, each worded as such
     [hung, rest] = sorted(category['notes'], key=lambda note: not note.startswith(str(folders[0])))
     assert hung.startswith(str(folders[0]) + ' ') and '6 photos' in hung
     assert rest.startswith(above + ' ') and '12 photos' in rest
+    assert ('is not reachable now' if behind == 'root' else 'cannot be reached now') in rest
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
