@@ -10,7 +10,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core.app_state import (APP_TABS, PAGE_STYLE, RESULTS_TAB, STATE_LINE_KEY,
+from framescout_core.app_state import (APP_TABS, PAGE_STYLE, RESULTS_TAB, STATE_LINE_KEY, TOOLTIP_SCRIPT,
                                        button_blocked_text, results_running_text, start_blocked_text, start_needs,
                                        start_needs_line)
 from framescout_core.cleanup import cleanup_running, count_text
@@ -376,3 +376,7 @@ with results_tab:
                        + (' too.' if quick_results else '.'))
     st.caption('The HTML galleries in the results folder link to the local thumbnails and original photos; keep '
                'the results folder together for the complete gallery.')
+
+# the script that hides tooltips left open (TOOLTIP_SCRIPT); last on the page, so the space of
+# its element is below everything else
+st.html(TOOLTIP_SCRIPT, unsafe_allow_javascript=True)

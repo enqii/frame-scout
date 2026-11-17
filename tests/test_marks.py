@@ -558,6 +558,13 @@ def test_mark_style_selectors_exist_in_the_installed_streamlit_frontend():
     # last child is the panel of the last tab
     assert any(re.search(r'"data-testid":`stTabPanel`,id:String\(\w+\),\$isActive:\w+===\w+,shouldForceMount:!0', text)
                for text in bundle)
+    # TOOLTIP_SCRIPT: an open tooltip has role="tooltip" and its id, which its element names
+    # in aria-describedby while it is open
+    assert any('role:`tooltip`' in text for text in bundle)
+    assert any(re.search(r'ariaDescribedBy:!\w+&&\w+\.isOpen\?(\w+):void 0.{0,400}\bid:\1,', text, re.DOTALL)
+               for text in bundle)
+    # and st.html runs the scripts of its HTML in the page itself
+    assert any('unsafeAllowJavascript' in text and 'document.createElement(`script`)' in text for text in bundle)
 
 
 # --- backup and restore ----------------------------------------------------------------
