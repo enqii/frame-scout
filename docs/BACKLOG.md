@@ -326,6 +326,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
       Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
+- [ ] `minor` **I56 – Project history in `.github/workflows/tests.yml` (F54 rest):** four
+      comments still name backlog IDs (F47, E4/E5, I9, I50). The agents' GitHub token has no
+      `workflow` scope, so a push that changes a workflow file is rejected; the user removes
+      the four IDs by hand (the reasons stay: "on Linux", "which needs numpy", "change the
+      SHA and its version comment together", "the private Python that Install-FrameScout.bat
+      downloads"). Found on 2026-11-17 in PR #154. Size XS.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
@@ -485,7 +491,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `CLAUDE.md`, `.claude/skills/roadmap/` briefs, all Python modules and tests,
       `docs/ARCHITECTURE.md` where it relies on IDs in the code. Risks: a "why" that only the
       history note carried is rewritten as a reason, not deleted. Decided 2026-11-17: yes,
-      roadmap P53 (1)–(4); rule added in [PR #152](https://github.com/enqii/frame-scout/pull/152), `framescout_core/` (2) cleaned in [PR #153](https://github.com/enqii/frame-scout/pull/153), (3)–(4) are open. Size S (rule) + M (cleanup). Idea of 2026-11-17.
+      roadmap P53 (1)–(4); rule added in [PR #152](https://github.com/enqii/frame-scout/pull/152), `framescout_core/` (2) cleaned in [PR #153](https://github.com/enqii/frame-scout/pull/153), the root files (3) in [PR #154](https://github.com/enqii/frame-scout/pull/154) (except `.github/workflows/tests.yml`, I56), (4) is open. Size S (rule) + M (cleanup). Idea of 2026-11-17.
 - [ ] `decision` **F56 – Feature review: what FrameScout really needs (recurring):** after I44 most
       of the size is features: search core about 3,400 lines, UI 2,700, user state 2,000,
       installation and housekeeping 3,200, extra features (time estimate, quick search,
