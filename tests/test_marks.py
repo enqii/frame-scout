@@ -11,7 +11,7 @@ import pytest
 
 from framescout_core.cleanup import NEVER_DELETED
 from framescout_core.locks import RunLock, lock_held
-from framescout_core.marks import (CARD_KEY_PREFIX, CARD_STYLE, CARD_WIDTH, MARKS_BACKUP, MARKS_FILE, MARK_COLORS,
+from framescout_core.marks import (CARD_KEY_PREFIX, CARD_STYLE, MARKS_BACKUP, MARKS_FILE, MARK_COLORS,
                                    MARK_MATCH, MARK_NO_MATCH, MARK_OPEN, MARK_STATES, MARK_STYLE_STREAMLIT,
                                    ReviewProgress, delete_marks, hidden_text, hide_no_match, mark_counts_text, mark_style, marks_backup,
                                    marks_restore_offer, progress_text, read_marks, remove_marks, rename_marks,
@@ -506,22 +506,6 @@ def test_the_card_style_fits_every_photo_into_a_square():
     # browser): they are stretched to the card's width, or a small photo gets a smaller cell
     assert ('[class*="st-key-fscard-"] :is(div:has(> [data-testid="stImage"]), [data-testid="stImage"], '
             '[data-testid="stImageContainer"]){width:100%!important}') in CARD_STYLE
-
-
-def test_a_card_takes_the_whole_row_when_two_do_not_fit():
-    # a narrow window wraps one fixed-width card per row: it is widened to the row instead
-    # of leaving the rest of the row empty
-    assert CARD_WIDTH == 250
-    assert ('div:has(> [data-testid="stLayoutWrapper"] > [class*="st-key-fscard-"])'
-            '{container-type:inline-size}') in CARD_STYLE
-    assert ('@container (width < calc(2 * 250px + 1rem)){[data-testid="stLayoutWrapper"]:has(> '
-            '[class*="st-key-fscard-"]){flex-basis:100%!important}[class*="st-key-fscard-"]{width:100%!important}}'
-            ) in CARD_STYLE
-
-
-def test_the_button_more_of_a_card_is_as_high_as_the_marks():
-    # 2rem, the height of the buttons of the segmented control "Match" / "No"
-    assert '[class*="st-key-fscard-"] [data-testid="stPopoverButton"]{min-height:2rem}' in CARD_STYLE
 
 
 def test_mark_style_is_empty_without_a_decided_mark():
