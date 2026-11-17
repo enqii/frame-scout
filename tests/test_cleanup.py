@@ -525,10 +525,12 @@ def test_a_root_that_stops_answering_during_the_pass_is_given_up(project, monkey
         release.set()
     category = scan['cache_missing']
     assert category['items'] == []
-    # the folder that hung and the rest of its root
+    # the folder that hung and the rest of its root, or of the mount point the photos are
+    # on (e.g. /tmp as a tmpfs of its own in WSL2, I53)
+    above = cleanup._link_above(str(folders[0]))
     [hung, rest] = sorted(category['notes'], key=lambda note: not note.startswith(str(folders[0])))
     assert hung.startswith(str(folders[0]) + ' ') and '6 photos' in hung
-    assert rest.startswith(root_of(project.photos) + ' ') and '12 photos' in rest
+    assert rest.startswith(above + ' ') and '12 photos' in rest
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
