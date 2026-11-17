@@ -13,6 +13,7 @@ The package is this one file; it stays a package rather than a module framescout
 because a package folder left by an older version extracted into the same folder would win
 over a module of the same name.
 """
+import math
 from typing import NamedTuple, Optional
 
 import numpy as np
@@ -150,13 +151,15 @@ def score_histogram(scores, bins=HISTOGRAM_BINS):
     """Histogram of the scores of every photo of a search for one profile, or None for no photos.
 
     Returns {'low', 'high', 'counts'}: bins equal bins from low to high (the lowest and
-    highest score; numpy widens a range of one value by 0.5 on each side), rounded to
-    HISTOGRAM_DIGITS, for the app's score distribution in the result file.
+    highest score; numpy widens a range of one value by 0.5 on each side), rounded outwards
+    to HISTOGRAM_DIGITS so that the range still holds every score, for the app's score
+    distribution in the result file.
     """
     if not len(scores):
         return None
     counts, edges = np.histogram(np.asarray(scores, dtype=np.float64), bins=bins)
-    return {'low': round(float(edges[0]), HISTOGRAM_DIGITS), 'high': round(float(edges[-1]), HISTOGRAM_DIGITS),
+    scale = 10 ** HISTOGRAM_DIGITS
+    return {'low': math.floor(edges[0] * scale) / scale, 'high': math.ceil(edges[-1] * scale) / scale,
             'counts': [int(c) for c in counts]}
 
 

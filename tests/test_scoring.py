@@ -252,6 +252,11 @@ def test_score_histogram_counts_every_photo_in_equal_bins_over_the_score_range()
     assert score_histogram([-1.0, 0.0, 0.1, 2.0, 3.0], bins=4) == {'low': -1.0, 'high': 3.0, 'counts': [1, 2, 0, 2]}
 
 
+def test_score_histogram_range_rounded_outwards_still_holds_every_score():
+    histogram = score_histogram([-1.23454, 0.98766])
+    assert histogram['low'] <= -1.23454 and histogram['high'] >= 0.98766
+
+
 def test_score_histogram_of_equal_scores_has_a_range_and_no_photos_give_none():
     histogram = score_histogram([0.5] * 3, bins=2)
     assert histogram['low'] < 0.5 < histogram['high'] and sum(histogram['counts']) == 3
