@@ -1,6 +1,7 @@
 """Copying the marked matches and exporting the result list of a profile.
 
-Both are in the popover "Export and copy" of the results toolbar.
+Both are in the popover "Export and copy" of the results toolbar; each of its buttons
+closes it, and the outcome is shown below the toolbar.
 """
 from pathlib import Path
 
@@ -13,8 +14,8 @@ from framescout_core.exporting import EXPORTS_DIR, export_cards, export_result_l
 from framescout_core.marks import MARKS_FILE, MARK_MATCH, MARK_NO_MATCH, read_marks
 from framescout_core.profiles import UnknownProfileError
 
-from .common import (EXPORTS, MARKS, PROFILES, RESULTS, SETTINGS, gallery_action, open_path, pictures_folder, plain,
-                     version_key, widget_id)
+from .common import (EXPORTS, MARKS, PROFILES, RESULTS, SETTINGS, close_popover, gallery_action, open_path,
+                     pictures_folder, plain, version_key, widget_id)
 
 
 @st.cache_data(show_spinner=False, max_entries=2)
@@ -50,8 +51,20 @@ def set_copy_folder(profile, key, default):
         unsaved.pop(profile, None)
 
 
-def copy_matches(profile, key, photo_folders):
-    """Copy the photos of profile marked as match into the folder typed into the field key.
+def request_copy(profile, key):
+    """Ask this page run to copy the matches of profile to the folder typed into the field key (on_click)."""
+    st.session_state.copy_request = (profile, st.session_state.get(key, ''))
+
+
+def run_copy_request(profile, photo_folders):
+    """Run the copy the button "Copy marked photos" asked for, if it was for profile."""
+    request = st.session_state.pop('copy_request', None)
+    if request and request[0] == profile:
+        copy_matches(profile, request[1], photo_folders)
+
+
+def copy_matches(profile, folder, photo_folders):
+    """Copy the photos of profile marked as match into folder (the text typed as target folder).
 
     Runs in the page run (not in a callback) with a progress bar: a reload, closing the tab
     or another click in the gallery stops it between two photos.
@@ -61,7 +74,7 @@ def copy_matches(profile, key, photo_folders):
     except (OSError, ValueError) as exc:
         st.warning(plain(f'Nothing was copied: {exc}'))
         return
-    target, problem = copy_target(st.session_state.get(key, ''), photo_folders, paths)
+    target, problem = copy_target(folder, photo_folders, paths)
     if problem:
         st.warning(plain(problem))
         return
@@ -124,12 +137,12 @@ def open_target_folder(key, photo_folders):
     gallery_action(open_path, target if target is not None and target.is_dir() else None, f'The folder {target}')
 
 
-def show_copy(name, entry, marks, photo_folders, profile_exists, notices):
+def show_copy(name, entry, marks, photo_folders, profile_exists, popover):
     """Copying the photos of profile name marked as match to a folder, in the popover "Export and copy".
 
     The target folder can be changed only for a profile that still exists: it is saved under
-    the profile name, which a later profile could take. notices: the container below
-    the toolbar that shows the copy's progress and result, also when the popover is closed.
+    the profile name, which a later profile could take. popover: the key of the popover,
+    closed by the buttons; the copy runs below the toolbar (run_copy_request).
     """
     st.markdown('**Copy marked matches**')
     matches = [photo for photo, state in marks.items() if state == MARK_MATCH]
@@ -154,19 +167,17 @@ def show_copy(name, entry, marks, photo_folders, profile_exists, notices):
     if problem:
         st.warning(plain(problem))
     c1, c2 = st.columns(2)
-    copy = c1.button(f"Copy {count_text(len(matches), 'marked photo', 'marked photos')}",
-                     disabled=not matches or target is None, width='stretch')
-    c2.button('Open target folder', on_click=open_target_folder, args=(key, photo_folders),
+    c1.button(f"Copy {count_text(len(matches), 'marked photo', 'marked photos')}", on_click=close_popover,
+              args=(popover, request_copy, name, key), disabled=not matches or target is None, width='stretch')
+    c2.button('Open target folder', on_click=close_popover, args=(popover, open_target_folder, key, photo_folders),
               disabled=target is None or not target.is_dir(), width='stretch')
-    if copy:
-        with notices:
-            copy_matches(name, key, photo_folders)
 
 
-def show_export(name, entry, marks, marks_error, notices):
+def show_export(name, entry, marks, marks_error, popover):
     """Exporting the result list of profile name as a CSV table and a file list, in "Export and copy".
 
-    notices: the container below the toolbar that shows the result of the last export.
+    popover: the key of the popover, closed by the buttons; the result of the export is
+    shown below the toolbar (export_notice).
     """
     st.markdown('**Export list**')
     # one short line, the rest behind the help icon (a long caption would widen the popover)
@@ -175,18 +186,17 @@ def show_export(name, entry, marks, marks_error, notices):
                     'as a text file with one path per line, e.g. for a cataloging program. The paths are those of '
                     'this computer; an export never replaces an earlier one.')
     key = 'export_matches_' + widget_id(name)
-    only = st.checkbox('Only photos marked as match', key=key, disabled=marks_error is not None,
+    # persist_state: kept while the popover is closed, which does not draw the box
+    only = st.checkbox('Only photos marked as match', key=key, disabled=marks_error is not None, persist_state='page',
                        help='Only the photos of this list marked as match. Photos marked as match in an earlier '
                             'search that are not in this list are not exported: they have no rank or score here.')
     only = only and marks_error is None
     count = len(export_cards(entry['cards'], marks, only))
     if marks_error is not None:
         st.caption(f'{MARKS_FILE} cannot be read: the mark column of the list stays empty.')
-    if 'export_notice' in st.session_state:
-        kind, text = st.session_state.pop('export_notice')
-        with notices:
-            (st.success if kind == 'success' else st.warning)(plain(text))
     c1, c2 = st.columns(2)
-    c1.button(f"Export {count:,} photo{'' if count == 1 else 's'}", on_click=export_list, args=(name, entry['gallery'], entry['cards'], only),
-              disabled=not count, width='stretch', key='export_list')
-    c2.button('Open exports folder', on_click=open_exports_folder, disabled=not EXPORTS.is_dir(), width='stretch')
+    c1.button(f"Export {count:,} photo{'' if count == 1 else 's'}", on_click=close_popover,
+              args=(popover, export_list, name, entry['gallery'], entry['cards'], only), disabled=not count,
+              width='stretch', key='export_list')
+    c2.button('Open exports folder', on_click=close_popover, args=(popover, open_exports_folder),
+              disabled=not EXPORTS.is_dir(), width='stretch')

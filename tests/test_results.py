@@ -121,7 +121,7 @@ def test_the_results_have_one_toolbar_row_above_the_photos():
     assert [row.index(text) for text in order] == sorted(row.index(text) for text in order)
     # copy, export and the gallery's buttons are in the popover, no longer below the grid
     [popover] = with_blocks(functions['show_profile_results'], "st.popover('Export and copy'")
-    for call in ('show_gallery_actions(entry)', 'show_copy(', 'show_export('):
+    for call in ('show_gallery_actions(entry', 'show_copy(', 'show_export('):
         assert call in popover
     [row] = with_blocks(functions['show_quick_results'], 'toolbar')
     assert "st.selectbox(f'Page (of {pages})'" in row and "st.popover('Gallery and folder'" in row
@@ -145,9 +145,6 @@ def test_the_popover_more_of_a_card_closes_after_its_action():
     assert {k.arg: ast.unparse(k.value) for k in similar.keywords} == {'close': 'more_key'}
     button = ast.unparse(functions['find_similar_button'])
     assert 'on_click=close_popover if close else None' in button and 'args=(close,)' in button
-    # the popover "Export and copy" stays open: its buttons are used one after another
-    [export] = with_blocks(functions['show_profile_results'], "st.popover('Export and copy'")
-    assert 'close_popover' not in export
     closing = ast.unparse(functions['close_popover'])
     assert 'st.session_state[key] = False' in closing
 
@@ -187,19 +184,33 @@ def call_name(call):
     return call.func.id if isinstance(call.func, ast.Name) else ast.unparse(call.func)
 
 
-def test_the_notices_of_copy_and_export_are_shown_outside_the_popover():
-    # a closed popover must not hide the result of a copy or an export: both are drawn
-    # into the container notices below the toolbar
+def test_the_popover_export_and_copy_closes_after_its_actions():
+    # its notices are drawn below the toolbar, which the open popover would cover: like
+    # "More", it tracks its state under a key and each of its buttons closes it
     functions = app_functions()
+    [popover] = [node for node in ast.walk(functions['show_profile_results']) if isinstance(node, ast.With)
+                 and ast.unparse(node.items[0].context_expr).startswith("st.popover('Export and copy'")]
+    keywords = {k.arg: ast.unparse(k.value) for k in popover.items[0].context_expr.keywords}
+    assert keywords['on_change'] == "'rerun'" and keywords['key'] == 'EXPORT_POPOVER'
+    calls = {ast.unparse(node.func): node for node in ast.walk(popover) if isinstance(node, ast.Call)}
+    for name in ('show_gallery_actions', 'show_copy', 'show_export'):
+        assert ast.unparse(calls[name].args[-1]) == 'EXPORT_POPOVER'
+        buttons = [node for node in ast.walk(functions[name]) if isinstance(node, ast.Call)
+                   and ast.unparse(node.func) in ('st.button', 'c1.button', 'c2.button')]
+        assert buttons
+        for button in buttons:
+            found = {k.arg: ast.unparse(k.value) for k in button.keywords}
+            assert found['on_click'] == 'close_popover' and found['args'].startswith('(popover, ')
 
-    def names_in_notices(function):
-        """The names (e.g. copy_matches, st.success) used inside a with block of notices."""
-        return {ast.unparse(node) for block in ast.walk(function) if isinstance(block, ast.With)
-                and ast.unparse(block.items[0].context_expr) == 'notices'
-                for node in ast.walk(block) if isinstance(node, (ast.Name, ast.Attribute))}
 
-    assert 'copy_matches' in names_in_notices(functions['show_copy'])
-    assert {'st.success', 'st.warning'} <= names_in_notices(functions['show_export'])
+def test_the_notices_of_copy_and_export_are_shown_below_the_toolbar():
+    # drawn into the container notices below the toolbar, after the popover closed; the
+    # copy runs in the page run, with its progress bar there
+    functions = app_functions()
+    notices = [ast.unparse(block) for block in ast.walk(functions['show_profile_results'])
+               if isinstance(block, ast.With) and ast.unparse(block.items[0].context_expr) == 'notices']
+    assert any("show_notice('export_notice')" in block for block in notices)
+    assert any('run_copy_request(name, photo_folders)' in block for block in notices)
 
 
 def test_an_empty_row_of_card_text_keeps_its_line():
