@@ -10,8 +10,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core.app_state import (APP_TABS, PAGE_STYLE, RESULTS_TAB, button_blocked_text, results_running_text,
-                                       start_blocked_text, start_needs, start_needs_line)
+from framescout_core.app_state import (APP_TABS, PAGE_STYLE, RESULTS_TAB, STATE_LINE_KEY,
+                                       button_blocked_text, results_running_text, start_blocked_text, start_needs,
+                                       start_needs_line)
 from framescout_core.cleanup import cleanup_running, count_text
 from framescout_core.estimate import finishing_minutes, gallery_thumbnails, known_throughput, start_summary
 from framescout_core.models import MODELS
@@ -42,10 +43,12 @@ st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
 # a width limit for the other tabs
 st.markdown(PAGE_STYLE, unsafe_allow_html=True)
 
-title_col, state_col = st.columns([1, 2], vertical_alignment='bottom')
-title_col.title('🔎 FrameScout')
+# the title at its own width and the state line in the rest of the row, or below the title
+# when the rest is narrower than STATE_LINE_MIN_WIDTH (PAGE_STYLE)
+header = st.container(horizontal=True, vertical_alignment='bottom', gap='medium')
+header.title('🔎 FrameScout', width='content')
 # the run state on every tab, filled once the photos are counted (below)
-state_area = state_col.container()
+state_area = header.container(key=STATE_LINE_KEY)
 st.caption('Local AI search in large photo collections · your images stay on your computer')
 
 # "Find similar" clicked on a result card: its fragment asked this page run to start it.
