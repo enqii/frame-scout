@@ -72,6 +72,10 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   change (e.g. `tests/test_example_profiles.py`), otherwise rely on CI.
 - **TDD** for behavior changes: write the failing test first, see it fail, implement,
   see it pass. Tests must not download models or need torch unless the item says so.
+  Test only what is necessary (`CLAUDE.md` → "Engineering principles" 5): no tests for
+  message wording or hypothetical cases; a removed feature takes its tests with it.
+- Code comments and docstrings you write or touch state what and why, never history:
+  no backlog IDs, "(review)", dates or "user decision" notes (`CLAUDE.md` principle 8).
 - Smoke run with real models (asks for approval; set the cache variables first, see
   "User data protection" in `CLAUDE.md`), e.g. in PowerShell from the worktree root:
 

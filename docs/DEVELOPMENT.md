@@ -83,6 +83,10 @@ The tests need neither torch nor a model download:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+Test only what is necessary (`CLAUDE.md` → "Engineering principles" 5): behavior that would hurt
+if it broke (user data, the cache signature, scoring, file formats, the CLI contract). A fixed bug
+gets a test only if it can plausibly come back; message wording and hypothetical cases get none.
+
 GitHub runs them on Windows and Linux (Ubuntu) with Python 3.14 for every pull request and
 every push to `main` (`.github/workflows/tests.yml`). On Linux the paths are
 `.venv/bin/python` and `requirements/…`; the tests that run the `.bat` files run only on

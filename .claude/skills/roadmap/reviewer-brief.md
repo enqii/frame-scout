@@ -71,6 +71,10 @@ findings like any other. Do not report hypothetical rare cases as fixes or backl
 default is "declined, known limit" (`CLAUDE.md` → "Engineering principles") unless user data
 is at risk. Check the PR's "Net line change" section and the 300-line rule.
 
+Check the diff against `CLAUDE.md` → "Engineering principles" 5 and 8: new or touched code
+comments and docstrings that record history (backlog IDs, "(review)", dates, "user decision"),
+and tests that pin message wording, hypothetical cases or a removed feature are findings.
+
 Review against `CLAUDE.md` as well: project language English, Conventional Commits,
 user data untouched, tests executed vs. claimed, general-purpose wording, and the
 definition of done in `.github/pull_request_template.md`.
