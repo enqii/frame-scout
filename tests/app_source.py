@@ -1,6 +1,6 @@
 """The source of the Streamlit app for tests that read it (the app imports streamlit, CI has none).
 
-Since A46 the app is app.py (the page layout) plus the modules of the package framescout_ui.
+The app is app.py (the page layout) plus the modules of the package framescout_ui.
 """
 import ast
 from pathlib import Path
@@ -30,6 +30,6 @@ def app_tree():
 def page_tree():
     """The syntax tree of app.py alone, the page run: for checks that compare line numbers.
 
-    Line numbers of app_tree() come from different files and must not be compared (review).
+    Line numbers of app_tree() come from different files and must not be compared.
     """
     return ast.parse(APP.read_text(encoding='utf-8'), str(APP))

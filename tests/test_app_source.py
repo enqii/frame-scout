@@ -1,4 +1,4 @@
-"""The app's files fit together (A46): app.py and the modules of framescout_ui.
+"""The app's files fit together: app.py and the modules of framescout_ui.
 
 The app imports streamlit, which CI does not install, so the tests never import it and CI only
 compiles it: a name lost when code moved between app.py and a module would only fail when the

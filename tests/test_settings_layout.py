@@ -1,4 +1,4 @@
-"""The AI settings of the tab "Settings" in two groups (F32), read from the app's source (CI has no streamlit)."""
+"""The AI settings of the tab "Settings" in two groups, read from the app's source (CI has no streamlit)."""
 import ast
 
 from app_source import UI_PACKAGE
@@ -65,7 +65,7 @@ def details_expander():
 
 def test_the_expander_does_not_close_by_itself_while_the_user_edits():
     # Streamlit closes an open expander when `expanded` turns False on a rerun, e.g. after a
-    # value is set back to its default (review): `expanded` only ever turns True in a session
+    # value is set back to its default: `expanded` only ever turns True in a session
     [expanded] = [keyword.value for keyword in details_expander().items[0].context_expr.keywords
                   if keyword.arg == 'expanded']
     assert ast.unparse(expanded) == "st.session_state.get('ai_details_open', False)"
@@ -120,6 +120,6 @@ def test_the_caption_explains_the_disabled_person_settings_in_the_expander():
 
 
 def test_the_widgets_get_their_values_only_through_the_session_state():
-    # CLAUDE.md gotcha (PR #10 review): never value= or index=
+    # CLAUDE.md gotcha: never value= or index=
     for name, (call, _) in setting_widgets().items():
         assert not {keyword.arg for keyword in call.keywords} & {'value', 'index'}, name
