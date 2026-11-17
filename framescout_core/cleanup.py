@@ -19,20 +19,18 @@ from .settings import SETTINGS_FILE
 from .signature import CACHE_FILE, CACHE_SIDE_FILES, classify_signatures, engine_id
 
 
-# Cleanup: the app's
-# "Clean up storage" lists what FrameScout no longer needs per category and deletes the
-# selected categories permanently after a confirmation, holding the run lock of the
+# Cleanup: the app's "Clean up storage" lists what FrameScout no longer needs per category
+# and deletes the selected categories permanently after a confirmation, holding the run lock of the
 # results folder; at the end of every search the engine itself removes the harmless part
 # (temporary and unreferenced thumbnails, and the stale temporary files of the status,
 # result and marks file and of the galleries: auto_cleanup). Never deleted: the marks file
 # (only single marks of photos that no longer exist, if the user selects them), the run,
 # status and result files, the cache file itself, settings and profiles.
-# Unbound entries: cache rows and marks stay keyed by the
-# absolute photo path, so a renamed or moved photo counts as a new one; the old rows and
-# marks stay until the cleanup offers them as "unbound" (photo gone, its drive reachable and
-# its folder there and not empty).
+# Unbound entries: cache rows and marks stay keyed by the absolute photo path, so a renamed
+# or moved photo counts as a new one; the old rows and marks stay until the cleanup offers
+# them as "unbound" (photo gone, its drive reachable and its folder there and not empty).
 THUMBNAILS_DIR = 'thumbnails'
-# the thumbnail folder of older versions: no longer written, still linked by their galleries
+# a thumbnail folder name that is no longer written but still linked by existing galleries
 LEGACY_THUMBNAILS_DIR = 'vorschaubilder'
 # every gallery the engine has written (also v1.1) has this title
 GALLERY_MARKER = '<title>FrameScout – '
@@ -40,11 +38,11 @@ CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missi
                       'cache_old', 'cache_other', 'cache_models', 'references', 'broken_files')
 # the categories of cache rows (deleted by signature, except cache_missing: by path and signature)
 CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
-# selected when a scan is shown; cache rows and marks of unbound photos (any folder searched so
-# far; a drive letter another disk got makes photos look unbound), reference images, rows
-# of other current settings, rows of other search models, marks of names that are no
-# profile (a profile of that name may come back) and the damaged files set aside (the
-# user may want to repair one) are not
+# selected when a scan is shown. Not selected: cache rows and marks of unbound photos (any
+# folder searched so far; a drive letter another disk got makes photos look unbound),
+# reference images, rows of other current settings, rows of other search models, marks of
+# names that are no profile (a profile of that name may come back) and the damaged files
+# set aside (the user may want to repair one)
 CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': False,
                     'marks_unbound': False, 'marks_profiles': False, 'cache_old': True, 'cache_other': False,
                     'cache_models': False, 'references': False, 'broken_files': False}
@@ -358,9 +356,10 @@ def _read_cache(cache):
 def _unbound_rows(rows, check, among=None):
     """The cache_missing category: the rows [(path, signature, size)] whose photo no longer exists.
 
-    Wherever the photo was, also outside the current photo folders (
-    a renamed or moved photo counts as a new one, its old rows are unbound); check: the
-    _PathCheck of this scan or deletion step; among: only these (path, signature) pairs (None: all).
+    Wherever the photo was, also outside the current photo folders; a renamed or moved
+    photo counts as a new one, so its old rows are unbound.
+    check: the _PathCheck of this scan or deletion step; among: only these (path, signature)
+    pairs (None: all).
     """
     if among is not None:
         rows = [row for row in rows if (row[0], row[1]) in among]
@@ -433,8 +432,9 @@ def _read_marks_entries(results):
 def _unbound_marks(entries, check, among=None):
     """The marks_unbound category: the marks of photos that no longer exist.
 
-    Kept by default: the photo may come back. entries:
-    _attempt(_read_marks_entries) of the results folder; check, among: as for _unbound_rows.
+    Kept by default: the photo may come back.
+    entries: _attempt(_read_marks_entries) of the results folder; check, among: as for
+    _unbound_rows.
     """
     if isinstance(entries, ValueError):
         return _category('marks_unbound', problem=f'Not offered: {entries}.', notes=[])
@@ -450,8 +450,8 @@ def _unbound_marks(entries, check, among=None):
 def _profile_marks(entries, profiles):
     """The marks_profiles category: the marks of names that are no profile of profiles.
 
-    E.g. of a profile an older version deleted without its marks: a new
-    profile of that name would get them. entries: _attempt(_read_marks_entries); profiles:
+    E.g. of a profile that was deleted without its marks: a new profile of that name would
+    get them. entries: _attempt(_read_marks_entries); profiles:
     the current profile list, or a ValueError if it cannot be read (nothing is offered then).
     Names are compared exactly, like require_profile.
     """
@@ -506,8 +506,8 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
 
     results: the results folder; profiles_file: the app's profiles.json; refs_root: the
     references folder; current_signature: the cache signature of the current settings
-    (never offered); current_model: the search model key of the current settings (
-    required, as the signature, a hash, does not tell it): rows of the other registered
+    (never offered); current_model: the search model key of the current settings
+    (required, as the signature, a hash, does not tell it): rows of the other registered
     models are cache_models, not cache_old; progress(done, total): called while the photos
     of the cache rows and marks are checked (one pass, per folder; the slow part).
     Each category of CLEANUP_CATEGORIES has items (paths; (path, signature) rows for
