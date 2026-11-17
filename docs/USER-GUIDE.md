@@ -348,7 +348,8 @@ no button.
 **Results** shows the last finished search per profile: one card per photo, best first, 48 per
 page. The photo is fitted whole into a square box, so every card has the same size (portrait
 and landscape photos alike), and the cards use the whole window width (cards 250 px wide, as many
-per row as fit; the other tabs stay at most 1,300 px wide). A card shows rank, score and the best-matching part
+per row as fit, one card across the whole width in a window too narrow for two; the other tabs stay at most
+1,300 px wide). A card shows rank, score and the best-matching part
 ("Full image" or "Person 1", …), the detail line and the file name; a long line ends with "…" and
 shows its whole text when you hover over it. The buttons **Match** and **No** mark the photo;
 **More** opens a menu with "Open photo", "Show in folder" and "Find similar"; the menu closes
@@ -359,8 +360,8 @@ Above the photos sits one row: the selector "Results of", the counts of the prof
 · 30 no match · 58 undecided"; hover over them for how to mark), the checkbox **Hide no match**,
 the page box, the button **Review one by one** (see "Reviewing one photo at a time") and the menu
 **Export and copy**. The menu holds "Open gallery in browser", "Download HTML (without
-thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export list" (see below); it
-stays open, so you can use them one after another. The quick search result has the same row with the menu **Gallery and folder**.
+thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export list" (see below); each
+of its buttons closes it, so you see the message of a copy or an export below the row. The quick search result has the same row with the menu **Gallery and folder**.
 Below the row come one caption about the search and only the notes that apply (another search
 model, a profile changed, renamed or deleted since the search, the state of the other profiles,
 an unreadable `marks.json`), then the messages of copying and exporting. Below the photos
