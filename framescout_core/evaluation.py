@@ -1,4 +1,4 @@
-"""Search-model evaluation (E32, E20): scores file, labels, candidate pool and AP@k.
+"""Search-model evaluation: scores file, labels, candidate pool and AP@k.
 
 The engine writes the raw per-crop similarities of a search to a scores file
 (--scores-file); the evaluation tool framescout_eval.py ranks them with the engine's
@@ -16,7 +16,7 @@ from ._common import _read_json_object, _replace_atomically
 
 SCORES_FORMAT = 1
 LABELS_FORMAT = 1
-# AP@40, as in the first evaluation (PR #11): about the first page of a gallery
+# AP@40, as in the first evaluation: about the first page of a gallery
 EVAL_K = 40
 # digits kept of each similarity in the scores file (the cache stores float16 anyway)
 SCORE_DIGITS = 6
@@ -70,7 +70,7 @@ def scores_document(model, signature, photos, profiles):
 def write_document(path, document, indent=None):
     """Write the JSON object document to path atomically (its folder is created).
 
-    ValueError for NaN or infinity, which standard JSON cannot hold (review).
+    ValueError for NaN or infinity, which standard JSON cannot hold.
     """
     path = Path(path)
     text = json.dumps(document, ensure_ascii=False, indent=indent, allow_nan=False)
@@ -140,10 +140,10 @@ def read_labels(path):
 
 def read_label_file(path):
     """Return (labels, motifs) of a labels file, read once: its labels as read_labels returns them
-    and {profile: motif}, the motif each profile's labels were made for (E36).
+    and {profile: motif}, the motif each profile's labels were made for.
 
     A missing file, or one of an earlier version, has no motifs ({}). Motifs that are not
-    readable give None and leave the labels usable (review): pool and metrics only cannot
+    readable give None and leave the labels usable: pool and metrics only cannot
     compare them, and the labelling page refuses to save over them. Keys a later version
     adds to a motif are kept and not compared.
     """
@@ -167,7 +167,7 @@ def read_label_file(path):
 def save_labels(path, labels, motifs=None):
     """Write labels ({profile: {photo path: bool}}) to path atomically (its folder is created).
 
-    motifs ({profile: motif}, record_motif) are saved with them if there are any (E36).
+    motifs ({profile: motif}, record_motif) are saved with them if there are any.
     """
     document = {'format': LABELS_FORMAT, 'labels': labels}
     if motifs:
@@ -180,7 +180,7 @@ _MOTIF_FIELDS = (('context', 'context'), ('features', 'features'), ('references'
 
 
 def motif(context, features, references):
-    """Return the motif a profile describes: its context, features and reference images (E36).
+    """Return the motif a profile describes: its context, features and reference images.
 
     Its prompts are left out: they may be reworded under the same name to compare wordings
     on the same labels.
@@ -192,7 +192,7 @@ def record_motif(motifs, labels, profile, current):
     """Return a copy of motifs after a label of profile was set or cleared (labels: all labels after it).
 
     A profile with labels and no motif yet gets current, the motif of the label just set
-    (None: not known, nothing is recorded; review); a recorded one is kept, so labels of an
+    (None: not known, nothing is recorded); a recorded one is kept, so labels of an
     earlier motif under the same name stay visible (changed_motifs) until they are cleared.
     Profiles without labels lose their motif.
     """

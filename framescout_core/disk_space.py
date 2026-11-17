@@ -1,7 +1,7 @@
-"""Free disk space checks before installing PyTorch and before a search (F3).
+"""Free disk space checks before installing PyTorch and before a search.
 
 A full disk leaves a broken .venv, a half-downloaded model or failed cache commits, so
-install_torch.py, the app and the evaluation tool (framescout_eval.py run, E51) compare
+install_torch.py, the app and the evaluation tool (framescout_eval.py run) compare
 what they are about to write with the free space of each drive involved. The sizes are
 estimates on the safe side; the result is a warning, never a block.
 """
@@ -20,7 +20,7 @@ from .photos import _file_stat, _file_times
 from .signature import DEFAULT_YOLO_MODEL
 
 # in the units size_text shows them in (and Windows Explorer shows free space in): a "GB"
-# here is 1024 ** 3 bytes, so 1.2 GB in the code reads 1.2 GB in a warning (review)
+# here is 1024 ** 3 bytes, so 1.2 GB in the code reads 1.2 GB in a warning
 _MB = 1024 ** 2
 _GB = 1024 ** 3
 # what installing PyTorch writes, about (download, installed) per kind of build: pip
@@ -30,7 +30,7 @@ _GB = 1024 ** 3
 # Windows); the CUDA build is about 2.5 GB to download and was not measured unpacked.
 TORCH_INSTALL_SPACE = {'cpu': (300 * _MB, 1200 * _MB), 'cuda': (3 * _GB, 6 * _GB)}
 # the part of it the other packages of requirements.txt take, installed after PyTorch: what a
-# rerun of the installer needs when PyTorch is there but they are not (review; an estimate)
+# rerun of the installer needs when PyTorch is there but they are not (an estimate)
 OTHER_PACKAGES_SPACE = (200 * _MB, 400 * _MB)
 # the feature cache rows of one photo: float16 embeddings of the whole image and of the
 # person crops (about 2-3 KB per photo on average), with room for SQLite
@@ -42,7 +42,7 @@ DETECTOR_DOWNLOAD = 6 * _MB
 # a drive should keep at least this much free after the install or search
 SPACE_RESERVE = 1 * _GB
 # seconds a drive or share root may take to answer before the check leaves it out: a stat on
-# a disconnected network share can hang far longer, and the app checks on its page runs (review)
+# a disconnected network share can hang far longer, and the app checks on its page runs
 SPACE_CHECK_TIMEOUT = 1.0
 
 _SIZE = re.compile(r'(\d+(?:\.\d+)?) (MB|GB)')
@@ -88,8 +88,8 @@ def analyzed_photos(cache_file, signature, paths, stats=None):
 def analyzed_paths(cache_file, signature, paths, stats=None):
     """Return the set of the photo paths that have a current row of signature in the feature cache cache_file.
 
-    A row is current, as for the engine, if its modification time and size are the photo's
-    (A44): a photo edited since its analysis is analyzed again. stats: {path: (mtime_ns,
+    A row is current, as for the engine, if its modification time and size are the photo's:
+    a photo edited since its analysis is analyzed again. stats: {path: (mtime_ns,
     size)} as the photo scan saw them (PhotoScan.stats), so that a large collection is not
     read again on every count. Only a photo whose row differs from them (or that has none
     in stats) is looked at now, so a photo analyzed again by a search after the scan still
@@ -138,7 +138,7 @@ def search_space_needs(results, photos, top, profiles, model, hub_cache, detecto
 
 def eval_run_needs(runs, photos, top, profiles, hub_cache, detector_weights=None, timeout=SPACE_CHECK_TIMEOUT,
                    reachable=_reachable_roots):
-    """Return the (folder, bytes) pairs the runs of the evaluation tool write (E51).
+    """Return the (folder, bytes) pairs the runs of the evaluation tool write.
 
     runs are (output folder, SearchModel) pairs, one per model the tool runs: each has an
     output folder and feature cache of its own, and every photo counts as new in each (on
@@ -166,10 +166,10 @@ def _download_needs(models, hub_cache, detector_weights, timeout, reachable):
 
 def app_search_needs(base, results, environ, photos, top, profiles, model, person_detection, analyzed=0,
                      timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
-    """Return the search_space_needs of a search the app starts (F3 review: tested here, not in app.py).
+    """Return the search_space_needs of a search the app starts (here, not in app.py, so that it is tested).
 
     The app runs the engine in base with the cache variables of cache_paths(base) set where
-    environ has none (cache_env, engine_cache_env; a value of the user is kept, A36), so the
+    environ has none (cache_env, engine_cache_env; a value of the user is kept), so the
     model comes from the Hugging Face cache those give (a HF_HUB_CACHE of the user is kept)
     and the person detector's weights are looked up as yolo_weights does
     (find_yolo_weights); person_detection False needs no weights.
@@ -184,7 +184,7 @@ def app_search_needs(base, results, environ, photos, top, profiles, model, perso
 
 
 def downloaded_models(base, environ, timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
-    """Return the keys of the MODELS whose files are in the Hugging Face cache the app's engine loads from (A39).
+    """Return the keys of the MODELS whose files are in the Hugging Face cache the app's engine loads from.
 
     That cache is found as in app_search_needs. If its drive does not answer within timeout
     seconds (reachable: cleanup's root probe), it is not read and no model counts as
@@ -229,7 +229,7 @@ def low_space(needs, reserve=SPACE_RESERVE, disk_usage=shutil.disk_usage):
 
     needs are (folder, bytes) pairs; a folder that does not exist yet counts on the drive of
     its nearest existing parent (nothing is created). The needs of folders with the same disk
-    usage (total, used, free) add up: one drive, however it is reached (I44). A need of 0
+    usage (total, used, free) add up: one drive, however it is reached. A need of 0
     bytes and a drive that cannot be asked give no warning; a drive that does not answer (a
     disconnected network share) holds the check up until the system gives up on it.
     """

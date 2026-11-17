@@ -1,4 +1,4 @@
-"""Exporting a result list as a CSV table and a file list (F5)."""
+"""Exporting a result list as a CSV table and a file list."""
 import csv
 import io
 from datetime import datetime
@@ -8,12 +8,12 @@ from ._common import _publish_new, _publish_via_temp
 from .marks import MARK_MATCH, MARK_NO_MATCH
 
 
-# Export (F5): the ranked photos of one profile of the last search leave the app as a CSV
+# Export: the ranked photos of one profile of the last search leave the app as a CSV
 # table and a text file with one path per line, e.g. for a cataloging program. Both are
 # written to results/exports/, never next to the photos; an export never replaces a file
 # (an earlier export or anything else), and no cleanup category lists the folder: exports
 # are the user's files. The paths are the absolute ones of this computer (like the cache
-# and the marks, E8/A21), so a list made on another PC or after moving photos may name
+# and the marks), so a list made on another PC or after moving photos may name
 # files that are not there.
 EXPORTS_DIR = 'exports'
 EXPORT_COLUMNS = ('rank', 'path', 'score', 'text_similarity', 'image_similarity', 'crop', 'mark')
@@ -64,12 +64,12 @@ def export_csv(cards, marks):
 
 def _has_line_break(path):
     # every line break str.splitlines knows: a program reading the list may split at any of them
-    # ''.splitlines() is [], so an empty path needs its own case (review)
+    # ''.splitlines() is [], so an empty path needs its own case
     return path.splitlines() not in ([path], [])
 
 
 def unlisted_paths(cards):
-    """Return the paths of cards that export_file_list leaves out: those with a line break (A42).
+    """Return the paths of cards that export_file_list leaves out: those with a line break.
 
     Possible on Linux/macOS file systems, not on Windows; one line of the list cannot hold
     such a path, so it is only in the CSV table, which quotes it.
@@ -78,7 +78,7 @@ def unlisted_paths(cards):
 
 
 def export_file_list(cards):
-    """Return the paths of cards, one per line ("\\n"), in rank order, without unlisted_paths (A42)."""
+    """Return the paths of cards, one per line ("\\n"), in rank order, without unlisted_paths."""
     return ''.join(card['path'] + '\n' for card in cards if not _has_line_break(card['path']))
 
 
@@ -101,7 +101,7 @@ def export_result_list(results, slug, cards, marks, only_matches=False, now=None
     UTF-8; the byte order mark does not set the delimiter: Excel splits a double-clicked CSV
     at the list separator of the system locale, which is ";" in German and other
     comma-decimal locales, so there the whole row lands in one column (the user guide points
-    to Data -> From Text/CSV; a ";" option is F9). The file list (export_file_list) is UTF-8
+    to Data -> From Text/CSV). The file list (export_file_list) is UTF-8
     without a byte order mark. Both get the same name
     (export_name, from now or the current time) plus "-2", "-3", ... while either name is
     taken: nothing is ever replaced. Raises ValueError if there is nothing to export

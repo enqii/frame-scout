@@ -26,7 +26,7 @@ def _path_key(path):
 
 
 def _broken_names(path, now=None):
-    """Yield the names to keep a damaged file path under: <name>.broken-<YYYYMMDD-HHMMSS>, then -2, -3, ... (F1).
+    """Yield the names to keep a damaged file path under: <name>.broken-<YYYYMMDD-HHMMSS>, then -2, -3, ...
 
     The local time of now (a time.time() value; None: the current time). The caller takes
     the first name that is free.
@@ -98,7 +98,7 @@ def _publish_together(files, attempts, retry_delay, replace=os.replace):
     every target as it was. If a rename fails every try, the targets replaced before it get
     their previous content back (one that did not exist is removed again) as far as that
     works, and the error is raised; only a process killed between the renames, or a failed
-    restore, can leave some targets replaced (E45). The temporary files are removed whatever
+    restore, can leave some targets replaced. The temporary files are removed whatever
     happens (a process killed meanwhile leaves them, see auto_cleanup).
     Raises the OSError of a write, a read or a rename that failed every try.
     """
@@ -238,7 +238,7 @@ def _update_locked(filename, parse, update, attempts, retry_delay, lock_timeout,
     so a file parse() rejects never replaces the backup; if the backup cannot be written, the
     file stays unchanged. The backup is not flushed to disk (durable=False), so a change costs
     one fsync, not two: it is written on every change (e.g. each mark click), and only the file
-    itself must survive a power loss complete (F1 review).
+    itself must survive a power loss complete.
     """
     with _file_lock(filename, lock_timeout):
         previous = _previous_content(filename, attempts, retry_delay)

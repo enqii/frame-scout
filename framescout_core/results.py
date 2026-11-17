@@ -12,18 +12,18 @@ from .names import EXT
 from .profiles import load_profiles, read_profiles
 
 
-# The result of a search (A12, P4): besides the HTML galleries, the engine writes what it
+# The result of a search: besides the HTML galleries, the engine writes what it
 # ranked to RESULTS_FILE in the output folder, so the app shows the galleries of the last
 # search under the profile names they were made for, with their date, instead of deriving
 # file names from the current profile list. Written once at the end of the export, together
-# with the galleries (publish_export, E24): an interrupted export leaves the galleries and
+# with the galleries (publish_export): an interrupted export leaves the galleries and
 # the file of the previous complete search.
 RESULTS_FILE = 'results.json'
-# format 2 lists the photo folders of the search ("photo_folders", A25); format 1 had one
-# ("photo_folder") and is still read. App versions before A25 reject format 2.
+# format 2 lists the photo folders of the search ("photo_folders"); format 1 had one
+# ("photo_folder") and is still read. Older app versions reject format 2.
 RESULTS_FORMAT = 2
-# the note of an HTML gallery whose cards name their closest search text (F17); it follows the
-# note on the best-scoring part, the crop whose text the card names (review)
+# the note of an HTML gallery whose cards name their closest search text; it follows the
+# note on the best-scoring part, the crop whose text the card names
 QUERY_NOTE = ('"Closest search text" names the search text that this best-scoring part of the photo is most similar '
               'to, often by a small margin over the others.')
 # the app's gallery: cards per page
@@ -40,7 +40,7 @@ def search_fingerprint(profile, base):
     ones) and its reference image paths: the app compares it with the current profile to
     say that a result is older than the last change of the profile. base is the resolved
     folder of the profiles file: a reference inside it counts by its path relative to it,
-    so moving the project folder does not change the fingerprint (review).
+    so moving the project folder does not change the fingerprint.
     """
     def reference(path):
         try:
@@ -79,9 +79,9 @@ def result_card(rank, path, relative, label, score, text, visual, caption, detai
 
     path: the photo; relative: its name as the HTML gallery shows it, its path in its photo
     folder, after the folder's label if the search had several (photo_name; computed once
-    by the engine for both, review); best_query: the name (query_labels) of the search
-    text the photo's best part is most similar to, only for a profile with several texts
-    (F17); the card has the key "best_query" only then.
+    by the engine for both); best_query: the name (query_labels) of the search
+    text the photo's best part is most similar to, only for a profile with several texts;
+    the card has the key "best_query" only then.
     """
     card = {'rank': rank, 'path': str(path), 'relative': relative, 'label': label,
             'score': score, 'text': text, 'visual': visual, 'caption': caption, 'detail': detail,
@@ -92,7 +92,7 @@ def result_card(rank, path, relative, label, score, text, visual, caption, detai
 
 
 def closest_query(index, queries):
-    """Return the name of a card's closest search text, or None if there is nothing to tell (F17).
+    """Return the name of a card's closest search text, or None if there is nothing to tell.
 
     index: Match.query (None for "Find similar"); queries: query_labels of the profile. A
     profile with a single text names none: it is always the closest.
@@ -101,11 +101,11 @@ def closest_query(index, queries):
 
 
 def query_caption(best_query):
-    """Return the line of a gallery card that names its closest search text (F17)."""
+    """Return the line of a gallery card that names its closest search text."""
     return f'Closest search text: {best_query}'
 
 
-# a row of a card's text in the app (F30): one line, cut with "…" if too long (the whole
+# a row of a card's text in the app: one line, cut with "…" if too long (the whole
 # text is its tooltip), so every card of a view is as tall as the others
 _CARD_LINE = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
 _CARD_DETAIL = _CARD_LINE + ';font-size:0.875em;opacity:0.7'
@@ -117,16 +117,16 @@ def _card_escape(text):
 
 
 def has_closest_line(cards):
-    """Whether the cards of a gallery have a row for the closest search text in the app (F17, F30).
+    """Whether the cards of a gallery have a row for the closest search text in the app.
 
     For all cards of the gallery, not those of one page: card_text expects it the same for
     every card of a view, so the cards keep one height from page to page.
     """
-    return any(card.get('best_query') for card in cards)  # F17: only with several texts
+    return any(card.get('best_query') for card in cards)  # only with several texts
 
 
 def card_text(card, closest_line):
-    """Return the HTML of the text of a gallery card in the app, on one line (F30).
+    """Return the HTML of the text of a gallery card in the app, on one line.
 
     Rows: rank, score caption and part; the detail; the closest search text (query_caption,
     only with closest_line, the same for every card of a view: an empty row for a card that
@@ -149,12 +149,12 @@ def card_text(card, closest_line):
 
 
 def query_summary(entry):
-    """Return how many photos of a gallery each search text was closest to (in their best-scoring part), or None (F17).
+    """Return how many photos of a gallery each search text was closest to (in their best-scoring part), or None.
 
-    entry: a profile of the result file. None for a search before F17, a profile with a
+    entry: a profile of the result file. None for a search of an older version, a profile with a
     single text (nothing to compare) or a gallery whose cards name no text. Every text is
     listed in the profile's order, also one that no photo was closest to; a custom text
-    given twice is listed once (the first copy is always the closest, review).
+    given twice is listed once (the first copy is always the closest).
     """
     queries = list(dict.fromkeys(entry.get('queries') or []))
     named = Counter(card['best_query'] for card in entry['cards'] if card.get('best_query') is not None)
@@ -173,7 +173,7 @@ def results_document(started, finished, folders, settings, photos, profiles):
     settings: the search options; photos: how many photos were found; profiles: per profile
     a dict with name, fingerprint (search_fingerprint), gallery (HTML file name),
     normalized, cards (result_card, in gallery order) and, for a search with texts, queries
-    (query_labels, F17).
+    (query_labels).
     """
     return {'format': RESULTS_FORMAT, 'started': started, 'finished': finished,
             'photo_folders': [str(f) for f in folders], 'settings': settings, 'photos': photos,
@@ -185,7 +185,7 @@ def _results_bytes(document):
 
 
 def publish_export(folder, galleries, document, replace=os.replace, attempts=40, retry_delay=0.05):
-    """Publish the HTML galleries of an export together with its result file (E24).
+    """Publish the HTML galleries of an export together with its result file.
 
     galleries: [(file name, HTML text)] in folder; document: the content of RESULTS_FILE
     (results_document). All files are written in full to temporary files
@@ -194,10 +194,10 @@ def publish_export(folder, galleries, document, replace=os.replace, attempts=40,
     and the result file of the previous search; if a rename fails every retry, the files
     renamed before it get their previous content back. Only the few renames are not one
     step: a kill between them (or a restore that fails too) can still leave a gallery newer
-    than RESULTS_FILE (E45). Renames are retried while another process has a file open
+    than RESULTS_FILE. Renames are retried while another process has a file open
     (replace, attempts and retry_delay: for tests).
     Raises OSError; the temporary files are removed (left only by a killed process, which
-    auto_cleanup removes after a later search, E26).
+    auto_cleanup removes after a later search).
     """
     folder = Path(folder)
     files = [(folder / name, text.encode('utf-8')) for name, text in galleries]
@@ -223,7 +223,7 @@ def _check_card(card):
 def read_results(path):
     """Return the result file path as written by the engine, or None if it does not exist.
 
-    A file of format 1 (before A25) is returned like one of format 2: its "photo_folder" as
+    A file of format 1 is returned like one of format 2: its "photo_folder" as
     the list "photo_folders" (empty if it had none). Raises ValueError for a file of
     another format or with invalid entries, in particular a gallery or thumbnail name that
     is not a plain file name (the app opens them in the results folder), and OSError if it
@@ -254,7 +254,7 @@ def read_results(path):
             raise ValueError(f'invalid profile entry: {entry!r}'[:300])
         if not _GALLERY_NAME.fullmatch(entry['gallery']):
             raise ValueError(f"invalid gallery file name: {entry['gallery']!r}")
-        if entry['name'] in names:  # the app picks a profile by its name (review)
+        if entry['name'] in names:  # the app picks a profile by its name
             raise ValueError(f"duplicate profile name: {entry['name']!r}")
         names.add(entry['name'])
         for card in entry['cards']:

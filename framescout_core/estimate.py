@@ -1,4 +1,4 @@
-"""How long a search takes: the remaining-time estimate of a run and the summary before its start (F12, F16)."""
+"""How long a search takes: the remaining-time estimate of a run and the summary before its start."""
 import collections
 import math
 import time
@@ -23,7 +23,7 @@ THROUGHPUT_KEPT = 8
 # a run replaces the stored speed of its settings and device only after measuring this
 # many seconds: a search stopped after a minute is a poor sample of a whole analysis
 THROUGHPUT_MIN_SECONDS = RATE_WINDOW
-# What follows the analysis (F16): scoring every photo and rendering the gallery thumbnails.
+# What follows the analysis: scoring every photo and rendering the gallery thumbnails.
 # Their speeds do not depend on the settings or the device much, so the status file keeps
 # one "finishing" record, {'scoring': photos scored per minute, 'thumbnails': thumbnails
 # rendered per minute}, from the last search that measured each. A thumbnail copied or
@@ -31,7 +31,7 @@ THROUGHPUT_MIN_SECONDS = RATE_WINDOW
 FINISHING_STEPS = ('scoring', 'thumbnails')
 # a step's speed is stored only if it measured at least this many items, and it replaces
 # a stored speed of the step only after this many seconds: a small search (e.g. a few
-# thumbnails from a cold disk) is a poor sample of a large one (review). Both steps are far
+# thumbnails from a cold disk) is a poor sample of a large one. Both steps are far
 # faster than the analysis, so a large search measures this long, unlike THROUGHPUT_MIN_SECONDS
 FINISHING_MIN_ITEMS = RATE_MIN_PHOTOS
 FINISHING_MIN_SECONDS = 10
@@ -123,17 +123,17 @@ def _count(status, key):
 
 
 def remaining_text(status, now=None):
-    """Return e.g. "about 25 min left" for a running search (A5, F16), or None without a usable speed.
+    """Return e.g. "about 25 min left" for a running search, or None without a usable speed.
 
     During the phase "analyzing" (the engine counts the photos of the cache first, so the
     photos left are the ones to analyze) the time comes from the run's rate; scoring all
     photos and rendering the planned gallery thumbnails ("thumbnails" of the status) are
-    added at the speeds of earlier searches ("finishing", F16). Without these the text names
+    added at the speeds of earlier searches ("finishing"). Without these the text names
     the analysis alone ("... left for the analysis"); once every photo is analyzed, only
-    the earlier speeds count (review). During "scoring" and "exporting" only
+    the earlier speeds count. During "scoring" and "exporting" only
     the earlier speeds count, for the photos and cards left (each card may need a new
     thumbnail). now: the current time (an aware datetime; default now). A status not
-    written for RATE_STALE seconds names no time (review: else a stalled analysis kept
+    written for RATE_STALE seconds names no time (else a stalled analysis kept
     "about 25 min left").
     """
     phase = status.get('phase')
@@ -146,7 +146,7 @@ def remaining_text(status, now=None):
         return None
     left = max(0, total - done)
     if status.get('analyze_only') is True:
-        # an analysis without a search (F18): nothing is scored or rendered after it
+        # an analysis without a search: nothing is scored or rendered after it
         rate = _positive(status.get('rate'))
         return None if phase != 'analyzing' or not left or rate is None else f'{duration_text(left / rate)} left'
     thumbnails = _count(status, 'thumbnails')
@@ -155,7 +155,7 @@ def remaining_text(status, now=None):
         rest = None if thumbnails is None else finishing_minutes(finishing, total, thumbnails)
         if not left:
             # every photo is analyzed (or came from the cache, without a rate), but scoring
-            # and the thumbnails still take their time (review)
+            # and the thumbnails still take their time
             analysis = 0.0
         else:
             rate = _positive(status.get('rate'))
@@ -184,7 +184,7 @@ def remember_finishing(finishing, step, items, seconds):
 
     None (keep finishing as it is) if fewer than FINISHING_MIN_ITEMS items were measured,
     or if a speed of step is stored and the measurement took less than FINISHING_MIN_SECONDS
-    (review: the first speed of a step is stored at once).
+    (the first speed of a step is stored at once).
     """
     if items < FINISHING_MIN_ITEMS or not seconds > 0:
         return None
@@ -195,7 +195,7 @@ def remember_finishing(finishing, step, items, seconds):
 
 
 class StepSpeed:
-    """The items of a step after the analysis and the seconds they took (F16).
+    """The items of a step after the analysis and the seconds they took.
 
     timed(func) returns func counting each call that returns (one that raises is not
     counted), e.g. the engine's rendering of a gallery thumbnail; remember(finishing, step)
@@ -264,7 +264,7 @@ def run_throughput(records, signature, device, speed):
 
     The first speed measured for signature and device is stored at once; an earlier record
     of them is replaced only once the run measured THROUGHPUT_MIN_SECONDS, so a search
-    stopped after its first minute keeps the speed of an earlier, longer analysis (review).
+    stopped after its first minute keeps the speed of an earlier, longer analysis.
     """
     per_minute = speed.overall()
     if per_minute is None:
@@ -299,21 +299,21 @@ def start_summary(photos, analyzed, per_minute, finishing=None, analysis_only=Fa
     photos: the photos counted in the folders; analyzed: those with a current cache row of
     the current settings (analyzed_photos); per_minute: known_throughput of these settings,
     or None; finishing: finishing_minutes of scoring all photos and rendering the gallery
-    thumbnails (F16), or None if unknown. It is named as an upper bound ("up to"): thumbnails
+    thumbnails, or None if unknown. It is named as an upper bound ("up to"): thumbnails
     of earlier searches are reused. Without the speed of the analysis no duration is named.
-    analysis_only: the summary next to "Analyze photos now" (F18), which neither scores nor
+    analysis_only: the summary next to "Analyze photos now", which neither scores nor
     writes galleries, so finishing is left out.
     """
     run = 'analysis' if analysis_only else 'search'
     if photos <= 0:
-        # not "all already analyzed": there is nothing to analyze or rank (review)
+        # not "all already analyzed": there is nothing to analyze or rank
         return f'No supported photos found in these folders: the {run} has nothing to analyze.'
     analyzed = min(analyzed, photos)
     todo = photos - analyzed
     finishing = None if analysis_only or finishing is None or finishing < 0 else finishing
     if not todo and analysis_only:
-        # photos is the count remembered for the browser session (A27): the analysis reads the
-        # folders again, so it stays available for photos added since (review)
+        # photos is the count remembered for the browser session: the analysis reads the
+        # folders again, so it stays available for photos added since
         return (('The photo is analyzed with these settings already.' if photos == 1 else
                  f'All {photos:,} photos are analyzed with these settings already.')
                 + ' Photos added to the folders since they were counted are counted after "Recount"; the analysis '

@@ -1,4 +1,4 @@
-"""Search profiles: loading and validating them, reading and saving the app's profiles.json (A2, A13)."""
+"""Search profiles: loading and validating them, reading and saving the app's profiles.json."""
 import hashlib
 import json
 from pathlib import Path
@@ -46,13 +46,13 @@ def generic_prompts(name, context='', features=''):
 
 
 def query_labels(profile):
-    """Return the names of a profile's text queries, in the order framescout_scoring.text_queries builds them (F17).
+    """Return the names of a profile's text queries, in the order framescout_scoring.text_queries builds them.
 
     profile: a profile of load_profiles (or quick_profile). The generated texts are
-    averaged into one query (E4), named after the search motif ('motif "Red car"'); each
+    averaged into one query, named after the search motif ('motif "Red car"'); each
     custom text is a query of its own, named in quotes with its white space joined to single
-    spaces (the query itself uses the text as written, review). [] for a profile without
-    texts ("Find similar", F11).
+    spaces (the query itself uses the text as written). [] for a profile without
+    texts ("Find similar").
     """
     custom = [f'"{" ".join(prompt.split())}"' for prompt in profile['prompts'][profile['generated']:]]
     return ([f'motif "{profile["name"]}"'] if profile['generated'] else []) + custom
@@ -64,7 +64,7 @@ def load_profiles(filename, inline):
     filename: path of a profiles JSON file or None; inline: list of "NAME|CONTEXT|FEATURES"
     strings (CLI option --character). Returns a list of dicts with the keys "name",
     "prompts" (generated + custom prompts), "generated" (how many of the prompts are
-    generated templates; they are averaged into one query, E4) and "refs" (reference image
+    generated templates; they are averaged into one query) and "refs" (reference image
     paths, resolved relative to the JSON file's folder). Raises ValueError for invalid input.
     """
     raw = list(_read_entries(filename)) if filename else []
@@ -112,7 +112,7 @@ def _check_entries(raw):
         if not isinstance(item, dict):
             raise ValueError('Every profile must be a JSON object.')
         name = item.get('name', '')
-        # compare the stripped name: it is the one stored and used as key (E10)
+        # compare the stripped name: it is the one stored and used as key
         if not isinstance(name, str) or not name.strip() or name.strip().lower() in names:
             raise ValueError(f'Profile name missing or duplicate: {name!r}')
         names.add(name.strip().lower())
@@ -131,20 +131,20 @@ def read_profiles(filename):
 
     Validated like load_profiles(), but an empty list is allowed and unknown keys are
     kept. The previous v3 format {name: [prompts, ...]} is converted, so saving it does
-    not lose the profiles (A2). Raises ValueError (including json.JSONDecodeError) for a
+    not lose the profiles. Raises ValueError (including json.JSONDecodeError) for a
     file the app cannot represent, so that the app never saves over it.
     """
     return read_profiles_versioned(filename)[0]
 
 
 def read_profiles_versioned(filename, attempts=5, retry_delay=0.05):
-    """Return (profiles, version) of the app's profiles JSON file, read once (A13).
+    """Return (profiles, version) of the app's profiles JSON file, read once.
 
     profiles as read_profiles() returns them (same errors); version identifies the file's
     exact content (None if it is missing). Pass it to save_profiles(expected=...) so that a
     save based on these profiles never overwrites a change made to the file since. On
     Windows, reading fails for a moment while another session replaces the file, so an
-    OSError is retried up to attempts times, retry_delay seconds apart (review).
+    OSError is retried up to attempts times, retry_delay seconds apart.
     """
     try:
         content = _read_with_retry(filename.read_bytes, attempts, retry_delay)
@@ -164,7 +164,7 @@ def require_profile(filename, name):
 
     Marks and saved copy target folders are keyed by the profile name, so a gallery drawn
     before its profile was deleted or renamed (e.g. in another tab) must not save them
-    under the old name: a later profile of that name would get them (review of A22, A33).
+    under the old name: a later profile of that name would get them.
     save_marks and save_copy_folder call it under their lock, so a deletion or rename,
     which saves profiles.json first and then changes those files under the same locks,
     never misses such a save. Raises ValueError (naming the file) for an unreadable file and
@@ -180,7 +180,7 @@ def require_profile(filename, name):
 
 
 class ProfilesChangedError(ValueError):
-    """save_profiles refused a save: the file changed since the profiles it is based on were read (A13)."""
+    """save_profiles refused a save: the file changed since the profiles it is based on were read."""
 
 
 # the default of save_profiles(expected=...): save without comparing versions
@@ -195,12 +195,12 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
 
     expected: the version (read_profiles_versioned) of the file the profiles are based on;
     if the file's content differs from it now (another tab, session or a text editor
-    changed, created or deleted it), nothing is written and ProfilesChangedError is raised
-    (A13). The comparison and the writes happen under a RunLock on <filename>.lock (the
+    changed, created or deleted it), nothing is written and ProfilesChangedError is raised.
+    The comparison and the writes happen under a RunLock on <filename>.lock (the
     file stays, empty), so no other save can come in between; OSError if that lock is not
     free within lock_timeout seconds. Without expected, the file is saved unchecked.
     Returns the version of the saved file, the expected version of the next save based on
-    these profiles (review).
+    these profiles.
 
     The previous content is copied byte for byte to <filename>.bak first (replacing an
     older backup, so only the state before the latest save is kept); if that fails,
@@ -208,7 +208,7 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
     folder, flushed to disk and then renamed, so a crash or power loss leaves a complete
     old or new file, never a half-written one. On Windows, reading or replacing a file fails
     while another session reads it at that moment (every app run reads profiles.json), so
-    each read and replace is tried up to attempts times, retry_delay seconds apart (review).
+    each read and replace is tried up to attempts times, retry_delay seconds apart.
     """
     with _file_lock(filename, lock_timeout):
         previous = _previous_content(filename, attempts, retry_delay)
@@ -223,7 +223,7 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
             except ValueError:  # unreadable: nothing to keep (the .bak has it)
                 old = None
             # other top-level keys (e.g. hand-added metadata) are kept in their order; a v3
-            # file, whose keys are profile names, is not merged (review)
+            # file, whose keys are profile names, is not merged
             if isinstance(old, dict) and 'profiles' in old:
                 document = {**old, 'profiles': profiles}
         data = _json_bytes(document)
@@ -232,14 +232,14 @@ def save_profiles(filename, profiles, expected=_UNCHECKED, lock_timeout=PROFILES
 
 
 def profiles_changed_notice(shown, current):
-    """Return the notice for a page whose profiles file changed since it showed it, or None (A31).
+    """Return the notice for a page whose profiles file changed since it showed it, or None.
 
     shown: the version (read_profiles_versioned) the profile forms of the last complete
     page showed; current: the version read now. If another tab, session or a text editor
     changed the file in between, e.g. deleted a profile, a click on a form the page no
     longer shows is not delivered by Streamlit at all; the notice says so instead of the
     page dropping it silently. Such a click leaves no trace, so the notice cannot tell
-    whether one was dropped or which: it names the dropped click only as a possibility (review).
+    whether one was dropped or which: it names the dropped click only as a possibility.
     """
     if shown == current:
         return None

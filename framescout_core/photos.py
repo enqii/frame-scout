@@ -1,4 +1,4 @@
-"""The photos of a search (E25): which files are read, which are skipped, and RAW previews."""
+"""The photos of a search: which files are read, which are skipped, and RAW previews."""
 import collections
 import importlib
 import os
@@ -11,10 +11,10 @@ from .paths import script
 
 # A RAW file is skipped when a photo of the same name with one of these extensions is in
 # the same folder: cameras write RAW+JPEG pairs of the same shot, which would otherwise
-# appear twice in the results (user decision at the E25 hold point).
+# appear twice in the results.
 RAW_PARTNER_EXT = frozenset({'.jpg', '.jpeg'}) | HEIF_EXT
 # The engine uses the JPEG preview a RAW file embeds if its longer edge has at least this
-# many pixels, and otherwise decodes the sensor data at half size (E25). Some cameras
+# many pixels, and otherwise decodes the sensor data at half size. Some cameras
 # embed only a small thumbnail, too small for person crops and the gallery. Changing it
 # changes the embeddings of RAW photos: bump framescout_core.signature.ENGINE then.
 RAW_PREVIEW_MIN_EDGE = 1024
@@ -28,10 +28,10 @@ SKIPPED_EXTENSIONS_SHOWN = 5
 # the same name, sorted; unsupported: Counter {extension: files} of the other files ('' for
 # files without an extension); found_again: the photos found again through another path (a
 # link or hard link) and analyzed once; folders_again: the folders reached again through a
-# link, searched once (A37; both 0 by default); stats: {path: (mtime_ns, size)} of the paths
-# and raw_pairs as the scan saw them, which the app compares with the cache rows (A44, E61
-# review; empty by default: a photo without one is looked at when needed). The default is a
-# plain dict, so that a scan can be pickled and copied (review); it is shared, so the stats
+# link, searched once (both 0 by default); stats: {path: (mtime_ns, size)} of the paths
+# and raw_pairs as the scan saw them, which the app compares with the cache rows (empty
+# by default: a photo without one is looked at when needed). The default is a
+# plain dict, so that a scan can be pickled and copied; it is shared, so the stats
 # of a scan are never changed
 PhotoScan = collections.namedtuple('PhotoScan', 'paths raw_pairs unsupported found_again folders_again stats',
                                    defaults=(0, 0, {}))
@@ -55,8 +55,8 @@ def available_decoders(import_module=importlib.import_module):
     """Return the Decoders of this Python environment.
 
     The packages are imported, not only looked up, so that a package that is installed but
-    cannot be loaded (e.g. a blocked DLL) counts as missing in the app as in the engine
-    (review). Any exception of an import counts as missing.
+    cannot be loaded (e.g. a blocked DLL) counts as missing in the app as in the engine.
+    Any exception of an import counts as missing.
     """
     def loads(name):
         try:
@@ -96,7 +96,7 @@ def _shot(path):
 
 
 def _identity(path):
-    """The (device, file id) of what path names, following links; None if it cannot be read (A28).
+    """The (device, file id) of what path names, following links; None if it cannot be read.
 
     Two paths of the same identity are the same folder or file, e.g. a mapped drive letter
     and the UNC path of the same share, a subst drive, a junction or a hard link. None
@@ -123,7 +123,7 @@ def _file_times(stat):
 
 
 def _file_identity(stat):
-    """The identity of a photo file of its _file_stat: _identity with its size and modification time (review).
+    """The identity of a photo file of its _file_stat: _identity with its size and modification time.
 
     Hard links and file links share all four. Including size and time keeps two different
     photos apart on a file system whose file ids are not unique.
@@ -134,7 +134,7 @@ def _file_identity(stat):
 
 
 def _real_path_key(path):
-    """The key of a folder or file without an identity: its path with all links resolved (review).
+    """The key of a folder or file without an identity: its path with all links resolved.
 
     A link loop on a file system without file ids then still ends at a folder walked before.
     """
@@ -164,7 +164,7 @@ def _shot_pairs(paths):
 
 
 def scan_each_folder(folders, extensions=EXT, exclude=None):
-    """Return the PhotoScan of each of folders and its subfolders, scanned together (A25, A28, A29).
+    """Return the PhotoScan of each of folders and its subfolders, scanned together.
 
     Files inside exclude (the output folder) are left out completely. A RAW file is
     skipped when a file of the same name (ignoring case) with an extension of
@@ -182,16 +182,16 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
 
     The output folder exclude is left out wherever it is reached: as one of folders or
     inside one (by path), or through a link or another path (by identity). A folder that
-    cannot be read through one path is tried again through another (review).
+    cannot be read through one path is tried again through another.
 
-    Each PhotoScan counts what was left out as found before (A37), for the folder it was
+    Each PhotoScan counts what was left out as found before, for the folder it was
     reached through again: found_again, the photos found again by another path, and
     folders_again, the folder links into a folder already walked (also a loop); a folder
     listed twice or inside another listed one is not counted (see distinct_folders).
 
     The modification time and size of each photo and skipped RAW file, read for its identity
-    anyway, are kept in stats (A44): the app compares them with the cache rows without reading
-    them again (a RAW file's for a quick search, E61 review).
+    anyway, are kept in stats: the app compares them with the cache rows without reading
+    them again (a RAW file's for a quick search).
     """
     exclude_path = None if exclude is None else Path(exclude)
     exclude_id = None if exclude is None else _identity(exclude)
@@ -212,7 +212,7 @@ def scan_each_folder(folders, extensions=EXT, exclude=None):
         identity = _identity(folder) or _real_path_key(folder)
         if identity in seen_folders:
             # only a link is counted: a folder listed twice or inside another listed one is
-            # distinct_folders' case (A25), which the app and the engine name themselves (review)
+            # distinct_folders' case, which the app and the engine name themselves
             folders_again[index] += via_link
             return
         if excluded(folder, identity):
@@ -264,7 +264,7 @@ def scan_photos(root, extensions=EXT, exclude=None):
 
 
 def raw_fallbacks(scan):
-    """Return {partner: RAW file} of the RAW files scan (a PhotoScan) skipped for a partner (E30).
+    """Return {partner: RAW file} of the RAW files scan (a PhotoScan) skipped for a partner.
 
     Every partner of a skipped RAW file (a JPEG/HEIC of the same name in the same folder)
     maps to it, so the engine can analyze the RAW file instead if the partner cannot be
@@ -283,7 +283,7 @@ def raw_fallbacks(scan):
 
 
 class TruncatedImageError(OSError):
-    """A photo whose data ends early, decoded with complete=True (framescout_images.open_image, E46)."""
+    """A photo whose data ends early, decoded with complete=True (framescout_images.open_image)."""
 
 
 # JPEG markers (jpeg_scans_missing): the start of frame markers (SOF0-SOF15 without DHT, JPG
@@ -326,7 +326,7 @@ def _scans_cover(components, scans, progressive):
 
 
 def jpeg_scans_missing(data):
-    """Whether the JPEG data, which ends before its end marker, certainly lacks scans (E57).
+    """Whether the JPEG data, which ends before its end marker, certainly lacks scans.
 
     Its marker segments are followed from the start: data that ends inside or right after a
     marker segment (not inside the image data of a scan) lacks scans, and so does data
@@ -371,22 +371,22 @@ def jpeg_scans_missing(data):
 
 
 class RawFallback:
-    """The RAW files a search analyzes instead of their partner that cannot be analyzed (E30).
+    """The RAW files a search analyzes instead of their partner that cannot be analyzed.
 
     A partner that fails (cache scan, decoding or storing) is deferred with defer(partner);
     once all photos are done, choose(analyzed) decides each deferred failure with the
     outcome of the whole shot known: the RAW file is analyzed only if no partner of the
-    shot was analyzed (e.g. the good JPEG next to a broken HEIC, review), and only once for
+    shot was analyzed (e.g. the good JPEG next to a broken HEIC), and only once for
     several failed partners. use(partner, raw) records a RAW file that was analyzed;
     photos(paths) names it in place of its partner, so the shot keeps its place and the
     number of photos stays the same. used: {partner: RAW file} of the analyzed ones.
 
     A partner must decode completely (strict): a merely truncated JPEG, which decodes with
     its missing part gray, fails (TruncatedImageError) so that the RAW file is analyzed
-    instead (E46). If that RAW file fails too, retry() returns the truncated partner, which
+    instead. If that RAW file fails too, retry() returns the truncated partner, which
     is then analyzed as far as its data goes, so a RAW file LibRaw cannot read does not cost
     the shot. That also holds for a truncated partner that did not get the RAW file because
-    another partner of the shot failed first (E53): it waits for the RAW file instead of
+    another partner of the shot failed first: it waits for the RAW file instead of
     being lost, and stays a failure only once the RAW file was analyzed.
     """
 
@@ -403,16 +403,16 @@ class RawFallback:
         self._retry = []
 
     def strict(self, path):
-        """Whether path must decode completely: a partner with a RAW file not retried yet (E46)."""
+        """Whether path must decode completely: a partner with a RAW file not retried yet."""
         return path in self.fallbacks and path not in self.lenient
 
     def defer(self, path, truncated=False):
         """Record a failed photo; True if it is decided later (by choose or retry), not counted now.
 
         That is a partner with a RAW file that failed for the first time (truncated: only
-        because its data ends early, E46), or the RAW file choose picked for a truncated
+        because its data ends early), or the RAW file choose picked for a truncated
         partner (its truncated partners are retried). A RAW file picked for a partner that
-        failed otherwise counts as that partner's failure (E53): the truncated partners that
+        failed otherwise counts as that partner's failure: the truncated partners that
         wait for it are retried and count on their own.
         """
         if path in self._waiting:
@@ -435,7 +435,7 @@ class RawFallback:
         analyzed(path) tells whether a photo of the search was analyzed. The deferred
         failures are decided in the order they were deferred, each one once. The truncated
         partners of a shot whose RAW file another partner got are not in the list: they wait
-        for the outcome of that RAW file (E53, retry).
+        for the outcome of that RAW file (retry).
         """
         failed, self.failed = self.failed, []
         # only the other partners of shots with a failure are asked about
@@ -460,12 +460,12 @@ class RawFallback:
         return chosen, [partner for partner in lost if partner not in self._late_lost]
 
     def retry(self):
-        """Return (truncated partners whose RAW file failed too, partners that stay failures) (E46, E53).
+        """Return (truncated partners whose RAW file failed too, partners that stay failures).
 
         The first are analyzed as far as their data goes; from then on they are no longer
         strict, and a failure of theirs counts (defer returns False). The second are the
         truncated partners that waited for the RAW file another partner of their shot got,
-        which was analyzed (E53): they count as failures now. Called once the RAW files
+        which was analyzed: they count as failures now. Called once the RAW files
         choose picked are done.
         """
         partners, self._retry, self._waiting = self._retry, [], {}
@@ -496,7 +496,7 @@ def _inside_key(key, parent):
 
 
 def distinct_folders(folders, identity=_identity):
-    """Return (kept, dropped) of the listed photo folders of a search (A25, A28).
+    """Return (kept, dropped) of the listed photo folders of a search.
 
     folders: resolved paths in the order listed. A folder listed twice is searched once, and
     a folder inside another listed folder is searched as part of it, so no photo is found
@@ -509,7 +509,7 @@ def distinct_folders(folders, identity=_identity):
 
     identity is called once per listed folder, and for the parent folders of a folder only
     when it and at least one other listed folder have an identity, so an unreachable
-    network folder is not asked again for each of its parent folders (review).
+    network folder is not asked again for each of its parent folders.
     """
     unique, unique_ids, dropped, seen = [], [], [], {}
     for folder in folders:
@@ -546,7 +546,7 @@ def output_folder_problem(folders, output):
     """Return why output cannot be the output folder of a search of the photo folders, or None.
 
     folders and output are resolved paths. Refused: output equal to a photo folder, and a
-    photo folder inside output, whose files the scan always leaves out (review). An output
+    photo folder inside output, whose files the scan always leaves out. An output
     folder inside a photo folder is fine: the scan leaves it out.
     """
     key = _folder_key(output)
@@ -573,13 +573,13 @@ def _label_parts(folder):
 
 
 def folder_labels(folders):
-    """Return the label of each photo folder that the gallery puts before a photo's path (A25).
+    """Return the label of each photo folder that the gallery puts before a photo's path.
 
     One folder has no label (''), so the gallery of a single folder is unchanged. Several
     are labeled by their names; folders of the same name (ignoring case) get as many of
     their last path parts as tell them apart, a drive root its drive (e.g. "D:"). A label
     is never the start of another one ("Event" and "Event/sub"): it gets more of its path
-    too, so no two photos of different folders get the same name (review).
+    too, so no two photos of different folders get the same name.
     """
     if len(folders) < 2:
         return [''] * len(folders)
@@ -619,7 +619,7 @@ def photo_name(path, folders, labels):
 
 
 def scan_folders(folders, extensions=EXT, exclude=None):
-    """Return the PhotoScan of several photo folders together (scan_photos of each, joined; A25).
+    """Return the PhotoScan of several photo folders together (scan_photos of each, joined).
 
     folders should be distinct_folders' kept list; scan_each_folder finds no photo twice.
     """
@@ -628,7 +628,7 @@ def scan_folders(folders, extensions=EXT, exclude=None):
 
 def remembered_scans(memory, folders, extensions=EXT, exclude=None, recount=False, clock=time.time,
                      scan=scan_each_folder):
-    """Return (scans, counted_at): scan_each_folder of folders, remembered in memory (A27).
+    """Return (scans, counted_at): scan_each_folder of folders, remembered in memory.
 
     The app counts the photos of the listed folders on every page run; walking a large
     folder tree on a network drive or HDD each time is slow. memory is a dict the app keeps
@@ -638,7 +638,7 @@ def remembered_scans(memory, folders, extensions=EXT, exclude=None, recount=Fals
     in a folder meanwhile is therefore counted only after a recount; counted_at (clock() of
     the count, None without folders) lets the page say how old the count is. Without folders
     (e.g. the only folder's drive disconnected) memory is cleared, so the same folder is
-    counted again when it is back (review). The search itself always scans the folders again.
+    counted again when it is back. The search itself always scans the folders again.
     """
     folders = list(folders)
     if not folders:
@@ -674,8 +674,8 @@ def skipped_lines(scan, decoders=ALL_DECODERS):
     """Return the log lines about the files of scan (a PhotoScan) that are not analyzed.
 
     Files of a missing decoder (see decoders) get one line with the reason, and only if the
-    folder has such files; they are not named again as an unsupported extension (review).
-    Photos and folders reached again through another path get a line each (A37), so a
+    folder has such files; they are not named again as an unsupported extension.
+    Photos and folders reached again through another path get a line each, so a
     count lower than a file manager's is explained.
     """
     lines = []

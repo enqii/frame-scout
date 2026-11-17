@@ -1,4 +1,4 @@
-"""Loading the search models without a Hugging Face Hub request once they are cached (E16, E31, E33).
+"""Loading the search models without a Hugging Face Hub request once they are cached.
 
 open_clip loads the weights (and SigLIP its tokenizer) through huggingface_hub, which asks
 the Hub for the file on every run even when it is in the cache. The engine therefore
@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 # Set unless the user set them: no "cache-system uses symlinks" warning in run.log on Windows
-# without Developer Mode (E33; the files are stored as copies either way) and no telemetry.
+# without Developer Mode (the files are stored as copies either way) and no telemetry.
 HUB_QUIET_ENV = {'HF_HUB_DISABLE_SYMLINKS_WARNING': '1', 'HF_HUB_DISABLE_TELEMETRY': '1'}
 # open_clip's weights file of a Hub repo, the safetensors one first (open_clip.pretrained)
 WEIGHTS_FILES = ('open_clip_model.safetensors', 'open_clip_pytorch_model.bin')

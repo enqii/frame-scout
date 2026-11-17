@@ -1,4 +1,4 @@
-"""The "Keep the PC responsive" option (F4): a lower process priority and fewer PyTorch threads.
+"""The "Keep the PC responsive" option: a lower process priority and fewer PyTorch threads.
 
 The engine lowers its own priority (--low-priority), so the option works the same for the
 app and a manual run, and the app's start and stop logic (Popen, process tree, PID in the
@@ -11,7 +11,7 @@ MAX_TORCH_THREADS = 12
 # Windows priority class of a low-priority search (BELOW_NORMAL_PRIORITY_CLASS): other
 # programs get the CPU first, the search still gets every core nobody else needs
 BELOW_NORMAL_PRIORITY_CLASS = 0x4000
-# the only Windows priority class below it; a process started at either keeps it (review)
+# the only Windows priority class below it; a process started at either keeps it
 IDLE_PRIORITY_CLASS = 0x40
 # niceness added to a low-priority search on other systems (os.nice; 19 is the lowest priority)
 LOW_PRIORITY_NICE = 10
@@ -65,10 +65,10 @@ def lower_priority(os_name=None, set_priority_class=None, nice=None, get_priorit
 
     Windows: BELOW_NORMAL_PRIORITY_CLASS for the whole process, unless it already runs at
     that class or at IDLE_PRIORITY_CLASS (inherited, e.g. from "start /low"), which is kept:
-    the class is absolute and would otherwise raise it (review). Other systems:
+    the class is absolute and would otherwise raise it. Other systems:
     LOW_PRIORITY_NICE more niceness, relative to the current one. On Linux os.nice changes
     only the calling thread, and threads started later inherit it; threads that already run
-    keep their priority, so call it before any other thread starts (review).
+    keep their priority, so call it before any other thread starts.
     os_name defaults to os.name; set_priority_class, get_priority_class and nice replace the
     system calls in tests. A failure (OSError) is returned as text, so the search can run
     at normal priority.

@@ -1,9 +1,9 @@
-"""The "Check installation" self-test (F15): is the installation in this folder complete and usable?
+"""The "Check installation" self-test: is the installation in this folder complete and usable?
 
 After a Windows update, a moved folder or an interrupted installation, a search fails with a
 traceback in run.log, and nothing says whether to reinstall. Check-FrameScout.bat
 (framescout_check.py) and the app's AI settings tab run these checks and name one fix per
-problem: the program files are of one FrameScout version (I34, I42), the Python environment
+problem: the program files are of one FrameScout version, the Python environment
 belongs to this folder, the installed package versions are those of requirements/constraints.txt, PyTorch imports (and finds the GPU for a CUDA build), .cache and
 results can be written, which model files are downloaded, and the free disk space.
 
@@ -40,7 +40,7 @@ TORCH_PROBE = ('import json, torch; available = torch.cuda.is_available(); '
                'print(json.dumps({"torch": torch.__version__, "cuda": torch.version.cuda, "available": available, '
                '"gpu": torch.cuda.get_device_name(0) if available else None}))')
 REINSTALL = f'Close FrameScout and run {script("Install")} again.'
-# one per version in the FrameScout folder (I42); Install- and Start-FrameScout.bat count them too
+# one per version in the FrameScout folder; Install- and Start-FrameScout.bat count them too
 VERSION_FILE_PATTERN = 'framescout-version-*.txt'
 _PIN = re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)')
 _REQUIREMENT_NAME = re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)')
@@ -107,7 +107,7 @@ def _read_cfg(path):
 
 
 def check_program_files(base):
-    """Are the program files in base of one FrameScout version (I34, I42)? More than one version file says no."""
+    """Are the program files in base of one FrameScout version? More than one version file says no."""
     name = 'Program files'
     found = sorted(path.name for path in Path(base).glob(VERSION_FILE_PATTERN))
     if len(found) <= 1:
@@ -137,9 +137,9 @@ def check_environment(base):
         return [CheckResult(name, False, f'The Python that .venv was created with is missing ({home}): the '
                             'FrameScout folder was moved, or that Python was deleted or uninstalled.',
                             f'Run {script("Install")}; it repairs the environment. Or move the folder back.')]
-    # Windows names the private Python's folder itself, Linux its bin folder (F47); the paths
+    # Windows names the private Python's folder itself, Linux its bin folder; the paths
     # are compared as written, so the same folder reached through a link or an 8.3 short name
-    # counts as another one (I44)
+    # counts as another one
     folder = home.parent if home.name == 'bin' else home
     if folder.name.lower() == PRIVATE_PYTHON and os.path.normcase(folder) != os.path.normcase(private):
         return [CheckResult(name, False, f'.venv uses the private Python of another folder ({home}): the FrameScout '
@@ -164,7 +164,7 @@ def check_packages(site_packages, constraints_text, requirements_text):
         if match:
             pins[_canonical(match[1])] = match[2]
     # a requirement with an environment marker (";") may not apply to this platform or Python,
-    # and the standard library cannot evaluate markers: it is not reported missing (review)
+    # and the standard library cannot evaluate markers: it is not reported missing
     unconditional = '\n'.join(line for line in requirements_text.splitlines() if ';' not in line.split('#', 1)[0])
     missing = [package for package in requirement_names(unconditional) if _canonical(package) not in installed]
     other = [f'{package} {installed[package]} instead of {version}' for package, version in sorted(pins.items())
@@ -198,7 +198,7 @@ def check_torch(python, environ, torch_version, run=subprocess.run, timeout=TORC
             raise ValueError(((result.stderr or '').strip().splitlines() or [f'exit code {result.returncode}'])[-1])
         found = json.loads(lines[-1])
     except (subprocess.TimeoutExpired, OSError, ValueError) as exc:
-        # one text for every way it fails (I44): the last line of the traceback, or the error
+        # one text for every way it fails: the last line of the traceback, or the error
         error = f'no answer within {timeout} seconds' if isinstance(exc, subprocess.TimeoutExpired) else exc
         return [CheckResult(name, False, f'PyTorch {torch_version} does not import: {error}',
                             f'{REINSTALL} If it still fails, delete the folder {VENV_DIR} and run it once more.')]

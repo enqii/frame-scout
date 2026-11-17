@@ -1,11 +1,11 @@
-"""The uninstall script (P5): what Uninstall-FrameScout.bat deletes and keeps.
+"""The uninstall script: what Uninstall-FrameScout.bat deletes and keeps.
 
 It deletes what the installer and FrameScout create again on their own (the Python
 environment, downloaded model weights, temporary and compiled files) and never the
 user's data: photos, reference images, results, profiles and settings stay, and so does
-everything outside the project folder. The private Python of the installer (P5 part C) is
+everything outside the project folder. The private Python of the installer is
 deleted too; when it runs the uninstall, Uninstall-FrameScout.bat deletes it after the
-script has ended (I20).
+script has ended.
 """
 import errno
 import os
@@ -52,12 +52,12 @@ USER_DATA = (
     ('.tmp/eval', 'collections of the evaluation tool with your labels'),
 )
 # files deleted before the rest of their folder: without its python.exe (on Linux bin/python
-# and bin/python3, F47), an environment or private Python whose removal stopped halfway never
+# and bin/python3), an environment or private Python whose removal stopped halfway never
 # looks complete, and the installer creates a new one
 UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe', 'bin/python'),
                    PRIVATE_PYTHON: ('python.exe', 'pythonw.exe', 'bin/python3')}
 # exit code of framescout_uninstall.py when it deleted everything but the private Python it
-# runs with: Uninstall-FrameScout.bat deletes that one after the script has ended (I20).
+# runs with: Uninstall-FrameScout.bat deletes that one after the script has ended.
 # 0 and 1 are the script's other results, 2 is argparse's usage error.
 PRIVATE_PYTHON_EXIT_CODE = 3
 # Windows error of removing a folder that is not empty
@@ -84,7 +84,7 @@ def _is_link(path):
 def _kept(entry, folder, keep):
     """Return True if the directory entry of folder is one of the names in keep.
 
-    Case-insensitive where the file system is (review): a kept name must match the same
+    Case-insensitive where the file system is: a kept name must match the same
     entries as _inside, which decides whether a protected folder is inside a kept entry.
     """
     for name in keep:
@@ -140,10 +140,10 @@ def protected_folders(root):
     photo folders and the copy target folders of settings.json (the default photo folder
     without one). Relative ones count from root.
 
-    The file is read once, so both lists come from the same version of it (review). Raises
+    The file is read once, so both lists come from the same version of it. Raises
     ValueError or OSError like read_settings if settings.json cannot be read, and ValueError
     if its photo or copy folders are not allowed values (the app would use the default photo
-    folder instead, review): the folders are unknown then, so nothing may be deleted.
+    folder instead): the folders are unknown then, so nothing may be deleted.
     """
     root = Path(root)
     data = _with_folder_list(_read_settings_file(root / SETTINGS_FILE))
@@ -182,7 +182,7 @@ def uninstall_plan(root, protected):
         if keep and path.is_dir():
             try:
                 rest = _entries(path, keep)
-            except OSError as exc:  # what it holds besides the kept entries is unknown (review)
+            except OSError as exc:  # what it holds besides the kept entries is unknown
                 skipped.append((path, f'cannot be listed ({exc})'))
                 continue
             if not rest:
@@ -207,7 +207,7 @@ def running_python(items, root, interpreter):
     that runs the uninstall, is inside it; else None.
 
     Windows does not delete a running program, so the uninstall leaves it to
-    Uninstall-FrameScout.bat, which deletes it after the script has ended (I20). A link is
+    Uninstall-FrameScout.bat, which deletes it after the script has ended. A link is
     removed by the script itself: that leaves the running Python where the link points to.
     """
     folder = Path(root) / PRIVATE_PYTHON
@@ -221,7 +221,7 @@ def user_data(root):
     """Return (path, what it is) of the user's data that exists below root.
 
     Without sizes: photos/ and results/ may hold many thousands of files, and walking them
-    would delay the question for what is never deleted anyway (review).
+    would delay the question for what is never deleted anyway.
     """
     root = Path(root)
     return [(root / relative, label) for relative, label in USER_DATA if os.path.lexists(root / relative)]
@@ -233,7 +233,7 @@ def search_running(root):
 
 
 def app_running(root):
-    """Return True if an app started with the start script of root holds its start lock (F47)."""
+    """Return True if an app started with the start script of root holds its start lock."""
     return AppInstance(root).running()
 
 
@@ -246,7 +246,7 @@ def _remove_file(path, failures):
         os.remove(path)
     except FileNotFoundError:
         pass
-    except OSError as exc:  # e.g. in use or read-only: reported, not retried (I44)
+    except OSError as exc:  # e.g. in use or read-only: reported, not retried
         failures.append((Path(path), exc))
 
 
@@ -258,7 +258,7 @@ def _remove_tree(path, failures):
             return
         if function is os.rmdir and _not_empty(exc) and any(
                 Path(name) in failed.parents for failed, _ in failures[start:]):
-            return  # what is left inside it failed and is reported already (review)
+            return  # what is left inside it failed and is reported already
         failures.append((Path(name), exc))
     # shutil.rmtree removes links and junctions inside the tree without following them
     shutil.rmtree(path, onexc=handle)
@@ -289,7 +289,7 @@ def remove_items(items):
         elif item.keep:
             try:
                 entries = _entries(path, item.keep)
-            except OSError as exc:  # the other items are still deleted (review)
+            except OSError as exc:  # the other items are still deleted
                 failures.append((path, exc))
                 continue
             for entry in entries:

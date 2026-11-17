@@ -1,4 +1,4 @@
-"""Quick search: one search text over the photos already analyzed, without a profile (F10).
+"""Quick search: one search text over the photos already analyzed, without a profile.
 
 The engine's --quick-query scores only photos with a current cache row of the search's
 signature (no analysis, no person detector) and writes its gallery and result file to the
@@ -6,7 +6,7 @@ folder QUICK_DIR inside the output folder, with thumbnails of its own, so the ga
 results.json and marks.json of the profile search stay untouched. The cleanup of the output
 folder does not look into it; the quick search cleans its own folder (auto_cleanup).
 
-"Find similar" (F11, the engine's --like) is a quick search without a text: it ranks the
+"Find similar" (the engine's --like) is a quick search without a text: it ranks the
 analyzed photos by their image similarity with the cached vector of one photo (the part
 shown on its card) and writes to the same folder.
 """
@@ -40,7 +40,7 @@ def quick_profile(query):
 
 
 def like_profile(photo, part):
-    """Return the search profile of "Find similar" (F11) for the part (crop label) of photo: no text.
+    """Return the search profile of "Find similar" for the part (crop label) of photo: no text.
 
     Its name names the photo and, for a part other than the whole photo, the part.
     """
@@ -51,7 +51,7 @@ def like_profile(photo, part):
 
 
 def like_crop(labels, part):
-    """Return the index of the crop of a cache row whose label (as the gallery shows it) is part (F11).
+    """Return the index of the crop of a cache row whose label (as the gallery shows it) is part.
 
     labels: the crop labels stored in the cache row (crop_label maps the legacy ones).
     Raises ValueError naming the parts the row has if it has no such part.
@@ -63,7 +63,7 @@ def like_crop(labels, part):
 
 
 def like_scan_path(photo, scanned, same_file=os.path.samefile):
-    """Return the path by which the scan names photo, the photo of "Find similar" (F11 review).
+    """Return the path by which the scan names photo, the photo of "Find similar".
 
     The cache keys a photo by the path the scan found it at, and the photo and its shot are
     left out by that path: a photo given by another path to the same file (other letter case,
@@ -88,7 +88,7 @@ def like_scan_path(photo, scanned, same_file=os.path.samefile):
 
 
 def like_labels_fit(labels, count):
-    """Whether the crop labels of the cache row of "Find similar"'s photo fit its count of vectors (F11 review).
+    """Whether the crop labels of the cache row of "Find similar"'s photo fit its count of vectors.
 
     They do if they are a list of texts, one per vector, and the row has at least one; the
     engine counts any other row as broken (not analyzed), so like_crop's index names a vector.
@@ -100,25 +100,25 @@ def like_labels_fit(labels, count):
 def quick_photos(paths, fallbacks, analyzed, exclude=None):
     """Return (photos to score, photos not analyzed) of a quick search, both in the order of paths.
 
-    paths: the photos of the scan; fallbacks: {partner: RAW file} (raw_fallbacks, E30): a
+    paths: the photos of the scan; fallbacks: {partner: RAW file} (raw_fallbacks): a
     partner without a current row is scored through its RAW file if that has one and no other
     partner of the shot has a row (a full search analyzed the RAW file in the partner's place
     only then), once per shot; analyzed(path): whether path has a cache row of the search's
     signature with its current modification time and size (the engine's check, which counts
     a row it cannot read as none), asked once per photo. A partner without a row whose shot
     is searched (through another partner or its RAW file) is neither scored nor counted as
-    not analyzed (E61): a full search would not analyze the shot again through it either.
+    not analyzed: a full search would not analyze the shot again through it either.
     Every partner of a shot without any row counts as not analyzed. exclude: the photo of
-    "Find similar" (F11): neither it nor another photo of its shot (its RAW file and every
+    "Find similar": neither it nor another photo of its shot (its RAW file and every
     partner of that RAW file, whichever of them it is and whether they have rows of their
-    own, review) is scored or counted as not analyzed.
+    own) is scored or counted as not analyzed.
     """
     shot_raw = exclude if exclude in fallbacks.values() else fallbacks.get(exclude)
     skip = {exclude} | {path for path, raw in fallbacks.items() if shot_raw is not None and raw == shot_raw}
     paths = [path for path in paths if path not in skip]
     rows = {path: analyzed(path) for path in paths}
     # the shots (by their RAW file) that are searched: those with an analyzed partner, whose
-    # RAW file is never shown in addition to it (review), and those searched through it
+    # RAW file is never shown in addition to it, and those searched through it
     searched = {fallbacks[path] for path in paths if rows[path] and path in fallbacks}
     raw_rows = {}  # asked once per shot
     chosen, missing = [], []
@@ -129,7 +129,7 @@ def quick_photos(paths, fallbacks, analyzed, exclude=None):
         raw = fallbacks.get(path)
         if raw is not None:
             if raw in searched:
-                continue  # E61
+                continue  # the RAW file was already scored for another partner
             if raw not in raw_rows:
                 raw_rows[raw] = analyzed(raw)
             if raw_rows[raw]:
@@ -141,11 +141,11 @@ def quick_photos(paths, fallbacks, analyzed, exclude=None):
 
 
 def quick_scope(scan, analyzed):
-    """Return (searched, not analyzed, partners) of a quick search over scan, as the engine counts them (E61).
+    """Return (searched, not analyzed, partners) of a quick search over scan, as the engine counts them.
 
     scan: the PhotoScan of the chosen folders; analyzed: the paths among its photos and RAW
     files (raw_pairs) that have a current cache row of the search's signature
-    (analyzed_paths). Each count is of the scan's photos, so they add up to them (review):
+    (analyzed_paths). Each count is of the scan's photos, so they add up to them:
     searched, the photos with a row of their own (analyzed_photos of scan.paths); not
     analyzed, those quick_photos counts as missing; partners, the JPEG/HEIC partners searched
     through another file of their shot (another partner or the RAW file the engine analyzes
@@ -158,7 +158,7 @@ def quick_scope(scan, analyzed):
 
 
 def quick_folders_differ(searched, folders):
-    """Whether a quick search searched other photo folders than folders, the ones chosen now (review).
+    """Whether a quick search searched other photo folders than folders, the ones chosen now.
 
     searched: the "photo_folders" of its result file; folders: the app's resolved folders, of
     which the engine searches those that exist. The order does not matter.
@@ -170,7 +170,7 @@ def quick_scope_text(photos, searched, not_analyzed, partners=0):
     """Return what the app says before a quick search: how many photos it searches and how many not.
 
     photos: the photos counted in the folders; searched, not_analyzed, partners: the counts
-    of quick_scope (E61): the photos analyzed and searched, those not analyzed, and the
+    of quick_scope: the photos analyzed and searched, those not analyzed, and the
     partners whose shot is searched through another file of it.
     """
     if photos <= 0:
@@ -190,7 +190,7 @@ def quick_scope_text(photos, searched, not_analyzed, partners=0):
         return 'the other photo is' if count == 1 else f'the other {count:,} are'
 
     if not searched:
-        # every photo searched is a partner, searched through another file of its shot (review)
+        # every photo searched is a partner, searched through another file of its shot
         if partners == photos:
             lead = 'The photo is' if photos == 1 else f'The {photos:,} photos are'
         else:
@@ -213,7 +213,7 @@ def quick_scope_text(photos, searched, not_analyzed, partners=0):
 def quick_note(searched, not_analyzed, like=False):
     """Return the note of a quick search's gallery and results: what was searched and why its scores differ.
 
-    like: of "Find similar" (F11), whose photo is not among the searched ones.
+    like: of "Find similar", whose photo is not among the searched ones.
     """
     if like:
         text = ('Photos similar to the chosen one among the other '
@@ -228,7 +228,7 @@ def quick_note(searched, not_analyzed, like=False):
 
 
 def quick_entry_label(results, names=()):
-    """Return the entry of the last quick search or "Find similar" in the app's results selector (F34).
+    """Return the entry of the last quick search or "Find similar" in the app's results selector.
 
     results: the quick search's result file (read_results); names: the profile names of the
     selector, from which the label is kept distinct (the selector tells its entries by their
@@ -250,16 +250,16 @@ def quick_entry_label(results, names=()):
 
 
 def quick_result_id(results):
-    """Tell one quick search's result file from the next one (F34): its finish time and its entry.
+    """Tell one quick search's result file from the next one: its finish time and its entry.
 
     The entry is taken without the profile names (quick_entry_label), so that a profile name
-    clashing with it does not make the same result look new (review).
+    clashing with it does not make the same result look new.
     """
     return results.get('finished'), quick_entry_label(results)
 
 
 def results_choice(options, chosen, quick_option=None, quick_new=False):
-    """Return the entry the results selector shows (F34), or None for its first one.
+    """Return the entry the results selector shows, or None for its first one.
 
     chosen: the entry shown so far (none, or one no longer offered, gives None);
     quick_option: the entry of the last quick search, if there is one; quick_new: whether

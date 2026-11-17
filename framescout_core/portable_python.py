@@ -1,4 +1,4 @@
-"""The private Python of a new installation (P5 part C, F47): what the installers download.
+"""The private Python of a new installation: what the installers download.
 
 Install-FrameScout.bat downloads python.org's full Windows package (a ZIP, not the
 installer) into .tmp, checks its SHA-256, extracts it to PRIVATE_PYTHON in the FrameScout
@@ -8,8 +8,7 @@ The scripts hold the same values; tests keep them in sync.
 """
 
 
-# Python version of new installations, the same on Windows and Linux (user decisions
-# 2026-10-27: one tested Python 3.14; 2026-11-16: Linux gets the same private Python)
+# Python version of new installations: one tested version, the same on Windows and Linux
 PYTHON_VERSION = '3.14.9'
 # python.org's full package for 64-bit Windows and its SHA-256 as published in
 # https://www.python.org/ftp/python/3.14.9/windows-3.14.9.json (checked against the

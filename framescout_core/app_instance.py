@@ -1,4 +1,4 @@
-"""The start of the app (F22): one app per project folder, on a free port of 127.0.0.1.
+"""The start of the app: one app per project folder, on a free port of 127.0.0.1.
 
 Start-FrameScout.bat runs framescout_start.py, which calls launch(). The app of a project
 folder holds an operating-system lock (RunLock) on .tmp/app-instance.lock while it runs
@@ -90,8 +90,8 @@ class AppInstance:
         """Take the lock; return False if the app of this folder runs already.
 
         It tries for _CLAIM_WAIT seconds: running() of a waiting start takes the lock for a
-        moment (lock_held), which must not look like a running app (review). With the lock taken, an instance file left by a killed app is removed at once, so
-        another start never reads that app's port before publish() names the new one (review).
+        moment (lock_held), which must not look like a running app. With the lock taken, an instance file left by a killed app is removed at once, so
+        another start never reads that app's port before publish() names the new one.
         """
         self.file.parent.mkdir(parents=True, exist_ok=True)
         if not self.lock.acquire(timeout=_CLAIM_WAIT, clock=clock, sleep=sleep):
@@ -151,8 +151,8 @@ def _wait_for_running(instance, answers, wait, clock, sleep):
 
 
 def stale_lock_hint(then):
-    """The way out when the start lock only looks held (e.g. a file a virus scanner keeps open,
-    review); then names what to run afterwards. A lock a running app holds cannot be deleted
+    """The way out when the start lock only looks held (e.g. a file a virus scanner keeps open);
+    then names what to run afterwards. A lock a running app holds cannot be deleted
     on Windows, so the advice is safe there."""
     return (f'If no FrameScout window of this folder is open, delete the file {Path(INSTANCE_DIR) / INSTANCE_LOCK} '
             f'in the FrameScout folder, then {then}.')

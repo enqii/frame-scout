@@ -1,4 +1,4 @@
-"""The review dialog of a result list: one photo at a time with a large preview (F19)."""
+"""The review dialog of a result list: one photo at a time with a large preview."""
 from .marks import MARK_MATCH, MARK_NO_MATCH
 
 # the longer edge of the preview in pixels: decoded at reduced scale and downscaled in

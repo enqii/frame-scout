@@ -1,4 +1,4 @@
-"""Copying marked photos to a folder and the saved target folders (A17)."""
+"""Copying marked photos to a folder and the saved target folders."""
 import filecmp
 import os
 import re
@@ -10,7 +10,7 @@ from .profiles import require_profile
 from .settings import SETTINGS_LOCK_TIMEOUT, _parse_settings, _read_settings_file
 
 
-# Copying the photos marked as matches (A17): copies only, never moving or deleting an
+# Copying the photos marked as matches: copies only, never moving or deleting an
 # original and never overwriting a file in the target folder; flat, one folder per profile.
 # The target folders the user typed are saved per profile in settings.json under this key.
 COPY_FOLDERS_KEY = 'copy_folders'
@@ -42,7 +42,7 @@ def copy_target(text, photo_folders, photos=()):
     working directory), a file, and a folder in one of photo_folders (empty entries are
     ignored): the copies would be analyzed again by the next search and appear twice.
     Likewise a folder in the folder of one of photos, the photos to copy: marked in an
-    earlier search, they may come from another photo folder (review; its root is unknown,
+    earlier search, they may come from another photo folder (its root is unknown,
     so only the photo's own folder is covered).
     """
     text = (text or '').strip()
@@ -79,7 +79,7 @@ def _copy_one(source, target):
     """Copy source into target; return 'copied', 'renamed' or 'already'. Raises OSError."""
     if not source.is_file():
         raise FileNotFoundError('the photo no longer exists')
-    # an earlier copy under any of its names, also behind a gap in the numbering (review)
+    # an earlier copy under any of its names, also behind a gap in the numbering
     flags = re.IGNORECASE if os.name == 'nt' else 0
     names = re.compile(re.escape(source.stem) + r'(?: \([0-9]+\))?' + re.escape(source.suffix), flags)
     with os.scandir(target) as entries:
@@ -93,7 +93,7 @@ def _copy_one(source, target):
             continue  # another file or a folder of that name: the next name
         try:
             # a complete file under the final name or none; never replaces anything that
-            # took the name meanwhile, and every name is tried once (review: no endless loop)
+            # took the name meanwhile, and every name is tried once, so the loop ends
             _publish_via_temp(candidate, lambda tmp: shutil.copy2(source, tmp), _publish_new)
         except FileExistsError:
             continue
@@ -108,7 +108,7 @@ def copy_photos(paths, target, progress=None):
     already there (also one named "name (n).jpg" by an earlier copy); the same name with
     other content gets the next free "name (n).jpg". A photo that cannot be copied fails
     on its own. progress(done, total) is called after each photo (the app shows it, and a
-    rerun of the app stops the copy there, review). Raises OSError if target cannot be
+    rerun of the app stops the copy there). Raises OSError if target cannot be
     created.
     """
     target = Path(target)
@@ -199,7 +199,7 @@ def rename_copy_folder(filename, old, new, attempts=5, retry_delay=0.05, lock_ti
 
 
 def forget_copy_folder(filename, profile, attempts=5, retry_delay=0.05, lock_timeout=SETTINGS_LOCK_TIMEOUT):
-    """Remove the saved target folder of the deleted profile profile from the app's settings file (A22).
+    """Remove the saved target folder of the deleted profile profile from the app's settings file.
 
     Only the entry: the folder and the copies in it are never touched. Nothing changes if
     none is saved. Raises like save_copy_folder.
