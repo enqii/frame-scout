@@ -208,3 +208,5 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **A56 – The title of a profile without context ends with a dangling " · "** – done 2026-11-17, [PR #157](https://github.com/enqii/frame-scout/pull/157)
 - [x] **A57 – Result cards use only half of the width in a narrow window** – done 2026-11-17, [PR #157](https://github.com/enqii/frame-scout/pull/157)
 - [x] **A59 – The popover button "More" of a result card is taller than "Match" and "No match"** – done 2026-11-17, [PR #157](https://github.com/enqii/frame-scout/pull/157)
+- [x] **A53 – The tooltips of the results toolbar stay open** – done 2026-11-17, [PR #158](https://github.com/enqii/frame-scout/pull/158)
+- [x] **A54 – The header is squeezed at window widths of about 680–1100 px** – done 2026-11-17, [PR #158](https://github.com/enqii/frame-scout/pull/158)

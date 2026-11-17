@@ -509,3 +509,7 @@ vulnerability reporting are on.
 - Absolute paths in galleries and links work only on the computer that made them.
 - Python 3.14 has been verified for one CPU run (and the CUDA runs above) only.
 - The system information in the UI is informational, not a hardware benchmark.
+- Streamlit leaves a tooltip open after a dialog or popover gives the focus back to its button
+  (A53); a page script (`TOOLTIP_SCRIPT` in `framescout_core/app_state.py`) hides every open
+  tooltip whose element is neither under the mouse nor holds the keyboard focus. It relies on
+  Streamlit internals, checked like the mark colors (`MARK_STYLE_STREAMLIT`).

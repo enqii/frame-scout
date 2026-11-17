@@ -51,7 +51,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a
       profile title, result cards in a narrow window, height of the "More" button
       (A55, A56, A57, A59; kind `code`) – 2026-11-17 ([#157](https://github.com/enqii/frame-scout/pull/157))
-- [ ] Tooltips that stay open and the squeezed header at 680–1100 px (A53, A54; kind `code`)
+- [x] Tooltips that stay open and the squeezed header at 680–1100 px (A53, A54; kind `code`) – 2026-11-17 ([#158](https://github.com/enqii/frame-scout/pull/158))
 
 ### P51 – Excel-friendly CSV (added 2026-11-17)
 - [ ] "Separator: comma / semicolon" choice for the result export (F9; kind `code`)
