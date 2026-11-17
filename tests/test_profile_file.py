@@ -1,4 +1,4 @@
-"""Reading and saving the app's profiles.json without losing data (framescout_core, A2)."""
+"""Reading and saving the app's profiles.json without losing data (framescout_core)."""
 import json
 import os
 from pathlib import Path
@@ -21,7 +21,7 @@ def test_a_missing_file_has_no_profiles(tmp_path):
 
 
 def test_require_profile_names_a_name_that_is_no_profile(tmp_path):
-    # the check of save_marks/save_copy_folder (review of A22)
+    # the check of save_marks/save_copy_folder
     path = tmp_path / 'profiles.json'
     with pytest.raises(UnknownProfileError, match='Red car'):
         require_profile(path, 'Red car')  # no file: no profiles
@@ -52,7 +52,7 @@ def test_an_empty_profile_list_is_allowed(tmp_path):
 
 
 def test_the_v3_format_is_converted_instead_of_read_as_empty(tmp_path):
-    # A2: the app used to read {name: [prompts]} as [] and the next save wiped the file
+    # the app used to read {name: [prompts]} as [] and the next save wiped the file
     path = write(tmp_path / 'profiles.json', {'Dog': ['a dog on a meadow'], 'Cat': []})
     assert read_profiles(path) == [{'name': 'Dog', 'prompts': ['a dog on a meadow']},
                                    {'name': 'Cat', 'prompts': []}]
@@ -92,7 +92,7 @@ def test_saved_profiles_are_read_back_and_loadable_by_the_engine(tmp_path):
 
 
 def test_other_top_level_keys_of_the_file_are_kept(tmp_path):
-    # review: {"version": 2, "profiles": [...]} lost "version" on the first save
+    # {"version": 2, "profiles": [...]} lost "version" on the first save
     path = write(tmp_path / 'profiles.json', {'version': 2, 'profiles': [{'name': 'Dog'}], 'note': 'mine'})
     save_profiles(path, [{'name': 'Cat'}])
     data = json.loads(path.read_text(encoding='utf-8'))
@@ -121,7 +121,7 @@ def test_the_previous_file_is_kept_as_backup(tmp_path):
 
 def test_without_a_previous_file_no_backup_is_written(tmp_path):
     save_profiles(tmp_path / 'profiles.json', [{'name': 'Dog'}])
-    # the lock file of the save stays (empty), like settings.json.lock (A13)
+    # the lock file of the save stays (empty), like settings.json.lock
     assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json', 'profiles.json.lock']
 
 
@@ -133,7 +133,7 @@ def test_no_temporary_file_is_left_behind(tmp_path):
 
 
 def test_both_files_are_flushed_to_disk_before_they_get_their_final_names(tmp_path, monkeypatch):
-    # review: without fsync, a power loss can persist the rename before the data and
+    # without fsync, a power loss can persist the rename before the data and
     # leave an empty profiles.json and profiles.json.bak
     path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
     events = []
@@ -170,7 +170,7 @@ def test_if_the_backup_fails_the_profiles_file_is_not_changed(tmp_path, monkeypa
     assert sorted(p.name for p in tmp_path.iterdir()) == ['profiles.json', 'profiles.json.lock']
 
 
-# A13: a save is based on the profiles a page showed; it must not overwrite a change that
+# a save is based on the profiles a page showed; it must not overwrite a change that
 # another tab, session or a text editor made to profiles.json in between
 
 def test_the_version_tells_whether_the_file_changed(tmp_path):
@@ -183,7 +183,7 @@ def test_the_version_tells_whether_the_file_changed(tmp_path):
 
 
 def test_a_page_tells_when_the_profiles_changed_since_it_showed_them(tmp_path):
-    # A31: a click on a profile form that the page no longer shows is not delivered by
+    # a click on a profile form that the page no longer shows is not delivered by
     # Streamlit; the page says that the list changed instead of dropping it silently
     path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}, {'name': 'Cat'}]})
     shown = read_profiles_versioned(path)[1]
@@ -191,7 +191,7 @@ def test_a_page_tells_when_the_profiles_changed_since_it_showed_them(tmp_path):
     save_profiles(path, [{'name': 'Dog'}])  # another session deletes "Cat"
     notice = profiles_changed_notice(shown, read_profiles_versioned(path)[1])
     assert 'changed in another tab or session' in notice and 'not carried out' in notice
-    # Streamlit leaves no trace of a dropped click: the notice says it only conditionally (review)
+    # Streamlit leaves no trace of a dropped click: the notice says it only conditionally
     assert 'If you just clicked' in notice
     # a file that was created or deleted meanwhile counts too
     assert profiles_changed_notice(None, shown) and profiles_changed_notice(shown, None)
@@ -302,7 +302,7 @@ def test_the_cleanup_never_deletes_the_lock_file():
 
 
 def test_a_replace_that_fails_for_a_moment_is_retried(tmp_path, monkeypatch):
-    # on Windows, replacing fails while another session reads the file at that moment (review)
+    # on Windows, replacing fails while another session reads the file at that moment
     path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
     original = path.read_bytes()
     real_replace = os.replace
@@ -338,7 +338,7 @@ def test_a_replace_that_keeps_failing_raises_os_error(tmp_path, monkeypatch):
 
 
 def test_a_transient_read_error_is_retried(tmp_path, monkeypatch):
-    # on Windows, reading fails for a moment while another session replaces the file (review)
+    # on Windows, reading fails for a moment while another session replaces the file
     path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
     expected = read_profiles_versioned(path)
     real_read = Path.read_bytes
@@ -367,7 +367,7 @@ def test_a_read_error_that_persists_raises_os_error(tmp_path, monkeypatch):
 
 
 def test_a_save_returns_the_version_of_the_file_it_wrote(tmp_path):
-    # the app's next save is based on its own saved file, not on the one before it (review)
+    # the app's next save is based on its own saved file, not on the one before it
     path = write(tmp_path / 'profiles.json', {'profiles': [{'name': 'Dog'}]})
     _, shown = read_profiles_versioned(path)
     version = save_profiles(path, [{'name': 'Cat'}], expected=shown)

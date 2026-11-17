@@ -1,4 +1,4 @@
-"""The registry of search models the engine's --model and the app's model choice offer (E22)."""
+"""The registry of search models the engine's --model and the app's model choice offer."""
 import re
 
 import pytest
@@ -9,14 +9,14 @@ from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, script
 
 
 def test_the_default_is_openai_clip_vit_b_32_with_quickgelu():
-    # user decision in PR #13: the default stays; its cache rows stay valid (test_signature.py)
+    # the default model's cache rows stay valid (test_signature.py)
     default = MODELS[DEFAULT_MODEL]
     assert (default.name, default.pretrained) == ('ViT-B-32-quickgelu', 'openai')
     assert MODEL_KEYS[0] == DEFAULT_MODEL
 
 
 def test_the_offered_models_are_the_chosen_candidates():
-    # user decision for E22: the default plus ViT-B-16, ViT-L-14 (DataComp-XL) and SigLIP B/16
+    # the default plus ViT-B-16, ViT-L-14 (DataComp-XL) and SigLIP B/16
     assert [(m.name, m.pretrained) for m in MODELS.values()] == [
         ('ViT-B-32-quickgelu', 'openai'),
         ('ViT-B-16', 'datacomp_xl_s13b_b90k'),
@@ -38,7 +38,7 @@ def test_registry_entries_are_consistent():
 
 
 def test_only_the_default_counts_as_evaluated():
-    # the other candidates are offered before their evaluation (user decision: two PRs)
+    # the other candidates are offered before their evaluation
     assert [key for key, model in MODELS.items() if model.evaluated] == [DEFAULT_MODEL]
 
 
@@ -48,7 +48,7 @@ def test_siglip_needs_transformers_and_the_others_nothing_extra():
 
 
 def test_no_offered_model_is_multilingual_yet():
-    # the "in English" hint of the app holds for every offered model (E3, E21)
+    # the "in English" hint of the app holds for every offered model
     assert not any(model.multilingual for model in MODELS.values())
 
 
@@ -62,7 +62,7 @@ def test_labels_name_the_cpu_factor_the_download_and_the_evaluation():
 
 
 def test_labels_of_downloaded_models_name_no_download_size():
-    # A39: a model whose weights are in the cache is not offered as a download
+    # a model whose weights are in the cache is not offered as a download
     label = model_label(DEFAULT_MODEL, downloaded=True)
     assert label == f'{MODELS[DEFAULT_MODEL].label} (default, fastest; downloaded)'
     for key in MODEL_KEYS[1:]:
@@ -83,18 +83,18 @@ def test_missing_packages_and_problem():
     assert missing_packages(DEFAULT_MODEL, none_installed) == []
     problem = model_problem('vit-b-16-siglip', none_installed)
     assert 'transformers' in problem and script('Install') in problem
-    # a manual install keeps the pinned versions (I12 review)
+    # a manual install keeps the pinned versions
     assert f'pip install -r {REQUIREMENTS_FILE} -c {CONSTRAINTS_FILE}' in problem
     assert model_problem('vit-b-16-siglip', all_installed) is None
     assert model_problem(DEFAULT_MODEL, none_installed) is None
 
 
 def test_the_model_of_a_search_comes_from_its_results_settings():
-    # E22 review: the app notes results of another model than the chosen one
+    # the app notes results of another model than the chosen one
     assert results_model({'model': 'vit-b-16-siglip', 'top': 150}) == 'vit-b-16-siglip'
-    assert results_model({'top': 150}) == DEFAULT_MODEL  # a search before E22
+    assert results_model({'top': 150}) == DEFAULT_MODEL  # a search of an older version names no model
     assert results_model({}) == DEFAULT_MODEL and results_model(None) == DEFAULT_MODEL
-    assert results_model({'model': 'removed-later'}) == 'removed-later'  # e.g. trimmed from the list (E32)
+    assert results_model({'model': 'removed-later'}) == 'removed-later'  # e.g. trimmed from the list
     assert results_model({'model': ['x']}) is None and results_model({'model': None}) is None
 
 
@@ -123,7 +123,7 @@ def test_open_clip_knows_the_model_and_its_weights(key):
 
 @pytest.mark.parametrize('key', MODEL_KEYS)
 def test_model_config_matches_the_activation_of_the_weights(key):
-    # open_clip warns about a "QuickGELU mismatch" exactly when these two values differ (E1)
+    # open_clip warns about a "QuickGELU mismatch" exactly when these two values differ
     open_clip = open_clip_or_skip()
     from open_clip.pretrained import get_pretrained_cfg
     model = MODELS[key]
@@ -151,7 +151,7 @@ def test_a_hugging_face_tokenizer_is_declared_as_an_extra_package(key):
 
 
 def test_every_model_names_its_hub_repositories():
-    # the engine checks them in the cache to load the model without a Hub request (E16)
+    # the engine checks them in the cache to load the model without a Hub request
     for model in MODELS.values():
         assert re.fullmatch(r'[\w.-]+/[\w.-]+', model.weights_repo), model.key
         assert model.tokenizer_repo == '' or re.fullmatch(r'[\w.-]+/[\w.-]+', model.tokenizer_repo), model.key

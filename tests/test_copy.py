@@ -1,4 +1,4 @@
-"""Copying marked photos to a folder and the saved target folders (framescout_core, A17)."""
+"""Copying marked photos to a folder and the saved target folders (framescout_core)."""
 import json
 import os
 from pathlib import Path
@@ -208,7 +208,7 @@ def test_a_renamed_profile_keeps_its_target_folder(tmp_path):
 
 
 def test_a_deleted_profile_forgets_only_its_target_folder_entry(tmp_path):
-    # A22: only the entry in settings.json; the folder and the copies in it stay
+    # only the entry in settings.json; the folder and the copies in it stay
     settings = tmp_path / 'settings.json'
     target = photo(tmp_path / 'cars' / 'a.jpg').parent
     save_settings(settings, {'top': 300}, default_settings(tmp_path))
@@ -233,7 +233,7 @@ def test_forgetting_a_profile_without_a_saved_folder_changes_nothing(tmp_path):
 
 
 def test_a_target_folder_is_saved_only_for_a_profile_of_the_profiles_file(tmp_path, monkeypatch):
-    # review of A22 (and A33): a gallery drawn before the profile was deleted or renamed, or
+    # a gallery drawn before the profile was deleted or renamed, or
     # the gallery of a deleted profile's old results, must not save a folder under that
     # name; the check runs under the settings lock, before forget/rename_copy_folder
     import framescout_core.copying as copying_module
@@ -263,10 +263,10 @@ def test_a_target_folder_is_saved_only_for_a_profile_of_the_profiles_file(tmp_pa
     assert settings.read_bytes() == before
 
 
-# --- review findings ------------------------------------------------------------------------
+# --- copy edge cases ----------------------------------------------------------------------
 
 def test_a_name_that_cannot_be_created_moves_on_to_the_next(tmp_path, monkeypatch):
-    # e.g. a dangling symbolic link: exists() is False, but the name is taken (review: no endless loop)
+    # e.g. a dangling symbolic link: exists() is False, but the name is taken (no endless loop)
     import framescout_core.copying
     publish = framescout_core.copying._publish_new
 
@@ -294,7 +294,7 @@ def test_a_dangling_link_with_the_photo_name_is_kept(tmp_path):
 
 
 def test_an_earlier_copy_behind_a_gap_is_already_there(tmp_path):
-    # review: a (2).jpg was deleted, a (3).jpg is this photo: no new copy as a (2).jpg
+    # a (2).jpg was deleted, a (3).jpg is this photo: no new copy as a (2).jpg
     target = tmp_path / 'out'
     photo(target / 'a.jpg', b'other')
     photo(target / 'a (3).jpg', b'new')
@@ -313,7 +313,7 @@ def test_similar_names_are_not_taken_for_earlier_copies(tmp_path):
 
 
 def test_a_target_in_the_folder_of_a_marked_photo_is_refused(tmp_path):
-    # review: matches marked in an earlier search may come from another photo folder
+    # matches marked in an earlier search may come from another photo folder
     old = photo(tmp_path / 'old' / 'sub' / 'a.jpg')
     target, problem = copy_target(str(tmp_path / 'old' / 'sub' / 'copies'), [str(tmp_path / 'photos')],
                                   photos=[str(old)])

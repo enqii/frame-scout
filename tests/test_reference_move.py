@@ -1,4 +1,4 @@
-"""Moving a renamed profile's reference images to the folder of its new name (A1, review)."""
+"""Moving a renamed profile's reference images to the folder of its new name."""
 import contextlib
 import json
 import os
@@ -50,7 +50,7 @@ def test_undo_removes_only_the_new_names(project):
 
 
 def test_files_of_other_profiles_and_leftovers_stay_in_the_old_folder(project):
-    # e.g. a folder shared by two profiles before A1, or files removed from the profile
+    # e.g. a folder shared by two profiles in older versions, or files removed from the profile
     (project / 'references' / 'red-car' / 'reference-3.jpg').write_bytes(b'leftover')
     others = [{'name': 'Red Car!', 'reference_images': ['references/red-car/reference-2.png']}]
     refs = ['references/red-car/reference-1.jpg', 'references/red-car/reference-2.png']
@@ -127,7 +127,7 @@ def test_a_failure_while_staging_undoes_the_files_staged_before(project, monkeyp
 
 @pytest.mark.skipif(os.name != 'nt', reason='directory junctions are a Windows feature')
 def test_a_references_folder_that_is_a_junction_elsewhere_works(tmp_path):
-    # review: resolving the new path left the project folder and relative_to raised ValueError
+    # resolving the new path left the project folder and relative_to raised ValueError
     _winapi = pytest.importorskip('_winapi')
     target = tmp_path / 'elsewhere' / 'refs'
     (target / 'red-car').mkdir(parents=True)
@@ -169,7 +169,7 @@ def rename_red_car(project, previous):
 
 
 def test_the_backup_points_to_the_moved_files_after_a_rename(project):
-    # review: restoring profiles.json.bak after a rename pointed at removed file names
+    # restoring profiles.json.bak after a rename pointed at removed file names
     (project / 'photos').mkdir()
     (project / 'photos' / 'bike.jpg').write_bytes(b'bike')
     previous = {'version': 2, 'profiles': [
@@ -240,7 +240,7 @@ def test_a_missing_backup_needs_no_update(project):
 
 
 def test_the_backup_is_rewritten_under_the_lock_of_the_profiles_file(project):
-    # A32: another session's save_profiles replaces the .bak under profiles.json.lock; the
+    # another session's save_profiles replaces the .bak under profiles.json.lock; the
     # rewrite waits for that lock, so it never replaces a newer backup with an older state
     previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}]}
     path, staged = rename_red_car(project, previous)
@@ -259,7 +259,7 @@ def test_the_backup_is_rewritten_under_the_lock_of_the_profiles_file(project):
 
 
 def test_the_backup_is_read_only_once_the_lock_is_held(project, monkeypatch):
-    # A32 (review): another session's save replaces the .bak while this rewrite waits for the
+    # another session's save replaces the .bak while this rewrite waits for the
     # lock; the rewrite must start from that newer backup, not from one read before the lock
     previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}]}
     path, staged = rename_red_car(project, previous)
@@ -296,7 +296,7 @@ def test_a_failed_backup_rewrite_raises_and_keeps_the_old_backup(project, monkey
 
 
 def test_old_names_kept_after_a_failed_backup_rewrite_are_offered_by_the_cleanup_after_the_next_save(project):
-    # A43: the app keeps the old names while profiles.json.bak still lists them; the next
+    # the app keeps the old names while profiles.json.bak still lists them; the next
     # save replaces that backup, and "Reference images no profile uses" then offers them
     previous = {'profiles': [{'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg',
                                                                       'references/red-car/reference-2.png']}]}

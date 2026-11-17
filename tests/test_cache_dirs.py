@@ -1,4 +1,4 @@
-"""Model and config files stay under the project's .cache folder, also for manual runs (E9, I10)."""
+"""Model and config files stay under the project's .cache folder, also for manual runs."""
 import ast
 import os
 import subprocess
@@ -26,7 +26,7 @@ def test_cache_paths_are_under_the_project_cache(tmp_path):
 
 
 def test_cache_folder_paths_take_the_cache_folder_itself(tmp_path):
-    # I25: the evaluation tool's --cache-dir names the cache folder, not the project folder
+    # the evaluation tool's --cache-dir names the cache folder, not the project folder
     assert cache_folder_paths(tmp_path / 'my-cache') == {
         'TORCH_HOME': tmp_path / 'my-cache' / 'torch', 'HF_HOME': tmp_path / 'my-cache' / 'huggingface',
         'YOLO_CONFIG_DIR': tmp_path / 'my-cache' / 'ultralytics', 'XDG_CACHE_HOME': tmp_path / 'my-cache'}
@@ -52,7 +52,7 @@ def test_default_cache_env_keeps_variables_a_user_set(tmp_path):
 
 
 def test_default_cache_env_leaves_torch_and_hugging_face_to_an_xdg_cache_home_a_user_set(tmp_path):
-    # review: torch and huggingface_hub derive TORCH_HOME and HF_HOME from XDG_CACHE_HOME, so a
+    # torch and huggingface_hub derive TORCH_HOME and HF_HOME from XDG_CACHE_HOME, so a
     # user's XDG_CACHE_HOME alone keeps their models there; Ultralytics does not read it
     own = str(tmp_path / 'own')
     environ = {'XDG_CACHE_HOME': own, 'HF_HOME': ''}
@@ -70,9 +70,9 @@ def test_default_cache_env_leaves_torch_and_hugging_face_to_an_xdg_cache_home_a_
 
 
 def test_importing_framescout_core_imports_no_third_party_module():
-    # review: the engine calls default_cache_env after importing framescout_core, which is safe
+    # the engine calls default_cache_env after importing framescout_core, which is safe
     # only while framescout_core loads nothing that reads the cache variables on import; this
-    # also keeps the package standard library only (all of its modules are imported, I45)
+    # also keeps the package standard library only (all of its modules are imported)
     script = ('import importlib, pkgutil, sys\nbefore = set(sys.modules)\nimport framescout_core\n'
               'for info in pkgutil.iter_modules(framescout_core.__path__):\n'
               '    importlib.import_module("framescout_core." + info.name)\n'
@@ -92,7 +92,7 @@ def test_yolo_weights_default_goes_to_the_cache(tmp_path):
 
 
 def test_yolo_weights_follow_a_yolo_config_dir_the_user_set(tmp_path):
-    # review: like default_cache_env, a folder the user (or framescout_eval) set is kept
+    # like default_cache_env, a folder the user (or framescout_eval) set is kept
     base, own = tmp_path / 'project', tmp_path / 'own'
     base.mkdir()
     environ = {'YOLO_CONFIG_DIR': str(own)}
@@ -109,7 +109,7 @@ def test_yolo_weights_uses_the_cached_file(tmp_path):
     cached.write_bytes(b'w')
     (tmp_path / DEFAULT_YOLO_MODEL).write_bytes(b'old')  # e.g. left by an older version
     assert yolo_weights(DEFAULT_YOLO_MODEL, tmp_path, tmp_path, {}) == str(cached)
-    # review: a second copy is not deleted (it may not be ours to delete); the uninstall removes it
+    # a second copy is not deleted (it may not be ours to delete); the uninstall removes it
     assert (tmp_path / DEFAULT_YOLO_MODEL).read_bytes() == b'old'
 
 
@@ -134,7 +134,7 @@ def test_yolo_weights_uses_the_old_download_if_it_cannot_be_moved(tmp_path):
 
     assert yolo_weights(DEFAULT_YOLO_MODEL, tmp_path, tmp_path, {}, lines.append, replace=refuse) == str(legacy)
     assert legacy.exists()
-    # review: not silently
+    # not silently
     assert len(lines) == 1 and str(legacy) in lines[0] and 'in use' in lines[0]
 
 
@@ -171,7 +171,7 @@ def test_yolo_weights_in_the_working_folder_are_used_as_before(tmp_path):
 
 
 def test_yolo_weights_in_the_working_folder_win_over_a_cached_copy(tmp_path):
-    # E41: a copy the user put into the working folder is deliberate, so it wins over the cache
+    # a copy the user put into the working folder is deliberate, so it wins over the cache
     base, cwd, own = tmp_path / 'project', tmp_path / 'elsewhere', tmp_path / 'own'
     base.mkdir(), cwd.mkdir()
     for name in (DEFAULT_YOLO_MODEL, 'yolo11s.pt'):
@@ -188,8 +188,8 @@ def test_yolo_weights_in_the_working_folder_win_over_a_cached_copy(tmp_path):
 
 
 def test_the_default_weights_in_the_project_folder_stay_an_older_download(tmp_path):
-    # E41: started in the project folder, the default file there is what an older version
-    # downloaded (E9), not a copy of the user: a cached copy still wins and it is not used
+    # started in the project folder, the default file there is what an older version
+    # downloaded, not a copy of the user: a cached copy still wins and it is not used
     cached = tmp_path / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
     cached.parent.mkdir(parents=True)
     cached.write_bytes(b'w')
@@ -202,7 +202,7 @@ def test_the_default_weights_in_the_project_folder_stay_an_older_download(tmp_pa
 
 
 def test_the_project_folder_is_told_by_its_path_not_by_the_file(tmp_path, monkeypatch):
-    # review: samefile stats a file another search may be moving into the cache meanwhile, and
+    # samefile stats a file another search may be moving into the cache meanwhile, and
     # on volumes without a unique file index (exFAT, network shares) two files compare equal
     base, cwd = tmp_path / 'project', tmp_path / 'elsewhere'
     (base / 'sub').mkdir(parents=True), cwd.mkdir()
@@ -220,7 +220,7 @@ def test_the_project_folder_is_told_by_its_path_not_by_the_file(tmp_path, monkey
 
 
 def test_engine_cache_env_keeps_the_variables_a_user_set(tmp_path):
-    # A36: the app gives the engine the cache variables as a manual run gets them
+    # the app gives the engine the cache variables as a manual run gets them
     environ = {'PATH': 'x', 'HF_HOME': r'D:\hf', 'TORCH_HOME': ''}
     env = engine_cache_env(environ, tmp_path)
     paths = cache_paths(tmp_path)
@@ -229,14 +229,14 @@ def test_engine_cache_env_keeps_the_variables_a_user_set(tmp_path):
     # a copy: the caller's environment is not changed
     assert environ == {'PATH': 'x', 'HF_HOME': r'D:\hf', 'TORCH_HOME': ''}
     assert not (tmp_path / '.cache').exists()
-    # applied again it changes nothing: check_installation hands its result on to check_models (review)
+    # applied again it changes nothing: check_installation hands its result on to check_models
     for environ in (environ, {'XDG_CACHE_HOME': r'D:\x', 'HF_HOME': ''}):
         env = engine_cache_env(environ, tmp_path)
         assert engine_cache_env(env, tmp_path) == env
 
 
 def test_find_yolo_weights_looks_where_yolo_weights_does_without_moving(tmp_path):
-    # the free disk space check asks whether the detector needs a download (F3 review)
+    # the free disk space check asks whether the detector needs a download
     base, cwd = tmp_path / 'project', tmp_path / 'elsewhere'
     base.mkdir(), cwd.mkdir()
     cached = base / '.cache' / 'ultralytics' / DEFAULT_YOLO_MODEL
@@ -259,14 +259,14 @@ def test_yolo_weights_paths_and_urls_are_used_as_given(tmp_path):
     names = [str(tmp_path / 'w.pt'), 'models/w.pt', 'https://example.org/w.pt']
     if os.name == 'nt':
         # a backslash separates folders on Windows only; elsewhere it is part of a bare file
-        # name, as Path and Ultralytics see it there (E40)
+        # name, as Path and Ultralytics see it there
         names.append(r'models\w.pt')
     for name in names:
         assert yolo_weights(name, tmp_path, tmp_path, {}) == name
 
 
 def test_the_detector_weights_line_names_the_file_that_is_loaded(tmp_path):
-    # E60: the cache signature keeps --yolo-model as given, so run.log names the file loaded
+    # the cache signature keeps --yolo-model as given, so run.log names the file loaded
     cwd = tmp_path / 'run'
     cwd.mkdir()
     (cwd / DEFAULT_YOLO_MODEL).write_bytes(b'own')
@@ -289,7 +289,7 @@ MISSING = ' (not found: Ultralytics downloads it if it is one of its official we
 
 @pytest.mark.parametrize('name', [DEFAULT_YOLO_MODEL, 'models/typo.pt'])
 def test_the_detector_weights_line_promises_no_download_for_a_missing_file(tmp_path, name):
-    # review: a missing file other than an official name (e.g. a typo) is not downloaded,
+    # a missing file other than an official name (e.g. a typo) is not downloaded,
     # so the note says when the load fails instead of promising a download
     assert detector_weights_line(name, tmp_path) == (
         f'Loading person detector weights: {tmp_path / name}{MISSING}')
@@ -301,7 +301,7 @@ def test_the_detector_weights_line_shows_a_url_as_given(tmp_path):
 
 
 def test_open_clip_downloads_from_a_url_into_the_project_cache(tmp_path):
-    # E39: open_clip fetches weights without a Hub repository from their URL into
+    # open_clip fetches weights without a Hub repository from their URL into
     # ~/.cache/clip unless it gets cache_dir; a Hub model gets none, or its weights would
     # leave the Hugging Face cache (HF_HOME) and be downloaded again
     url_model = replace(MODELS[DEFAULT_MODEL], weights_repo='')
@@ -322,8 +322,8 @@ def cache_lines(name):
 
 
 def test_the_bat_files_set_only_the_cache_variables_a_user_did_not_set():
-    # A36: as for a manual engine run (default_cache_env), a variable the user set wins; the
-    # lines of the variables derived from XDG_CACHE_HOME come before the line that sets it (review)
+    # as for a manual engine run (default_cache_env), a variable the user set wins; the
+    # lines of the variables derived from XDG_CACHE_HOME come before the line that sets it
     expected = []
     for variable, path in cache_paths(ROOT).items():
         condition = f'if not defined {variable} '
@@ -362,7 +362,7 @@ def test_the_cache_lines_of_the_bat_files_keep_a_variable_the_user_set(tmp_path)
     assert run_cache_lines(folder, {}) == expected
     expected['HF_HOME'] = str(tmp_path / 'own-hf')
     assert run_cache_lines(folder, {'HF_HOME': expected['HF_HOME']}) == expected
-    # review: with the user's XDG_CACHE_HOME, torch and Hugging Face derive their folders from it,
+    # with the user's XDG_CACHE_HOME, torch and Hugging Face derive their folders from it,
     # as default_cache_env leaves them
     own = str(tmp_path / 'own cache')
     environ = {'XDG_CACHE_HOME': own}

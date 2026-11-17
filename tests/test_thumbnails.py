@@ -1,4 +1,4 @@
-"""Gallery thumbnails of the HTML export (framescout_core.thumbnails.ensure_thumbnail, E6)."""
+"""Gallery thumbnails of the HTML export (framescout_core.thumbnails.ensure_thumbnail)."""
 import os
 import shutil
 from pathlib import Path
@@ -32,7 +32,7 @@ def test_a_missing_thumbnail_is_rendered(tmp_path):
     calls, log = [], []
     name = ensure_thumbnail(photo, thumbs, tmp_path / 'vorschaubilder', renderer(calls), log.append)
     assert name == thumbnail_name(photo, photo.stat().st_mtime_ns)
-    # rendered to a temporary .jpg in the same folder, then renamed (review)
+    # rendered to a temporary .jpg in the same folder, then renamed
     [(rendered, target)] = calls
     assert rendered == photo and target.parent == thumbs and target.suffix == '.jpg'
     assert [p.name for p in thumbs.iterdir()] == [name]
@@ -53,7 +53,7 @@ def test_an_existing_thumbnail_is_not_rendered_again(tmp_path):
 
 
 def test_a_thumbnail_can_be_named_by_a_given_modification_time_without_a_legacy_folder(tmp_path):
-    # the evaluation tool names a pool photo's thumbnail by the time its scores were made (E35)
+    # the evaluation tool names a pool photo's thumbnail by the time its scores were made
     photo = make_photo(tmp_path)
     thumbs = tmp_path / 'thumbnails'
     thumbs.mkdir()
@@ -79,7 +79,7 @@ def test_a_thumbnail_of_an_older_version_is_copied_and_left_in_place(tmp_path):
 
 
 def test_a_photo_deleted_after_scoring_is_skipped_instead_of_aborting_the_export(tmp_path):
-    # E6: the photo was scored, then deleted or moved before its gallery card is written
+    # the photo was scored, then deleted or moved before its gallery card is written
     photo = tmp_path / 'deleted.jpg'
     thumbs = tmp_path / 'thumbnails'
     thumbs.mkdir()
@@ -90,7 +90,7 @@ def test_a_photo_deleted_after_scoring_is_skipped_instead_of_aborting_the_export
 
 
 def test_an_interrupted_render_leaves_no_thumbnail_that_later_runs_would_reuse(tmp_path):
-    # review: a half-written thumbnail under the final name passed the exists() check of
+    # a half-written thumbnail under the final name passed the exists() check of
     # every later export, so the gallery kept showing a broken image
     photo = make_photo(tmp_path)
     thumbs = tmp_path / 'thumbnails'
@@ -142,7 +142,7 @@ def test_a_photo_that_cannot_be_rendered_is_skipped(tmp_path):
 
 
 def test_gallery_cards_rank_only_photos_with_a_thumbnail_and_fill_up_to_top():
-    # a skipped photo leaves no gap in the ranks, and lower-ranked photos fill up (E12)
+    # a skipped photo leaves no gap in the ranks, and lower-ranked photos fill up
     tried = []
 
     def thumbnail(photo):
@@ -161,7 +161,7 @@ def test_gallery_cards_show_fewer_cards_when_too_few_photos_have_a_thumbnail():
 
 
 def test_a_skipped_photo_is_tried_and_logged_once_per_export(tmp_path):
-    # a photo that ranks in several galleries is not decoded and logged again (review of E12)
+    # a photo that ranks in several galleries is not decoded and logged again
     thumbs = tmp_path / 'thumbnails'
     thumbs.mkdir()
     good, missing = make_photo(tmp_path, 'good.jpg'), tmp_path / 'missing.jpg'

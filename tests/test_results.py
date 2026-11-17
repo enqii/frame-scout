@@ -1,4 +1,4 @@
-"""The result file of a search (results.json) and the app's result gallery helpers (A12, P4)."""
+"""The result file of a search (results.json) and the app's result gallery helpers."""
 import ast
 import json
 import os
@@ -38,7 +38,7 @@ def write_profiles(folder, profiles):
 
 
 def test_a_card_holds_what_the_app_shows_and_opens():
-    # the relative path as the engine shows it in the HTML gallery, computed once (review)
+    # the relative path as the engine shows it in the HTML gallery, computed once
     c = result_card(2, Path('/photos/sub/a.jpg'), 'sub/a.jpg', 'Person 1', 1.5, 0.3, 0.8, 'Score +1.50',
                     'text 0.300 · image 0.800', THUMB)
     assert c == {'rank': 2, 'path': str(Path('/photos/sub/a.jpg')), 'relative': 'sub/a.jpg', 'label': 'Person 1',
@@ -47,7 +47,7 @@ def test_a_card_holds_what_the_app_shows_and_opens():
 
 
 def test_a_card_names_its_closest_search_text_only_when_given():
-    # F17: an optional key; a card without it is one of an older search or of a single text
+    # an optional key; a card without it is one of an older search or of a single text
     c = result_card(1, Path('/photos/a.jpg'), 'a.jpg', 'Full image', 1.5, 0.3, None, 'Score +1.50', 'text 0.300',
                     THUMB, best_query='"a red sports car"')
     assert c['best_query'] == '"a red sports car"'
@@ -58,7 +58,7 @@ def test_the_caption_of_the_closest_search_text():
     assert query_caption('"a red sports car"') == 'Closest search text: "a red sports car"'
 
 
-# --- the text of a card in the app (F30) ---
+# --- the text of a card in the app ---
 
 def text_lines(html):
     """The (title, shown text) of each line of card_text's HTML."""
@@ -66,7 +66,7 @@ def text_lines(html):
 
 
 def test_card_text_has_the_same_lines_for_every_card_of_a_view():
-    # equal cells: a fixed number of one-line rows, whatever the card holds (F30)
+    # equal cells: a fixed number of one-line rows, whatever the card holds
     plain_card, with_text = card(), card(2, best_query='"a red car"')
     assert len(text_lines(card_text(plain_card, closest_line=False))) == 3
     assert len(text_lines(card_text(plain_card, closest_line=True))) == 4  # an empty row for the missing text
@@ -81,7 +81,7 @@ def test_card_text_has_the_same_lines_for_every_card_of_a_view():
 
 def test_the_closest_text_row_is_decided_for_the_whole_gallery():
     # a page whose cards name no closest text keeps the row if another page has one, so the
-    # cards keep one height from page to page (review of F30)
+    # cards keep one height from page to page
     assert has_closest_line([card(1), card(2, best_query='"a red car"')])
     assert not has_closest_line([card(1), card(2)])
     assert not has_closest_line([])
@@ -106,7 +106,7 @@ def with_blocks(function, context):
 
 
 def test_the_results_have_one_toolbar_row_above_the_photos():
-    # F29: the selector, the counts of the marks, "Hide no match", the page box and the popover
+    # the selector, the counts of the marks, "Hide no match", the page box and the popover
     # "Export and copy" in one row; the views draw into the row show_results starts
     functions = app_functions()
     selector = ast.unparse(functions['show_results'])
@@ -128,7 +128,7 @@ def test_the_results_have_one_toolbar_row_above_the_photos():
 
 
 def test_the_popover_more_of_a_card_closes_after_its_action():
-    # F41: Streamlit keeps a popover open after a button in it reruns the page; "More" tracks
+    # Streamlit keeps a popover open after a button in it reruns the page; "More" tracks
     # its state under a key, and each of its buttons closes it in its callback
     functions = app_functions()
     [more] = [node for node in ast.walk(functions['draw_cards']) if isinstance(node, ast.With)
@@ -153,7 +153,7 @@ def test_the_popover_more_of_a_card_closes_after_its_action():
 
 
 def test_the_popover_export_and_copy_has_a_fixed_width():
-    # F43: its content has a fixed width, so the export caption no longer widens it
+    # its content has a fixed width, so the export caption no longer widens it
     functions = app_functions()
     [popover] = [node for node in ast.walk(functions['show_profile_results']) if isinstance(node, ast.With)
                  and ast.unparse(node.items[0].context_expr).startswith("st.popover('Export and copy'")]
@@ -162,7 +162,7 @@ def test_the_popover_export_and_copy_has_a_fixed_width():
 
 
 def test_the_results_have_a_pager_below_the_grid():
-    # F29: a second pager below the grid; in the profile results with "Go to the first undecided photo"
+    # a second pager below the grid; in the profile results with "Go to the first undecided photo"
     functions = app_functions()
     for name, page_key, progress in (('show_profile_results', 'key', 'progress'),
                                      ('show_quick_results', "'quick_page'", None)):
@@ -188,7 +188,7 @@ def call_name(call):
 
 
 def test_the_notices_of_copy_and_export_are_shown_outside_the_popover():
-    # F29: a closed popover must not hide the result of a copy or an export: both are drawn
+    # a closed popover must not hide the result of a copy or an export: both are drawn
     # into the container notices below the toolbar
     functions = app_functions()
 
@@ -204,7 +204,7 @@ def test_the_notices_of_copy_and_export_are_shown_outside_the_popover():
 
 def test_an_empty_row_of_card_text_keeps_its_line():
     # an empty div has no height: a card with an empty detail or path (read_results accepts
-    # any string) would be shorter than the others (review of F30)
+    # any string) would be shorter than the others
     lines = text_lines(card_text(card(detail='', relative=''), closest_line=True))
     assert len(lines) == 4
     assert all(shown for _, shown in lines)
@@ -233,11 +233,11 @@ def test_card_text_escapes_what_a_photo_name_may_hold():
 def test_a_card_names_the_closest_text_only_among_several():
     queries = ['motif "Red car"', '"a red sports car"']
     assert closest_query(1, queries) == '"a red sports car"'
-    # one text: it is always the closest, nothing to tell; no index: "Find similar" (F11)
+    # one text: it is always the closest, nothing to tell; no index: "Find similar"
     assert closest_query(0, queries[:1]) is None
     assert closest_query(None, queries) is None
     # the gallery note does not suggest that the other texts failed, and names the part of the
-    # photo the text was compared with, not the whole photo (review)
+    # photo the text was compared with, not the whole photo
     assert 'small margin' in QUERY_NOTE and 'best-scoring part' in QUERY_NOTE
     assert 'a photo is most similar' not in QUERY_NOTE
 
@@ -252,12 +252,12 @@ def test_the_summary_counts_the_photos_each_text_was_closest_to():
     assert summary.startswith('Closest search text of these 3 photos: motif "Red car" 1 · "a red sports car" 2 · '
                               '"a car in the snow" 0.')
     # a text closest to a photo can lead by a tiny margin: the others did not "fail"; it is the
-    # text of the part the card names (review)
+    # text of the part the card names
     assert 'small margin' in summary and 'best-scoring part' in summary
 
 
 def test_the_summary_lists_a_repeated_text_once():
-    # review: load_profiles accepts the same custom text twice; the closest one is always the
+    # load_profiles accepts the same custom text twice; the closest one is always the
     # first copy, and the counts add up to the listed photos
     queries = ['motif "Red car"', '"a red car"', '"a red car"']
     cards = [card(1, best_query=queries[1]), card(2, best_query=queries[0])]
@@ -266,7 +266,7 @@ def test_the_summary_lists_a_repeated_text_once():
 
 
 @pytest.mark.parametrize('entry', [
-    {'cards': [card()]},                                              # a search before F17
+    {'cards': [card()]},                                              # a search of an older version
     {'queries': ['"a red car"', '"a red car"'], 'cards': [card(best_query='"a red car"')]},  # one text, twice
     {'queries': QUERIES[:1], 'cards': [card()]},                      # a single text: nothing to compare
     {'queries': QUERIES, 'cards': [card()]},                          # no card names a text
@@ -287,7 +287,7 @@ def test_the_document_names_the_run_and_its_profiles():
     data = document()
     assert data['format'] == RESULTS_FORMAT == 2
     assert data['started'] == '2026-10-23T14:00:00+02:00' and data['finished'] == '2026-10-23T14:02:00+02:00'
-    # format 2 lists the photo folders (A25); "photo_folder" of format 1 is gone
+    # format 2 lists the photo folders; "photo_folder" of format 1 is gone
     assert data['photo_folders'] == [str(Path(r'C:\photos'))] and 'photo_folder' not in data
     assert data['settings'] == {'top': 150}
     assert data['photos'] == 200
@@ -301,7 +301,7 @@ def test_the_document_lists_several_photo_folders():
 
 @pytest.mark.parametrize('folder, expected', [(r'C:\photos', [r'C:\photos']), ('', []), (None, [])])
 def test_a_format_1_file_is_read_with_its_folder_as_a_list(tmp_path, folder, expected):
-    # written by FrameScout before A25: the app shows it until the next search replaces it
+    # written by an older FrameScout version: the app shows it until the next search replaces it
     data = {**document(), 'format': 1, 'photo_folder': folder}
     del data['photo_folders']
     if folder is None:
@@ -334,7 +334,7 @@ def test_results_round_trip(tmp_path):
     assert [p.name for p in tmp_path.iterdir()] == [RESULTS_FILE]
 
 
-# publishing the galleries together with results.json (E24)
+# publishing the galleries together with results.json
 
 def old_export(folder):
     (folder / 'red-car.html').write_text('old red car', encoding='utf-8')
@@ -397,7 +397,7 @@ def test_a_file_that_is_open_is_published_on_a_retry(tmp_path):
 @pytest.mark.parametrize('held', ['dog.html', RESULTS_FILE])
 def test_a_rename_that_fails_every_try_restores_what_was_published_before_it(tmp_path, held):
     # e.g. a virus scanner holds one file for longer than every retry: the run fails, but
-    # the galleries and results.json of the previous search stay together (review of PR #45)
+    # the galleries and results.json of the previous search stay together
     old_export(tmp_path)
     (tmp_path / 'dog.html').write_text('old dog', encoding='utf-8')
     tries = []
@@ -435,7 +435,7 @@ def test_a_restore_that_fails_too_is_skipped_and_the_rename_error_is_raised(tmp_
     with pytest.raises(PermissionError, match='dog in use'):
         publish_export(tmp_path, [('red-car.html', 'new'), ('cat.html', 'new'), ('dog.html', 'new')], document(),
                        replace=replace, attempts=2, retry_delay=0)
-    assert (tmp_path / 'red-car.html').read_text(encoding='utf-8') == 'new'  # left replaced (E45)
+    assert (tmp_path / 'red-car.html').read_text(encoding='utf-8') == 'new'  # left replaced
     assert not (tmp_path / 'cat.html').exists()  # the other restores still ran
     assert read_results(tmp_path / RESULTS_FILE) == document(cards=[])
     assert not list(tmp_path.glob('*.tmp'))
@@ -484,7 +484,7 @@ def test_names_that_could_leave_the_results_folder_are_rejected(tmp_path, profil
 
 
 def test_duplicate_profile_names_are_rejected(tmp_path):
-    # the app picks a profile by its name (review)
+    # the app picks a profile by its name
     path = tmp_path / RESULTS_FILE
     data = document()
     data['profiles'].append(dict(data['profiles'][0]))
@@ -522,7 +522,7 @@ def test_profile_fingerprints_of_the_apps_profile_file(tmp_path):
 
 def test_a_moved_project_folder_keeps_the_fingerprints(tmp_path):
     # references inside the profile file's folder count by their path relative to it, so
-    # moving the project folder does not mark every profile with references as changed (review)
+    # moving the project folder does not mark every profile with references as changed
     profile = {'name': 'Red car', 'reference_images': ['references/red-car/reference-1.jpg']}
     before = profile_fingerprints(write_profiles(tmp_path / 'C' / 'FrameScout', [profile]))
     after = profile_fingerprints(write_profiles(tmp_path / 'D' / 'Tools' / 'FrameScout', [profile]))

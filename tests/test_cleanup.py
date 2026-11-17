@@ -1,4 +1,4 @@
-"""Cleaning up the results folder, the feature cache and the reference images (E7, E11, E13, E23, A14)."""
+"""Cleaning up the results folder, the feature cache and the reference images."""
 import json
 import os
 import sqlite3
@@ -50,7 +50,7 @@ class Project:
         self.profiles = base / 'profiles.json'
         for folder in (self.thumbs, self.refs, self.photos):
             folder.mkdir(parents=True)
-        # the photos of an empty folder are not checked (I44): the photo folder holds one
+        # the photos of an empty folder are not checked: the photo folder holds one
         (self.photos / 'kept.jpg').write_bytes(b'photo')
         self.set_profiles([{'name': 'Red car', 'reference_images': []}])
 
@@ -123,7 +123,7 @@ def temp_thumbnail(folder, name):
     return Path(path)
 
 
-# temporary thumbnails (E13)
+# temporary thumbnails
 
 def test_temporary_thumbnails_of_a_stopped_export_are_found(project):
     tmp = temp_thumbnail(project.thumbs, T1)
@@ -134,15 +134,15 @@ def test_temporary_thumbnails_of_a_stopped_export_are_found(project):
     assert scan['temp_thumbnails']['default'] is True
 
 
-# galleries and thumbnails (E7, E23)
+# galleries and thumbnails
 
 def test_orphaned_galleries_are_only_framescout_galleries_of_no_current_profile_or_result(project):
     project.set_profiles([{'name': 'Red car'}, {'name': 'Bär'}])
     project.write_results([('Old dog', 'old-dog.html', [])])
     project.page('red-car.html', 'Red car')  # gallery of a current profile
     project.page('baer.html', 'Bär')
-    project.page('old-dog.html', 'Old dog')  # listed in results.json (E23)
-    orphan = project.page('b-r.html', 'Bär')  # the old slug of "Bär" (A3)
+    project.page('old-dog.html', 'Old dog')  # listed in results.json
+    orphan = project.page('b-r.html', 'Bär')  # the old slug of "Bär"
     deleted = project.page('cat.html', 'Cat')  # a deleted profile
     (project.results / 'my-notes.html').write_text('<html><title>Notes</title></html>', encoding='utf-8')
     scan = project.scan()
@@ -164,14 +164,14 @@ def test_thumbnails_linked_from_results_or_kept_galleries_are_kept(project):
     legacy_free = project.thumb(T4, project.legacy)
     scan = project.scan()
     assert scan['thumbnails']['items'] == [project.thumbs / T4, legacy_free]
-    # the thumbnails only orphaned galleries link belong to the galleries category (review)
+    # the thumbnails only orphaned galleries link belong to the galleries category
     assert sorted(scan['galleries']['thumbnails']) == sorted([project.thumbs / T2, legacy_linked])
     assert scan['galleries']['thumbnails_size'] == 2 * len(b'jpg')
     assert scan['thumbnails']['default'] is True
 
 
 def test_thumbnails_only_orphaned_galleries_link_are_not_a_thumbnail_item(project):
-    # nothing to delete on its own: the category must not offer "0 files" (review)
+    # nothing to delete on its own: the category must not offer "0 files"
     project.page('cat.html', 'Cat', [T2])
     project.thumb(T2)
     scan = project.scan()
@@ -215,10 +215,10 @@ def test_galleries_and_thumbnails_are_not_offered_without_readable_profiles(proj
         assert scan[key]['items'] == [] and 'profiles.json' in scan[key]['problem']
 
 
-# cache rows (E7, E11)
+# cache rows
 
 def test_rows_of_photos_that_no_longer_exist_anywhere_are_unbound(project):
-    # E8/A21 (user decision): a renamed, moved or deleted photo is "unbound", in whatever
+    # a renamed, moved or deleted photo is "unbound", in whatever
     # folder it was; a photo of an earlier search's folder that still exists is not
     kept = project.photo('a.jpg')
     gone = project.photos / 'b.jpg'
@@ -232,10 +232,10 @@ def test_rows_of_photos_that_no_longer_exist_anywhere_are_unbound(project):
     assert sorted(scan['cache_missing']['items']) == sorted(
         [(str(gone), CURRENT), (str(gone), OLD), (str(moved), OTHER)])
     # not selected by default: it covers every folder searched so far, and a drive letter
-    # another disk got since makes the earlier disk's photos look unbound (A35, user decision)
+    # another disk got since makes the earlier disk's photos look unbound
     assert scan['cache_missing']['rows'] == 3 and scan['cache_missing']['default'] is False
     assert scan['cache_missing']['problem'] is None and scan['cache_missing']['notes'] == []
-    # the folders are named before the deletion, fullest first (review, A35: e.g. a drive
+    # the folders are named before the deletion, fullest first (e.g. a drive
     # letter another disk got since)
     assert scan['cache_missing']['names'] == [f'{elsewhere} (1 photo)', f'{project.photos} (1 photo)']
     summary = project.clean(scan, {'cache_missing'})
@@ -243,7 +243,7 @@ def test_rows_of_photos_that_no_longer_exist_anywhere_are_unbound(project):
 
 
 def test_photos_of_a_missing_or_empty_folder_are_not_checked(project, monkeypatch):
-    # I44 (simple rule, user decision 2026-11-17): a disconnected drive or an unmounted share
+    # simple rule: a disconnected drive or an unmounted share
     # leaves the folder of its photos missing or empty (a mount point on Linux/macOS), so the
     # photos may only be offline; a renamed, deleted or emptied folder looks the same and is
     # not offered either. No photo of such a folder gets a stat, and one note counts them all.
@@ -261,7 +261,7 @@ def test_photos_of_a_missing_or_empty_folder_are_not_checked(project, monkeypatc
         assert category['items'] == [] and category['problem'] is None
         [note] = category['notes']
         assert note.startswith(count + ' not checked') and 'missing or empty' in note
-        # review: an emptied folder is named, and the way out for photos gone for good
+        # an emptied folder is named, and the way out for photos gone for good
         assert 'emptied' in note and 'gone for good, put any file into that folder' in note
     # once the folder holds a photo again (the drive is back), its missing photos are unbound
     (empty / 'IMG_0.jpg').write_bytes(b'photo')
@@ -326,7 +326,7 @@ def test_rows_on_a_drive_letter_that_is_not_there_are_not_checked(project):
 
 @pytest.mark.skipif(os.name != 'nt', reason='extended-length paths are a Windows feature')
 def test_an_extended_length_path_has_a_reachable_root(project):
-    # review: \\?\C:\x has the root \\?\C:\, which the probe reaches (the engine itself
+    # \\?\C:\x has the root \\?\C:\, which the probe reaches (the engine itself
     # writes resolved paths without the prefix)
     gone = '\\\\?\\' + str(project.photos / 'b.jpg')
     project.cache([(gone, CURRENT)])
@@ -353,7 +353,7 @@ def test_a_root_probe_that_hangs_counts_as_not_reachable(monkeypatch):
 
 
 def test_a_root_probe_that_still_hangs_gets_no_second_thread(monkeypatch):
-    # every scan probes a dead share again: its hanging threads must not pile up (review)
+    # every scan probes a dead share again: its hanging threads must not pile up
     import threading
     from framescout_core import cleanup
     release, calls = threading.Event(), []
@@ -413,7 +413,7 @@ def test_the_check_reports_its_progress_once_for_rows_and_marks(project):
     assert seen[-1] == (4, 4) and all(0 <= done <= total == 4 for done, total in seen)
 
 
-# marks of photos that no longer exist (E8/A21)
+# marks of photos that no longer exist
 
 def test_marks_of_photos_that_no_longer_exist_are_offered_unselected(project):
     kept = project.photo('a.jpg')
@@ -467,7 +467,7 @@ def test_deleting_unbound_marks_removes_only_those_entries(project):
 
 def test_a_mark_of_a_photo_back_since_the_cache_step_is_kept(project, monkeypatch):
     # the marks step checks the photos again itself: the answer of the cache step, which can
-    # include a VACUUM, may be out of date (review)
+    # include a VACUUM, may be out of date
     from framescout_core import cleanup
     gone = project.photos / 'b.jpg'
     project.marks({'Red car': {str(gone): 'match'}})
@@ -498,12 +498,12 @@ def test_unbound_marks_are_kept_unless_selected(project):
         'Red car': {str(gone): 'match'}}
 
 
-# marks of profile names that are no search profile (A34)
+# marks of profile names that are no search profile
 
 def test_marks_of_names_that_are_no_profile_are_offered_unselected(project):
     photo = project.photo('a.jpg')
     gone = project.photos / 'b.jpg'
-    # e.g. of a profile deleted before deleting a profile deleted its marks (A22)
+    # e.g. of a profile an older version deleted without its marks
     project.marks({'Red car': {str(photo): 'match'}, 'Dog': {str(photo): 'no-match', str(gone): 'match'},
                    'Cat': {str(photo): 'match'}, 'red car': {str(photo): 'match'}})
     category = project.scan()['marks_profiles']
@@ -525,7 +525,7 @@ def test_marks_of_deleted_profiles_are_not_offered_without_readable_profiles(pro
 
 
 def test_the_scan_reads_unreadable_profiles_only_once(project, monkeypatch):
-    # the first failure is the reason of every category that needs the profiles (review)
+    # the first failure is the reason of every category that needs the profiles
     from framescout_core import cleanup
     project.marks({'Dog': {'x.jpg': 'match'}})
     calls = []
@@ -588,7 +588,7 @@ def test_rows_of_old_engines_and_other_settings(project):
 
 
 def test_rows_of_other_search_models_are_kept_by_default(project):
-    # E22: switching back to a model reuses its rows, so they are offered unselected
+    # switching back to a model reuses its rows, so they are offered unselected
     photo = project.photo('a.jpg')
     b16 = feature_signature(True, 12, .3, DEFAULT_YOLO_MODEL, model='vit-b-16-datacomp')
     l14 = feature_signature(False, 12, .3, DEFAULT_YOLO_MODEL, model='vit-l-14-datacomp')
@@ -618,7 +618,7 @@ def test_with_another_model_chosen_the_default_rows_are_another_model(project):
 
 
 def test_the_search_model_must_be_named(project):
-    # E22 review: the signature alone does not tell the model, and a default would sort the
+    # the signature alone does not tell the model, and a default would sort the
     # rows of a non-default signature into the wrong categories without an error
     with pytest.raises(TypeError, match='current_model'):
         scan_cleanup(project.results, project.profiles, project.refs, CURRENT)
@@ -642,7 +642,7 @@ def test_an_unreadable_cache_is_not_offered(project):
         assert scan[key]['items'] == [] and CACHE_FILE in scan[key]['problem']
 
 
-# reference images (A14)
+# reference images
 
 def test_reference_files_no_profile_or_backup_references(project):
     used = project.refs / 'red-car' / 'reference-1.jpg'
@@ -667,7 +667,7 @@ def test_references_are_not_offered_if_the_backup_cannot_be_read(project):
     assert scan['references']['items'] == [] and 'profiles.json.bak' in scan['references']['problem']
 
 
-# damaged files FrameScout set aside (A40)
+# damaged files FrameScout set aside
 
 BROKEN = ('marks.json.broken-20261102-123045', 'marks.json.broken-20261102-123045-2',
           'cache.sqlite3.broken-20261102-123045', 'cache.sqlite3.broken-20261102-123045-journal',
@@ -728,14 +728,14 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
     project.thumb(T2)
     project.thumb(T3, project.legacy)
     temp_thumbnail(project.thumbs, T4)
-    # exported result lists are the user's files, also those of a deleted profile (F5)
+    # exported result lists are the user's files, also those of a deleted profile
     exports = export_result_list(project.results, 'cat', [card(T2)], {})
     photo = project.photo('a.jpg')
     project.cache([(photo, CURRENT), (photo, OLD), (photo, OTHER), (project.photos / 'gone.jpg', CURRENT)])
     # the only mark is unbound: the entry goes, the file stays
     project.marks({'Red car': {str(project.photos / 'gone.jpg'): 'match'}})
     (project.refs / 'old.jpg').write_bytes(b'image')
-    write_files(project.results, ['marks.json.broken-20261102-123045'])  # set aside by a restore (A40)
+    write_files(project.results, ['marks.json.broken-20261102-123045'])  # set aside by a restore
     scan = project.scan()
     summary = project.clean(scan, everything(scan), vacuum=True)
     assert summary['refused'] is None and summary['failed'] == []
@@ -743,7 +743,7 @@ def test_a_full_cleanup_never_deletes_user_data_and_run_files(project):
         assert path.exists(), path.name
     assert json.loads(keep[MARKS_FILE].read_text(encoding='utf-8')) == {'format': 1, 'profiles': {}}
     assert summary['marks'] == 1
-    # removing the mark kept the file before it as the backup (F1)
+    # removing the mark kept the file before it as the backup
     assert json.loads((project.results / 'marks.json.bak').read_text(encoding='utf-8'))['profiles'] == {
         'Red car': {str(project.photos / 'gone.jpg'): 'match'}}
     assert summary['temporary'] == 1  # the temporary thumbnail, counted like in auto_cleanup
@@ -853,7 +853,7 @@ def test_a_search_cannot_take_the_lock_during_the_cleanup(project, monkeypatch):
     lock.release()
 
 
-# the engine's automatic cleanup (E13, unreferenced thumbnails)
+# the engine's automatic cleanup (unreferenced thumbnails)
 
 def test_auto_cleanup_removes_temporary_and_unreferenced_thumbnails(project):
     project.write_results([('Red car', 'red-car.html', [T1])])
@@ -895,13 +895,13 @@ def temp_file(folder, name, age):
 
 
 def test_auto_cleanup_removes_temporary_files_of_a_stopped_run(project):
-    # left by terminate()/kill() during an atomic write (E26) or during publish_export (E24)
+    # left by terminate()/kill() during an atomic write or during publish_export
     project.write_results([('Red car', 'red-car.html', [])])
     (project.results / MARKS_FILE).write_text('{}', encoding='utf-8')
     (project.results / 'marks.json.bak').write_text('{}', encoding='utf-8')
     stale = [temp_file(project.results, name, 120)
              for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, 'marks.json.bak', 'red-car.html', 'cat-2.html',
-                          # the copy of a damaged marks file restore_marks keeps (F1 review)
+                          # the copy of a damaged marks file restore_marks keeps
                           'marks.json.broken-20261102-123045', 'marks.json.broken-20261102-123045-2')]
     # less than a minute old: possibly being written now (e.g. marks.json by an app session)
     fresh = [temp_file(project.results, name, 5) for name in (RUN_STATUS, MARKS_FILE, 'marks.json.bak',
@@ -945,7 +945,7 @@ def test_auto_cleanup_removes_temporary_files_also_if_results_json_cannot_be_rea
 
 
 def test_project_temp_cleanup_removes_temporary_files_of_the_app_in_the_project_folder(tmp_path):
-    # E44: a kill of the app during a save of profiles.json, its backup or settings.json left them
+    # a kill of the app during a save of profiles.json, its backup or settings.json left them
     for name, data in (('profiles.json', '{}'), ('profiles.json.bak', '{}'), ('settings.json', '{}')):
         (tmp_path / name).write_text(data, encoding='utf-8')
     stale = [temp_file(tmp_path, name, 120) for name in ('profiles.json', 'profiles.json.bak', 'settings.json')]
@@ -968,7 +968,7 @@ def test_project_temp_cleanup_removes_temporary_files_of_the_app_in_the_project_
 
 
 def test_project_temp_cleanup_of_a_folder_without_such_files(tmp_path, monkeypatch):
-    # review: no probe file is written into the project folder (e.g. a synced folder) on
+    # no probe file is written into the project folder (e.g. a synced folder) on
     # every app start when there is nothing to remove
     from framescout_core import cleanup
 
@@ -982,11 +982,11 @@ def test_project_temp_cleanup_of_a_folder_without_such_files(tmp_path, monkeypat
 
 
 def test_the_app_cleans_its_project_folder_once_per_start():
-    # E44: in a function Streamlit runs once per server process, called before the page
+    # in a function Streamlit runs once per server process, called before the page
     # reads profiles.json
     import ast
     from app_source import app_tree, page_tree
-    # two trees (A46, review): the function is searched in all app files, as it may be in a
+    # two trees: the function is searched in all app files, as it may be in a
     # module of framescout_ui; its call and the read of profiles.json are compared by their
     # line numbers, which is only meaningful within one file: app.py, whose page run it is
     tree = page_tree()
@@ -1016,7 +1016,7 @@ def test_cleanup_summary_text():
     assert text == 'Deleted 3 files and 1,200 cache entries · 2 KB freed · 1 could not be deleted'
     assert cleanup_summary_text({'refused': None, 'files': 1, 'rows': 0, 'freed': 0, 'compacted': False,
                                  'failed': [], 'skipped': []}) == 'Deleted 1 file and 0 cache entries · 0 B freed'
-    # without compacting, deleted rows free nothing on disk: said instead of a bare "0 B freed" (review)
+    # without compacting, deleted rows free nothing on disk: said instead of a bare "0 B freed"
     assert cleanup_summary_text({'refused': None, 'files': 0, 'rows': 1, 'freed': 0, 'compacted': False,
                                  'failed': [], 'skipped': []}) == (
         'Deleted 0 files and 1 cache entry · 0 B freed; cache.sqlite3 was not compacted, so it keeps its size and '
@@ -1034,7 +1034,7 @@ def test_rows_deleted_without_compacting_are_reported_as_not_compacted(project):
     assert summary['rows'] == 0 and summary['compacted'] is False  # nothing left to delete: no VACUUM
 
 
-# the read-only cache URI (review)
+# the read-only cache URI
 
 def make_db(path):
     con = sqlite3.connect(path)
@@ -1081,7 +1081,7 @@ def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, mo
 
 
 def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):
-    # review: profiles.json was parsed twice and every gallery scanned twice per scan
+    # profiles.json was parsed twice and every gallery scanned twice per scan
     import framescout_core.cleanup
     project.page('cat.html', 'Cat', [T2])
     project.page('red-car.html', 'Red car', [T1])
@@ -1095,7 +1095,7 @@ def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):
 
 
 def test_an_error_in_one_step_keeps_the_summary_of_what_was_deleted(project, monkeypatch):
-    # review: a PermissionError while listing a folder must not lose the count of what is gone
+    # a PermissionError while listing a folder must not lose the count of what is gone
     import framescout_core.cleanup
     project.thumb(T1)
     (project.refs / 'old.jpg').write_bytes(b'image')
@@ -1116,7 +1116,7 @@ def test_an_error_in_one_step_keeps_the_summary_of_what_was_deleted(project, mon
 
 
 def test_cleanup_running_while_clean_up_holds_the_lock(project, monkeypatch):
-    # other tabs (threads of the same process) tell the cleanup from a search by it (review)
+    # other tabs (threads of the same process) tell the cleanup from a search by it
     import framescout_core.cleanup
     project.thumb(T1)
     scan = project.scan()

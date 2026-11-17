@@ -14,7 +14,7 @@ def test_first_file_gets_number_one_and_the_folder_is_created(tmp_path):
 
 
 def test_existing_files_are_never_overwritten(tmp_path):
-    # e.g. a folder shared by "Bär" and "Baer" before A1, or files of a deleted profile:
+    # e.g. a folder shared by "Bär" and "Baer" in older versions, or files of a deleted profile:
     # a later upload must not replace a reference another profile may point to
     (tmp_path / 'reference-1.jpg').write_bytes(b'other profile')
     (tmp_path / 'reference-2.jpg').write_bytes(b'other profile 2')
@@ -37,7 +37,7 @@ def test_a_profile_gets_the_folder_of_its_slug(tmp_path):
 
 
 def test_a_folder_with_references_of_another_profile_is_not_shared(tmp_path):
-    # A1: "Bär" and "Baer" have the same slug; the second one gets its own folder
+    # "Bär" and "Baer" have the same slug; the second one gets its own folder
     others = [{'name': 'Bär', 'reference_images': ['references/baer/reference-1.jpg']}]
     assert reference_folder(tmp_path / 'references', 'Baer', others, tmp_path) == tmp_path / 'references' / 'baer-2'
 

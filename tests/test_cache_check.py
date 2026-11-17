@@ -1,4 +1,4 @@
-"""The cache health check of "Clean up storage" and setting a damaged cache aside (framescout_core, F1)."""
+"""The cache health check of "Clean up storage" and setting a damaged cache aside (framescout_core)."""
 import json
 import os
 import sqlite3
@@ -108,7 +108,7 @@ class FailingConnection:
 
 @pytest.mark.parametrize('code', [sqlite3.SQLITE_IOERR, sqlite3.SQLITE_IOERR | (2 << 8), None])
 def test_a_disk_io_error_makes_the_cache_unreadable(tmp_path, monkeypatch, code):
-    # review: a bad sector shows as "disk I/O error" (an OperationalError), and setting the
+    # a bad sector shows as "disk I/O error" (an OperationalError), and setting the
     # file aside is the remedy, so it is offered (SQLITE_IOERR_READ is an extended code)
     cache = healthy_cache(tmp_path)
     error = sqlite3.OperationalError('disk I/O error')
@@ -167,7 +167,7 @@ def test_the_check_holds_the_run_lock(tmp_path, monkeypatch):
     lock.release()
 
 
-# --- whether a shown result still applies (review) ------------------------------------------
+# --- whether a shown result still applies ------------------------------------------
 
 def test_a_result_applies_until_the_cache_changes(tmp_path):
     cache = healthy_cache(tmp_path)
@@ -273,7 +273,7 @@ def test_a_failed_rename_puts_the_side_files_back(tmp_path, monkeypatch):
     assert not list(tmp_path.glob('*.broken-*'))
 
 
-# the engine's message for a damaged cache (E50)
+# the engine's message for a damaged cache
 
 def engine_error(cache, read_rows=False):
     """The sqlite3 error the engine gets when it opens the cache (and reads its rows), or None."""
@@ -328,12 +328,12 @@ def test_other_errors_of_a_search_keep_their_own_message(tmp_path, error):
 
 @pytest.mark.parametrize('count, text', [(1, '1 photo was left out'), (3, '3 photos were left out')])
 def test_unreadable_rows_of_a_finished_search_point_to_check_cache(tmp_path, count, text):
-    # review: a damaged page that hits a few rows leaves out those photos, not the search
+    # a damaged page that hits a few rows leaves out those photos, not the search
     error = sqlite3.DatabaseError('database disk image is malformed')
     warning = cache_read_warning(tmp_path / CACHE_FILE, error, count)
     assert warning.startswith(text) and 'malformed' in warning and '"Check cache"' in warning
     assert str(tmp_path / CACHE_FILE) in warning
-    # an analysis without a search names itself (E63, F18 review)
+    # an analysis without a search names itself
     analysis = cache_read_warning(tmp_path / CACHE_FILE, error, count, run='analysis')
     assert analysis.startswith(f'{text} of this analysis') and 'search' not in analysis.split('.')[0]
 

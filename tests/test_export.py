@@ -1,4 +1,4 @@
-"""Exporting a result list as a CSV table and a file list (framescout_core, F5)."""
+"""Exporting a result list as a CSV table and a file list (framescout_core)."""
 import csv
 import io
 from datetime import datetime
@@ -74,7 +74,7 @@ def test_the_file_list_has_one_path_per_line():
 
 @pytest.mark.parametrize('brk', ['\n', '\r', '\r\n', '\x0b', '\x85', ' '])
 def test_a_path_with_a_line_break_is_left_out_of_the_file_list_only(brk):
-    # possible on Linux/macOS file systems; the CSV quotes it, one line of the list cannot hold it (A42)
+    # possible on Linux/macOS file systems; the CSV quotes it, one line of the list cannot hold it
     odd = card(2, f'/photos/two{brk}lines.jpg')
     cards = [CARDS[0], odd, CARDS[1]]
     assert unlisted_paths(cards) == [odd['path']]
@@ -85,7 +85,7 @@ def test_a_path_with_a_line_break_is_left_out_of_the_file_list_only(brk):
 
 
 def test_an_empty_path_has_no_line_break():
-    # ''.splitlines() is [], which is not [''] (review)
+    # ''.splitlines() is [], which is not ['']
     assert unlisted_paths([{'path': ''}]) == []
     assert export_file_list([{'path': ''}]) == '\n'
 

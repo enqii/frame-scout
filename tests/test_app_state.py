@@ -1,4 +1,4 @@
-"""The state line next to the app's title and what a search needs at the Start button (F27)."""
+"""The state line next to the app's title and what a search needs at the Start button."""
 import ast
 
 from app_source import app_files, page_tree
@@ -10,7 +10,7 @@ from framescout_core.run_status import NOTHING_NEW
 POINTER = 'progress and Stop in the tab "Search"'
 
 
-# --- the app's five tabs (F28) ---
+# --- the app's five tabs ---
 
 def test_the_app_has_five_tabs_in_this_order():
     assert APP_TABS == ('Search profiles', 'Photo source', 'Settings', 'Search', 'Results')
@@ -21,7 +21,7 @@ def test_the_app_has_five_tabs_in_this_order():
 def tab_blocks():
     """{tab label: the source of its with-blocks} of app.py, which makes the tabs in one st.tabs(APP_TABS) call.
 
-    Every with-block of a tab counts, also one nested in an if or a function (review); the
+    Every with-block of a tab counts, also one nested in an if or a function; the
     key None holds the whole page, for only_in to see code outside every tab.
     """
     page = page_tree()
@@ -42,7 +42,7 @@ def only_in(blocks, tab, text):
 
 
 def test_the_tabs_but_results_keep_a_width_limit():
-    # review of F30 (F39): the result cards use the whole window, the forms and text areas of
+    # the result cards use the whole window, the forms and text areas of
     # the other tabs do not stretch over it. The style limits every tab panel but the last,
     # so "Results" must stay the last tab
     assert APP_TABS[-1] == RESULTS_TAB
@@ -53,7 +53,7 @@ def test_the_tabs_but_results_keep_a_width_limit():
 
 
 def test_only_in_sees_code_outside_the_tabs_and_nested_tab_blocks(monkeypatch):
-    # review: a widget drifting out of its tab, into an if or a helper at module level, must
+    # a widget drifting out of its tab, into an if or a helper at module level, must
     # fail the check; a tab block nested in an if still counts for its tab
     source = ("p_tab, f_tab, settings_tab, search_tab, results_tab = st.tabs(list(APP_TABS))\n"
               "with search_tab:\n    st.button('A')\n"
@@ -76,12 +76,12 @@ def test_each_tab_holds_its_own_jobs():
     # start, "Analyze ahead", progress and Stop in one place
     for text in ("'▶ Start search'", "'■ Stop search'", "'Analyze photos now'", 'show_status(', "'quick_search'"):
         assert only_in(blocks, 'Search', text), text
-    # the results on their own; the quick result is an entry of their selector (F34)
+    # the results on their own; the quick result is an entry of their selector
     assert only_in(blocks, 'Results', 'show_results(')
 
 
 def test_the_note_of_a_start_that_failed_is_shown_in_the_tab_of_its_button():
-    # review: start_engine stores it under the key its caller names (tests/test_quick.py);
+    # start_engine stores it under the key its caller names (tests/test_quick.py);
     # Start, Stop, the quick search and "Analyze photos now" are in "Search", "Find similar"
     # is on the cards in "Results"
     blocks = tab_blocks()
@@ -90,7 +90,7 @@ def test_the_note_of_a_start_that_failed_is_shown_in_the_tab_of_its_button():
 
 
 def test_the_results_tab_says_that_a_run_is_running():
-    # review: "Find similar" starts from the tab "Results", whose results change only when the
+    # "Find similar" starts from the tab "Results", whose results change only when the
     # run is done; the tab says so and where its progress and Stop are
     assert results_running_text(False, {'phase': 'finished'}) is None
     assert results_running_text(True, None, cleanup=True) is None  # a cleanup is no run
@@ -150,7 +150,7 @@ def test_idle_names_a_last_analysis_and_how_the_last_run_ended():
         'Idle · last search interrupted 2026-11-13 09:00 · 2 photos in the photo folders'
     assert state_line(False, {'phase': 'failed', 'updated': '2026-11-13T09:00:00'}, 2) == \
         'Idle · last search failed 2026-11-13 09:00 · 2 photos in the photo folders'
-    # a status that is not final once its process is gone: stopped or crashed (A4)
+    # a status that is not final once its process is gone: stopped or crashed
     assert state_line(False, {'phase': 'analyzing', 'updated': '2026-11-13T09:00:00'}, 2) == \
         'Idle · last search ended without finishing 2026-11-13 09:00 · 2 photos in the photo folders'
 
@@ -166,7 +166,7 @@ def test_idle_without_an_existing_photo_folder():
 
 
 def test_a_count_that_is_not_a_whole_number_shows_only_the_phase():
-    # the 2 s fragment must not fail on a status it cannot count (review)
+    # the 2 s fragment must not fail on a status it cannot count
     for done, total in ((5.0, 10), ('5', 10), (True, 10), (5, None), (None, 10), (5, 0), (5, -1)):
         status = {'phase': 'analyzing', 'done': done, 'total': total}
         assert state_line(True, status, 10) == f'Search running · Analyzing photos · {POINTER}'
@@ -211,7 +211,7 @@ def test_listed_folders_that_do_not_exist():
 
 
 def test_an_existing_folder_is_enough_since_a_search_reads_the_folders_again():
-    # the count is the one remembered for the browser session (A27); Start is not gated on it
+    # the count is the one remembered for the browser session; Start is not gated on it
     assert start_needs(1, 0, True, 'M', None)[1] == ('photos', True, '0 photos')
     assert start_needs(1, 1, True, 'M', None)[1] == ('photos', True, '1 photo')
 
@@ -224,7 +224,7 @@ def test_a_running_search_or_cleanup_comes_first():
         'Start is not available because the storage is being cleaned up or the cache checked.'
 
 
-# --- the reasons of "Analyze photos now" and "Quick search" (F37) ---
+# --- the reasons of "Analyze photos now" and "Quick search" ---
 
 def test_the_buttons_without_a_profile_ignore_the_profile_need():
     # neither needs a search profile, so none missing is no reason
@@ -252,7 +252,7 @@ def test_the_buttons_without_a_profile_name_a_running_search_or_cleanup_first():
 
 
 def test_the_app_disables_the_buttons_without_a_profile_by_their_reasons():
-    # F37: the button is disabled exactly when its reason is shown (the quick search also when
+    # the button is disabled exactly when its reason is shown (the quick search also when
     # nothing is analyzed yet, which its scope line explains)
     search = tab_blocks()['Search']
     assert "analyze_blocked = button_blocked_text('Analyze photos now', needs, active, cleaning)" in search
@@ -261,5 +261,5 @@ def test_the_app_disables_the_buttons_without_a_profile_by_their_reasons():
     assert 'disabled=bool(quick_blocked) or' in search
     assert 'st.caption(plain(analyze_blocked))' in search and 'st.caption(plain(quick_blocked))' in search
     # the reason comes on top of the analysis count and the quick search's scope line, it hides
-    # neither (review)
+    # neither
     assert 'elif analysis_text' not in search and 'elif quick_counts' not in search

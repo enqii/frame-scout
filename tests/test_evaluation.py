@@ -1,4 +1,4 @@
-"""Shared logic of the search-model evaluation (framescout_core.evaluation, E32/E20)."""
+"""Shared logic of the search-model evaluation (framescout_core.evaluation)."""
 import json
 from pathlib import Path
 
@@ -200,7 +200,7 @@ def test_an_unreadable_labels_file_raises_and_is_not_replaced(tmp_path, content)
     assert path.read_text(encoding='utf-8') == content
 
 
-# --- the motif a profile's labels were made for (E36) ---
+# --- the motif a profile's labels were made for ---
 
 CAR = motif('Vehicles', 'red paint', [])
 
@@ -225,7 +225,7 @@ def test_the_motif_of_the_first_label_of_a_profile_is_kept(tmp_path):
     # once every label of the profile is cleared, its motif goes too
     labels = set_label(set_label(labels, 'Red car', 'a.jpg', None), 'Red car', 'b.jpg', None)
     assert record_motif(motifs, labels, 'Red car', CAR) == {}
-    # a motif that is not known (None) is not recorded (review)
+    # a motif that is not known (None) is not recorded
     assert record_motif({}, set_label({}, 'Red car', 'a.jpg', True), 'Red car', None) == {}
 
 
@@ -242,7 +242,7 @@ def test_a_labels_file_without_motifs_has_none(tmp_path):
                                     '{"Red car": {"context": "", "features": "", "references": [1]}}',
                                     '{"Red car": {"context": "", "features": ""}}'])
 def test_unreadable_motifs_leave_the_labels_usable(tmp_path, motifs):
-    # review: pool and metrics still work, without comparing the motifs
+    # pool and metrics still work, without comparing the motifs
     path = tmp_path / 'labels.json'
     path.write_text(f'{{"format": 1, "labels": {{"X": {{"a.jpg": true}}}}, "motifs": {motifs}}}', encoding='utf-8')
     assert read_label_file(path) == ({'X': {'a.jpg': True}}, None)
