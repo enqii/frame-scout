@@ -202,3 +202,4 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **F46 – Preview speed for large RAW/HEIC photos** – closed 2026-11-16 in the triage, not done: never measured
 - [x] **F40 – Check clicking "Match" and "No" in a browser** – closed 2026-11-16 in the triage, not done: merged into A52
 - [x] **F44 – Check the results toolbar in a browser** – closed 2026-11-16 in the triage, not done: merged into A52
+- [x] **F55 – Test scope: only what is necessary (rule)** – done 2026-11-17, [PR #152](https://github.com/enqii/frame-scout/pull/152)
