@@ -1,11 +1,11 @@
-"""constraints.txt pins every installed package to the version of the verified runs (I12).
+"""constraints.txt pins every installed package to the version of the verified runs.
 
 Install-FrameScout.bat runs pip install -r requirements.txt -c constraints.txt (both in the
-folder requirements/ since I31): requirements.txt
-names the direct dependencies with ranges, constraints.txt pins them and all their dependencies
-exactly. Standard library only, like the rest of the suite in CI. Whether constraints.txt lists
-every transitive dependency needs the packages' metadata and is checked when the lock is
-refreshed (pip install --dry-run --report), not here.
+folder requirements/): requirements.txt names the direct dependencies with ranges,
+constraints.txt pins them and all their dependencies exactly. Standard library only, like
+the rest of the suite in CI. Whether constraints.txt lists every transitive dependency needs
+the packages' metadata and is checked when the lock is refreshed (pip install --dry-run
+--report), not here.
 """
 import ast
 import re
@@ -18,7 +18,7 @@ from framescout_core.paths import CONSTRAINTS_FILE, REQUIREMENTS_DIR, REQUIREMEN
 from app_source import app_tree
 
 ROOT = Path(__file__).resolve().parent.parent
-# the requirement files are in requirements/ since I31: the folder the code names (review)
+# the requirement files are in requirements/, the folder the code names
 FOLDER = ROOT / REQUIREMENTS_DIR
 PIN = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)==(\d+(?:\.\d+)*(?:\.post\d+)?)$')
 REQUIREMENT = re.compile(r'^([A-Za-z0-9][A-Za-z0-9._-]*)\s*((?:[<>=!]=?\s*[\w.]+\s*,?\s*)*)$')
@@ -144,7 +144,7 @@ def test_batch_commands_skip_comments_and_messages():
 
 
 def test_installer_uses_the_constraints():
-    # the pip command itself, not a comment or a message that mentions it (review)
+    # the pip command itself, not a comment or a message that mentions it
     assert any('-m pip install' in line
                and f'-r {windows_path(REQUIREMENTS_FILE)} -c {windows_path(CONSTRAINTS_FILE)}' in line
                for line in installer_commands())
@@ -152,7 +152,7 @@ def test_installer_uses_the_constraints():
 
 def test_installer_constrains_the_torch_install_too():
     # PIP_CONSTRAINT reaches the pip call of install_torch.py, so torch's dependencies are
-    # installed in their pinned versions right away (I18); relative, because pip splits the
+    # installed in their pinned versions right away; relative, because pip splits the
     # value at spaces and the installer folder may contain one
     commands = installer_commands()
     setting = commands.index(f'set "PIP_CONSTRAINT={windows_path(CONSTRAINTS_FILE)}"')
@@ -162,7 +162,7 @@ def test_installer_constrains_the_torch_install_too():
 
 
 def test_the_requirement_files_the_installer_and_ci_name_exist():
-    # I31 moved them into requirements/: a path the installer or CI still names in the root
+    # they are in requirements/: a path the installer or CI named in the root folder
     # would only fail on a real install or in CI's pip step
     named = [match for line in installer_commands()
              for match in re.findall(r'(?:-[rc] |PIP_CONSTRAINT=)([\w\\/.-]+\.txt)', line)]
@@ -176,11 +176,11 @@ def test_the_requirement_files_the_installer_and_ci_name_exist():
 
 def test_streamlit_floor_allows_the_width_parameter():
     # the app sizes its buttons with width="stretch", which st.button and st.download_button
-    # accept since Streamlit 1.48.0 (A10)
+    # accept since Streamlit 1.48.0
     specifiers = requirements('requirements.txt')['streamlit']
     floors = [wanted for op, wanted in specifiers if op == '>=']
     assert floors and all(version_key(wanted) >= version_key('1.48') for wanted in floors)
     # only call keywords count, so a comment or string that names the old parameter does not
-    # fail the test (A10, review)
+    # fail the test
     keywords = {node.arg for node in ast.walk(app_tree()) if isinstance(node, ast.keyword)}
-    assert 'use_container_width' not in keywords, 'use width="stretch" instead (A10)'
+    assert 'use_container_width' not in keywords, 'use width="stretch" instead'

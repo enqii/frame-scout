@@ -1,4 +1,4 @@
-"""Install-FrameScout.bat (P5 part C, I21): the private Python of new installations.
+"""Install-FrameScout.bat: the private Python of new installations.
 
 The .bat is checked as text; nothing is downloaded or run (only the check of an existing
 private Python runs, on the Python of the tests).
@@ -94,7 +94,7 @@ def test_the_download_is_checked_before_it_is_extracted_and_used():
 
 def test_the_module_path_is_cleared_only_for_the_checksum():
     # Windows PowerShell started from PowerShell 7 finds no Get-FileHash with the inherited
-    # module path; pip, install_torch.py and their children get the user's value back (review)
+    # module path; pip, install_torch.py and their children get the user's value back
     commands = batch_commands(installer())
     check = index(commands, r'^powershell\.exe .*Get-FileHash ')
     assert commands[check - 2:check] == ['set "PSMODULEPATH_SAVED=%PSModulePath%"', 'set "PSModulePath="']
@@ -111,7 +111,7 @@ def test_the_python_is_extracted_in_tmp_and_moved_as_a_whole():
 
 
 def test_the_move_is_tried_again_while_a_virus_scanner_holds_the_new_files():
-    # "Access is denied" for a moment after the extraction (review)
+    # "Access is denied" for a moment after the extraction
     retry = section(installer(), 'move_python')
     assert retry[0] == 'set /a MOVE_TRIES+=1'
     assert retry[1].startswith('move "%PYTHON_UNPACKED%" ')
@@ -132,7 +132,7 @@ def test_a_working_environment_is_kept_without_downloading_python():
 
 
 def test_an_environment_whose_python_is_back_is_kept():
-    # a .venv of the private Python works again once .python is downloaded again (review)
+    # a .venv of the private Python works again once .python is downloaded again
     venv = section(installer(), 'venv')
     assert venv[0] == 'if not defined VENV_BROKEN goto venv_create'
     assert re.match(VENV_CHECK, venv[1])
@@ -140,7 +140,7 @@ def test_an_environment_whose_python_is_back_is_kept():
 
 
 def test_a_broken_environment_is_created_again():
-    # its Python is gone (.python deleted, the folder moved) or pip is missing (review);
+    # its Python is gone (.python deleted, the folder moved) or pip is missing;
     # --clear empties only a .venv that does not work: without python.exe or failing both checks
     create = section(installer(), 'venv_create')
     assert any(re.match(VENV_CREATE, line) for line in create)
@@ -148,12 +148,12 @@ def test_a_broken_environment_is_created_again():
 
 
 def test_a_half_created_environment_is_removed():
-    # it could pass the check at the top on the next run (review)
+    # it could pass the check at the top on the next run
     assert section(installer(), 'venv_failed')[0] == 'if exist ".venv" rmdir /s /q ".venv"'
 
 
 def test_an_existing_private_python_is_reused_only_if_complete_and_pinned():
-    # an older pin or a .python that lost files in Lib is downloaded again (review, I24)
+    # an older pin or a .python that lost files in Lib is downloaded again
     commands = batch_commands(installer())
     missing = index(commands, rf'^if not exist "{re.escape(PRIVATE_PYTHON)}\\python\.exe" goto python_download$')
     check = index(commands, PYTHON_CHECK)
@@ -167,7 +167,7 @@ def test_an_existing_private_python_is_reused_only_if_complete_and_pinned():
 def test_the_python_check_accepts_only_the_pinned_version():
     code = re.search(r'-c "([^"]+)" %PYTHON_VERSION%', installer()).group(1)
     # only the version comparison: the Python of the tests may lack ensurepip (Debian's
-    # system Python without python3-venv, F47); PYTHON_CHECK pins the imports
+    # system Python without python3-venv); PYTHON_CHECK pins the imports
     code = code.replace(', venv, ensurepip;', ';', 1)
     assert 'ensurepip' not in code
     assert subprocess.run([sys.executable, '-I', '-c', code, platform.python_version()]).returncode == 0
@@ -175,7 +175,7 @@ def test_the_python_check_accepts_only_the_pinned_version():
 
 
 def test_the_installer_keeps_exclamation_marks_in_paths_and_arguments():
-    # with delayed expansion, cmd removes the "!" of a folder like C:\Photos!2026 from %~dp0 and %CD% (I21)
+    # with delayed expansion, cmd removes the "!" of a folder like C:\Photos!2026 from %~dp0 and %CD%
     text = installer()
     assert 'EnableDelayedExpansion' not in text
     assert not any('!' in line for line in batch_commands(text))

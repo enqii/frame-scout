@@ -1,4 +1,4 @@
-"""Choice of the PyTorch build in the installer (A7, I3)."""
+"""Choice of the PyTorch build in the installer."""
 import sys
 import tempfile
 from pathlib import Path
@@ -50,7 +50,7 @@ def test_older_driver_or_gpu_gets_cuda_12_6():
 
 
 def test_the_driver_minimums_are_those_of_the_system():
-    # F47: NVIDIA's Linux drivers have other numbers than the Windows drivers; CUDA 12 runs
+    # NVIDIA's Linux drivers have other numbers than the Windows drivers; CUDA 12 runs
     # from 528.33 on Windows and from 525.60.13 on Linux
     linux_driver = gpu((8, 9), (525, 60, 13))
     assert cuda_build([linux_driver], windows=False) == 'cu126'
@@ -63,7 +63,7 @@ def test_the_driver_minimums_are_those_of_the_system():
 
 
 def test_wsl_compares_the_driver_with_the_windows_minimums():
-    # review: in WSL2, nvidia-smi reports the driver of the Windows host, so a Windows driver
+    # in WSL2, nvidia-smi reports the driver of the Windows host, so a Windows driver
     # 525.60.13 to 528.32 must not pass the Linux minimum of CUDA 12
     assert reports_windows_driver(True, '10') is True
     assert reports_windows_driver(False, '6.6.87.2-microsoft-standard-WSL2') is True
@@ -94,7 +94,7 @@ def test_a_build_for_every_gpu_is_preferred():
 
 
 def test_an_unsupported_second_gpu_does_not_block_the_best_one():
-    # review: an old display card next to a modern GPU must not drop the PC to the CPU build;
+    # an old display card next to a modern GPU must not drop the PC to the CPU build;
     # the build for the most capable GPU is used, the other GPU is named (unsupported_gpus)
     rtx5090, gtx1060, kepler = (((12, 0), (590, 1), 'RTX 5090'), ((6, 1), (590, 1), 'GTX 1060'),
                                 ((3, 7), (590, 1), 'Tesla K80'))
@@ -108,7 +108,7 @@ def test_an_unsupported_second_gpu_does_not_block_the_best_one():
 
 
 def test_mixed_generations_with_a_current_driver_get_no_driver_hint():
-    # review: the hint "a current driver may help" was given although the driver is current
+    # no hint "a current driver may help" when the driver is current
     rtx5090, gtx1060 = ((12, 0), (590, 1), 'RTX 5090'), ((6, 1), (590, 1), 'GTX 1060')
     assert cuda_build([gtx1060, rtx5090]) == 'cu130'
 
@@ -159,7 +159,7 @@ def test_torch_index_url():
 def test_requirements_pin_the_same_versions(path):
     # requirements.txt is installed after the build from the PyTorch index; the same pins
     # (without a local label) keep pip from replacing that build with another version, and
-    # match the +cpu and CUDA builds (constraints.txt applies to both pip calls, I12/I18)
+    # match the +cpu and CUDA builds (constraints.txt applies to both pip calls)
     lines = (ROOT / path).read_text(encoding='utf-8').splitlines()
     assert f'torch=={TORCH_VERSION}' in lines
     assert f'torchvision=={TORCHVISION_VERSION}' in lines
@@ -188,7 +188,7 @@ def nothing_installed(monkeypatch):
     monkeypatch.setattr(install_torch, 'installed_version', lambda name: None)
     # and whether this PC has an NVIDIA driver
     monkeypatch.setattr(install_torch, 'driver_found', lambda: False)
-    # and that its drives have enough free space (F3)
+    # and that its drives have enough free space
     monkeypatch.setattr(install_torch, 'low_space', lambda needs: [])
 
 
@@ -214,7 +214,7 @@ def test_cpu_installs_the_cpu_build(monkeypatch):
     assert index(command) == 'https://download.pytorch.org/whl/cpu'
     # torch's and torchvision's dependencies (e.g. numpy) also come from PyPI: the PyTorch
     # index lags behind and may lack the pinned versions of constraints.txt, so
-    # requirements.txt would replace them right away (review, I18)
+    # requirements.txt would replace them right away
     assert command[command.index('--extra-index-url') + 1] == 'https://pypi.org/simple'
     assert torch_requirements('cpu')[0] in command
 
@@ -249,7 +249,7 @@ def test_a_pip_failure_is_reported_as_exit_code_1(monkeypatch):
     assert install_torch.main(['cpu']) == 1
 
 
-# --- without an argument: ask only if useful, never drop an installed CUDA build (review) ---
+# --- without an argument: ask only if useful, never drop an installed CUDA build ---
 
 def installed(monkeypatch, build):
     label = '' if build is None else '+' + build
@@ -372,7 +372,7 @@ def test_unknown_variant_is_rejected():
         install_torch.main(['gpu'])
 
 
-# --- free disk space before the download (F3): a warning, never a block ---
+# --- free disk space before the download: a warning, never a block ---
 
 def low_drive(monkeypatch):
     """Let the space check find a full drive; return the needs it was asked about."""
@@ -422,7 +422,7 @@ def test_low_disk_space_without_a_console_or_in_a_dry_run_continues(monkeypatch)
 
 
 def test_the_user_stopping_has_its_own_exit_code(monkeypatch):
-    # review: Install-FrameScout.bat must not report a deliberate "N" as "Installing PyTorch failed"
+    # Install-FrameScout.bat must not report a deliberate "N" as "Installing PyTorch failed"
     low_drive(monkeypatch)
     monkeypatch.setattr('builtins.input', lambda prompt: 'n')
     monkeypatch.setattr(install_torch.subprocess, 'run', Ran())
@@ -444,7 +444,7 @@ def all_installed(monkeypatch, build):
 
 
 def test_installed_build_still_checks_space_for_the_other_packages(monkeypatch, capsys):
-    # review: after a full disk stopped the requirements.txt step, the rerun keeps the installed
+    # after a full disk stopped the requirements.txt step, the rerun keeps the installed
     # torch but must still warn before pip installs the other packages
     installed(monkeypatch, 'cpu')
     asked = low_drive(monkeypatch)
@@ -463,7 +463,7 @@ def test_installed_build_still_checks_space_for_the_other_packages(monkeypatch, 
 
 
 def test_requirement_names_of_requirements_txt():
-    # in the folder requirements/ since I31
+    # in the folder requirements/
     assert install_torch.REQUIREMENTS == ROOT / REQUIREMENTS_FILE
     names = install_torch.requirement_names(install_torch.REQUIREMENTS.read_text(encoding='utf-8'))
     assert {'torch', 'torchvision', 'streamlit', 'open_clip_torch', 'pillow-heif', 'transformers'} <= set(names)

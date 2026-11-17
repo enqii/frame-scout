@@ -1,4 +1,4 @@
-"""The search-model evaluation tool framescout_eval.py (E32, E20), without torch or a model."""
+"""The search-model evaluation tool framescout_eval.py, without torch or a model."""
 import http.server
 import json
 import os
@@ -73,7 +73,7 @@ def test_the_default_folder_is_ignored_by_git():
 
 
 def test_the_labelling_page_is_shipped_in_assets():
-    # moved out of the root folder in I31
+    # in assets/, not in the root folder
     assert EVAL_PAGE_FILE.as_posix() == 'assets/framescout_eval_page.html'
     assert ev.PAGE == Path(ev.__file__).resolve().parent / EVAL_PAGE_FILE
     assert ev.PAGE.is_file()
@@ -127,7 +127,7 @@ def option(command, name):
 
 def test_run_starts_the_engine_for_every_registered_model(tmp_path, setup, monkeypatch, capsys):
     photos, profiles, calls = setup
-    # the default cache folder, independent of the interpreter that runs the tests (review)
+    # the default cache folder, independent of the interpreter that runs the tests
     cache = tmp_path / 'checkout' / '.cache'
     monkeypatch.setattr(ev, 'default_cache_dir', lambda: cache)
     assert ev.main(['run', 'cosplay', str(photos), '--profiles', str(profiles), '--dir', str(tmp_path / 'eval'),
@@ -156,7 +156,7 @@ def test_run_takes_an_explicit_cache_folder(tmp_path, setup):
 
 
 def test_run_warns_about_little_free_disk_space_and_runs_anyway(tmp_path, setup, monkeypatch, capsys):
-    # E51: the F3 check of the app, for the photos, models and downloads of the runs
+    # the free disk space check of the app, for the photos, models and downloads of the runs
     photos, profiles, calls = setup
     for name in ('a.jpg', 'b.jpg'):
         (photos / name).write_bytes(b'x')
@@ -192,7 +192,7 @@ def test_a_disk_space_check_that_fails_gives_no_warning(tmp_path, setup, monkeyp
 
 
 def test_an_unexpected_error_of_the_disk_space_check_does_not_stop_the_runs(tmp_path, setup, monkeypatch, capsys):
-    # review: an advisory check; the photos are counted with a line first, so a long scan is not silent
+    # an advisory check; the photos are counted with a line first, so a long scan is not silent
     photos, profiles, calls = setup
 
     def broken(needs):
@@ -207,7 +207,7 @@ def test_an_unexpected_error_of_the_disk_space_check_does_not_stop_the_runs(tmp_
 
 
 def test_the_engine_gets_the_cache_variables_of_the_shared_helper(tmp_path):
-    # I25: the same four variables as the .bat files and the app set, from cache_folder_paths
+    # the same four variables as the .bat files and the app set, from cache_folder_paths
     env = ev.engine_env(tmp_path / 'my-cache', environ={'PATH': 'x', 'HF_HOME': 'own'})
     assert env == {'PATH': 'x', 'PYTHONIOENCODING': 'utf-8',
                    **{name: str(path) for name, path in cache_folder_paths(tmp_path / 'my-cache').items()}}
@@ -221,7 +221,7 @@ def checkout(path):
 
 
 def test_the_cache_defaults_to_the_checkout_of_the_venv_in_use(tmp_path):
-    # E48: the tool run from a git worktree with the main checkout's venv uses its .cache
+    # the tool run from a git worktree with the main checkout's venv uses its .cache
     main, worktree = checkout(tmp_path / 'main'), tmp_path / 'main' / '.claude' / 'worktrees' / 'w'
     assert ev.default_cache_dir(prefix=str(main / '.venv'), base_prefix=str(tmp_path / 'python'),
                                 root=worktree) == main / '.cache'
@@ -236,7 +236,7 @@ def test_the_cache_defaults_to_the_script_folder_outside_a_framescout_venv(tmp_p
     other = tmp_path / 'other'; (other / 'venv').mkdir(parents=True)
     assert ev.default_cache_dir(prefix=str(other / 'venv'), base_prefix=str(tmp_path / 'python'),
                                 root=root) == root / '.cache'
-    # the venv of another FrameScout clone, which does not hold the tool (review)
+    # the venv of another FrameScout clone, which does not hold the tool
     clone = checkout(tmp_path / 'clone')
     assert ev.default_cache_dir(prefix=str(clone / '.venv'), base_prefix=str(tmp_path / 'python'),
                                 root=root) == root / '.cache'
@@ -421,7 +421,7 @@ def test_the_sweep_marks_the_best_weights_of_a_model():
 
 
 def test_the_sweep_marks_no_weight_when_every_ap_is_zero():
-    # E47: a tie at 0 has no best weight
+    # a tie at 0 has no best weight
     text = ev.report('cosplay', sweep_result(0.0, 0.0, None), 2, 0.3, [DEFAULT_MODEL])
     assert '| 0.0 | 0.000 |' in text and '| 0.3 | 0.000 |' in text and '| 0.6 | – |' in text
 
@@ -441,7 +441,7 @@ def test_labels_no_model_run_scored_are_warned_about(collection, capsys):
 
 
 def test_labels_made_for_another_motif_are_warned_about(collection, tmp_path, capsys):
-    # E36: the same profile name with another context, features or reference images
+    # the same profile name with another context, features or reference images
     profiles = tmp_path / 'profiles.json'
     profiles.write_text(json.dumps({'profiles': [{'name': 'Car', 'franchise': 'Vehicles', 'features': 'red'}]}),
                         encoding='utf-8')
@@ -458,10 +458,10 @@ def test_labels_made_for_another_motif_are_warned_about(collection, tmp_path, ca
     assert f'Warning: cosplay: {warning}' in capsys.readouterr().out
     assert ev.main(['pool', 'cosplay', *dir_option]) == 0
     assert f'Warning: {warning}' in capsys.readouterr().out
-    # motifs that cannot be read: one warning, the labels are still evaluated (review)
+    # motifs that cannot be read: one warning, the labels are still evaluated
     [unreadable] = ev.motif_warnings(collection, collection.scores(), None)
     assert 'cannot be read' in unreadable
-    # a profile renamed or removed in the profiles file has no known motif: nothing compared (review)
+    # a profile renamed or removed in the profiles file has no known motif: nothing compared
     profiles.write_text(json.dumps({'profiles': [{'name': 'Truck', 'franchise': 'Vehicles'}]}), encoding='utf-8')
     assert ev.current_motifs(collection, collection.scores()) == {}
     assert ev.motif_warnings(collection, collection.scores(), {'Car': motif('Vehicles', 'blue', [])}) == []
@@ -544,14 +544,14 @@ def test_a_label_is_saved_right_away_and_can_be_cleared(session, collection):
     body = json.dumps({'profile': 1, 'photo': 2, 'value': False}).encode()
     status, _, answer = session.handle('POST', f'/{session.token}/label', body)
     assert status == 200 and json.loads(answer) == {'ok': True}
-    # no profiles file: the motif is not known, so none is recorded (review of E36)
+    # no profiles file: the motif is not known, so none is recorded
     assert read_label_file(collection.labels_file) == ({'Dog': {target: False}}, {})
     session.handle('POST', f'/{session.token}/label', json.dumps({'profile': 1, 'photo': 2, 'value': None}).encode())
     assert read_labels(collection.labels_file) == {}
 
 
 def test_a_label_records_the_motif_the_page_shows(session, collection, tmp_path):
-    # E36: the motif of the pool; a profile changed after pool is warned about before labelling (review)
+    # the motif of the pool; a profile changed after pool is warned about before labelling
     profiles = tmp_path / 'profiles.json'
     profiles.write_text(json.dumps({'profiles': [{'name': 'Dog', 'franchise': 'Animals', 'features': 'brown'}]}),
                         encoding='utf-8')
@@ -615,7 +615,7 @@ def pool_files(session):
 
 
 def test_pool_renders_the_thumbnails_the_labelling_page_lacks(session, collection, monkeypatch, capsys):
-    # E35: a pool photo outside every gallery has no thumbnail, and the page would show the
+    # a pool photo outside every gallery has no thumbnail, and the page would show the
     # original, which a browser cannot display for HEIC/HEIF or RAW; reference images too
     entry = session.pool['profiles'][0]['photos'][0]
     thumbs = collection.engine_output(DEFAULT_MODEL) / 'thumbnails'
@@ -653,7 +653,7 @@ def test_a_thumbnail_that_cannot_be_rendered_leaves_the_original(session, collec
 
 
 def test_a_photo_changed_since_scoring_gets_no_thumbnail_of_its_new_pixels(session, collection, monkeypatch, capsys):
-    # review: the thumbnail is named by the time of scoring, so rendering the photo as it is
+    # the thumbnail is named by the time of scoring, so rendering the photo as it is
     # now would show other pixels than were scored under that name; the page shows the original
     changed = Path(session.pool['profiles'][0]['photos'][0]['path'])
     changed.write_bytes(b'edited')
@@ -668,7 +668,7 @@ def test_a_photo_changed_since_scoring_gets_no_thumbnail_of_its_new_pixels(sessi
 
 
 def test_pool_names_a_reference_image_that_cannot_be_read(session, collection, monkeypatch, capsys):
-    # review: it gets no thumbnail and the page answers "not found"; pool says so
+    # it gets no thumbnail and the page answers "not found"; pool says so
     (collection.root / 'dog.jpg').unlink()
     calls = []
     monkeypatch.setattr(ev, 'load_renderer', lambda: (renderer(calls), None))
@@ -687,7 +687,7 @@ def test_pool_without_the_decoders_names_the_photos_left_without_a_thumbnail(ses
 
 
 def test_the_renderer_is_the_image_modules_or_none_with_the_reason():
-    # E49: framescout_images, not the engine, which imports torch and sets the cache variables
+    # framescout_images, not the engine, which imports torch and sets the cache variables
     def render(path, target):
         pass
 

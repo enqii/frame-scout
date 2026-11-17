@@ -1,4 +1,4 @@
-"""The image decoding module framescout_images (E49): torch-free, shared by the engine and the evaluation tool."""
+"""The image decoding module framescout_images: torch-free, shared by the engine and the evaluation tool."""
 import ast
 import os
 import subprocess
@@ -52,7 +52,7 @@ def test_rendering_a_thumbnail_loads_neither_torch_nor_the_cache_variables(tmp_p
 
 
 def test_the_review_preview_is_an_upright_downscaled_jpeg(tmp_path):
-    # F19: needs Pillow, so it is skipped in CI; a portrait photo stored sideways with an EXIF
+    # needs Pillow, so it is skipped in CI; a portrait photo stored sideways with an EXIF
     # orientation comes out upright, its longer edge at most the preview size; a small photo
     # is not enlarged
     pytest.importorskip('PIL')
@@ -96,7 +96,7 @@ OUTCOME = ('import os, random, sys\n'
 
 
 def test_a_truncated_jpeg_fails_only_where_it_must_decode_completely(tmp_path):
-    # E46: needs Pillow, so it is skipped in CI; pins how Pillow tells a JPEG whose data ends
+    # needs Pillow, so it is skipped in CI; pins how Pillow tells a JPEG whose data ends
     # early (its _ended flag), which a Pillow update could change
     pytest.importorskip('PIL')
     script = OUTCOME + (
@@ -118,13 +118,13 @@ def test_a_truncated_jpeg_fails_only_where_it_must_decode_completely(tmp_path):
     assert lenient == '(900, 600)'  # anywhere else it decodes as before, the missing part gray
     assert strict.startswith('truncated: ') and drafted.startswith('truncated: ')
     assert 'ends early' in strict
-    # E57: a JPEG that lacks only its end marker holds all of its image data: it is complete
+    # a JPEG that lacks only its end marker holds all of its image data: it is complete
     # (also one that keeps the first byte of its end marker)
     assert no_end_marker == '(900, 600) (450, 300) (900, 600)'
 
 
 def test_a_jpeg_damaged_in_the_middle_fails_only_where_it_must_decode_completely(tmp_path):
-    # E53: libjpeg gives up on a marker it cannot use in the middle of the image data; the
+    # libjpeg gives up on a marker it cannot use in the middle of the image data; the
     # photo decodes with a gray part, which a partner must not
     pytest.importorskip('PIL')
     script = OUTCOME + (
@@ -143,7 +143,7 @@ def test_a_jpeg_damaged_in_the_middle_fails_only_where_it_must_decode_completely
                                      {'quality': 75, 'subsampling': 0}, {'quality': 85, 'restart_marker_blocks': 2}],
                          ids=['baseline', 'progressive', 'no-subsampling', 'restart-markers'])
 def test_a_jpeg_without_its_end_marker_is_told_from_a_truncated_one(tmp_path, options):
-    # E57: the photo lacks only its end marker (complete) or is cut anywhere in its image
+    # the photo lacks only its end marker (complete) or is cut anywhere in its image
     # data, also right after a 0xFF byte, at the start of a restart interval and before or
     # after the marker segments between the scans of a progressive JPEG (truncated). A cut
     # that leaves the decoded pixels as they are (e.g. of the 0x00 of a stuffed 0xFF byte at
@@ -177,7 +177,7 @@ def test_a_jpeg_without_its_end_marker_is_told_from_a_truncated_one(tmp_path, op
 
 
 def test_strict_loading_holds_only_in_its_own_thread():
-    # E53: the decoding threads load other photos leniently while one partner loads strictly
+    # the decoding threads load other photos leniently while one partner loads strictly
     pytest.importorskip('PIL')
     script = ('import threading\n'
               'from PIL import ImageFile\n'
@@ -195,7 +195,7 @@ def test_strict_loading_holds_only_in_its_own_thread():
 @pytest.mark.parametrize('kind, suffix, module', [('HEIF', 'heic', 'pillow_heif'), ('AVIF', 'avif', 'PIL')],
                          ids=['heic', 'avif'])
 def test_a_truncated_heif_or_avif_photo_fails_without_being_retried(tmp_path, kind, suffix, module):
-    # E53, E59: pillow-heif decodes a truncated HEIC all black where truncated images are
+    # pillow-heif decodes a truncated HEIC all black where truncated images are
     # allowed, so it is always decoded strictly: any photo fails instead of being analyzed as
     # a black image, and a partner not as truncated (a retry would only analyze black).
     # Pillow's own AVIF reader already rejects a truncated AVIF.
@@ -219,7 +219,7 @@ def test_a_truncated_heif_or_avif_photo_fails_without_being_retried(tmp_path, ki
         pytest.skip(f'cannot write {kind} here ({lines[-1]})')
     whole, truncated = lines[-2:]
     assert whole == '(320, 240)'
-    # review: cuts well inside the image data, and any error class (a library update may
+    # cuts well inside the image data, and any error class (a library update may
     # change it): what matters is that each fails, and never as truncated ("truncated: ...")
     # or with a size (an image decoded from part of the data)
     outcomes = ast.literal_eval(truncated)
