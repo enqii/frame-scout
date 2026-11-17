@@ -270,7 +270,10 @@ Sync (`reconcile_settings`): the widgets (keys `setting_<name>`, filled through
 `settings_seen` (last value taken from or written to the file) and `settings_shown` (what the
 widget showed). A widget that differs from `settings_shown` was changed here and is saved; a
 saved value that differs from `settings_seen` came from another session and is shown, so the
-latest action wins. "Reset to defaults" (A26) goes through the same mechanism.
+latest action wins. "Reset to defaults" (A26) goes through the same mechanism. A search is not
+started in the run that took over another session's photo folders or AI settings, so it never
+uses values the user has not seen; the export separator does not block it. The separator's radio
+sits in a popover drawn only while open, so it keeps its key with `persist_state`.
 
 ### `results/marks.json` (A17)
 
