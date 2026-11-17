@@ -54,7 +54,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] Tooltips that stay open and the squeezed header at 680–1100 px (A53, A54; kind `code`) – 2026-11-17 ([#158](https://github.com/enqii/frame-scout/pull/158))
 
 ### P51 – Excel-friendly CSV (added 2026-11-17)
-- [ ] "Separator: comma / semicolon" choice for the result export (F9; kind `code`)
+- [x] "Separator: comma / semicolon" choice for the result export (F9; kind `code`) – 2026-11-17 ([#159](https://github.com/enqii/frame-scout/pull/159))
 
 ### P52 – Score distribution (added 2026-11-17)
 - [ ] Collapsed score histogram per profile with an additive `results.json` field (F53; kind

@@ -457,9 +457,12 @@ be read, only the full list can be exported, with an empty mark column.
 
 An export never replaces a file: if the name is taken, `-2`, `-3`, ... is added. The paths
 are those of this computer, so a list may not fit after moving photos or on another PC. The
-CSV is comma-separated UTF-8 with a decimal point. Excel with a German (or other `;`) locale
-may show everything in one column when you double-click it: use **Data → From Text/CSV**
-instead. **Clean up storage** never deletes exports; delete them yourself.
+CSV is UTF-8 with a decimal point. Choose its **Separator** in the popover: **comma** (the
+default) or **semicolon**. Excel opens a double-clicked CSV in columns only with the list
+separator of your Windows region, a semicolon in German and other regions with a decimal
+comma; there, choose semicolon (or use **Data → From Text/CSV**). Excel in such a region may
+still read the scores, which keep their decimal point, as text. The choice is saved with the
+settings. **Clean up storage** never deletes exports; delete them yourself.
 
 ## Supported formats
 
