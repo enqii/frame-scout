@@ -21,7 +21,7 @@ from framescout_core.photos import distinct_folders, join_scans, remembered_scan
 from framescout_core.profiles import create_from_example, read_profiles_versioned
 from framescout_core.quick import QUICK_DIR, QUICK_QUERY_MAX, quick_scope_text
 from framescout_core.results import RESULTS_FILE
-from framescout_core.settings import engine_command
+from framescout_core.settings import AI_SETTINGS, engine_command
 from framescout_core.signature import CACHE_FILE
 from framescout_ui.cleanup import cleanup_signature, show_cache_check, show_cleanup
 from framescout_ui.common import (BASE, EXAMPLE_PROFILES, PROFILES, QUICK_JSON, RESULTS, clean_project_folder,
@@ -85,6 +85,8 @@ st.session_state.state_line_state = (active, run_status)  # for the state line n
 
 # the settings of the widgets, synchronized with settings.json
 settings, seen, shown, settings_taken_over = sync_settings()
+# the ones a search uses block its start below; the export separator does not
+search_settings_taken_over = [name for name in settings_taken_over if name == 'photo_folders' or name in AI_SETTINGS]
 # the folders as the image count, the Start check and the engine use them, with ~ expanded
 photo_folders = [Path(folder).expanduser() for folder in settings['photo_folders']]
 # a folder listed twice or inside another listed folder is searched once
@@ -188,11 +190,11 @@ with search_tab:
         notice: the session key of the note shown where the click was, if the start failed.
         """
         what = 'analysis' if search.get('analyze_only') else 'search'
-        if settings_taken_over:
+        if search_settings_taken_over:
             # the page showed other values until this click: never start with settings the
             # user has not seen
             st.session_state[notice] = (f'The {what} was not started: another tab or window changed these settings '
-                                        'meanwhile: ' + ', '.join(settings_taken_over) + '. Check the settings '
+                                        'meanwhile: ' + ', '.join(search_settings_taken_over) + '. Check the settings '
                                         'shown now and start again.')
             st.rerun()
         cmd = engine_command(sys.executable, BASE / 'framescout_engine.py', search_folders, RESULTS, settings,
