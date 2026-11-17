@@ -552,6 +552,10 @@ def test_mark_style_selectors_exist_in_the_installed_streamlit_frontend():
     # the wrapper of a card in the gallery row, and the button of the popover "More"
     assert any('"data-testid":`stLayoutWrapper`' in text for text in bundle)
     assert any('"data-testid":`stPopoverButton`' in text for text in bundle)
+    # the state line of PAGE_STYLE (its stLayoutWrapper and key class are checked above): the
+    # wrapper of a stretched element in a horizontal row grows ("1 1 <basis>"), so PAGE_STYLE
+    # sets only the basis
+    assert any('case`stretch`:return`1 1 ${' in text for text in bundle)
     # the frame around an image, whose content REVIEW_STYLE centers in the review dialog
     assert any('"data-testid":`stFullScreenFrame`' in text for text in bundle)
     # the tab panels PAGE_STYLE limits: all drawn, after the tab list, so the
