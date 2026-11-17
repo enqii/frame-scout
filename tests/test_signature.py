@@ -7,7 +7,7 @@ from framescout_core.signature import ENGINE, MODEL_ENGINES, engine_id, feature_
 DEFAULTS = dict(person_detection=True, max_persons=12, person_confidence=.3, yolo_model='yolo11n.pt')
 # Signature of the default settings in v1.1 (ENGINE v4, GELU embeddings)
 V1_1_DEFAULT_SIGNATURE = '552c0464be05f62156f4acb048eb1555db8e3bc80f63416f9909695dc59c20b4'
-# Signature without person detection before the drafted decoding (full-resolution decoding)
+# Signature without person detection under full-resolution decoding; drafted decoding must differ
 FULL_DECODING_NO_DETECTION_SIGNATURE = '943924600aec2d9c711312c59c8db2ae7e33864857967169edc8f87ea2bdcb76'
 
 

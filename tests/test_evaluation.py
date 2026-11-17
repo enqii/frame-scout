@@ -230,7 +230,7 @@ def test_the_motif_of_the_first_label_of_a_profile_is_kept(tmp_path):
 
 
 def test_a_labels_file_without_motifs_has_none(tmp_path):
-    # files of an earlier version: the next label of a profile records its motif
+    # a labels file without motifs: the next label of a profile records its motif
     path = tmp_path / 'labels.json'
     save_labels(path, {'Red car': {'a.jpg': True}})
     assert read_label_file(path)[1] == {} and read_label_file(tmp_path / 'missing.json') == ({}, {})
