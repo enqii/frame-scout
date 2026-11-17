@@ -195,7 +195,7 @@ run then use your folder instead (with only `XDG_CACHE_HOME` set, the model weig
 its `torch` and `huggingface` folders, as PyTorch and Hugging Face use it themselves; the
 person detection model still goes to `.cache`). If you set one after models were downloaded, the first
 search downloads them again there (about 600 MB for the default model). The uninstall
-script lists such folders outside the project but does not delete them. A `yolo11n.pt` in
+script does not delete such folders outside the project. A `yolo11n.pt` in
 the folder of a manual run is used instead of the cached copy.
 
 **Analyze ahead** (in the "Search" tab, below Start) analyzes the photos without a search, for example overnight, so
@@ -593,10 +593,15 @@ the folders to delete by hand.
   its backup, `settings.json`, `run.log`, the evaluation labels and the program files. A
   photo or copy folder from your settings is never deleted, also not when it lies inside
   the project folder.
-- **Outside the project folder:** copied matches stay. Caches that FrameScout wrote into
-  your user profile when it ran without the FrameScout scripts (PyTorch, Hugging Face,
-  `%APPDATA%\Ultralytics`, on Linux `~/.config/Ultralytics`) are only listed, since other
-  programs may use them.
+- **Outside the project folder:** nothing is deleted. Copied matches stay, and so do caches
+  that FrameScout wrote into your user profile when it ran without the FrameScout scripts
+  (`%USERPROFILE%\.cache\torch` and `huggingface`, `%APPDATA%\Ultralytics`, on Linux
+  `~/.cache/torch`, `~/.cache/huggingface`, `~/.config/Ultralytics`, or the folders of your
+  `TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`); other programs may use them, delete them
+  yourself if nothing else needs them.
+- **Could not be deleted:** a file that a program holds open or that is read-only is listed
+  at the end; close the program (or clear the read-only attribute) and run the uninstall
+  again.
 
 Afterwards, delete the project folder yourself to remove FrameScout completely. A Python
 you installed yourself stays in place.

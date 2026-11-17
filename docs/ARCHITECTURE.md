@@ -377,11 +377,12 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   else means it could not run.
 - **Uninstall** (`Uninstall-FrameScout.bat [--dry-run]`, on Linux `.sh`, P5 part B): runs with the private
   `.python` (not with `.venv`'s Python, which cannot delete itself; without `.python` it only
-  names the folders to delete by hand), refuses while a search runs, the app holds its start lock,
-  the environment's Python is in use or `settings.json` is unreadable, lists what it deletes and
-  what it keeps (`USER_DATA`: photos, references, results with marks, profiles and backup,
-  settings, `run.log`, `.tmp/eval`) and the caches outside the folder (listed, never deleted),
-  and deletes after the answer `yes`. Exit code 3: everything deleted except the private Python
+  names the folders to delete by hand), refuses while a search runs, the app holds its start lock
+  or `settings.json` is unreadable, lists what it deletes and what it keeps (`USER_DATA`: photos,
+  references, results with marks, profiles and backup, settings, `run.log`, `.tmp/eval`), and
+  deletes after the answer `yes`. Since I44 it does not list caches outside the folder, nor
+  probe whether the environment's Python runs, nor retry a read-only file: a file held open
+  or read-only ends in the failure list (exit code 1, the private Python stays for another try). Exit code 3: everything deleted except the private Python
   the script runs with; the `.bat` removes it last. Program files themselves are not deleted.
 - **Linux** (F47): `Install-`, `Start-`, `Check-` and `Uninstall-FrameScout.sh` (bash, LF
   endings by `.gitattributes`, mode 100755 in git) do what their `.bat` files do, with the same
@@ -401,9 +402,8 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   the system's form; `CUDA_BUILDS` holds a Windows and a Linux driver minimum per build, and
   WSL (a kernel release with `microsoft`) uses the Windows ones, since its nvidia-smi reports the
   Windows host's driver (`reports_windows_driver`; not verified on a GPU, F48); the uninstall
-  deletes `.venv/bin/python` and `.python/bin/python3` first, lists `~/.config/Ultralytics`
-  (`XDG_CONFIG_HOME`) and, since `.venv/bin/python` is a link to the private Python that runs
-  the uninstall itself, tells a running app by its start lock (`app_running`, on Windows too;
+  deletes `.venv/bin/python` and `.python/bin/python3` first and tells a running app by its
+  start lock (`app_running`, on Windows too;
   a lock that only looks held gets the start script's way out, `stale_lock_hint`); the check
   takes a `home` of `.python/bin` for the private Python `.python`.
 
@@ -418,7 +418,7 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   engine therefore uses the worktree's own `.cache/`: smoke runs point the variables at the main
   checkout's `.cache/` to avoid a download.
 - Do not promise perfect portability or no residual files: some dependencies may write
-  user-level caches (the uninstall lists them, never deletes them). Open: E39 (open_clip's URL
+  user-level caches (the uninstall neither lists nor deletes them). Open: E39 (open_clip's URL
   download ignores the variables), I25 (`framescout_eval.py` builds its own paths).
 - **Ultralytics (E27/E28):** `import_detector_class` sets `YOLO_OFFLINE=true` (turns off its
   analytics, Sentry and update checks; model downloads still work) and `YOLO_AUTOINSTALL=false`
