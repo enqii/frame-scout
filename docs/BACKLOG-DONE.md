@@ -203,3 +203,4 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **F40 – Check clicking "Match" and "No" in a browser** – closed 2026-11-16 in the triage, not done: merged into A52
 - [x] **F44 – Check the results toolbar in a browser** – closed 2026-11-16 in the triage, not done: merged into A52
 - [x] **F55 – Test scope: only what is necessary (rule)** – done 2026-11-17, [PR #152](https://github.com/enqii/frame-scout/pull/152)
+- [x] **F54 – Project history in the code (rule and cleanup)** – done 2026-11-17, rule in [PR #152](https://github.com/enqii/frame-scout/pull/152), cleanup in [PR #153](https://github.com/enqii/frame-scout/pull/153), [PR #154](https://github.com/enqii/frame-scout/pull/154) and [PR #155](https://github.com/enqii/frame-scout/pull/155); the rest in `.github/workflows/tests.yml` is I56
