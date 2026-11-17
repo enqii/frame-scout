@@ -338,14 +338,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
       Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
-- [ ] `ready` **I53 – A cleanup test fails when the temporary folder is a mount point:**
-      `tests/test_cleanup.py::test_a_root_that_stops_answering_during_the_pass_is_given_up`
-      expects the note to name the root `/` (`root_of` in the test), but on Linux the cleanup
-      names the mount point of the photos, and in WSL2 `/tmp` (pytest's `tmp_path`) is a
-      `tmpfs` of its own: the note names `/tmp`. The code is right, the test's `root_of` is not.
-      Sketch: take the root from the code under test (or the mount point) instead of `/`. Found
-      on 2026-11-16 when F47 part 2 ran the test suite in WSL2 (CI's `ubuntu-latest` passes).
-      Size S, kind `code`.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 

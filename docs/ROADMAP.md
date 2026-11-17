@@ -21,7 +21,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 
 ### P48 – Workflow and tests (added 2026-11-17)
 - [x] State machine row for a review with 0 findings in the `/roadmap` skill (I52; kind `docs`) – 2026-11-17
-- [ ] Fix the cleanup test that fails when the temporary folder is a mount point (I53; kind `code`)
+- [x] Fix the cleanup test that fails when the temporary folder is a mount point (I53; kind `code`) – 2026-11-17
 
 ### P49 – Simplify the rare-case handling (added 2026-11-17)
 - [ ] List per module (`cleanup.py`, `uninstall.py`, `install_check.py`, `disk_space.py`) what
