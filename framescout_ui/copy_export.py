@@ -195,8 +195,11 @@ def show_export(name, entry, marks, marks_error, popover):
                        help='Only the photos of this list marked as match. Photos marked as match in an earlier '
                             'search that are not in this list are not exported: they have no rank or score here.')
     only = only and marks_error is None
-    # a setting (settings.json), synchronized by sync_settings like the AI settings
+    # a setting (settings.json), synchronized by sync_settings like the AI settings;
+    # persist_state keeps the choice while the popover is closed, also when settings.json
+    # cannot be read (sync_settings would otherwise put the default back)
     st.radio('Separator', list(EXPORT_SEPARATORS), key=setting_key('export_separator'), horizontal=True,
+             persist_state='page',
              format_func=lambda name: f'{name} ({EXPORT_SEPARATORS[name]})',
              help='The character between the columns of the CSV table. Excel opens a double-clicked CSV in columns '
                   'only if it uses the list separator of your Windows region: comma in English, semicolon in German '
