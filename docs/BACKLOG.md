@@ -479,17 +479,62 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       Decided 2026-11-17: yes, roadmap P52 (additive `results.json` field, caption that scores
       are relative heuristics). Size S–M. Idea of 2026-11-16.
 - [ ] `decision` **F56 – Feature review: what FrameScout really needs (recurring):** after I44 most
-      of the size is features: search core about 3,400 lines, UI 2,700, user state 2,000,
-      installation and housekeeping 3,200, extra features (time estimate, quick search,
-      evaluation tool) 1,800. Sketch: a list per module of features that could go or shrink,
-      with size and who uses them (e.g. the evaluation tool, about 1,170 lines, needed for P4b;
-      the own uninstaller, about 470 lines, vs. "delete the folder" for a portable install; the
-      install check; the copy/export area; the cache check; I43's legacy names); the user
-      decides each line. In the same PR `/triage` gets a fixed step: name at least one removal
-      candidate per round (extends the I47 rule). Affected: `docs/BACKLOG.md`,
+      of the size is features (about 11,500 lines of code, 15,400 of tests). Sizes below are
+      code plus tests, rounded. **List of 2026-11-17** – per feature: lines, who uses it, what
+      goes or shrinks, what it costs to give up. The user decides each line (remove / shrink /
+      keep); a decided line becomes its own backlog item or roadmap PR.
+      *Candidates to remove (largest saving first):*
+      (1) **Evaluation tool** (`framescout_eval.py`, `framescout_core/evaluation.py`,
+      `assets/framescout_eval_page.html`, `--scores-file` of the engine; about 1,420 + 1,010
+      tests = 2,400): used only to pick search models (E32/P4b, paused; the only model-choice
+      evidence so far is one home-PC run). Keep it until P4b has run, or remove it and
+      re-create it from git if model choice returns. Gives up: measuring models and labelling.
+      (2) **Own uninstaller** (`framescout_uninstall.py`, `core/uninstall.py`,
+      `Uninstall-FrameScout.bat/.sh`; about 550 + 706 tests = 1,250): a portable install with
+      everything in one folder (`.python`, `.venv`, `.cache`, `results`) is removed by deleting
+      the folder; the uninstaller adds a confirmation, a running-app check and a report.
+      Gives up: a guided, safe delete (user data such as photos is never inside the folder).
+      (3) **Linux scripts** (`*.sh`, `tests/test_linux_scripts.py`; about 270 + 395 = 670):
+      never run end to end (F48), maintained in step with every `.bat` change. Keep only if
+      Linux/WSL2 use is wanted.
+      (4) **Legacy names** (I43: `Gesamtbild`, `vorschaubilder/`, `franchise`, `--character`,
+      `LEGACY_PHOTO_FOLDER`; spread over about 15 files, 150-250 lines plus tests): removal
+      needs one migration, a breaking change; decided per name in I43.
+      (5) **Quick search / "Find similar"** (`core/quick.py`, engine `--quick-query`/`--like`,
+      UI parts; about 270 + 120 + 635 tests = 1,000): a second result folder (`quick/`) and
+      its own cleanup rules. Heavily useful for exploring, but not needed for the profile
+      search. Gives up: instant search without a profile.
+      *Candidates to shrink:*
+      (6) **Storage cleanup** (`core/cleanup.py`, `ui/cleanup.py`, `core/cache_check.py`;
+      about 1,415 + 1,476 tests = 2,900, the largest area): shrink to "delete old results" and
+      "delete cache rows of other models" without per-photo classification; F57 (C) names
+      leftovers inside it. Never touches `NEVER_DELETED`. Gives up: fine-grained reclaim.
+      (7) **Install check** (`core/install_check.py`, `framescout_check.py`,
+      `Check-FrameScout.*`, `core/disk_space.py`; about 710 + 760 tests = 1,470): after I44 it
+      is lean; "reinstall" is the usual fix anyway, so the separate Check script and the
+      version/constraints comparison could go, keeping only the disk-space check.
+      (8) **Time estimate** (`core/estimate.py`, throughput records, "finishing" speeds; about
+      335 + 414 tests = 750): shrink to a plain "N of M photos" progress (F57 D).
+      (9) **Copy / export** (`core/copying.py`, `core/exporting.py`, `ui/copy_export.py`;
+      about 540 + 500 tests = 1,040): CSV and file list are cheap; the saved target folders
+      and the collision handling of copying could shrink to "copy to a folder".
+      (10) **Marks** (`core/marks.py`, `ui/marks.py`, review dialog `core/review.py`,
+      `ui/review.py`; about 800 + 960 tests = 1,760): marks (match / no match) feed copy,
+      export and cleanup; the backup and restore of `marks.json` (F1) and the review dialog
+      are the optional part.
+      (11) **Process priority, offline hub loading, app instance lock** (`core/priority.py`,
+      `core/hub.py`, `core/app_instance.py`, `framescout_start.py`; about 470 + 700 tests =
+      1,170): small user-visible gains each ("Keep the PC responsive", no Hub request, one app
+      per folder); the priority option is unmeasured (see its docstring).
+      (12) **Model list** (`core/models.py`, 4 models; E32/E21): trimmed together with P4b.
+      *Keep (core, not for removal):* search engine and cache, signature, scoring, photo scan
+      with RAW pairing, profiles and references, HTML export, run lock/status, installer and
+      PyTorch build selection, settings, results gallery.
+      `/triage` got a fixed step in the same PR: name at least one removal candidate per
+      round (extends the I47 rule; candidates come from this list). Affected: `docs/BACKLOG.md`,
       `.claude/skills/triage/SKILL.md`. Risks: removing features users rely on. Decided
-      2026-11-17: the list goes on the roadmap (P54); **Question** after the list: which
-      features go. Size S (list), then M–L. Idea of 2026-11-17.
+      2026-11-17: the list goes on the roadmap (P54). **Question:** which numbered lines
+      go or shrink. Size S (list, done in P54), then M–L per decision. Idea of 2026-11-17.
 - [ ] `decision` **F57 – Second simplification round after I44:** functions that grew through chains
       of review follow-ups (rough line counts, tests about twice as many): (A) RAW fallback for
       truncated JPEG partners (E46 → E53 → E57, about 200 lines: `jpeg_scans_missing`, the
