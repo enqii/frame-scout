@@ -114,7 +114,7 @@ def test_the_results_have_one_toolbar_row_above_the_photos():
     [row] = with_blocks(functions['show_results'], 'toolbar')
     assert "st.selectbox('Results of'" in row
     assert 'show_quick_results(quick, folders, model, find_disabled, toolbar)' in selector
-    assert 'show_profile_results(results, name, photo_folders, model, find_disabled, toolbar)' in selector
+    assert 'show_profile_results(results, name, photo_folders, model, find_disabled, toolbar, copy_request)' in selector
     [row] = with_blocks(functions['show_profile_results'], 'toolbar')
     order = ['mark_counts_text(progress)', "st.checkbox('Hide no match'", "st.selectbox(f'Page (of {pages})'",
              "st.popover('Export and copy'"]
@@ -210,7 +210,11 @@ def test_the_notices_of_copy_and_export_are_shown_below_the_toolbar():
     notices = [ast.unparse(block) for block in ast.walk(functions['show_profile_results'])
                if isinstance(block, ast.With) and ast.unparse(block.items[0].context_expr) == 'notices']
     assert any("show_notice('export_notice')" in block for block in notices)
-    assert any('run_copy_request(name, photo_folders)' in block for block in notices)
+    assert any('run_copy_request(copy_request, name, photo_folders)' in block for block in notices)
+    # the request is taken at the start of every run of the results, also one that shows
+    # no profile gallery: never kept to copy photos in a later, unrelated run
+    first = functions['show_results'].body[1]
+    assert ast.unparse(first) == "copy_request = st.session_state.pop('copy_request', None)"
 
 
 def test_an_empty_row_of_card_text_keeps_its_line():

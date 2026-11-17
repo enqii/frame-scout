@@ -52,13 +52,12 @@ def set_copy_folder(profile, key, default):
 
 
 def request_copy(profile, key):
-    """Ask this page run to copy the matches of profile to the folder typed into the field key (on_click)."""
+    """Ask the next run of the results to copy the matches of profile to the folder typed into the field key (on_click)."""
     st.session_state.copy_request = (profile, st.session_state.get(key, ''))
 
 
-def run_copy_request(profile, photo_folders):
-    """Run the copy the button "Copy marked photos" asked for, if it was for profile."""
-    request = st.session_state.pop('copy_request', None)
+def run_copy_request(request, profile, photo_folders):
+    """Run the copy the button "Copy marked photos" asked for (request, taken by show_results), if it was for profile."""
     if request and request[0] == profile:
         copy_matches(profile, request[1], photo_folders)
 
