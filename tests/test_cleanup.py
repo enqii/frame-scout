@@ -50,6 +50,8 @@ class Project:
         self.profiles = base / 'profiles.json'
         for folder in (self.thumbs, self.refs, self.photos):
             folder.mkdir(parents=True)
+        # the photos of an empty folder are not checked (I44): the photo folder holds one
+        (self.photos / 'kept.jpg').write_bytes(b'photo')
         self.set_profiles([{'name': 'Red car', 'reference_images': []}])
 
     def set_profiles(self, profiles):
@@ -219,28 +221,51 @@ def test_rows_of_photos_that_no_longer_exist_anywhere_are_unbound(project):
     # E8/A21 (user decision): a renamed, moved or deleted photo is "unbound", in whatever
     # folder it was; a photo of an earlier search's folder that still exists is not
     kept = project.photo('a.jpg')
-    gone = project.photos / 'sub' / 'b.jpg'
+    gone = project.photos / 'b.jpg'
     elsewhere = project.base / 'elsewhere'
     elsewhere.mkdir()
     earlier = elsewhere / 'c.jpg'  # another folder searched earlier: still there
     earlier.write_bytes(b'photo')
     moved = elsewhere / 'd.jpg'  # its photo was moved away
-    vanished = project.base / 'renamed folder' / 'e.jpg'  # the whole folder was renamed
-    project.cache([(kept, CURRENT), (gone, CURRENT), (gone, OLD), (earlier, CURRENT), (moved, OTHER),
-                   (vanished, CURRENT)])
+    project.cache([(kept, CURRENT), (gone, CURRENT), (gone, OLD), (earlier, CURRENT), (moved, OTHER)])
     scan = project.scan()
     assert sorted(scan['cache_missing']['items']) == sorted(
-        [(str(gone), CURRENT), (str(gone), OLD), (str(moved), OTHER), (str(vanished), CURRENT)])
+        [(str(gone), CURRENT), (str(gone), OLD), (str(moved), OTHER)])
     # not selected by default: it covers every folder searched so far, and a drive letter
     # another disk got since makes the earlier disk's photos look unbound (A35, user decision)
-    assert scan['cache_missing']['rows'] == 4 and scan['cache_missing']['default'] is False
+    assert scan['cache_missing']['rows'] == 3 and scan['cache_missing']['default'] is False
     assert scan['cache_missing']['problem'] is None and scan['cache_missing']['notes'] == []
     # the folders are named before the deletion, fullest first (review, A35: e.g. a drive
     # letter another disk got since)
-    assert scan['cache_missing']['names'] == [
-        f'{elsewhere} (1 photo)', f'{project.photos / "sub"} (1 photo)', f'{vanished.parent} (1 photo)']
+    assert scan['cache_missing']['names'] == [f'{elsewhere} (1 photo)', f'{project.photos} (1 photo)']
     summary = project.clean(scan, {'cache_missing'})
-    assert summary['rows'] == 4 and project.rows() == sorted([(str(kept), CURRENT), (str(earlier), CURRENT)])
+    assert summary['rows'] == 3 and project.rows() == sorted([(str(kept), CURRENT), (str(earlier), CURRENT)])
+
+
+def test_photos_of_a_missing_or_empty_folder_are_not_checked(project, monkeypatch):
+    # I44 (simple rule, user decision 2026-11-17): a disconnected drive or an unmounted share
+    # leaves the folder of its photos missing or empty (a mount point on Linux/macOS), so the
+    # photos may only be offline; a renamed or deleted folder looks the same and is not
+    # offered either. No photo of such a folder gets a stat, and one note counts them all.
+    empty = project.base / 'media' / 'DRIVE'
+    empty.mkdir(parents=True)
+    vanished = project.base / 'renamed folder'
+    project.cache([(empty / f'IMG_{n}.jpg', CURRENT) for n in range(3)]
+                  + [(vanished / f'IMG_{n}.jpg', CURRENT) for n in range(2)])
+    project.marks({'Red car': {str(vanished / 'IMG_9.jpg'): 'match'}})
+    stated = count_photo_stats(monkeypatch)
+    scan = project.scan()
+    assert stated == []
+    for key, count in (('cache_missing', '5 photos were'), ('marks_unbound', '1 photo was')):
+        category = scan[key]
+        assert category['items'] == [] and category['problem'] is None
+        [note] = category['notes']
+        assert note.startswith(count + ' not checked') and 'missing or empty' in note
+    # once the folder holds a photo again (the drive is back), its missing photos are unbound
+    (empty / 'IMG_0.jpg').write_bytes(b'photo')
+    category = project.scan()['cache_missing']
+    assert sorted(category['items']) == [(str(empty / f'IMG_{n}.jpg'), CURRENT) for n in (1, 2)]
+    assert category['notes'][0].startswith('2 photos were not checked')
 
 
 def unreachable(*roots):
@@ -263,9 +288,8 @@ def test_rows_on_a_root_that_is_not_reachable_are_not_checked(project, monkeypat
     monkeypatch.setattr(cleanup, '_probe_root', unreachable(root_of(project.photos)))
     scan = project.scan()
     assert scan['cache_missing']['items'] == [] and scan['cache_missing']['problem'] is None
-    notes = scan['cache_missing']['notes']
-    assert len(notes) == 1 and root_of(project.photos) in notes[0] and '2 photos' in notes[0]
-    assert 'not reachable' in notes[0]
+    [note] = scan['cache_missing']['notes']
+    assert note.startswith('2 photos were not checked') and 'cannot be reached' in note
 
 
 def test_rows_whose_root_went_offline_since_the_scan_are_kept(project, monkeypatch):
@@ -279,36 +303,6 @@ def test_rows_whose_root_went_offline_since_the_scan_are_kept(project, monkeypat
     assert summary['rows'] == 0 and project.rows() == [(str(gone), CURRENT)]
 
 
-def test_a_root_that_goes_offline_during_the_check_is_not_checked(project, monkeypatch):
-    # a share that drops during the pass makes its folders look missing: the root is
-    # probed again for the paths found gone
-    from framescout_core import cleanup
-    project.cache([(project.photos / 'b.jpg', CURRENT)])
-    answers = iter([True, False])
-    monkeypatch.setattr(cleanup, '_probe_root', lambda root: next(answers))
-    scan = project.scan()
-    assert scan['cache_missing']['items'] == [] and len(scan['cache_missing']['notes']) == 1
-
-
-def test_a_share_that_drops_during_the_check_and_is_back_keeps_its_photos(project, monkeypatch):
-    # the folder listing fails while the share is away; by the second probe it is back (review)
-    names = [f'IMG_{n}.jpg' for n in range(6)]
-    for name in names:
-        project.photo(name)
-    project.cache([(project.photos / name, CURRENT) for name in names])
-    real, failures = os.listdir, [1]
-
-    def listdir(path):
-        if failures and os.path.normcase(str(path)) == os.path.normcase(str(project.photos)):
-            failures.pop()
-            raise FileNotFoundError('the network path was not found')
-        return real(path)
-
-    monkeypatch.setattr(os, 'listdir', listdir)
-    scan = project.scan()
-    assert not failures and scan['cache_missing']['items'] == [] and scan['cache_missing']['notes'] == []
-
-
 @pytest.mark.skipif(os.name != 'nt', reason='drive letters are a Windows feature')
 def test_rows_on_a_drive_letter_that_is_not_there_are_not_checked(project):
     free = [letter for letter in 'QRSTUVWXYZ' if not os.path.exists(letter + ':\\')]
@@ -318,7 +312,7 @@ def test_rows_on_a_drive_letter_that_is_not_there_are_not_checked(project):
     project.cache([(offline, CURRENT), (project.photos / 'b.jpg', CURRENT)])
     scan = project.scan()
     assert scan['cache_missing']['items'] == [(str(project.photos / 'b.jpg'), CURRENT)]
-    assert free[-1] + ':\\' in scan['cache_missing']['notes'][0]
+    assert scan['cache_missing']['notes'][0].startswith('1 photo was not checked')
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='extended-length paths are a Windows feature')
@@ -369,443 +363,31 @@ def test_a_root_probe_that_still_hangs_gets_no_second_thread(monkeypatch):
 
 
 def count_photo_stats(monkeypatch):
-    """Record the photos that cleanup._missing stats, in the list that is returned.
-
-    Only the photos (.jpg) are recorded: the empty mount point check of Linux and macOS
-    (E54) also stats the folder of gone photos and its parents, once per folder, and it
-    keeps running in the tests that count the stats of the photos (F47, review).
-    """
+    """Record the photos that cleanup._missing stats, in the list that is returned."""
     from framescout_core import cleanup
     stated, real = [], cleanup._missing
 
     def missing(path):
-        if str(path).endswith('.jpg'):
-            stated.append(path)
+        stated.append(path)
         return real(path)
 
     monkeypatch.setattr(cleanup, '_missing', missing)
     return stated
 
 
-def test_a_folder_with_many_rows_is_listed_once(project, monkeypatch):
-    # one listing per folder instead of one stat per photo (much faster on a network share)
-    names = [f'IMG_{n}.jpg' for n in range(10)]
-    for name in names[:8]:
-        project.photo(name)
-    project.cache([(project.photos / name, CURRENT) for name in names])
-    from framescout_core import cleanup
-    listed = []
-    stated = count_photo_stats(monkeypatch)
-    # the listings of the photos, not the one of the empty mount point check (E54)
-    real_names = cleanup._folder_names
-    monkeypatch.setattr(cleanup, '_folder_names', lambda path: listed.append(path) or real_names(path))
-    scan = project.scan()
-    assert sorted(scan['cache_missing']['items']) == [(str(project.photos / n), CURRENT) for n in names[8:]]
-    assert [os.path.normcase(p) for p in listed].count(os.path.normcase(str(project.photos))) == 1
-    # a name the listing does not hold is confirmed by its own stat (once more after the
-    # pass, as it is gone)
-    assert sorted(stated) == sorted([str(project.photos / n) for n in names[8:]] * 2)
-
-
-def test_many_names_a_listing_does_not_hold_need_only_a_few_stats(project, monkeypatch):
-    # e.g. a folder whose 50,000 photos were moved away: the listing is trusted once a few
-    # of the absent names are confirmed (review)
-    from framescout_core import cleanup
-    names = [f'IMG_{n:02}.jpg' for n in range(30)]
-    project.photo(names[0])
-    project.cache([(project.photos / name, CURRENT) for name in names])
-    stated = count_photo_stats(monkeypatch)
-    assert project.scan()['cache_missing']['rows'] == 29
-    assert len(stated) == 2 * cleanup._STAT_UP_TO  # the pass and the second look at the gone photos
-    assert project.scan()['cache_missing']['names'] == [f'{project.photos} (29 photos)']
-
-
-def test_a_listing_that_spells_names_differently_is_checked_by_a_stat_each(project, monkeypatch):
-    # e.g. another Unicode normalization: a confirmed name exists, so no absent name is trusted
-    names = [f'IMG_{n:02}.jpg' for n in range(10)]
-    for name in names:
-        project.photo(name)
-    project.cache([(project.photos / name, CURRENT) for name in names])
-    real = os.listdir
-
-    def listdir(path):
-        found = real(path)
-        if os.path.normcase(str(path)) == os.path.normcase(str(project.photos)):
-            return [name.replace('IMG', 'img_x') for name in found]
-        return found
-
-    monkeypatch.setattr(os, 'listdir', listdir)
-    assert project.scan()['cache_missing']['items'] == []
-
-
-@pytest.mark.skipif(os.name != 'nt', reason='Windows file names ignore case')
-def test_a_listed_name_of_another_case_exists(project):
-    names = [f'IMG_{n}.jpg' for n in range(6)]
-    for name in names:
-        project.photo(name)
-    project.cache([(project.photos / name.upper(), CURRENT) for name in names])
-    assert project.scan()['cache_missing']['items'] == []
-
-
-def test_rows_of_a_whole_missing_folder_need_no_stat_each(project, monkeypatch):
-    gone = project.base / 'renamed' / 'event'
-    project.cache([(gone / f'IMG_{n}.jpg', CURRENT) for n in range(10)])
-    stated = count_photo_stats(monkeypatch)
-    assert project.scan()['cache_missing']['rows'] == 10
-    assert stated == []
-
-
-def test_rows_of_a_folder_that_cannot_be_listed_are_kept(project, monkeypatch):
+def test_rows_of_a_folder_that_cannot_be_listed_are_not_checked(project, monkeypatch):
     # e.g. no permission: nothing tells that the photos are gone
-    names = [f'IMG_{n}.jpg' for n in range(6)]
-    project.cache([(project.photos / name, CURRENT) for name in names])
-    real = os.listdir
+    project.cache([(project.photos / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
+    real = os.scandir
 
-    def listdir(path):
+    def scandir(path):
         if os.path.normcase(str(path)) == os.path.normcase(str(project.photos)):
             raise PermissionError('access denied')
         return real(path)
 
-    monkeypatch.setattr(os, 'listdir', listdir)
-    assert project.scan()['cache_missing']['items'] == []
-
-
-def listing_that_hangs(monkeypatch, folder, release):
-    """Make os.listdir of folder hang until release is set, as on a share that stops answering."""
-    real = os.listdir
-
-    def listdir(path):
-        if os.path.normcase(str(path)) == os.path.normcase(str(folder)):
-            release.wait(10)
-        return real(path)
-
-    monkeypatch.setattr(os, 'listdir', listdir)
-
-
-def test_a_folder_whose_listing_hangs_is_not_checked(project, monkeypatch):
-    # E37: a listing on a share that hangs during the pass stalled the scan until the OS
-    # gave up; now the folder's photos count as not checked after FOLDER_TIMEOUT, and the
-    # other folders of its root are still checked while the root answers
-    import threading
-    from framescout_core import cleanup
-    hanging, other = project.photos / 'hanging', project.photos / 'other'
-    rows = [(hanging / f'IMG_{n}.jpg', CURRENT) for n in range(6)] + [(other / 'gone.jpg', CURRENT)]
-    hanging.mkdir()
-    project.cache(rows)
-    release = threading.Event()
-    listing_that_hangs(monkeypatch, hanging, release)
-    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
-    start = time.monotonic()
-    try:
-        scan = project.scan()
-    finally:
-        release.set()
-    assert time.monotonic() - start < 5
-    category = scan['cache_missing']
-    assert category['items'] == [(str(other / 'gone.jpg'), CURRENT)]
-    assert len(category['notes']) == 1 and str(hanging) in category['notes'][0] and '6 photos' in category['notes'][0]
-
-
-@pytest.mark.parametrize('behind', ['root', 'link'])
-def test_a_root_that_stops_answering_during_the_pass_is_given_up(project, monkeypatch, behind):
-    # after a folder hangs, the root (or the link or mount point the folder is behind) is
-    # probed again: a share that does not answer is not waited for once per folder; the
-    # link is set here, not taken from the file system, since pytest's tmp_path can be on a
-    # mount point of its own (e.g. /tmp as a tmpfs in WSL2, I53)
-    import threading
-    from framescout_core import cleanup
-    above = root_of(project.photos) if behind == 'root' else str(project.photos)
-    monkeypatch.setattr(cleanup, '_link_above', lambda folder: above)
-    folders = [project.photos / name for name in ('a', 'b', 'c')]
-    project.cache([(folder / f'IMG_{n}.jpg', CURRENT) for folder in folders for n in range(6)])
-    folders[0].mkdir()
-    release = threading.Event()
-    listing_that_hangs(monkeypatch, folders[0], release)
-    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.2)
-    probes = iter([True, False])  # reachable before the pass, not after the hang
-    monkeypatch.setattr(cleanup, '_probe_root', lambda root: next(probes, False))
-    try:
-        scan = project.scan()
-    finally:
-        release.set()
-    category = scan['cache_missing']
-    assert category['items'] == []
-    # the folder that hung and the rest of its root or link, each worded as such
-    [hung, rest] = sorted(category['notes'], key=lambda note: not note.startswith(str(folders[0])))
-    assert hung.startswith(str(folders[0]) + ' ') and '6 photos' in hung
-    assert rest.startswith(above + ' ') and '12 photos' in rest
-    assert ('is not reachable now' if behind == 'root' else 'cannot be reached now') in rest
-
-
-@pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
-def test_photos_behind_a_junction_to_a_missing_volume_are_not_checked(project):
-    # E37: a junction or mount point inside a reachable root that leads to a disconnected
-    # volume made its photos look gone; the link counts as a root of its own
-    _winapi = pytest.importorskip('_winapi')
-    volume = project.base / 'volume'
-    (volume / 'event').mkdir(parents=True)
-    link = project.photos / 'nas'
-    _winapi.CreateJunction(str(volume), str(link))
-    few = [(link / 'event' / f'IMG_{n}.jpg', CURRENT) for n in range(2)]
-    many = [(link / 'other' / f'IMG_{n}.jpg', CURRENT) for n in range(6)]
-    direct = [(link / 'top.jpg', CURRENT)]
-    project.cache(few + many + direct)
-    (volume / 'event').rmdir()
-    volume.rmdir()  # the volume is gone, the junction stays
+    monkeypatch.setattr(os, 'scandir', scandir)
     category = project.scan()['cache_missing']
-    assert category['items'] == []
-    assert len(category['notes']) == 1 and str(link) in category['notes'][0] and '9 photos' in category['notes'][0]
-
-
-def posix_mounts(monkeypatch, roots=(), fstab=''):
-    """Look at empty mount points as on Linux/macOS, with roots as the usual mount folders and an fstab text."""
-    from framescout_core import cleanup
-    monkeypatch.setattr(cleanup, '_EMPTY_MOUNT_POINTS', True)
-    monkeypatch.setattr(cleanup, '_MOUNT_ROOTS', tuple(str(root) for root in roots))
-    monkeypatch.setattr(cleanup, '_FSTAB', str(fstab) if fstab else os.devnull)
-
-
-@pytest.mark.parametrize('layout', ['photos-in-the-mount-point', 'photos-in-subfolders'])
-def test_photos_of_a_drive_that_is_not_mounted_are_not_checked(project, monkeypatch, layout):
-    # E54: on Linux/macOS a mount point stays as an empty folder when its drive is unmounted
-    media = project.base / 'media'
-    drive = media / 'user' / 'DRIVE'
-    folder = drive if layout == 'photos-in-the-mount-point' else drive / 'trip'
-    project.cache([(folder / f'IMG_{n}.jpg', CURRENT) for n in range(6)] + [(drive / 'a' / 'b.jpg', CURRENT)])
-    drive.mkdir(parents=True)  # unmounted: only the empty mount point is left
-    posix_mounts(monkeypatch, roots=[media])
-    category = project.scan()['cache_missing']
-    assert category['items'] == []
-    [note] = category['notes']
-    assert note.startswith(str(drive) + ' ') and 'not mounted' in note and '7 photos' in note
-    # the mount points udisks makes (/media/<user>/<label>) disappear on unmount: the
-    # missing mount point counts too
-    drive.rmdir()
-    [note] = project.scan()['cache_missing']['notes']
-    assert note.startswith(str(drive) + ' does not exist') and 'not mounted' in note and '7 photos' in note
-
-
-@pytest.mark.parametrize('parent', ['user-folder', 'mount-root'])
-def test_photos_of_a_drive_whose_mount_point_went_away_are_not_checked_next_to_another_drive(
-        project, monkeypatch, parent):
-    # E54 review: /media/<user>/A (udisks) or /Volumes/A (macOS) goes away on unmount while
-    # /media/<user>/B or /Volumes/Macintosh HD stays, so the folder above is not empty
-    media = project.base / 'media'
-    above = media / 'user' if parent == 'user-folder' else media
-    (above / 'B').mkdir(parents=True)
-    (above / 'B' / 'photo.jpg').write_bytes(b'photo')
-    gone_drive = above / 'A'
-    project.cache([(gone_drive / 'trip' / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
-    posix_mounts(monkeypatch, roots=[media])
-    category = project.scan()['cache_missing']
-    assert category['items'] == []
-    [note] = category['notes']
-    assert note.startswith(str(gone_drive) + ' does not exist') and '6 photos' in note
-
-
-def test_a_folder_deleted_on_a_mounted_drive_is_gone(project, monkeypatch):
-    # E54 review: /media/<user>/B is mounted; a folder deleted on it is no mount point
-    from framescout_core import cleanup
-    media = project.base / 'media'
-    drive = media / 'user' / 'B'
-    drive.mkdir(parents=True)
-    (drive / 'photo.jpg').write_bytes(b'photo')
-    project.cache([(drive / 'deleted' / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
-    posix_mounts(monkeypatch, roots=[media])
-    monkeypatch.setattr(cleanup, '_mounted', lambda path: os.path.normcase(str(path)) == os.path.normcase(str(drive)))
-    category = project.scan()['cache_missing']
-    assert category['notes'] == [] and len(category['items']) == 6
-    # deeper below a mount root, a missing folder is no mount point either (sub is neither a
-    # mount root nor right inside one)
-    deep = drive / 'sub'
-    deep.mkdir()
-    (deep / 'photo.jpg').write_bytes(b'photo')
-    monkeypatch.setattr(cleanup, '_mounted', lambda path: False)
-    project.cache([(deep / 'deleted' / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
-    category = project.scan()['cache_missing']
-    assert category['notes'] == [] and len(category['items']) == 12
-
-
-def test_a_missing_mount_point_of_the_fstab_counts_wherever_it_is(project, monkeypatch):
-    home = project.base / 'home'
-    home.mkdir()
-    (home / 'other.txt').write_bytes(b'x')
-    nas = home / 'nas'
-    project.cache([(nas / f'IMG_{n}.jpg', CURRENT) for n in range(3)])
-    fstab = project.base / 'fstab'
-    fstab.write_text(f'//server/photos {nas} cifs noauto 0 0\n', encoding='utf-8')
-    posix_mounts(monkeypatch, fstab=fstab)
-    [note] = project.scan()['cache_missing']['notes']
-    assert note.startswith(str(nas) + ' does not exist') and '3 photos' in note
-
-
-def test_an_empty_mount_point_of_the_fstab_counts_wherever_it_is(project, monkeypatch):
-    # E54: a mount point the system mounts at start (/etc/fstab) can be anywhere
-    nas = project.base / 'home' / 'nas'
-    nas.mkdir(parents=True)
-    project.cache([(nas / f'IMG_{n}.jpg', CURRENT) for n in range(3)])
-    fstab = project.base / 'fstab'
-    fstab.write_text('# comment\nUUID=1 / ext4 defaults 0 1\n//server/photos ' + str(nas).replace(' ', '\\040')
-                     + ' cifs noauto 0 0\n', encoding='utf-8')
-    posix_mounts(monkeypatch, fstab=fstab)
-    [note] = project.scan()['cache_missing']['notes']
-    assert note.startswith(str(nas) + ' ') and '3 photos' in note
-
-
-def test_photos_of_an_emptied_folder_elsewhere_are_gone(project, monkeypatch):
-    # E54: a folder whose photos were deleted is no mount point; outside the usual mount
-    # folders and the fstab its photos are unbound as before
-    media = project.base / 'media'
-    (media / 'DRIVE').mkdir(parents=True)
-    (media / 'DRIVE' / 'photo.jpg').write_bytes(b'photo')
-    emptied = project.photos / 'emptied'
-    emptied.mkdir()
-    project.cache([(emptied / f'IMG_{n}.jpg', CURRENT) for n in range(6)]
-                  + [(media / 'DRIVE' / f'IMG_{n}.jpg', CURRENT) for n in range(2)])
-    posix_mounts(monkeypatch, roots=[media])
-    category = project.scan()['cache_missing']
-    # a mount point that is not empty is mounted: its photos that are missing are gone too
-    assert category['notes'] == [] and len(category['items']) == 8
-
-
-def test_an_empty_mount_point_counts_only_on_linux_and_macos(project, monkeypatch):
-    # E54: on Windows, junctions and mount points are handled by E37
-    from framescout_core import cleanup
-    assert cleanup._EMPTY_MOUNT_POINTS is (os.name != 'nt')
-    media = project.base / 'media'
-    (media / 'DRIVE').mkdir(parents=True)
-    project.cache([(media / 'DRIVE' / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
-    posix_mounts(monkeypatch, roots=[media])
-    monkeypatch.setattr(cleanup, '_EMPTY_MOUNT_POINTS', False)
-    category = project.scan()['cache_missing']
-    assert category['notes'] == [] and len(category['items']) == 6
-
-
-def test_notes_tell_a_folder_that_timed_out_from_a_root_that_is_not_reachable(project, monkeypatch):
-    # review: a slow folder on a connected drive is no "disconnected drive or offline share"
-    import threading
-    from framescout_core import cleanup
-    hanging = project.photos / 'hanging'
-    hanging.mkdir()
-    project.cache([(hanging / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
-    release = threading.Event()
-    listing_that_hangs(monkeypatch, hanging, release)
-    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.5)
-    try:
-        [note] = project.scan()['cache_missing']['notes']
-    finally:
-        release.set()
-    assert note.startswith(str(hanging) + ' ') and 'did not answer within' in note and '6 photos' in note
-    assert 'disconnected' not in note
-
-
-def test_a_folder_that_still_hangs_gets_no_second_thread(project, monkeypatch):
-    # review: the worker that hangs on a folder is abandoned; the next scan must not start
-    # another thread blocked on the same folder, as for a root probe (_PROBES)
-    import threading
-    from framescout_core import cleanup
-    hanging = project.photos / 'hanging'
-    hanging.mkdir()
-    project.cache([(hanging / f'IMG_{n}.jpg', CURRENT) for n in range(6)])
-    release, calls = threading.Event(), []
-    real = os.listdir
-
-    def listdir(path):
-        if os.path.normcase(str(path)) == os.path.normcase(str(hanging)):
-            calls.append(path)
-            release.wait(10)
-        return real(path)
-
-    monkeypatch.setattr(os, 'listdir', listdir)
-    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.5)
-    try:
-        for _ in range(3):
-            [note] = project.scan()['cache_missing']['notes']
-            assert str(hanging) in note
-        assert len(calls) == 1
-    finally:
-        release.set()
-    for thread in [t for t in threading.enumerate() if t.name == 'FrameScout folder check']:
-        thread.join(5)
-    # the folder answered meanwhile: the next scan looks at it again (and finds the photos gone)
-    category = project.scan()['cache_missing']
-    assert category['notes'] == [] and len(category['items']) == 6 and len(calls) > 1
-
-
-@pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
-def test_a_share_behind_a_junction_that_stops_answering_is_given_up_once(project, monkeypatch):
-    # review: after a folder behind a junction hangs, the junction (not only the drive root,
-    # which still answers) is probed again, so its other folders do not each wait
-    # FOLDER_TIMEOUT; folders outside the junction are still checked
-    import threading
-    from framescout_core import cleanup
-    _winapi = pytest.importorskip('_winapi')
-    volume = project.base / 'volume'
-    volume.mkdir()
-    link = project.photos / 'nas'
-    _winapi.CreateJunction(str(volume), str(link))
-    events = [link / f'event{n}' for n in range(4)]
-    for folder in events:
-        folder.mkdir()
-    local = project.photos / 'local'
-    project.cache([(folder / f'IMG_{n}.jpg', CURRENT) for folder in events for n in range(6)]
-                  + [(local / 'gone.jpg', CURRENT)])
-    behind = os.path.normcase(str(link))
-    release, listed = threading.Event(), []
-    real_listdir, real_probe = os.listdir, cleanup._probe_root
-
-    def listdir(path):
-        if os.path.normcase(str(path)).startswith(behind):
-            listed.append(path)
-            release.wait(10)
-        return real_listdir(path)
-
-    monkeypatch.setattr(os, 'listdir', listdir)
-    # the share behind the junction does not answer, the drive root does
-    monkeypatch.setattr(cleanup, '_probe_root', lambda path: (not os.path.normcase(str(path)).startswith(behind)
-                                                              and real_probe(path)))
-    monkeypatch.setattr(cleanup, 'FOLDER_TIMEOUT', 0.5)
-    try:
-        category = project.scan()['cache_missing']
-    finally:
-        release.set()
-    assert len(listed) == 1
-    assert category['items'] == [(str(local / 'gone.jpg'), CURRENT)]
-    [hung, rest] = sorted(category['notes'], key=lambda note: not note.startswith(str(events[0])))
-    assert hung.startswith(str(events[0]) + ' ') and '6 photos' in hung
-    assert rest.startswith(str(link) + ' ') and '18 photos' in rest and 'cannot be reached' in rest
-
-
-def test_the_first_link_or_mount_on_the_way_down_is_found(monkeypatch):
-    import stat
-    from types import SimpleNamespace
-    from framescout_core import cleanup
-    root = root_of(Path.cwd())
-    top, mount, deep = (os.path.join(root, *parts) for parts in (['a'], ['a', 'm'], ['a', 'm', 'x', 'y']))
-    seen = []
-
-    def lstat(path):
-        seen.append(path)
-        # a/m is another file system (a POSIX mount point); nothing below it is looked at
-        return SimpleNamespace(st_mode=stat.S_IFDIR, st_dev=2 if path == mount else 1)
-
-    monkeypatch.setattr(os, 'lstat', lstat)
-    assert cleanup._link_above(deep) == mount
-    assert seen == [root, top, mount]
-    assert cleanup._link_above(top) == root
-
-
-@pytest.mark.skipif(os.name != 'nt', reason='junctions are a Windows feature')
-def test_photos_behind_a_junction_whose_target_is_there_can_be_gone(project):
-    _winapi = pytest.importorskip('_winapi')
-    volume = project.base / 'volume'
-    volume.mkdir()
-    link = project.photos / 'nas'
-    _winapi.CreateJunction(str(volume), str(link))
-    gone = [(link / 'event' / f'IMG_{n}.jpg', CURRENT) for n in range(6)] + [(link / 'a.jpg', CURRENT)]
-    project.cache(gone)
-    category = project.scan()['cache_missing']
-    assert sorted(category['items']) == sorted((str(p), s) for p, s in gone) and category['notes'] == []
+    assert category['items'] == [] and category['notes'][0].startswith('6 photos were not checked')
 
 
 def test_a_relative_path_is_never_unbound(project):
@@ -1486,7 +1068,7 @@ def test_each_photo_is_looked_at_once_however_many_signatures_it_has(project, mo
     project.cache([(gone, CURRENT), (gone, OTHER), (gone, OLD)])
     calls = count_photo_stats(monkeypatch)
     assert project.scan()['cache_missing']['rows'] == 3
-    assert calls == [str(gone)] * 2  # once in the pass, once more as it is gone
+    assert calls == [str(gone)]
 
 
 def test_a_scan_reads_profiles_and_galleries_once(project, monkeypatch):

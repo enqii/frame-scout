@@ -1,9 +1,7 @@
 """The app's "Clean up storage": what FrameScout no longer needs, listed and deleted (E7, E11)."""
 import os
-import queue
 import re
 import sqlite3
-import stat
 import threading
 import time
 from contextlib import contextmanager
@@ -31,7 +29,8 @@ from .signature import CACHE_FILE, CACHE_SIDE_FILES, classify_signatures, engine
 # status and result files, the cache file itself, settings and profiles.
 # Unbound entries (E8/A21, user decision 2026-10-28): cache rows and marks stay keyed by the
 # absolute photo path, so a renamed or moved photo counts as a new one; the old rows and
-# marks stay until the cleanup offers them as "unbound" (photo gone, its drive reachable).
+# marks stay until the cleanup offers them as "unbound" (photo gone, its drive reachable and
+# its folder there and not empty, I44).
 THUMBNAILS_DIR = 'thumbnails'
 # the thumbnail folder of versions before I7: no longer written, still linked by their galleries
 LEGACY_THUMBNAILS_DIR = 'vorschaubilder'
@@ -52,21 +51,6 @@ CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': Tr
 # seconds the reachability probe of the drive and share roots may take (all roots together); a
 # stat on a disconnected network share can hang much longer
 ROOT_TIMEOUT = 5.0
-# seconds the look at one folder of the pass may take (a listing, a few stats, E37); a share
-# that stops answering during the pass would otherwise stall it until the OS gives up. A
-# folder that takes longer is not checked (its photos stay), which is the safe side.
-FOLDER_TIMEOUT = 30.0
-# Linux and macOS leave the mount point of an unmounted drive or share as an empty folder or
-# take it away, so its photos look gone (E54; on Windows, E37's junction check covers mount
-# points);
-# the folders drives and shares are usually mounted in, and the file of the mount points
-# the system mounts at start
-_EMPTY_MOUNT_POINTS = os.name != 'nt'
-_MOUNT_ROOTS = ('/media', '/mnt', '/run/media', '/Volumes')
-_FSTAB = '/etc/fstab'
-# a folder with at most this many photos to check gets one stat per photo, a fuller one is
-# listed once (see _PathCheck)
-_STAT_UP_TO = 4
 NEVER_DELETED = frozenset({MARKS_FILE, MARKS_BACKUP, MARKS_FILE + '.lock', RUN_LOCK, RUN_STATUS, RESULTS_FILE,
                            CACHE_FILE, SETTINGS_FILE, SETTINGS_FILE + '.lock', 'profiles.json', 'profiles.json.bak',
                            'profiles.json.lock'})
@@ -264,249 +248,13 @@ def _reachable_roots(roots, timeout=ROOT_TIMEOUT):
     return {root: probes[root].answer is True for root in roots}
 
 
-def _folder_names(folder):
-    """The normcased names in folder; False if it certainly does not exist, None if it cannot be listed."""
+def _filled(folder):
+    """Whether folder exists and holds anything (False also if it cannot be listed, e.g. no permission)."""
     try:
-        return {os.path.normcase(name) for name in os.listdir(folder)}
-    except (FileNotFoundError, NotADirectoryError):
-        return False
-    except (OSError, ValueError):
-        return None
-
-
-def _gone_in(folder, members):
-    """The paths of members (all in folder) that certainly no longer exist.
-
-    At most _STAT_UP_TO paths: one stat each. More: one listing of the folder; a folder that
-    does not exist makes them all gone, one that cannot be listed keeps them. The names the
-    listing does not hold are gone; the first _STAT_UP_TO of them are confirmed by a stat in
-    case the listing spells a name differently (e.g. another Unicode normalization), and if
-    one of those exists, every absent name gets its own stat (review: not one stat per
-    photo of a renamed folder of 50,000 photos).
-    """
-    if len(members) <= _STAT_UP_TO:
-        return {p for p in members if _missing(p)}
-    names = _folder_names(folder)
-    if names is False:
-        return set(members)
-    if names is None:
-        return set()
-    absent = sorted(p for p in members if os.path.normcase(os.path.basename(p)) not in names)
-    if all(_missing(p) for p in absent[:_STAT_UP_TO]):
-        return set(absent)
-    return {p for p in absent if _missing(p)}
-
-
-def _is_link(info):
-    """Whether the lstat result info is a symbolic link, a junction or a volume mount point.
-
-    Junctions and volume mount points exist on Windows only; the stat module defines their
-    reparse tag only there.
-    """
-    if stat.S_ISLNK(info.st_mode):
-        return True
-    tag = getattr(stat, 'IO_REPARSE_TAG_MOUNT_POINT', None)
-    return tag is not None and getattr(info, 'st_reparse_tag', 0) == tag
-
-
-def _dead_link(folder):
-    """The link above the photos of folder that leads nowhere now, or None (E37).
-
-    A junction, volume mount point or symbolic link inside a reachable root can lead to a
-    volume or share that is disconnected: the folders behind it then look missing, although
-    the photos may only be offline. The nearest part of folder that exists (folder itself or
-    a parent folder) is looked at: if it is such a link and its target cannot be reached, it
-    is returned, so the photos behind it count as not checked, as on a root that is not
-    reachable. A part that cannot be looked at (an error other than "not found") is returned
-    too. None if the nearest existing part is a folder or a link whose target is there.
-    """
-    path = folder
-    while True:
-        try:
-            info = os.lstat(path)
-        except (FileNotFoundError, NotADirectoryError):
-            parent = os.path.dirname(path)
-            if parent == path:
-                return None
-            path = parent
-            continue
-        except (OSError, ValueError):
-            return path
-        return path if _is_link(info) and not os.path.exists(path) else None
-
-
-def _fstab_mount_points():
-    """The mount points listed in _FSTAB (normalized paths; none if it cannot be read)."""
-    try:
-        with open(_FSTAB, encoding='utf-8', errors='replace') as file:
-            lines = file.read().splitlines()
-    except OSError:
-        return set()
-    points = set()
-    for line in lines:
-        fields = line.split()
-        if len(fields) >= 2 and not fields[0].startswith('#'):
-            # fstab writes a space in a path as \040
-            points.add(os.path.normcase(os.path.normpath(fields[1].replace('\\040', ' '))))
-    return points
-
-
-def _holds_mount_points(path):
-    """Whether path is one of _MOUNT_ROOTS or a folder right inside one (such as /media/<user>)."""
-    path = os.path.normcase(os.path.normpath(path))
-    roots = {os.path.normcase(os.path.normpath(root)) for root in _MOUNT_ROOTS}
-    return path in roots or os.path.dirname(path) in roots
-
-
-def _mounted(path):
-    """Whether path is a mount point with a drive or share mounted on it now (False if that cannot be told)."""
-    try:
-        return os.path.ismount(path)
+        with os.scandir(folder) as entries:
+            return next(entries, None) is not None
     except (OSError, ValueError):
         return False
-
-
-def _unmounted(folder):
-    """The mount point above the photos of folder whose drive or share is not mounted now, as (kind, path), or None (E54).
-
-    On Linux and macOS (_EMPTY_MOUNT_POINTS) an unmounted drive or share leaves its mount
-    point as an empty folder, or takes it away (the ones udisks makes in /media/<user> or
-    /run/media/<user>, and macOS in /Volumes), so the photos behind it look gone. Returned:
-    - ('vanished', the first part of folder that is missing) if it is a mount point of the
-      fstab, or if the part above it is one of _MOUNT_ROOTS or a folder right inside one
-      (such as /media/<user>) with no drive mounted on it, also when other drives are
-      mounted next to it (review); a folder deleted on a drive mounted there is gone;
-    - else ('unmounted', the nearest part of folder that exists: folder itself or a parent
-      folder) if it is an empty folder inside one of the folders drives and shares are
-      usually mounted in (_MOUNT_ROOTS) or a mount point of the fstab.
-    Its photos count as not checked. A folder emptied or deleted by hand elsewhere is no
-    mount point; its photos are gone as before.
-    """
-    if not _EMPTY_MOUNT_POINTS:
-        return None
-    path, below = folder, None
-    while _missing(path):
-        parent = os.path.dirname(path)
-        if parent == path:
-            return None
-        path, below = parent, path
-    fstab = _fstab_mount_points()
-    if below is not None and (os.path.normcase(os.path.normpath(below)) in fstab
-                              or (_holds_mount_points(path) and not _mounted(path))):
-        return 'vanished', below
-    try:
-        if os.listdir(path):
-            return None
-    except (OSError, ValueError):
-        return None
-    if any(_inside(path, root) for root in _MOUNT_ROOTS) or os.path.normcase(os.path.normpath(path)) in fstab:
-        return 'unmounted', path
-    return None
-
-
-def _look_at(folder, members):
-    """Return (gone, why not checked) of one folder of the pass.
-
-    gone: _gone_in. If any member looks gone, the photos may only be offline: ('link',
-    _dead_link) or _unmounted's ('unmounted' or 'vanished', mount point), else None.
-    """
-    gone = _gone_in(folder, members)
-    if not gone:
-        return gone, None
-    link = _dead_link(folder)
-    if link is not None:
-        return gone, ('link', link)
-    return gone, _unmounted(folder)
-
-
-def _link_above(folder):
-    """The first junction, mount point or symbolic link on the way from the root of folder down to folder (review).
-
-    The share or volume behind it is what a folder that hangs waits for, so the other folders
-    behind it can be given up together. Only the parts up to that link are looked at (lstat,
-    which does not follow it), all on the root's own volume; a part on another file system
-    than its parent (a POSIX mount point) counts as such a link too. The root of folder if
-    there is none or a part cannot be looked at.
-    """
-    root = _root_of(folder)
-    try:
-        device = os.lstat(root).st_dev
-        path = root
-        for part in os.path.normpath(folder)[len(root):].split(os.sep):
-            if not part:
-                continue
-            path = os.path.join(path, part)
-            info = os.lstat(path)
-            if _is_link(info) or info.st_dev != device:
-                return path
-    except (OSError, ValueError):
-        pass
-    return root
-
-
-def _within(timeout, function, *args):
-    """function(*args) in a daemon thread: its result, or None if it has not returned within timeout seconds."""
-    answer = []
-    thread = threading.Thread(target=lambda: answer.append(function(*args)), daemon=True, name='FrameScout link check')
-    thread.start()
-    thread.join(timeout)
-    return answer[0] if answer else None
-
-
-def _inside(path, folder):
-    """Whether path is folder or lies below it (by name only, nothing is looked at)."""
-    path, folder = os.path.normcase(path), os.path.normcase(folder)
-    return path == folder or path.startswith(folder.rstrip(os.sep) + os.sep)
-
-
-# the folders whose look still hangs in an abandoned _FolderWorker: a later pass gives such a
-# folder up at once instead of starting another thread blocked on it, so the threads of a
-# share that hangs do not pile up over the scans (review; like _PROBES for the roots)
-_HANGING = {}
-_HANGING_LOCK = threading.Lock()
-_STILL_HANGING = object()
-
-
-def _still_hanging(folder):
-    with _HANGING_LOCK:
-        thread = _HANGING.get(folder)
-        if thread is not None and not thread.is_alive():
-            del _HANGING[folder]
-            thread = None
-    return thread is not None
-
-
-def _hangs(folder, thread):
-    with _HANGING_LOCK:
-        _HANGING[folder] = thread
-
-
-class _FolderWorker:
-    """Looks at folders one after another in a daemon thread (_look_at), so a hanging one can be waited for with a timeout (E37).
-
-    results gets (answer, error) per folder in order. Once cancelled, it stops before the next
-    folder; a folder that hangs ends on its own later, like a root probe. A folder an earlier
-    worker still hangs on (_still_hanging) is not looked at again: the answer _STILL_HANGING
-    is put instead, and the worker stops.
-    """
-
-    def __init__(self, folders):
-        self.results = queue.Queue()
-        self.cancelled = False
-        self.thread = threading.Thread(target=self._run, args=(folders,), daemon=True, name='FrameScout folder check')
-        self.thread.start()
-
-    def _run(self, folders):
-        for folder, members in folders:
-            if self.cancelled:
-                return
-            if _still_hanging(folder):
-                self.results.put((_STILL_HANGING, None))
-                return
-            try:
-                self.results.put((_look_at(folder, members), None))
-            except Exception as exc:  # passed on to the scan, as before the worker
-                self.results.put((None, exc))
 
 
 def _by_folder(paths):
@@ -520,171 +268,53 @@ class _PathCheck:
     """Tells which photo paths certainly no longer exist ("unbound", E8/A21); one per scan or deletion step.
 
     Each path is checked once (the answer is kept, so the cache rows and the marks of a scan
-    share one pass), each drive or share root is probed once (_reachable_roots): the paths
-    under a root that is not reachable now are not checked, as their photos may only be
-    offline. Paths are grouped by folder (_gone_in): a folder with at most _STAT_UP_TO paths
-    gets one stat per path, a fuller one is listed once (one directory listing instead of a
-    stat per photo, measured about 70 times faster on a network share), and of the names the
-    listing does not hold only a few are confirmed by a stat. A folder that does not exist
-    makes all its paths gone; one that cannot be listed (e.g. no permission) keeps them. A path that is not
-    absolute is never gone. After the pass, the gone paths are checked once more and then
-    their roots are probed again, so a share that dropped during the pass (and is back, or
-    still offline) does not make its photos look deleted.
-
-    The pass itself is guarded too (E37, _pass): a folder that does not answer within
-    folder_timeout seconds (FOLDER_TIMEOUT if None) is not checked, and the photos behind a
-    junction, mount point or link that leads nowhere now (_dead_link) or behind an empty or
-    missing mount point on Linux/macOS (_unmounted, E54) are not checked either.
+    share one pass). Simple rule (I44): a path is checked only if it is absolute, its drive
+    or share root answers the probe (_reachable_roots, once per root) and its folder exists
+    and is not empty (_filled); then one stat tells whether it is gone (_missing). Every
+    other path is not checked, as its photo may only be offline: a disconnected drive or an
+    offline share does not answer, and an unmounted one leaves its folder missing or, on
+    Linux/macOS, an empty mount point. A renamed or deleted folder looks the same, so its
+    photos are not offered either (known limit). A relative path is never gone.
     """
 
-    def __init__(self, root_timeout=ROOT_TIMEOUT, folder_timeout=None):
+    def __init__(self, root_timeout=ROOT_TIMEOUT):
         self._timeout = root_timeout
-        self._folder_timeout = FOLDER_TIMEOUT if folder_timeout is None else folder_timeout
         self._gone = set()
         self._checked = set()  # paths with an answer: gone, there or never gone
-        # path -> what it waits for, (kind, path) as _unchecked_notes words it: ('root', its
-        # root that was not reachable), ('folder', a folder that did not answer), ('link', a
-        # link that leads nowhere or does not answer) (E37, review), ('unmounted', an empty
-        # mount point) or ('vanished', a missing one) (E54)
-        self._unreachable = {}
-
-    def _not_checked(self, paths, reason):
-        self._unreachable.update(dict.fromkeys(paths, reason))
-
-    def _pass(self, folders, progress=None):
-        """Return the paths of folders ({folder: members}) that are gone; progress(done, total) per folder.
-
-        The folders of each root are looked at one after another in a _FolderWorker (E37). A
-        folder that has not answered within the folder timeout (or that an earlier pass still
-        hangs on) is not checked; then the first junction, mount point or link above it
-        (_link_above, review), else its root, is probed again, and if that does not answer
-        either, the other folders behind it are not checked either (no timeout per folder of
-        a dead share). Paths not checked, also those behind a link that leads nowhere or an
-        empty or missing mount point (_look_at), go to _unreachable with what they wait for:
-        ('root', root), ('folder', folder) for a folder that did not answer, ('link', link),
-        ('unmounted' or 'vanished', mount point).
-        """
-        gone, done, total = set(), 0, len(folders)
-        step = max(1, total // 100)
-
-        def tick(count):
-            nonlocal done
-            before, done = done, done + count
-            if progress and count and (before // step != done // step or done == total):
-                progress(done, total)
-
-        by_root = {}
-        for folder, members in sorted(folders.items()):
-            by_root.setdefault(_root_of(folder), []).append((folder, members))
-        for root, items in by_root.items():
-            while items:
-                worker, answered = _FolderWorker(items), 0
-                for folder, members in items:
-                    try:
-                        answer, error = worker.results.get(timeout=self._folder_timeout)
-                    except queue.Empty:
-                        worker.cancelled = True
-                        _hangs(folder, worker.thread)
-                        break
-                    if answer is _STILL_HANGING:
-                        break
-                    if error is not None:
-                        worker.cancelled = True
-                        raise error
-                    found, reason = answer
-                    if reason is None:
-                        gone |= found
-                    else:
-                        self._not_checked(found, reason)
-                    answered += 1
-                    tick(1)
-                else:
-                    break
-                hung, rest = items[answered], items[answered + 1:]
-                self._not_checked(hung[1], ('folder', hung[0]))
-                tick(1)
-                if rest:
-                    # the share or volume the folder is on: behind a link, or the root itself
-                    above = _within(self._timeout, _link_above, hung[0]) or root
-                    if not _reachable_roots([above], self._timeout)[above]:
-                        given_up = [item for item in rest if _inside(item[0], above)]
-                        for _, members in given_up:
-                            self._not_checked(members, ('root', root) if above == root else ('link', above))
-                        tick(len(given_up))
-                        rest = [item for item in rest if not _inside(item[0], above)]
-                items = rest
-        return gone
+        self._unchecked = set()
 
     def check(self, paths, progress=None):
         """Check the paths not checked yet; progress(done, total) is called per folder."""
-        todo = {p for p in paths if p not in self._checked and p not in self._unreachable}
+        todo = {p for p in paths if p not in self._checked and p not in self._unchecked}
         absolute = {p for p in todo if os.path.isabs(p)}
         self._checked |= todo - absolute
-        roots = {}
-        for path in absolute:
-            roots.setdefault(_root_of(path), []).append(path)
-        reachable = _reachable_roots(sorted(roots), self._timeout) if roots else {}
-        checked = []
-        for root, members in roots.items():
-            if reachable[root]:
-                checked += members
+        reachable = _reachable_roots(sorted({_root_of(p) for p in absolute}), self._timeout)
+        folders = sorted(_by_folder(absolute).items())
+        step = max(1, len(folders) // 100)
+        for done, (folder, members) in enumerate(folders, 1):
+            if reachable[_root_of(folder)] and _filled(folder):
+                self._gone |= {p for p in members if _missing(p)}
+                self._checked |= set(members)
             else:
-                self._not_checked(members, ('root', root))
-        gone = self._pass(_by_folder(checked), progress)
-        # a share that went offline during the pass makes its folders look missing: the gone
-        # paths are looked at once more (a share back by now shows them again, review), then
-        # their roots are probed again (a share still offline is not checked)
-        gone = self._pass(_by_folder(gone))
-        suspects = {_root_of(p) for p in gone}
-        lost = {root for root, up in _reachable_roots(sorted(suspects), self._timeout).items() if not up}
-        for path in [p for p in gone if _root_of(p) in lost]:
-            gone.discard(path)
-            self._unreachable[path] = ('root', _root_of(path))
-        self._gone |= gone
-        self._checked |= {p for p in absolute if p not in self._unreachable}
+                self._unchecked |= set(members)
+            if progress and (done % step == 0 or done == len(folders)):
+                progress(done, len(folders))
 
     def result(self, paths):
-        """Return (the paths of paths that are gone, {(kind, path): number of paths not checked}); checks them first.
-
-        The keys are what the paths not checked wait for (see _unreachable).
-        """
+        """Return (the paths of paths that are gone, the number of paths not checked); checks them first."""
         paths = set(paths)
         self.check(paths)
-        unchecked = {}
-        for path in paths:
-            if path in self._unreachable:
-                reason = self._unreachable[path]
-                unchecked[reason] = unchecked.get(reason, 0) + 1
-        return paths & self._gone, unchecked
+        return paths & self._gone, len(paths & self._unchecked)
 
 
-def _unchecked_notes(unchecked):
-    """The notes of the photos not checked ({(kind, path): number of photos}, _PathCheck.result), by path.
-
-    Worded by what they wait for (review): a root that is not reachable, a folder that did not
-    answer within FOLDER_TIMEOUT, a junction, mount point or link that cannot be reached, or
-    an empty or missing mount point (E54).
-    """
-    notes = []
-    for (kind, path), count in sorted(unchecked.items(), key=lambda item: (item[0][1], item[0][0])):
-        photos = f'{count_text(count, "photo", "photos")} {"was" if count == 1 else "were"} not checked'
-        if kind == 'folder':
-            notes.append(f'{path} did not answer within {FOLDER_TIMEOUT:g} seconds (e.g. a busy drive or a slow network '
-                         f'share), so {photos} there. The next scan tries again.')
-        elif kind == 'link':
-            notes.append(f'{path} cannot be reached now (a junction, mount point or link to e.g. a disconnected drive '
-                         f'or an offline network share), so {photos} behind it.')
-        elif kind == 'unmounted':
-            notes.append(f'{path} is empty: a drive or network share mounted there is probably not mounted now, so '
-                         f'{photos} behind it. Mount it and scan again; if the photos are gone for good, delete the '
-                         'empty folder first.')
-        elif kind == 'vanished':
-            notes.append(f'{path} does not exist: a drive or network share mounted there is probably not mounted now '
-                         f'(its mount point goes away with it), so {photos} behind it. Mount it and scan again.')
-        else:
-            notes.append(f'{path} is not reachable now (e.g. a disconnected drive or an offline network share), so '
-                         f'{photos} there.')
-    return notes
+def _unchecked_notes(count):
+    """The note on the photos not checked (count, _PathCheck.result): one line, or none."""
+    if not count:
+        return []
+    return [f'{count_text(count, "photo", "photos")} {"was" if count == 1 else "were"} not checked: the drive or '
+            'network share cannot be reached now, or the folder is missing or empty or cannot be listed (e.g. a '
+            'disconnected drive or an unmounted share; a renamed or deleted folder looks the same). Connect it and '
+            'scan again.']
 
 
 def _read_only_uri(path):
@@ -883,9 +513,9 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
     cache_missing; the signatures for cache_old/cache_other/cache_models; (profile, photo
     path) pairs for marks_unbound), size (bytes), default, problem (why it is not offered,
     else None) and names (to show); the cache categories have rows; cache_missing and
-    marks_unbound have notes (the drive or share roots that were not reachable and how many
-    photos there were not checked); galleries has thumbnails/thumbnails_size: the
-    thumbnails only the orphaned galleries link, deleted together with them.
+    marks_unbound have notes (how many photos were not checked, _PathCheck); galleries has
+    thumbnails/thumbnails_size: the thumbnails only the orphaned galleries link, deleted
+    together with them.
     """
     results, refs_root = Path(results), Path(refs_root)
     temps = _temp_thumbnails(results)
@@ -1124,8 +754,8 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     """Delete the selected categories of the scan shown (scan_cleanup) permanently; return a summary (E7).
 
     current_model: the search model key of the current settings, as for scan_cleanup (E22).
-    Unbound cache rows and marks are deleted only if their photo is still gone now and its
-    drive or share is reachable (E8/A21); of marks.json only those entries are removed.
+    Unbound cache rows and marks are deleted only if their photo is still gone now and still
+    checked (_PathCheck, E8/A21); of marks.json only those entries are removed.
 
     Holds the run lock of results, so it is refused while a search runs (also one being
     started: alive(pid, status) tells whether the process of a "starting" status runs) and
