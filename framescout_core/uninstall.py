@@ -3,21 +3,19 @@
 It deletes what the installer and FrameScout create again on their own (the Python
 environment, downloaded model weights, temporary and compiled files) and never the
 user's data: photos, reference images, results, profiles and settings stay, and so does
-everything outside the project folder (it is only listed). The private Python of the
+everything outside the project folder. The private Python of the
 installer (P5 part C) is deleted too; when it runs the uninstall, Uninstall-FrameScout.bat
 deletes it after the script has ended (I20).
 """
 import errno
 import os
 import shutil
-import stat
 from dataclasses import dataclass
 from pathlib import Path
 
 from .app_instance import AppInstance
 from .copying import COPY_FOLDERS_KEY, _inside
 from .locks import lock_held
-from .paths import WINDOWS
 from .portable_python import PRIVATE_PYTHON
 from .run_status import RUN_LOCK
 from .settings import (LEGACY_PHOTO_FOLDER, SETTINGS_FILE, _read_settings_file, _setting_value, _with_folder_list,
@@ -58,22 +56,12 @@ USER_DATA = (
 # looks complete, and the installer creates a new one
 UNINSTALL_FIRST = {'.venv': ('Scripts/python.exe', 'Scripts/pythonw.exe', 'bin/python'),
                    PRIVATE_PYTHON: ('python.exe', 'pythonw.exe', 'bin/python3')}
-# programs of the environment that run while the app or a search runs: Windows does not let
-# anyone open them for writing then, which tells that FrameScout still runs. On Linux the
-# environment's Python is a link to the private Python, which runs the uninstall itself:
-# there the app's start lock tells it (app_running, F47)
-ENVIRONMENT_PROGRAMS = ('.venv/Scripts/python.exe', '.venv/Scripts/pythonw.exe')
 # exit code of framescout_uninstall.py when it deleted everything but the private Python it
 # runs with: Uninstall-FrameScout.bat deletes that one after the script has ended (I20).
 # 0 and 1 are the script's other results, 2 is argparse's usage error.
 PRIVATE_PYTHON_EXIT_CODE = 3
 # Windows error of removing a folder that is not empty
 _ERROR_DIR_NOT_EMPTY = 145
-# Windows: the access right to write a file's data, all sharing modes, and the error of opening
-# a file that a running program (or another handle without write sharing) holds
-_FILE_WRITE_DATA = 0x2
-_FILE_SHARE_ALL = 0x7
-_ERROR_SHARING_VIOLATION = 32
 
 
 @dataclass(frozen=True)
@@ -239,33 +227,6 @@ def user_data(root):
     return [(root / relative, label) for relative, label in USER_DATA if os.path.lexists(root / relative)]
 
 
-def outside_leftovers(root, environ, home, windows=WINDOWS):
-    """Return (path, what it is, size) of folders outside root that model downloads and
-    Ultralytics may have filled when FrameScout ran without its scripts (I10).
-
-    They are shared with other programs, so the uninstall only lists them. environ is the
-    environment the uninstall runs in (the scripts do not set these variables for it);
-    windows: Ultralytics' settings folder of Windows, otherwise that of Linux (F47).
-    """
-    root, home = Path(root), Path(home)
-    cache = Path(environ['XDG_CACHE_HOME']) if environ.get('XDG_CACHE_HOME') else home / '.cache'
-    if windows:
-        config = Path(environ['APPDATA']) if environ.get('APPDATA') else home / 'AppData' / 'Roaming'
-    else:
-        config = Path(environ['XDG_CONFIG_HOME']) if environ.get('XDG_CONFIG_HOME') else home / '.config'
-    candidates = (
-        (environ.get('TORCH_HOME') or cache / 'torch', 'PyTorch cache (model weights)'),
-        (environ.get('HF_HOME') or cache / 'huggingface', 'Hugging Face cache (CLIP model weights)'),
-        (environ.get('YOLO_CONFIG_DIR') or config / 'Ultralytics', 'Ultralytics settings'),
-    )
-    found = []
-    for path, label in candidates:
-        path = Path(path)
-        if path.is_dir() and not _inside(path, root):
-            found.append((path, label, _tree_size(path)))
-    return found
-
-
 def search_running(root):
     """Return True if a search holds the run lock of the app's results folder."""
     return lock_held(Path(root) / 'results' / RUN_LOCK)
@@ -276,74 +237,6 @@ def app_running(root):
     return AppInstance(root).running()
 
 
-def _held_open(path):
-    """Return True if path cannot be opened for writing because a process runs it or holds it
-    open without sharing it; opened without writing anything."""
-    if os.name != 'nt':
-        try:
-            with open(path, 'r+b'):
-                pass
-        except OSError as exc:
-            return exc.errno == errno.ETXTBSY
-        return False
-    import _winapi
-    try:
-        handle = _winapi.CreateFile(str(path), _FILE_WRITE_DATA, _FILE_SHARE_ALL, 0, _winapi.OPEN_EXISTING, 0, 0)
-    except OSError as exc:
-        # only a sharing violation tells that it runs: a read-only file or missing rights give
-        # "access denied", which open() reports alike (review)
-        return getattr(exc, 'winerror', None) == _ERROR_SHARING_VIOLATION
-    _winapi.CloseHandle(handle)
-    return False
-
-
-def programs_in_use(root, clear_read_only=False):
-    """Return the ENVIRONMENT_PROGRAMS below root that a running process holds open.
-
-    A read-only program cannot be checked (Windows refuses to open it for writing before it
-    looks whether it runs), so it does not count as running; with clear_read_only, its
-    read-only attribute is cleared first. The uninstall does that only after the
-    confirmation, since the file is deleted then anyway.
-    """
-    busy = []
-    for relative in ENVIRONMENT_PROGRAMS:
-        path = Path(root) / relative
-        if not path.is_file() or _is_link(path):
-            continue
-        if clear_read_only and _read_only(path):
-            try:
-                os.chmod(path, os.lstat(path).st_mode | stat.S_IWRITE)
-            except OSError:
-                pass
-        if _held_open(path):
-            busy.append(path)
-    return busy
-
-
-def _read_only(path):
-    try:
-        return not os.lstat(path).st_mode & stat.S_IWRITE
-    except OSError:
-        return False
-
-
-def _retry_writable(function, path, exc):
-    """Run function(path) again after clearing the read-only attribute if exc came from that
-    attribute; return the error that remains (None if it worked or path is gone)."""
-    if isinstance(exc, FileNotFoundError):
-        return None
-    if not isinstance(exc, PermissionError) or not _read_only(path):
-        return exc  # e.g. a file in use: a second try fails the same way (review)
-    try:
-        os.chmod(path, stat.S_IWRITE)
-        function(path)
-    except FileNotFoundError:
-        return None
-    except OSError as again:
-        return again
-    return None
-
-
 def _not_empty(exc):
     return exc.errno == errno.ENOTEMPTY or getattr(exc, 'winerror', None) == _ERROR_DIR_NOT_EMPTY
 
@@ -351,21 +244,17 @@ def _not_empty(exc):
 def _remove_file(path, failures):
     try:
         os.remove(path)
-    except OSError as exc:
-        error = _retry_writable(os.remove, path, exc)
-        if error is not None:
-            failures.append((Path(path), error))
+    except FileNotFoundError:
+        pass
+    except OSError as exc:  # e.g. in use or read-only: reported, not retried (I44)
+        failures.append((Path(path), exc))
 
 
 def _remove_tree(path, failures):
     start = len(failures)
 
     def handle(function, name, exc):
-        if function in (os.unlink, os.remove, os.rmdir):
-            exc = _retry_writable(function, name, exc)
-        elif isinstance(exc, FileNotFoundError):
-            exc = None
-        if exc is None:
+        if isinstance(exc, FileNotFoundError):
             return
         if function is os.rmdir and _not_empty(exc) and any(
                 Path(name) in failed.parents for failed, _ in failures[start:]):

@@ -14,9 +14,8 @@ import pytest
 import framescout_uninstall
 from framescout_core.locks import RunLock
 from framescout_core.portable_python import PRIVATE_PYTHON
-from framescout_core.uninstall import (ENVIRONMENT_PROGRAMS, PRIVATE_PYTHON_EXIT_CODE, outside_leftovers,
-                                       programs_in_use, protected_folders, remove_items, running_python, search_running,
-                                       uninstall_plan, user_data)
+from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, protected_folders, remove_items, running_python,
+                                       search_running, uninstall_plan, user_data)
 from framescout_core import uninstall as uninstall_module
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -270,13 +269,16 @@ def test_an_emptied_tmp_folder_is_removed(project):
     assert not (project / '.tmp').exists()
 
 
-def test_read_only_files_are_removed(project):
+@windows_only
+def test_a_read_only_file_is_reported_and_the_rest_is_removed(project):
+    # I44: no retry after clearing the attribute; the failure list names it
     path = project / '.cache' / 'huggingface' / 'model.bin'
     os.chmod(path, stat.S_IREAD)
-    single = project / 'yolo11n.pt'
-    os.chmod(single, stat.S_IREAD)
-    assert remove_items(plan(project)[0]) == []
-    assert not path.exists() and not single.exists()
+    try:
+        failures = remove_items([item for item in plan(project)[0] if item.path.name == '.cache'])
+        assert [failed for failed, _ in failures] == [path]
+    finally:
+        os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
 
 
 def test_the_environment_python_goes_first(project, monkeypatch):
@@ -322,7 +324,6 @@ def test_failures_are_reported_and_the_rest_is_removed(project, monkeypatch):
             raise OSError('locked')
         return original(path, *args, **kwargs)
     monkeypatch.setattr(uninstall_module.os, 'remove', remove)
-    monkeypatch.setattr(uninstall_module.os, 'chmod', lambda *args: None)
     failures = remove_items(plan(project)[0])
     assert [path.name for path, _ in failures] == ['yolo11n.pt']
     assert not (project / '.cache').exists()
@@ -342,15 +343,7 @@ def test_a_locked_file_is_reported_once_without_its_folders(project, monkeypatch
     items = [item for item in plan(project)[0] if item.path.name == '.cache']
     failures = remove_items(items)
     assert [path.name for path, _ in failures] == ['model.bin']
-    assert len(calls) == 1  # not read-only: no second try
-
-
-@windows_only
-def test_a_read_only_folder_is_removed(project):
-    folder = project / '.cache' / 'huggingface'
-    os.chmod(folder, stat.S_IREAD)
-    assert remove_items([item for item in plan(project)[0] if item.path.name == '.cache']) == []
-    assert not (project / '.cache').exists()
+    assert len(calls) == 1  # no second try
 
 
 @windows_only
@@ -422,87 +415,13 @@ def test_a_running_search_is_detected(project):
     assert not search_running(project)
 
 
-@windows_only
-def test_a_running_environment_python_is_detected(project):
-    import _winapi
-    exe = project / ENVIRONMENT_PROGRAMS[0]
-    assert programs_in_use(project) == []
-    # a running program is open without write sharing; this handle does the same
-    handle = _winapi.CreateFile(str(exe), _winapi.GENERIC_READ, 0, 0, _winapi.OPEN_EXISTING, 0, 0)
-    try:
-        assert programs_in_use(project) == [exe]
-    finally:
-        _winapi.CloseHandle(handle)
-
-
-@windows_only
-def test_a_read_only_environment_python_is_not_taken_for_a_running_one(project):
-    # opening a read-only file for writing fails too, but it does not tell that it runs (review)
-    exe = project / ENVIRONMENT_PROGRAMS[0]
-    os.chmod(exe, stat.S_IREAD)
-    try:
-        assert programs_in_use(project) == []
-    finally:
-        os.chmod(exe, stat.S_IWRITE | stat.S_IREAD)
-
-
-@windows_only
-def test_a_running_read_only_environment_python_is_detected_after_clearing_the_attribute(project):
-    import _winapi
-    exe = project / ENVIRONMENT_PROGRAMS[0]
-    os.chmod(exe, stat.S_IREAD)
-    handle = _winapi.CreateFile(str(exe), _winapi.GENERIC_READ, 0, 0, _winapi.OPEN_EXISTING, 0, 0)
-    try:
-        assert programs_in_use(project) == []  # read-only: cannot tell
-        assert programs_in_use(project, clear_read_only=True) == [exe]
-    finally:
-        _winapi.CloseHandle(handle)
-    assert os.stat(exe).st_mode & stat.S_IWRITE
-
-
-def test_the_check_after_the_confirmation_clears_the_read_only_attribute(project, tmp_path, monkeypatch):
-    calls = []
-    monkeypatch.setattr(framescout_uninstall, 'programs_in_use',
-                        lambda root, clear_read_only=False: calls.append(clear_read_only) or [])
-    code, _, _ = run(project, tmp_path, 'yes')
-    assert code == 0 and calls == [False, True]
-
-
-# --- user_data and outside_leftovers: listed only ---
+# --- user_data: listed only ---
 
 def test_user_data_lists_what_exists_without_walking_it(project, monkeypatch):
     # photos/ and results/ may hold many thousands of files, never deleted: no sizes (review)
     monkeypatch.setattr(uninstall_module, '_tree_size', lambda *args: pytest.fail('walked the user data'))
     rows = [path.relative_to(project).as_posix() for path, _ in user_data(project)]
     assert rows == ['photos', 'references', 'results', 'profiles.json', 'settings.json', 'run.log', '.tmp/eval']
-
-
-def test_caches_in_the_user_profile_are_listed(project, tmp_path):
-    home = tmp_path / 'home'
-    write(home / '.cache' / 'huggingface' / 'hub' / 'model.bin', b'h' * 7)
-    write(home / 'AppData' / 'Roaming' / 'Ultralytics' / 'settings.json')
-    found = outside_leftovers(project, {}, home, windows=True)
-    assert [(path, size) for path, _, size in found] == [(home / '.cache' / 'huggingface', 7),
-                                                       (home / 'AppData' / 'Roaming' / 'Ultralytics', 1)]
-
-
-def test_the_ultralytics_settings_on_linux_are_listed(project, tmp_path):
-    # F47: Ultralytics keeps its settings in ~/.config/Ultralytics on Linux (XDG_CONFIG_HOME)
-    home = tmp_path / 'home'
-    write(home / '.config' / 'Ultralytics' / 'settings.json')
-    write(home / 'AppData' / 'Roaming' / 'Ultralytics' / 'settings.json')
-    assert [path for path, _, _ in outside_leftovers(project, {}, home, windows=False)] == [
-        home / '.config' / 'Ultralytics']
-    config = write(tmp_path / 'config' / 'Ultralytics' / 'settings.json').parent.parent
-    found = outside_leftovers(project, {'XDG_CONFIG_HOME': str(config)}, home, windows=False)
-    assert [path for path, _, _ in found] == [config / 'Ultralytics']
-
-
-def test_cache_variables_are_followed_but_not_into_the_project(project, tmp_path):
-    torch_home = write(tmp_path / 'torch-cache' / 'hub' / 'w.pt').parent.parent
-    environ = {'TORCH_HOME': str(torch_home), 'HF_HOME': str(project / '.cache' / 'huggingface'),
-               'APPDATA': str(tmp_path / 'nothing')}
-    assert [path for path, _, _ in outside_leftovers(project, environ, tmp_path / 'home')] == [torch_home]
 
 
 # --- main: the dialog ---
@@ -517,7 +436,7 @@ def run(project, tmp_path, answer=None, argv=(), interpreter=None):
             raise EOFError
         return answer
     interpreter = tmp_path / 'Python314' / 'python.exe' if interpreter is None else interpreter
-    code = framescout_uninstall.main(list(argv), root=project, environ={}, home=tmp_path / 'home', ask=ask,
+    code = framescout_uninstall.main(list(argv), root=project, ask=ask,
                                      out=lines.append, interpreter=interpreter)
     return code, '\n'.join(lines), questions
 

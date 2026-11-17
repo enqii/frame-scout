@@ -10,8 +10,7 @@ downloaded model weights and
 the pip cache (.cache), temporary files (.tmp, except the evaluation tool's .tmp/eval),
 the person detection model and compiled Python files. Never deleted: your photos, reference
 images, results (galleries, cache, marks), profiles, settings and run.log, and nothing
-outside this folder; caches that model downloads may have left in your user profile are
-only listed. Afterwards the folder holds the program files and your data: delete it
+outside this folder. Afterwards the folder holds the program files and your data: delete it
 yourself to remove FrameScout completely.
 
   python framescout_uninstall.py             lists, asks, deletes
@@ -28,9 +27,8 @@ from pathlib import Path
 from framescout_core.app_instance import stale_lock_hint
 from framescout_core.cleanup import size_text
 from framescout_core.paths import script
-from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, app_running, outside_leftovers, programs_in_use,
-                                       protected_folders, remove_items, running_python, search_running, uninstall_plan,
-                                       user_data)
+from framescout_core.uninstall import (PRIVATE_PYTHON_EXIT_CODE, app_running, protected_folders, remove_items,
+                                       running_python, search_running, uninstall_plan, user_data)
 
 ROOT = Path(__file__).resolve().parent
 # failed paths shown; the rest is counted
@@ -55,10 +53,12 @@ def _rows(rows, root, out):
         out(f'  {_name(path, root):<{width}}  {size}{label}')
 
 
-def _blocked(root, out, confirmed=False):
-    """Print why nothing may be deleted now and return True, or return False. confirmed: the
-    user agreed to the deletion, so a read-only environment Python may be made writable to
-    check it."""
+def _blocked(root, out):
+    """Print why nothing may be deleted now and return True, or return False.
+
+    A program that holds a file open without these locks shows up in the failure list of
+    remove_items instead (I44).
+    """
     if search_running(root):
         out('A search is running. Stop it (or wait for its end), close FrameScout and run the uninstall again.')
         return True
@@ -66,23 +66,16 @@ def _blocked(root, out, confirmed=False):
         out(f'FrameScout is still running. Close the window of {script("Start")}, then run the uninstall again. '
             + stale_lock_hint('run the uninstall again'))
         return True
-    busy = programs_in_use(root, clear_read_only=confirmed)
-    if busy:
-        out(f'FrameScout is still running ({busy[0]} is in use). Close the Start-FrameScout window and any '
-            'other program that uses this Python environment, then run the uninstall again. If FrameScout is '
-            'closed, another program (e.g. a virus scanner) has the file open: try again in a moment.')
-        return True
     return False
 
 
-def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=print, interpreter=sys.executable):
+def main(argv=None, root=ROOT, ask=input, out=print, interpreter=sys.executable):
     """Run the dialog; interpreter is the Python that runs the script."""
     parser = argparse.ArgumentParser(description='Delete what the FrameScout installer and FrameScout created '
                                      'again (environment, model weights, temporary files); never your data.')
     parser.add_argument('--dry-run', action='store_true', help='only list what would be deleted and kept')
     args = parser.parse_args(argv)
     root = Path(root)
-    home = Path.home() if home is None else Path(home)
     out(f'FrameScout uninstall: {root}')
     out('')
     if _blocked(root, out):
@@ -116,13 +109,6 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
     if kept:
         _rows([(path, label, None) for path, label in kept], root, out)
     out('  Also kept: the program files of this folder, your photo folders and copy folders anywhere else.')
-    leftovers = outside_leftovers(root, environ, home)
-    if leftovers:
-        out('')
-        out('Outside this folder, not deleted: runs without the FrameScout scripts may have stored model '
-            'weights or settings here. Other programs may use them too; delete them yourself if nothing else '
-            'needs them:')
-        _rows(leftovers, root, out)
     out('')
     if not items:
         out(f'To remove FrameScout completely, back up the data you want to keep and delete the folder {root}.')
@@ -138,7 +124,7 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
     if answer.strip().lower() != CONFIRMATION:
         out('Cancelled: nothing was deleted.')
         return 0
-    if _blocked(root, out, confirmed=True):  # FrameScout may have been started while the question waited
+    if _blocked(root, out):  # FrameScout may have been started while the question waited
         return 1
     now = [item for item in items if item is not last]
     failures = remove_items(now)
@@ -149,7 +135,8 @@ def main(argv=None, root=ROOT, environ=os.environ, home=None, ask=input, out=pri
             out(f'  {path}: {exc}')
         if len(failures) > MAX_FAILURES_SHOWN:
             out(f'  … and {len(failures) - MAX_FAILURES_SHOWN} more')
-        out('Close FrameScout and other programs that use these files, then run the uninstall again.')
+        out('Close FrameScout and other programs that use these files (a read-only file: clear its read-only '
+            'attribute), then run the uninstall again.')
         return 1
     out(f'Done: {size_text(sum(item.size for item in now))} deleted.')
     if last:
