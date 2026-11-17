@@ -23,14 +23,15 @@ CLEANUP_LABELS = {
     'cache_missing': ('Cache entries of unbound photos',
                       'Analyses of photos that no longer exist at their path: deleted, renamed or moved, in any '
                       'folder searched so far (a renamed or moved photo is analyzed again as a new photo). Photos '
-                      'on a drive or network share that is not reachable now are not checked. Check the folders '
+                      'on a drive or network share that is not reachable now and photos of a folder that is missing '
+                      'or empty (also a renamed or deleted one) are not checked. Check the folders '
                       'listed below: if a drive letter now belongs to another disk, the photos of the earlier disk '
                       'look unbound too.'),
     'marks_unbound': ('Marks of unbound photos',
                       'Your match/no-match marks of photos that no longer exist at their path (deleted, renamed or '
                       'moved). They are kept in case the photos come back. Deleting removes only these marks from '
                       'marks.json, never the file or other marks. Photos on a drive or network share that is not '
-                      'reachable now are not checked.'),
+                      'reachable now and photos of a folder that is missing or empty are not checked.'),
     'marks_profiles': ('Marks of deleted profiles',
                        'Your match/no-match marks saved under a name that is none of your search profiles now, e.g. '
                        'of a profile deleted before FrameScout deleted the marks together with their profile. A new '
