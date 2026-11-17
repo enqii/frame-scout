@@ -233,7 +233,8 @@ def show_profiles(profiles, profiles_version, profiles_shown, active):
     if st.session_state.get('delete_pending') not in [(p['name'], saves) for p in profiles]:
         st.session_state.pop('delete_pending', None)
     for index, p in enumerate(profiles):
-        with st.expander(f"{p['name']}  ·  {p.get('franchise','')}"):
+        # the separator only between the name and a context
+        with st.expander(p['name'] + (f"  ·  {p['franchise']}" if p.get('franchise') else '')):
             with st.form(f'edit_{index}_{saves}'):
                 edit_name = st.text_input(LABEL_NAME, value=p['name'])
                 franchise = st.text_input(LABEL_CONTEXT, value=p.get('franchise', ''))
