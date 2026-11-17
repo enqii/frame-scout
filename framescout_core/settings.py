@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from ._common import _json_object, _read_json_object, _update_locked
+from .exporting import DEFAULT_EXPORT_SEPARATOR, EXPORT_SEPARATORS
 from .models import DEFAULT_MODEL, MODELS
 
 
@@ -49,7 +50,9 @@ def default_settings(base):
             'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30,
             'reference_weight': DEFAULT_REFERENCE_WEIGHT, 'model': DEFAULT_MODEL,
             # "Keep the PC responsive": the engine's --low-priority
-            'low_priority': False}
+            'low_priority': False,
+            # the column separator of the result list export, a key of EXPORT_SEPARATORS
+            'export_separator': DEFAULT_EXPORT_SEPARATOR}
 
 
 def folder_lines(text):
@@ -65,6 +68,8 @@ def _setting_value(key, value):
         return [x.strip() for x in value if x.strip()]
     if key == 'device':
         return value if isinstance(value, str) and value in DEVICES else None
+    if key == 'export_separator':
+        return value if isinstance(value, str) and value in EXPORT_SEPARATORS else None
     if key == 'model':  # a registry key, never a free-text OpenCLIP name
         return value if isinstance(value, str) and value in MODELS else None
     if key in _BOOL_SETTINGS:

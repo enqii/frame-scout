@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 import framescout_core.exporting as exporting
-from framescout_core.exporting import (EXPORTS_DIR, EXPORT_COLUMNS, export_cards, export_csv, export_file_list,
-                                       export_name, export_result_list, unlisted_paths)
+from framescout_core.exporting import (EXPORTS_DIR, EXPORT_COLUMNS, EXPORT_SEPARATORS, export_cards, export_csv,
+                                       export_file_list, export_name, export_result_list, unlisted_paths)
 from framescout_core.marks import MARK_MATCH, MARK_NO_MATCH, MARK_OPEN
 from framescout_core.results import result_card
 
@@ -26,8 +26,8 @@ CARDS = [card(1, '/photos/a.jpg', 2.25, 0.3125, 0.8, 'Person 1'), card(2, '/phot
 A, B, C = (c['path'] for c in CARDS)
 
 
-def rows(text):
-    return list(csv.reader(io.StringIO(text, newline='')))
+def rows(text, delimiter=','):
+    return list(csv.reader(io.StringIO(text, newline=''), delimiter=delimiter))
 
 
 # --- selection -------------------------------------------------------------------------
@@ -57,6 +57,21 @@ def test_the_csv_has_a_header_and_one_row_per_photo():
     assert table[3][1] == C  # quoted by the csv module
     assert table[3][-1] == ''  # not marked
     assert len(table) == 4
+
+
+def test_the_separators_are_comma_and_semicolon():
+    assert EXPORT_SEPARATORS == {'comma': ',', 'semicolon': ';'}
+
+
+def test_a_semicolon_csv_keeps_the_cells_and_the_decimal_point():
+    text = export_csv(CARDS, {A: MARK_MATCH}, separator=';')
+    assert text.splitlines()[0] == ';'.join(EXPORT_COLUMNS)
+    assert rows(text, ';') == rows(export_csv(CARDS, {A: MARK_MATCH}))
+
+
+def test_a_path_with_a_semicolon_is_quoted_in_a_semicolon_csv():
+    path = '/photos/a;b.jpg'
+    assert rows(export_csv([card(1, path)], {}, separator=';'), ';')[1][1] == path
 
 
 def test_an_open_mark_is_an_empty_cell():
@@ -123,6 +138,11 @@ def test_non_ascii_paths_survive(tmp_path):
     table, listing = export_result_list(tmp_path, 'x', cards, {}, now=NOW)
     assert rows(table.read_text(encoding='utf-8-sig'))[1][1] == cards[0]['path']
     assert listing.read_text(encoding='utf-8').splitlines() == [cards[0]['path']]
+
+
+def test_the_export_writes_the_chosen_separator(tmp_path):
+    table, _ = export_result_list(tmp_path, 'red-car', CARDS, {}, now=NOW, separator=';')
+    assert table.read_bytes().decode('utf-8-sig') == export_csv(CARDS, {}, separator=';')
 
 
 def test_only_matches_is_in_the_name_and_the_content(tmp_path):

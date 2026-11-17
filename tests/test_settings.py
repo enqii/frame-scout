@@ -31,7 +31,7 @@ def test_the_defaults_are_the_previous_session_defaults(tmp_path):
     assert default_settings(tmp_path) == {
         'photo_folders': [str(tmp_path / 'photos')], 'device': 'auto', 'batch_size': 8, 'top': 150,
         'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30, 'reference_weight': 0.3,
-        'model': DEFAULT_MODEL, 'low_priority': False}
+        'model': DEFAULT_MODEL, 'low_priority': False, 'export_separator': 'comma'}
 
 
 def test_keep_the_pc_responsive_is_an_ai_setting_off_by_default(tmp_path, defaults):
@@ -42,6 +42,16 @@ def test_keep_the_pc_responsive_is_an_ai_setting_off_by_default(tmp_path, defaul
     assert stored(path) == {'low_priority': True}
     assert read_settings(path, defaults) == ({**defaults, 'low_priority': True}, [])
     save_settings(path, {'low_priority': False}, defaults)  # the default is not written
+    assert stored(path) == {}
+
+
+def test_the_export_separator_is_saved_by_name(tmp_path, defaults):
+    # not an AI setting: "Reset to defaults" of the AI settings tab leaves it
+    assert defaults['export_separator'] == 'comma' and 'export_separator' not in AI_SETTINGS
+    path = tmp_path / 'settings.json'
+    assert save_settings(path, {'export_separator': 'semicolon'}, defaults) == {'export_separator': 'semicolon'}
+    assert read_settings(path, defaults) == ({**defaults, 'export_separator': 'semicolon'}, [])
+    save_settings(path, {'export_separator': 'comma'}, defaults)
     assert stored(path) == {}
 
 
@@ -98,6 +108,7 @@ def test_a_byte_order_mark_is_accepted(tmp_path, defaults):
     ('reference_weight', -0.1), ('reference_weight', 1.5), ('reference_weight', float('nan')),
     # a free-text OpenCLIP name or a model no longer offered
     ('model', 'ViT-B-32'), ('model', 'removed-model'), ('model', None), ('model', ['vit-b-16-datacomp']),
+    ('export_separator', ';'), ('export_separator', 'tab'), ('export_separator', None),
 ])
 def test_an_invalid_value_falls_back_to_its_default_and_is_reported(tmp_path, defaults, key, value):
     # the widgets raise for values outside their range, so these must never reach them
@@ -429,8 +440,8 @@ def test_an_unreadable_file_keeps_what_the_widgets_show(defaults):
 
 # --- resetting the AI settings to their defaults ---
 
-def test_the_ai_settings_are_every_setting_but_the_photo_folders(defaults):
-    assert set(AI_SETTINGS) == set(defaults) - {'photo_folders'}
+def test_the_ai_settings_are_every_setting_but_the_photo_folders_and_the_export_separator(defaults):
+    assert set(AI_SETTINGS) == set(defaults) - {'photo_folders', 'export_separator'}
     assert len(AI_SETTINGS) == len(set(AI_SETTINGS))
 
 
