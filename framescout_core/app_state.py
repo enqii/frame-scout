@@ -12,11 +12,20 @@ APP_TABS = (START_NEEDS_TAB['profiles'], START_NEEDS_TAB['photos'], START_NEEDS_
 # the widest the tabs with forms and text areas get, in pixels: the page uses
 # the whole window for the result cards, the other tabs keep the width they had before
 FORM_TAB_MAX_WIDTH = 1300
+# the key of the container of the state line, in the header row next to the title
+STATE_LINE_KEY = 'header_state'
+# the narrowest the state line gets next to the title; in a narrower window it wraps below
+# the title, so the title is never squeezed and the text length never moves the line
+STATE_LINE_MIN_WIDTH = '20rem'
 # the app's page style. The limit holds for every tab panel but the last ("Results", the last
 # of APP_TABS): Streamlit internals (the data-testid of a tab panel; all panels are drawn,
-# after the tab list), checked with the Streamlit of MARK_STYLE_STREAMLIT
+# after the tab list), checked with the Streamlit of MARK_STYLE_STREAMLIT. The state line's
+# flex-basis is set on the wrapper of its keyed container, as Streamlit draws a container in
+# a horizontal row (internals as above)
 PAGE_STYLE = ('<style>.block-container{padding-top:2rem}.stButton button{border-radius:8px}'
-              f'[data-testid="stTabPanel"]:not(:last-child){{max-width:{FORM_TAB_MAX_WIDTH}px}}</style>')
+              f'[data-testid="stTabPanel"]:not(:last-child){{max-width:{FORM_TAB_MAX_WIDTH}px}}'
+              f'[data-testid="stLayoutWrapper"]:has(> .st-key-{STATE_LINE_KEY})'
+              f'{{flex-basis:{STATE_LINE_MIN_WIDTH}!important}}</style>')
 
 
 def _plural(count, one, many):
