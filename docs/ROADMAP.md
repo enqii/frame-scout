@@ -33,6 +33,20 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] `install_check.py` and `disk_space.py`: drop the model-cache probe, merge the PyTorch
       texts, drop `_same_folder`; simple rule for `low_space` (I44 step 2; kind `code`) – 2026-11-17 ([#149](https://github.com/enqii/frame-scout/pull/149))
 
+### P54 – Feature review (added 2026-11-17)
+- [ ] List per module the features that could go or shrink, for the user's decision; `/triage`
+      names at least one removal candidate per round (F56; kind `docs`)
+
+### P53 – Rules and project history (added 2026-11-17)
+- [ ] Rules in `CLAUDE.md` and the `/roadmap` briefs: no project history in code comments and
+      docstrings, tests only for what is necessary (F54, F55; kind `docs`)
+- [ ] Remove the project history from `framescout_core/` and its tests (F54; kind `code`, no
+      behavior change)
+- [ ] Remove the project history from the engine, images, scoring, evaluation tool and the other
+      root files, and their tests (F54; kind `code`, no behavior change)
+- [ ] Remove the project history from `app.py` and `framescout_ui/`, and their tests (F54; kind
+      `code`, no behavior change)
+
 ### P50 – Interface follow-ups 2 (added 2026-11-17)
 - [ ] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a
       profile title, result cards in a narrow window, height of the "More" button
@@ -45,20 +59,6 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 ### P52 – Score distribution (added 2026-11-17)
 - [ ] Collapsed score histogram per profile with an additive `results.json` field (F53; kind
       `code`; the caption says scores are relative heuristics)
-
-### P53 – Rules and project history (added 2026-11-17)
-- [ ] Rules in `CLAUDE.md` and the `/roadmap` briefs: no project history in code comments and
-      docstrings, tests only for what is necessary (F54, F55; kind `docs`)
-- [ ] Remove the project history from `framescout_core/` and its tests (F54; kind `code`, no
-      behavior change)
-- [ ] Remove the project history from the engine, images, scoring, evaluation tool and the other
-      root files, and their tests (F54; kind `code`, no behavior change)
-- [ ] Remove the project history from `app.py` and `framescout_ui/`, and their tests (F54; kind
-      `code`, no behavior change)
-
-### P54 – Feature review (added 2026-11-17)
-- [ ] List per module the features that could go or shrink, for the user's decision; `/triage`
-      names at least one removal candidate per round (F56; kind `docs`)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
