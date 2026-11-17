@@ -20,7 +20,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
 ### P48 – Workflow and tests (added 2026-11-17)
-- [ ] State machine row for a review with 0 findings in the `/roadmap` skill (I52; kind `docs`)
+- [x] State machine row for a review with 0 findings in the `/roadmap` skill (I52; kind `docs`) – 2026-11-17
 - [ ] Fix the cleanup test that fails when the temporary folder is a mount point (I53; kind `code`)
 
 ### P49 – Simplify the rare-case handling (added 2026-11-17)
