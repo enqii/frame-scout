@@ -1,6 +1,6 @@
-"""Copying the marked matches and exporting the result list of a profile (A17, F5, A46).
+"""Copying the marked matches and exporting the result list of a profile.
 
-Both are in the popover "Export and copy" of the results toolbar (F29).
+Both are in the popover "Export and copy" of the results toolbar.
 """
 from pathlib import Path
 
@@ -19,7 +19,7 @@ from .common import (EXPORTS, MARKS, PROFILES, RESULTS, SETTINGS, gallery_action
 
 @st.cache_data(show_spinner=False, max_entries=2)
 def cached_copy_folders(path, mtime_ns, size, ino):
-    """read_copy_folders, read again only when settings.json changes (review)."""
+    """read_copy_folders, read again only when settings.json changes."""
     return read_copy_folders(Path(path))
 
 
@@ -38,7 +38,7 @@ def set_copy_folder(profile, key, default):
     """Save the target folder typed into the field key in settings.json (on_change of the field)."""
     unsaved = st.session_state.setdefault('copy_folders_unsaved', {})
     try:
-        # like set_mark: never under the name of a deleted or renamed profile (A22, A33)
+        # like set_mark: never under the name of a deleted or renamed profile
         save_copy_folder(SETTINGS, profile, st.session_state.get(key, ''), default, profiles_file=PROFILES)
     except UnknownProfileError as exc:
         unsaved.pop(profile, None)  # not kept for this session either
@@ -51,10 +51,10 @@ def set_copy_folder(profile, key, default):
 
 
 def copy_matches(profile, key, photo_folders):
-    """Copy the photos of profile marked as match into the folder typed into the field key (A17).
+    """Copy the photos of profile marked as match into the folder typed into the field key.
 
     Runs in the page run (not in a callback) with a progress bar: a reload, closing the tab
-    or another click in the gallery stops it between two photos (review).
+    or another click in the gallery stops it between two photos.
     """
     try:
         paths = [photo for photo, state in read_marks(MARKS).get(profile, {}).items() if state == MARK_MATCH]
@@ -86,7 +86,7 @@ def copy_matches(profile, key, photo_folders):
 
 
 def export_list(profile, gallery, cards, only_matches):
-    """Write the result list of profile to results/exports/ (on_click of the export button, F5).
+    """Write the result list of profile to results/exports/ (on_click of the export button).
 
     gallery and cards are the list the page showed when it was drawn, on purpose: the user
     exports the list in front of them, under its own gallery name, even if a newer search
@@ -106,7 +106,7 @@ def export_list(profile, gallery, cards, only_matches):
     except (OSError, ValueError) as exc:
         st.session_state.export_notice = ('warning', f'Nothing was exported: {exc}.')
         return
-    # a path with a line break (not possible on Windows) is only in the CSV table (A42)
+    # a path with a line break (not possible on Windows) is only in the CSV table
     unlisted = len(unlisted_paths(export_cards(cards, marks, only_matches)))
     st.session_state.export_notice = (
         'success', f'Exported to {table.name} and {listing.name} in {EXPORTS}.'
@@ -125,10 +125,10 @@ def open_target_folder(key, photo_folders):
 
 
 def show_copy(name, entry, marks, photo_folders, profile_exists, notices):
-    """Copying the photos of profile name marked as match to a folder, in the popover "Export and copy" (A17, F29).
+    """Copying the photos of profile name marked as match to a folder, in the popover "Export and copy".
 
     The target folder can be changed only for a profile that still exists: it is saved under
-    the profile name, which a later profile could take (A33). notices: the container below
+    the profile name, which a later profile could take. notices: the container below
     the toolbar that shows the copy's progress and result, also when the popover is closed.
     """
     st.markdown('**Copy marked matches**')
@@ -149,7 +149,7 @@ def show_copy(name, entry, marks, photo_folders, profile_exists, notices):
                        'a different photo with the same name is saved as "name (2)".'
                        + ('' if profile_exists else ' It cannot be changed for a profile that is no longer one of '
                           'your search profiles.'))
-    # also not in the folder of a photo to copy, which may be from another photo folder (review)
+    # also not in the folder of a photo to copy, which may be from another photo folder
     target, problem = copy_target(st.session_state[key], photo_folders, matches)
     if problem:
         st.warning(plain(problem))
@@ -164,12 +164,12 @@ def show_copy(name, entry, marks, photo_folders, profile_exists, notices):
 
 
 def show_export(name, entry, marks, marks_error, notices):
-    """Exporting the result list of profile name as a CSV table and a file list, in "Export and copy" (F5, F29).
+    """Exporting the result list of profile name as a CSV table and a file list, in "Export and copy".
 
     notices: the container below the toolbar that shows the result of the last export.
     """
     st.markdown('**Export list**')
-    # F43: one short line, the rest behind the help icon (a long caption widened the popover)
+    # one short line, the rest behind the help icon (a long caption would widen the popover)
     st.caption(f'A CSV table and a file list, in the folder {plain(EXPORTS_DIR)} of the results folder.',
                help=f'Writes the ranked photos of "{plain(name)}" as a CSV table (rank, path, score, crop, mark) and '
                     'as a text file with one path per line, e.g. for a cataloging program. The paths are those of '

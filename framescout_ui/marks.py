@@ -1,4 +1,4 @@
-"""The marks of gallery photos: reading them, the backup offer, saving a mark (A17, F1, A40, A46)."""
+"""The marks of gallery photos: reading them, the backup offer, saving a mark."""
 import time
 from pathlib import Path
 
@@ -11,7 +11,7 @@ from framescout_core.marks import (MARKS_BACKUP, MARKS_FILE, MARK_MATCH, MARK_NO
 from .common import MARKS, PROFILES, version_key
 
 
-# the two buttons of the mark control on each gallery card (A17, F30): neither pressed is
+# the two buttons of the mark control on each gallery card: neither pressed is
 # undecided (MARK_OPEN), and a second click on the pressed one takes the mark back
 MARK_LABELS = {MARK_MATCH: 'Match', MARK_NO_MATCH: 'No'}
 MARK_BY_LABEL = {label: state for state, label in MARK_LABELS.items()}
@@ -19,12 +19,12 @@ MARK_BY_LABEL = {label: state for state, label in MARK_LABELS.items()}
 
 @st.cache_data(show_spinner=False, max_entries=2)
 def cached_marks(path, mtime_ns, size, ino):
-    """read_marks, read again only when the file changes (review: not on every gallery click)."""
+    """read_marks, read again only when the file changes, not on every gallery click."""
     return read_marks(Path(path))
 
 
 def load_marks():
-    """Return (marks of all profiles, error or None) of results/marks.json (A17)."""
+    """Return (marks of all profiles, error or None) of results/marks.json."""
     try:
         return cached_marks(*version_key(MARKS)), None
     except FileNotFoundError:
@@ -34,11 +34,11 @@ def load_marks():
 
 
 def marks_backup_offer(error):
-    """The text offering to restore marks.json.bak, or None if there is nothing to offer (F1, A40).
+    """The text offering to restore marks.json.bak, or None if there is nothing to offer.
 
     error: the error of load_marks, or None. For a damaged marks.json and for a missing one
     whose backup holds marks (marks_restore_offer). This runs on every gallery rerun, so the
-    backup is read through cached_marks: again only when it changes (review).
+    backup is read through cached_marks: again only when it changes.
     """
     offer = marks_restore_offer(MARKS, error, read=lambda backup: cached_marks(*version_key(backup)))
     if offer is None:
@@ -55,7 +55,7 @@ def marks_backup_offer(error):
 
 
 def restore_marks_backup():
-    """Replace the damaged or missing marks.json by its backup (on_click of "Restore marks from backup", F1, A40)."""
+    """Replace the damaged or missing marks.json by its backup (on_click of "Restore marks from backup")."""
     try:
         restored, kept = restore_marks(MARKS)
     except (OSError, ValueError) as exc:
@@ -74,7 +74,7 @@ def set_mark(profile, photo, key):
     state = MARK_BY_LABEL.get(st.session_state.get(key), MARK_OPEN)
     try:
         # only for a profile that still exists: this gallery may have been drawn before it
-        # was deleted or renamed in another tab (review of A22); the run after this
+        # was deleted or renamed in another tab; the run after this
         # callback then shows it as no longer a search profile
         save_marks(MARKS, profile, {photo: state}, profiles_file=PROFILES)
     except (OSError, ValueError) as exc:

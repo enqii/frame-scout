@@ -1,4 +1,4 @@
-"""The expander "Clean up storage": the storage cleanup and the cache check (E7, E11, F1, A46)."""
+"""The expander "Clean up storage": the storage cleanup and the cache check."""
 import streamlit as st
 
 from framescout_core.cache_check import cache_check_current, check_cache, set_cache_aside
@@ -10,7 +10,7 @@ from .common import PROFILES, REFS, RESULTS, plain
 from .run import engine_alive
 
 
-# the categories of "Clean up storage" (E7): (label, explanation)
+# the categories of "Clean up storage": (label, explanation)
 CLEANUP_LABELS = {
     'temp_thumbnails': ('Temporary thumbnail files',
                         'Left behind by a search that was stopped while it wrote the galleries; never used again.'),
@@ -62,15 +62,15 @@ CLEANUP_NAMES_SHOWN = 20
 
 
 def cleanup_signature(settings):
-    """The cache signature of the current settings: its entries are never offered for deletion (E11)."""
+    """The cache signature of the current settings: its entries are never offered for deletion."""
     return feature_signature(settings['person_detection'], settings['max_persons'], settings['person_confidence'],
                              DEFAULT_YOLO_MODEL, model=settings['model'])
 
 
 def cleanup_inputs(settings):
-    """What a cleanup scan was classified for: a scan of other values is out of date (E22 review).
+    """What a cleanup scan was classified for: a scan of other values is out of date.
 
-    Not the photo folders: unbound photos are looked for wherever they were (E8/A21).
+    Not the photo folders: unbound photos are looked for wherever they were.
     """
     return cleanup_signature(settings), settings['model']
 
@@ -80,15 +80,15 @@ def cleanup_offered(category):
 
 
 def scan_storage(settings):
-    """Look for what the cleanup can delete and select the default categories (E7)."""
+    """Look for what the cleanup can delete and select the default categories."""
     bar = st.progress(0.0, text='Checking which photos still exist …')
 
     def progress(done, total):
-        # the slow part: one look per folder of the cached and marked photos (E8/A21)
+        # the slow part: one look per folder of the cached and marked photos
         bar.progress(done / total, text=f'Checking which photos still exist … {done:,} of {total:,} folders')
 
     try:
-        # rows of the other search models are a category of their own, kept by default (E22)
+        # rows of the other search models are a category of their own, kept by default
         scan = scan_cleanup(RESULTS, PROFILES, REFS, cleanup_signature(settings), current_model=settings['model'],
                             progress=progress)
     except OSError as exc:
@@ -106,14 +106,14 @@ def scan_storage(settings):
 
 
 def delete_storage(scan, selected, settings):
-    """Delete the selected categories of scan after the confirmation; the summary is shown next run (E7)."""
+    """Delete the selected categories of scan after the confirmation; the summary is shown next run."""
     try:
         with st.spinner('Cleaning up …'):
             summary = clean_up(RESULTS, scan, selected, st.session_state.get('cleanup_vacuum', False), engine_alive,
                                PROFILES, REFS, cleanup_signature(settings), current_model=settings['model'])
     except Exception as exc:
         # clean_up reports the errors of its steps in the summary; this is e.g. the lock file
-        # that cannot be opened. The scan is dropped: some files may be gone (review)
+        # that cannot be opened. The scan is dropped: some files may be gone
         st.session_state.cleanup_notice = ('warning', f'The cleanup stopped: {exc}. Scan again to see what is left.')
         st.session_state.pop('cleanup_scan', None)
         return
@@ -133,7 +133,7 @@ def delete_storage(scan, selected, settings):
 
 
 def show_cleanup(settings, active):
-    """The expander "Clean up storage": scan, choose categories, delete permanently after a confirmation (E7).
+    """The expander "Clean up storage": scan, choose categories, delete permanently after a confirmation.
 
     settings: the settings of this page run; active: whether a search runs (nothing can be deleted then).
     """
@@ -162,7 +162,7 @@ def show_cleanup(settings, active):
         if category['problem']:
             st.caption(f"{label}: {plain(category['problem'])}")
             continue
-        # e.g. a drive or network share that is not reachable now, not checked (E8/A21)
+        # e.g. a drive or network share that is not reachable now, not checked
         notes = ' '.join(category.get('notes', []))
         if not cleanup_offered(category):
             st.caption(f'{label}: nothing to clean up.' + (f' {plain(notes)}' if notes else ''))
@@ -177,7 +177,7 @@ def show_cleanup(settings, active):
         if notes:
             st.caption(plain(notes))
         if category.get('thumbnails'):
-            # the thumbnails only these galleries show go with them (review)
+            # the thumbnails only these galleries show go with them
             st.caption(f"Together with {count_text(len(category['thumbnails']), 'thumbnail', 'thumbnails')} "
                        f"({size_text(category['thumbnails_size'])}) that only these galleries show.")
         if category['names']:
@@ -209,7 +209,7 @@ def show_cleanup(settings, active):
 
 
 def check_cache_now():
-    """Run the cache check (F1); its result is shown below the button until a search starts or the file changes."""
+    """Run the cache check; its result is shown below the button until a search starts or the file changes."""
     try:
         with st.spinner(f'Checking {CACHE_FILE} …'):
             st.session_state.cache_check = check_cache(RESULTS, engine_alive)
@@ -219,7 +219,7 @@ def check_cache_now():
 
 
 def set_damaged_cache_aside(expected):
-    """Rename the damaged cache the check found (F1); the outcome is shown next run."""
+    """Rename the damaged cache the check found; the outcome is shown next run."""
     st.session_state.pop('cache_check', None)
     try:
         done = set_cache_aside(RESULTS, engine_alive, expected)
@@ -238,7 +238,7 @@ def set_damaged_cache_aside(expected):
 
 
 def show_cache_check(active):
-    """"Check cache" in "Clean up storage": SQLite's quick check of the cache, a damaged one set aside (F1).
+    """"Check cache" in "Clean up storage": SQLite's quick check of the cache, a damaged one set aside.
 
     active: whether a search runs (no check then).
     """
@@ -255,7 +255,7 @@ def show_cache_check(active):
         return
     if not cache_check_current(RESULTS, result):
         # e.g. compacted by a cleanup or written by a search of another tab: the result and
-        # its rename offer no longer apply (review)
+        # its rename offer no longer apply
         st.session_state.pop('cache_check', None)
         st.caption(f'{CACHE_FILE} changed since the check. Check it again.')
         return
@@ -275,7 +275,7 @@ def show_cache_check(active):
                        'and the next search builds a new cache and analyzes all photos again, which takes about as '
                        'long as the first search. Your marks, results, profiles and photos are not affected.')
         if result['state'] == 'unreadable':
-            # a disk I/O error: a bad sector, or a drive that is not reachable now (review)
+            # a disk I/O error: a bad sector, or a drive that is not reachable now
             st.error(f'{CACHE_FILE} could not be read, so a search may fail or stop with an error. SQLite reports: '
                      f'{details}. This can be a damaged spot on the disk, or a drive or network share that is not '
                      f'reachable at the moment.\n\nIf the error stays when you check again, you can rename it to '

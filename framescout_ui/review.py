@@ -1,4 +1,4 @@
-"""The review dialog: one photo of a result list at a time with a large preview (F19)."""
+"""The review dialog: one photo of a result list at a time with a large preview."""
 from pathlib import Path
 
 import streamlit as st
@@ -14,13 +14,13 @@ from .marks import load_marks
 
 
 def find_similar_button(card, key, disabled, close=None):
-    """The button "Find similar" of a gallery card and of the review dialog (F11, F19).
+    """The button "Find similar" of a gallery card and of the review dialog.
 
     A fragment cannot start the engine (start_engine reruns the whole page), so the click
     stores the photo and the part shown on the card and reruns the page, which starts it;
     it closes the review dialog first. A missing model package does not disable it: it
-    loads no model (review). disabled: while a search runs or no photo folder exists (the
-    page run's state). close: the key of the popover it is in, closed by the click (F41).
+    loads no model. disabled: while a search runs or no photo folder exists (the
+    page run's state). close: the key of the popover it is in, closed by the click.
     """
     if st.button('Find similar', key=key, width='stretch', disabled=disabled,
                  on_click=close_popover if close else None, args=(close,),
@@ -33,7 +33,7 @@ def find_similar_button(card, key, disabled, close=None):
 
 
 def open_review(profile, path):
-    """Open the review dialog of the gallery of profile (None: the quick search) at the photo path, or None (F19).
+    """Open the review dialog of the gallery of profile (None: the quick search) at the photo path, or None.
 
     on_click of "Review one by one" (path None: the first undecided photo) and of a card's photo.
     """
@@ -54,7 +54,7 @@ def _still_shown(path):
 
     A second press before the dialog is drawn again (e.g. M pressed twice quickly) arrives
     with the arguments of the photo before: it is ignored, so it neither saves that photo
-    again nor acts on the next one, which the user has not seen yet (review).
+    again nor acts on the next one, which the user has not seen yet.
     """
     return st.session_state.get('review', {}).get('path') == path
 
@@ -111,7 +111,7 @@ def show_preview(card, thumbs):
     problem = 'The photo is no longer there, so its thumbnail is shown.'
     if photo is not None:
         # only the decoding is caught: an error after the container below was drawn would
-        # draw a second one with the same key in the fallback (review)
+        # draw a second one with the same key in the fallback
         try:
             with st.spinner('Loading the photo…'):
                 data = cached_preview(*file_key(photo))
@@ -130,7 +130,7 @@ def show_preview(card, thumbs):
 
 @st.dialog('Review one by one', width='large', on_dismiss=close_review)
 def review_dialog(cards, thumbs, profile, can_mark, find_disabled):
-    """One photo of cards at a time with a large preview (F19); its buttons rerun only the dialog.
+    """One photo of cards at a time with a large preview; its buttons rerun only the dialog.
 
     profile: the profile of the gallery, whose marks it shows and saves; None for the quick
     search, which has no marks. can_mark and find_disabled as in draw_cards. "Match", "No
@@ -148,7 +148,7 @@ def review_dialog(cards, thumbs, profile, can_mark, find_disabled):
         state = st.session_state.review = {**state, 'path': card['path'], 'notice': None}
     saved = marks.get(card['path'])
     # the style block rides in this caption, which is drawn anyway, as CARD_STYLE does in the
-    # gallery: an element of its own takes a layout slot with the block gap (A38)
+    # gallery: an element of its own takes a layout slot with the block gap
     st.caption(REVIEW_STYLE + '\n\n' + review_position(index, len(cards))
                # no saved mark where the photos cannot be marked: without readable marks, or for
                # a profile that is gone (it took its marks along), every photo would look undecided

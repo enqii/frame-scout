@@ -1,8 +1,8 @@
 """FrameScout: local Streamlit user interface for framescout_engine.py.
 
-This file is the page Streamlit runs: its five tabs (F28), the photo source tab, the search tab and the
+This file is the page Streamlit runs: its five tabs, the photo source tab, the search tab and the
 results tab.
-The other areas are modules of the package framescout_ui (A46).
+The other areas are modules of the package framescout_ui.
 """
 import sys
 import time
@@ -33,24 +33,24 @@ from framescout_ui.run import (cached_analyzed_photos, low_space_warning, run_st
                                start_run, stop_run)
 from framescout_ui.settings import setting_key, show_ai_settings, sync_settings
 
-# the readable formats, in every page run: clearing the cache of decoders() refreshes them (review)
+# the readable formats, in every page run: clearing the cache of decoders() refreshes them
 DECODERS = decoders()
 SUPPORTED = supported()
 
 st.set_page_config(page_title='FrameScout', page_icon='🔎', layout='wide')
-# the whole window width for the result cards, which have a fixed width and fill the rows (F30);
+# the whole window width for the result cards, which have a fixed width and fill the rows;
 # a width limit for the other tabs
 st.markdown(PAGE_STYLE, unsafe_allow_html=True)
 
 title_col, state_col = st.columns([1, 2], vertical_alignment='bottom')
 title_col.title('🔎 FrameScout')
-# F27: the run state on every tab, filled once the photos are counted (below)
+# the run state on every tab, filled once the photos are counted (below)
 state_area = state_col.container()
 st.caption('Local AI search in large photo collections · your images stay on your computer')
 
-# "Find similar" clicked on a result card (F11): its fragment asked this page run to start it.
+# "Find similar" clicked on a result card: its fragment asked this page run to start it.
 # Taken at once, so a page run that stops early (e.g. at an unreadable profiles.json) drops it
-# instead of leaving it for a later run to start unexpectedly (review); handled under "Start search"
+# instead of leaving it for a later run to start unexpectedly; handled under "Start search"
 find_similar_request = st.session_state.pop('find_similar', None)
 
 clean_project_folder()
@@ -63,11 +63,11 @@ except OSError as exc:  # e.g. a read-only project folder
 try:
     profiles, profiles_version = read_profiles_versioned(PROFILES)
 except (OSError, ValueError) as exc:
-    # never save over a file the app cannot read (A2)
+    # never save over a file the app cannot read
     st.error('profiles.json cannot be read, so FrameScout does not change it. Fix it in a text '
              f'editor, or restore the backup profiles.json.bak if there is one.\n\nDetails: {exc}')
     st.stop()
-# A13: the version of profiles.json that the profile forms of the last complete page showed.
+# the version of profiles.json that the profile forms of the last complete page showed.
 # A form submit reruns the page and reads the file again; store() saves only if the file is
 # still at this version, so an edit based on what the page showed never overwrites a change
 # made in another tab or session or by hand. Updated after the forms are shown (below), so
@@ -75,18 +75,18 @@ except (OSError, ValueError) as exc:
 # and by this session's own successful save (store), so that it never refuses the next one.
 profiles_shown = st.session_state.get('profiles_shown', profiles_version)
 
-# whether a search runs, also after a reload or in another tab (A4)
+# whether a search runs, also after a reload or in another tab
 active, run_status = run_state()
 st.session_state.page_run_state = (active, run_status)
-st.session_state.state_line_state = (active, run_status)  # for the state line next to the title (F27)
+st.session_state.state_line_state = (active, run_status)  # for the state line next to the title
 
-# the settings of the widgets, synchronized with settings.json (A8)
+# the settings of the widgets, synchronized with settings.json
 settings, seen, shown, settings_taken_over = sync_settings()
-# the folders as the image count, the Start check and the engine use them (review: ~ expanded)
+# the folders as the image count, the Start check and the engine use them, with ~ expanded
 photo_folders = [Path(folder).expanduser() for folder in settings['photo_folders']]
-# a folder listed twice or inside another listed folder is searched once (A25)
+# a folder listed twice or inside another listed folder is searched once
 search_folders, dropped_folders = distinct_folders([folder.resolve() for folder in photo_folders])
-# F28: five tabs; start, analysis, progress and Stop in "Search", the results on their own,
+# five tabs; start, analysis, progress and Stop in "Search", the results on their own,
 # storage maintenance with the settings
 p_tab, f_tab, settings_tab, search_tab, results_tab = st.tabs(list(APP_TABS))
 
@@ -98,12 +98,12 @@ with f_tab:
     st.text_area('Local photo folders (one per line, including subfolders)', key=setting_key('photo_folders'),
                  disabled=active, help='One search covers all listed folders, e.g. event folders on several '
                                        'drives. A folder inside another listed folder is searched as part of it.')
-    # per listed folder (A25): its photo count, or why it is not searched on its own. The
-    # folders are scanned together, as the engine scans them (E25), so the numbers match its
+    # per listed folder: its photo count, or why it is not searched on its own. The
+    # folders are scanned together, as the engine scans them, so the numbers match its
     # log; a photo reached through a link into another listed folder counts once, for the
-    # folder it is really in (A29). The count is remembered for this browser session and
+    # folder it is really in. The count is remembered for this browser session and
     # repeated only when the existing folders, the readable formats or the output folder
-    # change, or on "Recount" (A27): not on every widget click, which walked the whole
+    # change, or on "Recount": not on every widget click, which would walk the whole
     # photo tree each time. Whether a folder exists is checked on every page run.
     existing = [folder for folder in search_folders if folder.is_dir()]
     missing_folders = [folder for folder in search_folders if folder not in existing]
@@ -111,7 +111,7 @@ with f_tab:
                                          RESULTS, recount=st.session_state.pop('recount_photos', False))
     folder_scans = list(zip(existing, scans))
     photo_scan = join_scans(scans)
-    # the photos counted in the existing folders, None without one: the state line and Start's needs (F27)
+    # the photos counted in the existing folders, None without one: the state line and Start's needs
     photo_count = len(photo_scan.paths) if folder_scans else None
     if len(search_folders) == 1 and folder_scans:
         st.success(f'{len(photo_scan.paths):,} supported image files found.')
@@ -134,7 +134,7 @@ with f_tab:
     else:
         for folder in missing_folders:
             st.warning(plain(f'{folder} does not exist (e.g. a disconnected drive); the search leaves it out.'))
-    # a missing decoder is named only if the folders have files of it (review)
+    # a missing decoder is named only if the folders have files of it
     for line in skipped_lines(photo_scan, DECODERS):
         st.caption(line)
     st.caption('Supports JPG, PNG, WebP, BMP, TIFF, AVIF, HEIC/HEIF and camera RAW (DNG, CR2, CR3, NEF, ARW, ORF, '
@@ -146,7 +146,7 @@ with state_area:
 
 with settings_tab:
     info, model_missing = show_ai_settings(settings, seen, shown, active)
-    # F28: storage maintenance is rarely used and neither search nor results; disabled during a run
+    # storage maintenance is rarely used and neither search nor results; disabled during a run
     st.divider()
     st.subheader('Storage')
     with st.expander('Clean up storage'):
@@ -156,20 +156,20 @@ with settings_tab:
 
 with search_tab:
     st.subheader('Start search')
-    # F27: what a search needs, with what is missing and the tab to fix it in. At least one
+    # what a search needs, with what is missing and the tab to fix it in. At least one
     # listed folder must exist (as sorted out in the Photo source tab, without asking the file
-    # system again, review); the engine leaves out the others with a note (A25). A search
-    # model without its package would only fail in the engine (E22 review); how to install it is
-    # shown in the tab "Settings", which the blocked line names (review)
+    # system again); the engine leaves out the others with a note. A search
+    # model without its package would only fail in the engine; how to install it is
+    # shown in the tab "Settings", which the blocked line names
     needs = start_needs(len(profiles), photo_count, bool(photo_folders), MODELS[settings['model']].label,
                         model_missing)
-    cleaning = active and cleanup_running(RESULTS)  # a cleanup holding the run lock is no search (review)
+    cleaning = active and cleanup_running(RESULTS)  # a cleanup holding the run lock is no search
     start_blocked = start_blocked_text(needs, active, cleaning)
     c1,c2 = st.columns([1,1])
     with c1:
         start = st.button('▶ Start search', type='primary', width='stretch', disabled=bool(start_blocked))
     with c2:
-        # a cleanup holding the run lock is no search to stop (review)
+        # a cleanup holding the run lock is no search to stop
         stop = st.button('■ Stop search', disabled=not active or cleaning, width='stretch',
                          help='Stops the running search, also an analysis started with "Analyze photos now" or a '
                               'quick search. Photos analyzed so far are kept in the cache.')
@@ -179,23 +179,23 @@ with search_tab:
     elif start_blocked:
         st.warning(plain(start_blocked))
     def start_engine(notice='run_notice', **search):
-        """Start the engine with the current settings: search is profiles=..., quick_query=... (F10), like=... (F11)
-        or analyze_only=True (F18).
+        """Start the engine with the current settings: search is profiles=..., quick_query=..., like=...
+        or analyze_only=True.
 
         notice: the session key of the note shown where the click was, if the start failed.
         """
         what = 'analysis' if search.get('analyze_only') else 'search'
         if settings_taken_over:
             # the page showed other values until this click: never start with settings the
-            # user has not seen (review)
+            # user has not seen
             st.session_state[notice] = (f'The {what} was not started: another tab or window changed these settings '
                                         'meanwhile: ' + ', '.join(settings_taken_over) + '. Check the settings '
                                         'shown now and start again.')
             st.rerun()
         cmd = engine_command(sys.executable, BASE / 'framescout_engine.py', search_folders, RESULTS, settings,
                              st.session_state[setting_key('device')], **search)
-        st.session_state.pop('cleanup_scan', None)  # the search changes what a cleanup finds (E7)
-        st.session_state.pop('cache_check', None)  # and the cache a check looked at (F1)
+        st.session_state.pop('cleanup_scan', None)  # the search changes what a cleanup finds
+        st.session_state.pop('cache_check', None)  # and the cache a check looked at
         try:
             problem = start_run(cmd, analyze_only=bool(search.get('analyze_only')))
         except Exception as exc:
@@ -207,8 +207,8 @@ with search_tab:
         start_engine(profiles=PROFILES)
     if find_similar_request:
         # the card's button may have been drawn before a search started (its fragment reruns
-        # alone): never dropped without a word (review). Its notes are shown in the tab
-        # "Results", where the click was (F28)
+        # alone): never dropped without a word. Its notes are shown in the tab
+        # "Results", where the click was
         if active:
             st.session_state.like_notice = ('"Find similar" was not started: a search is running already. Try again '
                                             'when it has finished.')
@@ -222,29 +222,29 @@ with search_tab:
         st.rerun()
     if st.session_state.get('run_notice'):
         st.warning(st.session_state.pop('run_notice'))
-    quick_counts = None  # quick_scope: (analyzed, not analyzed, partners) of a quick search, as the engine counts (E61)
-    analysis_text = None  # what "Analyze photos now" would do (F18)
-    analysis_space = None  # and its low disk space warning (review)
+    quick_counts = None  # quick_scope: (analyzed, not analyzed, partners) of a quick search, as the engine counts
+    analysis_text = None  # what "Analyze photos now" would do
+    analysis_space = None  # and its low disk space warning
     if folder_scans and not active:
         try:
             cache_key = file_key(RESULTS / CACHE_FILE)
         except OSError:  # no cache yet
             cache_key = None
-        # photos analyzed with these settings need no new cache rows (review: else a large,
-        # analyzed collection kept the warning for good)
+        # photos analyzed with these settings need no new cache rows, so a large, analyzed
+        # collection does not keep the warning for good
         quick_counts = cached_analyzed_photos(cache_key, cleanup_signature(settings),
                                               (tuple(map(str, existing)), counted_at), photo_scan)
-        # a JPEG/HEIC searched through another file of its shot (its RAW file, E30, or another
+        # a JPEG/HEIC searched through another file of its shot (its RAW file or another
         # partner) never gets a row of its own, however often it is analyzed: done for a search
-        # and an analysis, as for the quick search (F18 review, A48)
+        # and an analysis, as for the quick search
         analyzed = quick_counts[0] + quick_counts[2]
         # what the search will do and, if an earlier search with these settings measured its
-        # speed on this device, roughly how long its analysis takes (F12). "auto" picks CUDA
+        # speed on this device, roughly how long its analysis takes. "auto" picks CUDA
         # if PyTorch can use it; without the system details any device's record counts
         chosen_device = st.session_state[setting_key('device')]
         if chosen_device == 'auto':
             chosen_device = ('cuda' if info['cuda'] else 'cpu') if info else None
-        # and scoring and the gallery thumbnails at the speeds of earlier searches (F16)
+        # and scoring and the gallery thumbnails at the speeds of earlier searches
         finishing = finishing_minutes((run_status or {}).get('finishing'), len(photo_scan.paths),
                                       gallery_thumbnails(len(photo_scan.paths), settings['top'], len(profiles)))
         per_minute = known_throughput(run_status, cleanup_signature(settings), chosen_device)
@@ -255,14 +255,14 @@ with search_tab:
         if space_warning:
             st.warning(space_warning)
         # the analysis writes the cache rows without gallery thumbnails (no profile): its own
-        # warning, next to its button (review)
+        # warning, next to its button
         analysis_space = low_space_warning(len(photo_scan.paths), settings['top'], 0, settings['model'],
                                            settings['person_detection'], analyzed, analysis=True)
-    # F18: the analysis of a search without the search, e.g. overnight before the profiles
+    # the analysis of a search without the search, e.g. overnight before the profiles
     # are written; it runs like a search (run lock, status, stop button, low priority). Next
-    # to Start since F28, so that start, progress and Stop are in one place
+    # to Start, so that start, progress and Stop are in one place
     st.subheader('Analyze ahead')
-    # A51: one short sentence, the rest behind the help icon
+    # one short sentence, the rest behind the help icon
     st.caption('Analyzes the photos now, e.g. overnight, so that a later search only has to rank them.',
                help='Analyzing the photos is the slow part of a first search. "Analyze photos now" analyzes the '
                     'photos of the listed folders with the current AI settings and keeps the analyses in the cache, '
@@ -275,14 +275,14 @@ with search_tab:
                f"{'on' if settings['person_detection'] else 'off'}.")
     if st.session_state.get('analyze_notice'):
         st.warning(st.session_state.pop('analyze_notice'))
-    # not gated on the photo count: it is the one remembered for the browser session (A27),
-    # while the engine reads the folders again, e.g. for photos added since (review). Its
-    # needs are Start's without a profile, and it says which one is missing (F37)
+    # not gated on the photo count: it is the one remembered for the browser session,
+    # while the engine reads the folders again, e.g. for photos added since. Its
+    # needs are Start's without a profile, and it says which one is missing
     analyze_blocked = button_blocked_text('Analyze photos now', needs, active, cleaning)
     analyze_now = st.button('Analyze photos now', disabled=bool(analyze_blocked))
     if analyze_blocked:
         st.caption(plain(analyze_blocked))
-    if analysis_text:  # also while blocked, e.g. by the search model (review)
+    if analysis_text:  # also while blocked, e.g. by the search model
         st.info(analysis_text)
     if analysis_space and not active:
         st.warning(analysis_space)
@@ -290,7 +290,7 @@ with search_tab:
         start_engine(notice='analyze_notice', analyze_only=True)
     show_status(active)
     st.divider()
-    # F10: one search text over the photos already analyzed, without a profile and without
+    # one search text over the photos already analyzed, without a profile and without
     # analyzing; its result goes to results/quick/, the profiles' results and marks stay
     st.subheader('Quick search')
     st.caption('Try a search text without a search profile, over the photos already analyzed: fast, nothing new '
@@ -301,12 +301,12 @@ with search_tab:
                     f'appears in the tab "{RESULTS_TAB}", as an entry next to your search profiles; "Find similar" '
                     'on a result card searches the same way by the image similarity with that photo, and its '
                     'result appears there too.')
-    # F34: the text stays in the field; Streamlit emptied it in the run after the click, in
+    # the text stays in the field; Streamlit empties it in the run after the click, in
     # which the field is disabled while the search runs. Only then: a value put into the key
     # resets the field in the browser, which would drop a text typed but not searched for yet
     if active:
         restore_value('quick_query')
-    # its needs are Start's without a profile (F37); that nothing is analyzed yet is said by
+    # its needs are Start's without a profile; that nothing is analyzed yet is said by
     # its scope line below
     quick_blocked = button_blocked_text('Quick search', needs, active, cleaning)
     with st.form('quick_search', border=False):
@@ -319,7 +319,7 @@ with search_tab:
                                             (quick_counts is not None and not (quick_counts[0] or quick_counts[2])))
     if quick_blocked:
         st.caption(plain(quick_blocked))
-    if quick_counts is not None:  # also while blocked, e.g. by the search model (review)
+    if quick_counts is not None:  # also while blocked, e.g. by the search model
         st.caption(quick_scope_text(len(photo_scan.paths), *quick_counts))
     if quick_start:
         query = ' '.join(str(st.session_state.get('quick_query') or '').split())
@@ -329,16 +329,16 @@ with search_tab:
             st.warning('Type a search text first.')
 
 with results_tab:
-    # F28: the results on their own, without the start and status area; while a run is
-    # active, e.g. one "Find similar" started here, the tab says so (review)
+    # the results on their own, without the start and status area; while a run is
+    # active, e.g. one "Find similar" started here, the tab says so
     running_note = results_running_text(active, run_status, cleaning)
     if running_note:
         st.info(running_note)
     if st.session_state.get('like_notice'):
         st.warning(st.session_state.pop('like_notice'))  # a "Find similar" that could not start
     st.subheader('Results')
-    # the galleries of the last complete search, as the engine wrote them (A12), and the last
-    # quick search or "Find similar" as an entry of the same selector (F34)
+    # the galleries of the last complete search, as the engine wrote them, and the last
+    # quick search or "Find similar" as an entry of the same selector
     last_results, results_error = load_results()
     if results_error:
         st.warning(f'{RESULTS_FILE} cannot be read, so the results of the last search are not shown here. Starting '
@@ -349,16 +349,16 @@ with results_tab:
                    f'results are not shown here. The next quick search writes it anew.\n\n'
                    f'Details: {plain(str(quick_error))}')
     if last_results or quick_results:
-        # a copy target must not be in a photo folder of this search or of the next one (A17, A25)
+        # a copy target must not be in a photo folder of this search or of the next one
         show_results(last_results, quick_results,
                      [*(last_results['photo_folders'] if last_results else []), *map(str, photo_folders)],
                      search_folders, settings['model'], active or not folder_scans)
     else:
-        close_review()  # no list to review: its state must not open the dialog over a later one (F19)
+        close_review()  # no list to review: its state must not open the dialog over a later one
     if not last_results:
         if RESULTS.is_dir() and (old_pages := sorted(RESULTS.glob('*.html'))):
             # galleries of a search before results.json: listed by file name, since the
-            # current profile list may no longer match them (A12)
+            # current profile list may no longer match them
             st.caption('These galleries come from a search by an earlier FrameScout version. Start the search again '
                        'to see its results here.')
             for page in old_pages:

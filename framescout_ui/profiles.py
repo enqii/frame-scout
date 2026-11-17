@@ -1,4 +1,4 @@
-"""The tab "Search profiles": editing, adding and deleting profiles and their reference images (A13, A22, A46)."""
+"""The tab "Search profiles": editing, adding and deleting profiles and their reference images."""
 from pathlib import Path
 
 import streamlit as st
@@ -15,8 +15,8 @@ from .marks import load_marks
 from .copy_export import cached_copy_folders
 
 
-# labels of the profile fields, shared by the edit and the new-profile form (review);
-# search terms are English only (E3)
+# labels of the profile fields, shared by the edit and the new-profile form;
+# search terms are English only
 LABEL_NAME = 'Search motif (in English)'
 LABEL_CONTEXT = 'Context / origin (optional, in English)'
 LABEL_FEATURES = 'Distinctive features (optional, in English)'
@@ -31,14 +31,14 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False, *, profile
     nothing changes: the message is shown, the new files and names made for this save are
     removed again and the caller keeps its unchanged profile list, which still matches
     the file on disk. The save is refused if profiles.json changed since this page showed
-    the profiles the user edited (profiles_shown, A13): then the page is run again with
+    the profiles the user edited (profiles_shown): then the page is run again with
     emptied edit forms and the message at the top of the profile tab. profiles_shown: the
     version of profiles.json the forms of the last complete page showed (show_profiles).
     """
     written, staged, refs, new_folder = [], [], list(keep), None
     try:
         if uploads or move:
-            # one folder per profile, never one holding references of another profile (A1),
+            # one folder per profile, never one holding references of another profile,
             # named after the profile: a rename moves the profile's files along
             folder = reference_folder(REFS, name, others, BASE)
             new_folder = None if folder.exists() else folder
@@ -51,10 +51,10 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False, *, profile
                 suffix = Path(f.name).suffix.lower()
                 if suffix in readable:
                     written.append(write_new_file(folder, 'reference', suffix, f.getvalue()))
-        # keeps the previous file as profiles.json.bak (A2); never overwrites a change made in
-        # another tab, session or by hand since the page showed the edited profiles (A13).
+        # keeps the previous file as profiles.json.bak; never overwrites a change made in
+        # another tab, session or by hand since the page showed the edited profiles.
         # The next save is based on this saved file, also if the rerun that shows it is
-        # interrupted before the forms (review)
+        # interrupted before the forms
         st.session_state.profiles_shown = save_profiles(
             PROFILES, build(refs + [x.relative_to(BASE).as_posix() for x in written]), expected=profiles_shown)
     except (OSError, ValueError) as exc:  # ValueError: e.g. a path that cannot be made relative
@@ -73,7 +73,7 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False, *, profile
             # the profile at this form's place may now be another one: new widget keys, so
             # that its uploads and "Remove" checkbox are not kept for that profile, and the
             # message at the top of the tab, since the expander of this form may be redrawn
-            # closed or no longer exist (review)
+            # closed or no longer exist
             st.session_state.saves = st.session_state.get('saves', 0) + 1
             st.session_state.profile_error = (
                 f'Your changes were not saved: {exc}. The page now shows the current search profiles: please '
@@ -83,12 +83,12 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False, *, profile
         return False
     try:
         # profiles.json.bak still lists the old paths: point it to the new names before the
-        # old ones are removed, so restoring the backup keeps working (review)
+        # old ones are removed, so restoring the backup keeps working
         update_backup_references(PROFILES, staged, BASE)
     except OSError as exc:
         # keep the old names too, so the backup still points to existing files
         # the next save replaces the backup: the old names are then offered by "Clean up
-        # storage" as reference images no profile uses (A43)
+        # storage" as reference images no profile uses
         st.session_state.notice = (f'Saved. profiles.json.bak could not be updated ({exc}), so the moved '
                                    'reference images also keep their old names for now. After the next save of '
                                    'the search profiles, "Clean up storage" offers these old files as reference '
@@ -100,19 +100,19 @@ def store(build, uploads=(), name='', others=(), keep=(), move=False, *, profile
                                        'and now exist twice; the profile uses the new copy: ' + '; '.join(problems))
     # new widget keys for the edit forms: their uploaders would otherwise keep the saved
     # files and add them again on the next save, or pass them to the profile that moves
-    # into a deleted profile's place (review)
+    # into a deleted profile's place
     st.session_state.saves = st.session_state.get('saves', 0) + 1
     return True
 
 
 def add_notice(text, first=''):
     """Add text to the one-shot notice at the top of the profile tab; first starts a new notice."""
-    # names and error texts (paths) are shown as Markdown: escaped (review)
+    # names and error texts (paths) are shown as Markdown: escaped
     st.session_state.notice = (st.session_state.notice + ' ' if 'notice' in st.session_state else first) + plain(text)
 
 
 def change_name_data(marks_action, folder_action):
-    """Run the changes of a renamed or deleted profile's marks and saved copy target folder (A17, A22).
+    """Run the changes of a renamed or deleted profile's marks and saved copy target folder.
 
     Both run, also if the first fails. Returns (the result of marks_action or None if it
     failed, the failed parts as text, e.g. "its marks (error)", or '' if none failed).
@@ -127,7 +127,7 @@ def change_name_data(marks_action, folder_action):
 
 
 def carry_over(old, new):
-    """Give the marks and the saved target folder of the renamed profile old to its new name (A17)."""
+    """Give the marks and the saved target folder of the renamed profile old to its new name."""
     _, problems = change_name_data(lambda: rename_marks(MARKS, old, new),
                                    lambda: rename_copy_folder(SETTINGS, old, new))
     if problems:
@@ -135,7 +135,7 @@ def carry_over(old, new):
 
 
 def deletion_consequences(p):
-    """Return the confirmation of deleting the profile p: what happens to its data (A22).
+    """Return the confirmation of deleting the profile p: what happens to its data.
 
     Returns (its Markdown lines, the number of marks they name, or None if marks.json
     cannot be read).
@@ -163,7 +163,7 @@ def deletion_consequences(p):
                      f'({plain(str(exc))}).')
         saved = None
     # the folder typed in this session that settings.json could not save is used instead of
-    # the saved one (copy_folder_value) and is forgotten as well (review)
+    # the saved one (copy_folder_value) and is forgotten as well
     unsaved = st.session_state.get('copy_folders_unsaved', {}).get(name)
     if unsaved is not None:
         lines.append(f'The copy target folder {plain(unsaved) or "(empty)"} typed for it in this session (not saved '
@@ -183,7 +183,7 @@ def deletion_consequences(p):
 
 
 def forget_profile(name, named):
-    """Delete the marks and the saved copy target folder of the deleted profile name (A22).
+    """Delete the marks and the saved copy target folder of the deleted profile name.
 
     Called after the deletion is saved; the folder itself and the copies in it are never
     touched. named: the number of marks the confirmation named (None: it could not read
@@ -207,28 +207,28 @@ def show_profiles(profiles, profiles_version, profiles_shown, active):
     """The tab "Search profiles": the saved profiles with their edit forms and the new-profile form.
 
     profiles and profiles_version: profiles.json as this page run read it; profiles_shown: the
-    version the forms of the last complete page showed (A13); active: whether a search runs.
+    version the forms of the last complete page showed; active: whether a search runs.
     """
     st.subheader('Saved search profiles')
-    # first, so that a one-shot save notice is not missed below the static hint (review)
+    # first, so that a one-shot save notice is not missed below the static hint
     if 'notice' in st.session_state:
         st.warning(st.session_state.pop('notice'))
-    if 'profile_error' in st.session_state:  # a save refused by store() (A13)
+    if 'profile_error' in st.session_state:  # a save refused by store()
         st.error(st.session_state.pop('profile_error'))
     elif profiles_notice := profiles_changed_notice(profiles_shown, profiles_version):
-        # A31: the file changed since the last complete page, e.g. a profile was deleted in
+        # the file changed since the last complete page, e.g. a profile was deleted in
         # another session: a click on a form this page no longer draws was dropped by
         # Streamlit, so say so (a click on a form still drawn is refused by store instead).
         # Only this first run after the change can carry such a click: it redraws the forms
         st.warning(profiles_notice)
-    # hint only, no check of the input (user decision on E3: English search terms only);
-    # one box with the call to action on an empty list (review)
+    # hint only, no check of the input (search terms are English only);
+    # one box with the call to action on an empty list
     st.info(('Create a search profile first. ' if not profiles else '') +
             'Enter the search motif, context, features and custom search texts **in English**. The CLIP model '
             'FrameScout uses understands practically only English: a word in another language, e.g. German '
             '"Schwert" instead of "sword", can find completely different photos.')
     saves = st.session_state.get('saves', 0)
-    # "Delete profile" asks first (A8, A22): the profile name and the save count of the click.
+    # "Delete profile" asks first: the profile name and the save count of the click.
     # Any save since (also a refused one) or the profile's disappearance ends the question
     if st.session_state.get('delete_pending') not in [(p['name'], saves) for p in profiles]:
         st.session_state.pop('delete_pending', None)
@@ -251,21 +251,21 @@ def show_profiles(profiles, profiles_version, profiles_shown, active):
                     st.error('The profile name must be unique and must not be empty.')
                 else:
                     def edited(refs, index=index, p=p):
-                        # {**p, ...} keeps keys the form does not edit (A2)
+                        # {**p, ...} keeps keys the form does not edit
                         return profiles[:index] + [{**p, 'name': edit_name, 'franchise': franchise.strip(),
                                 'features': features.strip(), 'reference_images': refs,
                                 'prompts': [x.strip() for x in prompts.splitlines() if x.strip()]}] + profiles[index+1:]
                     others = profiles[:index] + profiles[index+1:]
                     keep = [] if clear_refs else p.get('reference_images', [])
-                    # a renamed profile's reference folder follows the new name (A1)
+                    # a renamed profile's reference folder follows the new name
                     if store(edited, refs_new or [], edit_name, others, keep, move=edit_name != p['name'],
                              profiles_shown=profiles_shown):
                         if edit_name != p['name']:
-                            carry_over(p['name'], edit_name)  # its marks and copy folder follow the name (A17)
+                            carry_over(p['name'], edit_name)  # its marks and copy folder follow the name
                         st.rerun()
             if delete:
                 # run again before any question is drawn: a question still open for a profile
-                # above this one would otherwise be shown too in this run (review)
+                # above this one would otherwise be shown too in this run
                 st.session_state.delete_pending = (p['name'], saves)
                 st.rerun()
             if st.session_state.get('delete_pending') == (p['name'], saves):
@@ -277,12 +277,12 @@ def show_profiles(profiles, profiles_version, profiles_shown, active):
                           args=('delete_pending', None))
                 # new lists instead of changing profiles in place: after a failed save the page
                 # keeps showing (and the search uses) exactly what is in profiles.json. A save
-                # refused since profiles.json changed (A13) ends the question: the page shows
+                # refused since profiles.json changed ends the question: the page shows
                 # the current profiles, and the user decides again
                 if confirmed and store(lambda _, index=index: profiles[:index] + profiles[index+1:],
                                        profiles_shown=profiles_shown):
-                    # its marks and saved copy folder go with it (A22), compared with the number
-                    # of marks the question the user answered named (review)
+                    # its marks and saved copy folder go with it, compared with the number
+                    # of marks the question the user answered named
                     forget_profile(p['name'], st.session_state.get('delete_marks_named'))
                     st.rerun()
                 # after the click is handled: the number the user saw is the one of the run before
@@ -314,5 +314,5 @@ def show_profiles(profiles, profiles_version, profiles_shown, active):
                 st.rerun()
     st.caption('FrameScout automatically creates several English CLIP search texts from the name, context and features; '
                'it does not translate them. No language model is required.')
-    # the forms above show this version now: the next submit is based on it (A13)
+    # the forms above show this version now: the next submit is based on it
     st.session_state.profiles_shown = profiles_version
