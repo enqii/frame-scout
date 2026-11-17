@@ -43,7 +43,8 @@ of what to do for each problem:
   extract the ZIP into a new, empty folder and copy your data into it (see above).
 - **Python environment:** `.venv` belongs to this folder and its Python still exists. After
   a moved or copied folder, delete `.venv` and run `Install-FrameScout.bat`; if the Python is
-  missing, run the installer, which repairs it.
+  missing, run the installer, which repairs it. A folder that was installed through a link
+  or a short (8.3) name of its path counts as another folder here too.
 - **Packages:** all packages of `requirements/requirements.txt` are installed, in the versions of
   `requirements/constraints.txt` (PyTorch in any build).
 - **PyTorch:** it imports (this can take several seconds); an installation with GPU support
@@ -51,7 +52,8 @@ of what to do for each problem:
   `Install-FrameScout.bat cpu`.
 - **Writable folders:** `.cache` and `results`.
 - **Downloaded files (information only):** the search models and the person detection
-  weights that are already downloaded.
+  weights that are already downloaded. A model folder on a drive that does not answer shows
+  no model as downloaded.
 - **Free disk space:** a problem below 1 GB on the drive of the FrameScout folder.
 
 `Check-FrameScout.bat` uses the Python of `.venv`, or the private Python in `.python` if
@@ -309,8 +311,9 @@ search: it lists the drives with the space needed and the space free, and what t
 writes (cache, thumbnails, and the search model or person detector if they still have to
 be downloaded). Only photos not yet analyzed with the current AI settings count for the
 cache, so a repeat search of an analyzed collection needs little. The figure is an
-estimate, checked again at most every 30 seconds; a drive that does not answer within a
-second (e.g. a disconnected network share) is left out. The warning does not block "Start
+estimate, checked again at most every 30 seconds. A model download folder whose drive does
+not answer within a second (e.g. a disconnected network share) is left out; a results folder
+on such a drive holds the page up until the system gives up on it. The warning does not block "Start
 search"; free some space or lower "Maximum matches per search profile" to reduce the
 thumbnails.
 
