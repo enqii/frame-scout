@@ -279,22 +279,21 @@ class _PathCheck:
 
     def __init__(self, root_timeout=ROOT_TIMEOUT):
         self._timeout = root_timeout
-        self._gone = set()
-        self._checked = set()  # paths with an answer: gone, there or never gone
-        self._unchecked = set()
+        self._seen = set()  # paths with an answer: gone, there, never gone or not checked
+        self._gone = set()  # the paths of _seen that are gone
+        self._unchecked = set()  # the paths of _seen that were not checked
 
     def check(self, paths, progress=None):
         """Check the paths not checked yet; progress(done, total) is called per folder."""
-        todo = {p for p in paths if p not in self._checked and p not in self._unchecked}
+        todo = set(paths) - self._seen
+        self._seen |= todo
         absolute = {p for p in todo if os.path.isabs(p)}
-        self._checked |= todo - absolute
         reachable = _reachable_roots(sorted({_root_of(p) for p in absolute}), self._timeout)
         folders = sorted(_by_folder(absolute).items())
         step = max(1, len(folders) // 100)
         for done, (folder, members) in enumerate(folders, 1):
             if reachable[_root_of(folder)] and _filled(folder):
                 self._gone |= {p for p in members if _missing(p)}
-                self._checked |= set(members)
             else:
                 self._unchecked |= set(members)
             if progress and (done % step == 0 or done == len(folders)):
