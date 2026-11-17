@@ -23,10 +23,9 @@ from pathlib import Path
 from typing import NamedTuple
 
 from .cache_dirs import CACHE_DIR, engine_cache_env, find_yolo_weights
-from .cleanup import _reachable_roots, size_text
+from .cleanup import size_text
 from .devices import cuda_hint
-from .disk_space import SPACE_CHECK_TIMEOUT, SPACE_RESERVE, _existing_folder, _reachable, downloaded_models
-from .hub import hub_cache_dir
+from .disk_space import SPACE_RESERVE, _existing_folder, downloaded_models
 from .models import MODELS
 from .paths import CONSTRAINTS_FILE, REQUIREMENTS_FILE, WINDOWS, script
 from .portable_python import PRIVATE_PYTHON
@@ -107,14 +106,6 @@ def _read_cfg(path):
     return values
 
 
-def _same_folder(first, second):
-    """Whether both paths name the same existing folder, also through a link, junction or 8.3 short name."""
-    try:
-        return os.path.samefile(first, second)
-    except OSError:
-        return False
-
-
 def check_program_files(base):
     """Are the program files in base of one FrameScout version (I34, I42)? More than one version file says no."""
     name = 'Program files'
@@ -146,9 +137,11 @@ def check_environment(base):
         return [CheckResult(name, False, f'The Python that .venv was created with is missing ({home}): the '
                             'FrameScout folder was moved, or that Python was deleted or uninstalled.',
                             f'Run {script("Install")}; it repairs the environment. Or move the folder back.')]
-    # Windows names the private Python's folder itself, Linux its bin folder (F47)
+    # Windows names the private Python's folder itself, Linux its bin folder (F47); the paths
+    # are compared as written, so the same folder reached through a link or an 8.3 short name
+    # counts as another one (I44)
     folder = home.parent if home.name == 'bin' else home
-    if folder.name.lower() == PRIVATE_PYTHON and not _same_folder(folder, private):
+    if folder.name.lower() == PRIVATE_PYTHON and os.path.normcase(folder) != os.path.normcase(private):
         return [CheckResult(name, False, f'.venv uses the private Python of another folder ({home}): the FrameScout '
                             'folder was copied or moved, and it stops working when that folder is deleted.',
                             f'Delete the folder {VENV_DIR} in this folder, then run {script("Install")}.')]
@@ -200,18 +193,14 @@ def check_torch(python, environ, torch_version, run=subprocess.run, timeout=TORC
     try:
         result = run([str(python), '-B', '-c', TORCH_PROBE], capture_output=True, text=True, env=environ,
                      timeout=timeout, cwd=None if cwd is None else str(cwd))
-    except subprocess.TimeoutExpired:
-        return [CheckResult(name, False, f'Importing PyTorch did not finish within {timeout} seconds.', REINSTALL)]
-    except OSError as exc:
-        return [CheckResult(name, False, f'The Python of .venv cannot be started ({exc}).', REINSTALL)]
-    lines = (result.stdout or '').strip().splitlines()
-    try:
-        if result.returncode:
-            raise ValueError
+        lines = (result.stdout or '').strip().splitlines()
+        if result.returncode or not lines:
+            raise ValueError(((result.stderr or '').strip().splitlines() or [f'exit code {result.returncode}'])[-1])
         found = json.loads(lines[-1])
-    except (ValueError, IndexError):
-        error = ((result.stderr or '').strip().splitlines() or [f'exit code {result.returncode}'])[-1]
-        return [CheckResult(name, False, f'PyTorch {torch_version} cannot be imported: {error}',
+    except (subprocess.TimeoutExpired, OSError, ValueError) as exc:
+        # one text for every way it fails (I44): the last line of the traceback, or the error
+        error = f'no answer within {timeout} seconds' if isinstance(exc, subprocess.TimeoutExpired) else exc
+        return [CheckResult(name, False, f'PyTorch {torch_version} does not import: {error}',
                             f'{REINSTALL} If it still fails, delete the folder {VENV_DIR} and run it once more.')]
     cuda_build = torch_version.partition('+')[2].startswith('cu')
     if found.get('available'):
@@ -244,18 +233,12 @@ def check_writable(folder, label):
     return [CheckResult(name, True, f'{folder} can be written{state}.', '')]
 
 
-def check_models(base, environ, timeout=SPACE_CHECK_TIMEOUT, reachable=_reachable_roots):
+def check_models(base, environ):
     """Information only: which search models and whether the person detection model are downloaded.
 
-    A model that is not downloaded is no problem: a search downloads it on first use. If the
-    drive of the model cache does not answer within timeout seconds (reachable: cleanup's root
-    probe), the result says that it is not known instead of "not downloaded yet" (review).
+    A model that is not downloaded is no problem: a search downloads it on first use.
     """
     env = engine_cache_env(environ, base)  # the engine's cache variables, as the app gives them
-    hub_cache = hub_cache_dir(env)
-    if not _reachable([hub_cache], timeout, reachable)[hub_cache]:
-        return [CheckResult('Model files', None, f'The model folder {hub_cache} did not answer within {timeout:g} '
-                            'seconds, so which model files are downloaded is not known.', '')]
     downloaded = downloaded_models(base, env)
     found, _ = find_yolo_weights(DEFAULT_YOLO_MODEL, base, base, env)
     have = [MODELS[key].label for key in MODELS if key in downloaded] + (['person detection'] if found else [])
