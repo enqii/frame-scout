@@ -517,15 +517,16 @@ click **Scan** (it only looks), check the categories, click **Delete selected** 
 confirm. Deleting is **permanent** (no Recycle Bin) and not possible while a search runs.
 
 Renaming or moving photos counts as new photos: they are analyzed again, and the old
-analyses and marks are listed as "unbound".
+analyses and marks are listed as "unbound". This does not apply to the photos of a renamed or
+deleted folder (see the table).
 
 | Category | Selected after a scan | What it is |
 |---|---|---|
 | Temporary thumbnail files | yes | Left by a search stopped while writing the galleries |
 | Galleries of renamed or deleted profiles | yes | HTML galleries that belong neither to a current profile nor to the last search |
 | Thumbnails no gallery shows | yes | Thumbnails neither the last search nor a kept gallery shows |
-| Cache entries of unbound photos | no | Analyses of photos no longer at their path. Unreachable drives, folders that do not answer within 30 seconds and links (junctions, mounted drives) whose target cannot be reached are not checked (a note names them); on Linux/macOS an empty folder at a mount point (e.g. under `/media` or `/mnt`) counts as an unmounted drive and is not checked either (mount it and scan again, or delete the empty folder first if the photos are gone for good), and so does a drive folder that is missing right in `/media/<user>`, `/run/media/<user>`, `/Volumes` or `/mnt` (removed on unmount; mount it and scan again); if a drive letter now belongs to another disk, its photos look unbound too |
-| Marks of unbound photos | no | Your marks of photos no longer at their path (only these marks, never `marks.json` itself) |
+| Cache entries of unbound photos | no | Analyses of photos no longer at their path. A photo is checked only if its drive or network share can be reached and its folder still exists and is not empty. A disconnected drive or an unmounted share leaves the folder missing or empty, so its photos are not checked, and a note counts them (connect the drive and scan again). A renamed or deleted folder looks the same, so the analyses of its photos are not offered. If a drive letter now belongs to another disk, its photos look unbound too |
+| Marks of unbound photos | no | Your marks of photos no longer at their path (only these marks, never `marks.json` itself; checked like the cache entries) |
 | Cache entries of older versions or unknown settings | yes | Analyses of an earlier FrameScout version or of command-line-only settings |
 | Cache entries of other AI settings | no | Analyses with other person detection settings; used again if you switch back |
 | Cache entries of other search models | no | Analyses of another search model; used again if you switch back |

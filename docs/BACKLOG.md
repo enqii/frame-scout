@@ -146,10 +146,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       home PC together with E17 (P10 B); from the results adjust how many cores
       `torch_threads` leaves free, or also lower the decoding threads (E2), which are not
       reduced now. Found in F4 (PR #65).
-- [ ] `hardware` **E58 – `FOLDER_TIMEOUT` is not measured on a slow folder:** the 30 s limit of
-      the unbound check (E37) is not tested on a legitimately slow folder (e.g. many absent
-      names, each confirmed by a `stat` on a slow share); such a folder is not checked (the safe
-      side). Measure it on the home PC or NAS and adjust the limit. Split off from E54 (PR #84).
 - [ ] `decision` **E64 – The feature cache signature still names the detector weights only by
       the name given:** `feature_signature` records `--yolo-model` as given, not which file
       `yolo_weights` loaded (see E60, which only logs the file). A run with fine-tuned weights
@@ -184,7 +180,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       the category lists its folders with their photo counts and its help asks to check
       them, and (user decision) neither category is selected by default any more. Idea:
       record the volume serial number (or mount) per root, which changes the cache or a
-      side file (hold point). Found in the PR of E8.
+      side file (hold point). Found in the PR of E8. Since I44 (PR #146) the photos of a
+      missing or empty folder (e.g. an unmounted mount point) are not checked, so the POSIX
+      case is covered; the reused drive letter remains.
 - [ ] `decision` **A47 – Decide the frontend framework before distribution (simplification):** a large
       part of `app.py` works around Streamlit's rerun model (session-state keys for every
       widget, fragments, `cached_*` functions keyed by mtime/size, notices carried over
@@ -385,6 +383,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       probe, (b) one generic PyTorch text, (d) go; (c) `check_program_files` stays.
       `disk_space.py`: simple rule as described. Roadmap P49 lines (cleanup, uninstall,
       install_check + disk_space); the item is done when the three PRs are merged.
+      Cleanup done in PR #146 (2026-11-17): `cleanup.py` 1,309 → about 940 lines, its tests
+      1,543 → about 1,130. Known limit of the simple rule: the photos of a renamed or deleted
+      folder are never offered as unbound.
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and

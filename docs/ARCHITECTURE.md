@@ -43,8 +43,8 @@ call the app production-ready.
 - The first download of a model into an empty cache and the fallback after an incomplete cache
   (E38); the time estimate (F12) of a live search; "Find similar" (F11) with real CLIP vectors
   and in a real browser; an export stopped during its writes; closing the
-  `Start-FrameScout.bat` window during a search; the mount-point check of unbound photos on
-  Linux/macOS (E54); HEIC from a real phone; RAW files without a usable preview.
+  `Start-FrameScout.bat` window during a search; the unbound-photo check with a real
+  disconnected drive or unmounted share (I44); HEIC from a real phone; RAW files without a usable preview.
 - The search quality of the three optional models (none is evaluated beyond the first AP@40
   values, E32).
 
@@ -332,10 +332,13 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   settings and other models, references no profile uses, and the opt-in ones (default off):
   cache rows and marks of unbound photos, marks of deleted profiles, damaged files set aside.
   `results/quick/` and `results/exports/` are in no category.
-- "Unbound" means the photo no longer exists at its path, anywhere. Existence checks
-  (`cleanup._PathCheck`) probe each drive or share root with a timeout (`ROOT_TIMEOUT`,
-  `FOLDER_TIMEOUT`), and an unreachable root or folder is **not checked**: its photos are neither
-  gone nor offered. A drive letter reused by another disk counts as reachable (A35, open); the
+- "Unbound" means the photo no longer exists at its path, anywhere. The existence check
+  (`cleanup._PathCheck`, simple rule since I44) probes each drive or share root once in a thread
+  with a timeout (`ROOT_TIMEOUT`). A photo is checked by one `stat` only if its root answers and
+  its folder exists and is not empty. Every other photo is **not checked**: it is neither gone nor
+  offered, and one note counts these photos. Known limit: a renamed or deleted folder looks like an
+  unmounted drive, so its photos are never offered. A share that hangs during the scan stalls it
+  until the OS gives up. A drive letter reused by another disk counts as reachable (A35, open); the
   scan therefore names folders with counts.
 - Categories that need an unreadable file (`results.json`, `profiles.json`, `marks.json`, the
   cache) are not offered with the reason. `_remove_file` refuses every `NEVER_DELETED` name.

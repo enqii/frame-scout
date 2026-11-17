@@ -60,6 +60,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **E45 – `publish_export` is not one step across files** – closed 2026-11-16 in the triage, not done: a kill within milliseconds between the renames was never observed
 - [x] **E55 – A model without `weights_repo` needs more than E39's download folder** – closed 2026-11-16 in the triage, not done: only needed if such a model is ever added
 - [x] **E62 – Rows cached as black images for a truncated HEIC stay valid after E59** – closed 2026-11-16 in the triage, not done: rare: needs a truncated HEIC analyzed before E59
+- [x] **E58 – `FOLDER_TIMEOUT` is not measured on a slow folder** – closed 2026-11-17, not done: the timeout was removed in [PR #146](https://github.com/enqii/frame-scout/pull/146) (I44)
 
 ### App (`app.py`)
 
