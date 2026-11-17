@@ -259,7 +259,8 @@ In the project folder, gitignored. Only values that differ from the defaults are
 are kept; keys follow the CLI options: `photo_folders` (list; the legacy single `photo_folder` is
 read as a list of one and never written again), `device` (`auto|cpu|cuda`), `batch_size`,
 `low_priority`, `top`, `person_detection`, `max_persons`, `person_confidence`,
-`reference_weight`, `model`, and `copy_folders` ({profile name: folder}, A17). `read_settings`
+`reference_weight`, `model`, `export_separator` (`comma|semicolon`, the CSV export's column
+separator, not an AI setting, F9) and `copy_folders` ({profile name: folder}, A17). `read_settings`
 checks every value against its widget range and falls back to the default with a warning; an
 unreadable file is never replaced. Saves merge into the current file under
 `settings.json.lock`.
