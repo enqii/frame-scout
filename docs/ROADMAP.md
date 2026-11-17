@@ -45,7 +45,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 
 ### P54 – Feature review (added 2026-11-17)
 - [x] List per module the features that could go or shrink, for the user's decision; `/triage`
-      names at least one removal candidate per round (F56; kind `docs`) – 2026-11-17
+      names at least one removal candidate per round (F56; kind `docs`) – 2026-11-17 ([#156](https://github.com/enqii/frame-scout/pull/156))
 
 ### P50 – Interface follow-ups 2 (added 2026-11-17)
 - [ ] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a
