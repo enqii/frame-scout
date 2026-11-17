@@ -70,8 +70,8 @@ def test_a_semicolon_csv_keeps_the_cells_and_the_decimal_point():
 
 
 def test_a_path_with_a_semicolon_is_quoted_in_a_semicolon_csv():
-    path = '/photos/a;b.jpg'
-    assert rows(export_csv([card(1, path)], {}, separator=';'), ';')[1][1] == path
+    cards = [card(1, '/photos/a;b.jpg')]
+    assert rows(export_csv(cards, {}, separator=';'), ';')[1][1] == cards[0]['path']
 
 
 def test_an_open_mark_is_an_empty_cell():
