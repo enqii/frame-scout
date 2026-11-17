@@ -380,10 +380,12 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   names the folders to delete by hand), refuses while a search runs, the app holds its start lock
   or `settings.json` is unreadable, lists what it deletes and what it keeps (`USER_DATA`: photos,
   references, results with marks, profiles and backup, settings, `run.log`, `.tmp/eval`), and
-  deletes after the answer `yes`. Since I44 it does not list caches outside the folder, nor
-  probe whether the environment's Python runs, nor retry a read-only file: a file held open
-  or read-only ends in the failure list (exit code 1, the private Python stays for another try). Exit code 3: everything deleted except the private Python
-  the script runs with; the `.bat` removes it last. Program files themselves are not deleted.
+  deletes after the answer `yes`. Caches outside the folder are neither listed nor deleted. A
+  program running without these locks is not detected beforehand (I44): deleting goes on, a
+  file it holds open (Windows) or a read-only file ends in the failure list, the rest of
+  that folder is already gone (exit code 1, the private Python stays for another try). Exit
+  code 3: everything deleted except the private Python the script runs with; the `.bat`
+  removes it last. Program files themselves are not deleted.
 - **Linux** (F47): `Install-`, `Start-`, `Check-` and `Uninstall-FrameScout.sh` (bash, LF
   endings by `.gitattributes`, mode 100755 in git) do what their `.bat` files do, with the same
   exit codes; `tests/test_linux_scripts.py` checks the shared lines and runs them on Linux.
@@ -402,10 +404,10 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   the system's form; `CUDA_BUILDS` holds a Windows and a Linux driver minimum per build, and
   WSL (a kernel release with `microsoft`) uses the Windows ones, since its nvidia-smi reports the
   Windows host's driver (`reports_windows_driver`; not verified on a GPU, F48); the uninstall
-  deletes `.venv/bin/python` and `.python/bin/python3` first and tells a running app by its
-  start lock (`app_running`, on Windows too;
-  a lock that only looks held gets the start script's way out, `stale_lock_hint`); the check
-  takes a `home` of `.python/bin` for the private Python `.python`.
+  deletes `.venv/bin/python` and `.python/bin/python3` first and tells a running app only by
+  its start lock (`app_running`, on Windows too; a lock that only looks held gets the start
+  script's way out, `stale_lock_hint`): Linux deletes files in use, so a Python of the
+  environment running without that lock is not reported at all; the check takes a `home` of `.python/bin` for the private Python `.python`.
 
 ## Environment variables, caches and offline loading
 

@@ -599,9 +599,10 @@ the folders to delete by hand.
   `~/.cache/torch`, `~/.cache/huggingface`, `~/.config/Ultralytics`, or the folders of your
   `TORCH_HOME`, `HF_HOME`, `YOLO_CONFIG_DIR`); other programs may use them, delete them
   yourself if nothing else needs them.
-- **Could not be deleted:** a file that a program holds open or that is read-only is listed
-  at the end; close the program (or clear the read-only attribute) and run the uninstall
-  again.
+- **Could not be deleted:** a file that a program holds open (for example a Python shell
+  started from `.venv`) or that you may not change is listed at the end; the rest is
+  deleted anyway, so such a program loses its environment. Close the program (on Windows,
+  clear the read-only attribute of a read-only file) and run the uninstall again.
 
 Afterwards, delete the project folder yourself to remove FrameScout completely. A Python
 you installed yourself stays in place.
