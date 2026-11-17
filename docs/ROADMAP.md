@@ -46,6 +46,20 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [ ] Collapsed score histogram per profile with an additive `results.json` field (F53; kind
       `code`; the caption says scores are relative heuristics)
 
+### P53 – Rules and project history (added 2026-11-17)
+- [ ] Rules in `CLAUDE.md` and the `/roadmap` briefs: no project history in code comments and
+      docstrings, tests only for what is necessary (F54, F55; kind `docs`)
+- [ ] Remove the project history from `framescout_core/` and its tests (F54; kind `code`, no
+      behavior change)
+- [ ] Remove the project history from the engine, images, scoring, evaluation tool and the other
+      root files, and their tests (F54; kind `code`, no behavior change)
+- [ ] Remove the project history from `app.py` and `framescout_ui/`, and their tests (F54; kind
+      `code`, no behavior change)
+
+### P54 – Feature review (added 2026-11-17)
+- [ ] List per module the features that could go or shrink, for the user's decision; `/triage`
+      names at least one removal candidate per round (F56; kind `docs`)
+
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new
       pool at home, search quality is a hold point) (tooling done 2026-10-26 in PR #32;

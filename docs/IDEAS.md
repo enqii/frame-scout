@@ -189,3 +189,22 @@ Disposition: parked: overlaps I19 and F14, decide those first (2026-11-16)
   same paths on the new PC (say so); restore must never overwrite user files; overlaps with
   F14 (shared ZIP code) and A30 (backups).
 - **Hold point:** product decision (scope of restore); no new dependency.
+
+## 2026-11-17
+
+Not from a brainstorming run: a size review after I44 (application code 13,139 lines, of
+which about 7,900 executable, 2,400 docstrings; tests 15,360). I44 removed about 1,050 lines
+(code and tests); the remaining size comes less from rare-case handling than from chains
+of follow-up fixes, the breadth of features and the verbosity of docstrings.
+
+### 1. Second simplification round: follow-up chains and leftovers (after I44)
+Disposition: take over → F57; tag decision, assessed after F56 (2026-11-17)
+
+### 2. Feature and style review: what FrameScout really needs
+Disposition: take over → F56; tag decision, roadmap P54 (2026-11-17)
+
+### 3. Remove the project history from the code and keep it out (rule)
+Disposition: take over → F54; roadmap P53 (2026-11-17)
+
+### 4. Test scope: only what is necessary (rule)
+Disposition: take over → F55; roadmap P53 (2026-11-17)
