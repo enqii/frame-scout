@@ -210,19 +210,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       A half-screen window is typical for this. Whether the header jumps when the 2 s update
       changes the length of the state text was not measured (no search was running at those
       widths). Found in the pass of A52 (the open question of PR #108).
-- [ ] `ready` **A55 – Notices of "Export and copy" appear behind the open popover:** "N copied …"
-      and "Exported to …" are written above the result grid, the popover stays open and covers
-      them, and the grid moves down by one notice per click. The user sees the outcome only
-      after closing the popover (the popover also scrolls inside itself at 726 px window
-      height). Options: write the notice inside the popover, or close it after the action as
-      the popover "More" does (F41). Found in the pass of A52.
-- [ ] `minor` **A56 – The title of a profile without context ends with a dangling " · ":** the saved
-      profile "purple picture" is listed as "purple picture ·" (Search profiles tab); the
-      separator belongs only between motif and context. Found in the pass of A52.
-- [ ] `minor` **A57 – Result cards use only half of the width in a narrow window:** at 420 px the
-      grid shows one card of about 200 px per row and the right half stays empty; the toolbar
-      wraps into three rows (usable). The popover "Export and copy" fits. Found in the pass
-      of A52.
 - [ ] `minor` **A58 – Parts of A52 that the second pass could not check:** open are the page change
       of the results (12 generated photos fit on one page), the contents of "Clean up
       storage" with entries (the scan listed eleven times "nothing to clean up"), person
@@ -233,10 +220,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (cards, marks, dialog, popover), the popover "Export and copy" at 420 px, copy and
       export notices. Photo set: 12 generated images, not real photos; the narrow widths
       were an iframe of that width in Chrome. Kind `docs`.
-- [ ] `minor` **A59 – The popover button "More" of a result card is taller than "Match" and "No
-      match":** the three buttons of a card's action row differ in height; the same height
-      would look tidier. Reported by the user in chat, not measured in the browser. Found
-      after the pass of A52.
 
 ### Installation / project
 

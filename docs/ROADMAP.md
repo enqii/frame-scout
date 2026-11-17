@@ -48,9 +48,9 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       names at least one removal candidate per round (F56; kind `docs`) – 2026-11-17 ([#156](https://github.com/enqii/frame-scout/pull/156))
 
 ### P50 – Interface follow-ups 2 (added 2026-11-17)
-- [ ] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a
+- [x] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a
       profile title, result cards in a narrow window, height of the "More" button
-      (A55, A56, A57, A59; kind `code`)
+      (A55, A56, A57, A59; kind `code`) – 2026-11-17 ([#157](https://github.com/enqii/frame-scout/pull/157))
 - [ ] Tooltips that stay open and the squeezed header at 680–1100 px (A53, A54; kind `code`)
 
 ### P51 – Excel-friendly CSV (added 2026-11-17)

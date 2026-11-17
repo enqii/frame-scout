@@ -204,3 +204,7 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **F44 – Check the results toolbar in a browser** – closed 2026-11-16 in the triage, not done: merged into A52
 - [x] **F55 – Test scope: only what is necessary (rule)** – done 2026-11-17, [PR #152](https://github.com/enqii/frame-scout/pull/152)
 - [x] **F54 – Project history in the code (rule and cleanup)** – done 2026-11-17, rule in [PR #152](https://github.com/enqii/frame-scout/pull/152), cleanup in [PR #153](https://github.com/enqii/frame-scout/pull/153), [PR #154](https://github.com/enqii/frame-scout/pull/154) and [PR #155](https://github.com/enqii/frame-scout/pull/155); the rest in `.github/workflows/tests.yml` is I56
+- [x] **A55 – Notices of "Export and copy" appear behind the open popover** – done 2026-11-17, [PR #157](https://github.com/enqii/frame-scout/pull/157)
+- [x] **A56 – The title of a profile without context ends with a dangling " · "** – done 2026-11-17, [PR #157](https://github.com/enqii/frame-scout/pull/157)
+- [x] **A57 – Result cards use only half of the width in a narrow window** – done 2026-11-17, [PR #157](https://github.com/enqii/frame-scout/pull/157)
+- [x] **A59 – The popover button "More" of a result card is taller than "Match" and "No match"** – done 2026-11-17, [PR #157](https://github.com/enqii/frame-scout/pull/157)
