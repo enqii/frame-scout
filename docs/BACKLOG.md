@@ -485,17 +485,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `CLAUDE.md`, `.claude/skills/roadmap/` briefs, all Python modules and tests,
       `docs/ARCHITECTURE.md` where it relies on IDs in the code. Risks: a "why" that only the
       history note carried is rewritten as a reason, not deleted. Decided 2026-11-17: yes,
-      roadmap P53 (1)–(4). Size S (rule) + M (cleanup). Idea of 2026-11-17.
-- [ ] `ready` **F55 – Test scope: only what is necessary (rule):** the tests (about 15,400 lines)
-      are larger than the code (about 13,100); many pin message wording or review edge cases, so
-      every feature costs twice. Sketch: a rule in `CLAUDE.md` (principle 5): tests cover what
-      would hurt if it broke (user data never overwritten or deleted, the cache signature,
-      scoring, file formats, the CLI contract); a fixed bug gets a test only if it can plausibly
-      come back; no tests for the exact wording of messages or for hypothetical cases; removing
-      a feature removes its tests. The simplification PRs apply it to the tests they touch; no
-      separate test-deletion sweep. Affected: `CLAUDE.md`, `/roadmap` briefs,
-      `docs/DEVELOPMENT.md`. Risks: a removed test lets a regression through; tests near user
-      data stay. Decided 2026-11-17: yes, roadmap P53 (1). Size S. Idea of 2026-11-17.
+      roadmap P53 (1)–(4); rule added in [PR #152](https://github.com/enqii/frame-scout/pull/152), the cleanup (2)–(4) is open. Size S (rule) + M (cleanup). Idea of 2026-11-17.
 - [ ] `decision` **F56 – Feature review: what FrameScout really needs (recurring):** after I44 most
       of the size is features: search core about 3,400 lines, UI 2,700, user state 2,000,
       installation and housekeeping 3,200, extra features (time estimate, quick search,
