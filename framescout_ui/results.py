@@ -379,7 +379,8 @@ def show_score_distribution(entry):
                        'encoding': {'x': {'field': 'cut', 'type': 'quantitative'}}})
     with st.expander('Score distribution'):
         st.vega_lite_chart({'data': {'values': bars}, 'layer': layers, 'height': 160}, width='stretch')
-        st.caption(f'The {score.lower()} of all {photos:,} photos of this search for this profile'
+        st.caption(f'The {score.lower()} of '
+                   + ('the only photo' if photos == 1 else f'all {photos:,} photos') + ' of this search for this profile'
                    + (f'; the red line marks place {len(cards):,}, the last photo shown (Maximum matches)'
                       if cards else '')
                    + '. Scores are relative to this search, not probabilities: a gap or bend in the curve is '
