@@ -389,6 +389,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       1,543 → about 1,130. Known limit of the simple rule: the photos of a renamed, deleted or
       emptied folder are never offered as unbound (way out: put any file into the folder and
       scan again).
+      Uninstall done in PR #148 (2026-11-17): `outside_leftovers`, `_retry_writable` and
+      `_held_open`/`programs_in_use` removed; a file held open or read-only ends in the
+      failure list.
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and
