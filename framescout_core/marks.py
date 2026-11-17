@@ -64,7 +64,9 @@ CARD_STYLE = (f'<style>{_CARD} :is(div:has(> [data-testid="stImage"]), [data-tes
               # a row too narrow for two cards (the gap between them is 1rem, Streamlit's
               # "small") shows one card across the whole row, not one of CARD_WIDTH and
               # an empty rest; the row is the element whose children wrap the cards, and
-              # the wrapper of a card gets its width from flex-basis
+              # the wrapper of a card gets its width from flex-basis; relies on Streamlit's
+              # DOM (the testids are checked against its bundle in the tests, the gap is
+              # not): after a change there, the row is half empty again
               f'div:has(> [data-testid="stLayoutWrapper"] > {_CARD}){{container-type:inline-size}}'
               f'@container (width < calc(2 * {CARD_WIDTH}px + 1rem)){{'
               f'[data-testid="stLayoutWrapper"]:has(> {_CARD}){{flex-basis:100%!important}}'
