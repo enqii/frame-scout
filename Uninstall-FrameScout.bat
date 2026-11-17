@@ -6,11 +6,11 @@ rem Deletes what the installer and FrameScout create again (.venv, the private P
 rem .python, .cache, .tmp, the person detection model, compiled files) after showing the
 rem list and asking. Never deletes your photos, references, results, profiles or settings.
 rem --dry-run only shows the list.
-rem It runs with the private Python of the installer (.python, P5 part C), never with
+rem It runs with the private Python of the installer (.python), never with
 rem .venv's own Python, which cannot delete itself while it runs. The private Python cannot
 rem delete itself either: the script deletes everything else and ends with exit code 3
 rem (framescout_core.uninstall.PRIVATE_PYTHON_EXIT_CODE) only after "yes", never in a dry run or when
-rem .python is not to be deleted; then this file deletes .python (I20).
+rem .python is not to be deleted; then this file deletes .python.
 rem No cache or TMP variables are set here: .tmp is deleted, and the script reports the
 rem user's caches.
 rem No delayed expansion: it would remove a "!" from the folder path and the arguments. The

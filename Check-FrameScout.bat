@@ -1,8 +1,8 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-rem Checks the FrameScout installation in this folder (F15) and names a fix per problem:
-rem leftover program files of another FrameScout version (I34), the Python environment,
+rem Checks the FrameScout installation in this folder and names a fix per problem:
+rem leftover program files of another FrameScout version, the Python environment,
 rem the package versions, PyTorch (and CUDA), whether .cache and results can be written,
 rem the downloaded model files and the free disk space. Read-only:
 rem nothing is written (-B: no compiled files), downloaded or repaired.

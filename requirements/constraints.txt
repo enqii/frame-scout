@@ -1,6 +1,6 @@
 # Exact versions of every package FrameScout installs, including the dependencies of the
-# dependencies (I12), sorted by name. Install-FrameScout.bat sets PIP_CONSTRAINT to this
-# file for install_torch.py (I18) and runs, in the FrameScout folder,
+# dependencies, sorted by name. Install-FrameScout.bat sets PIP_CONSTRAINT to this
+# file for install_torch.py and runs, in the FrameScout folder,
 #     pip install -r requirements\requirements.txt -c requirements\constraints.txt
 # so a fresh install gets these versions instead of the newest releases; requirements.txt
 # keeps the ranges of the direct dependencies. A constraint only limits versions and

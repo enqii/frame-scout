@@ -4,7 +4,7 @@ cd /d "%~dp0"
 rem Usage: Install-FrameScout.bat [cpu or cuda]
 rem Without an argument, an installed CUDA build of PyTorch is kept; otherwise GPU support
 rem is offered if an NVIDIA graphics driver is found. "cpu" or "cuda" switches the build.
-rem No delayed expansion (I21): it would remove a "!" from the folder path and the
+rem No delayed expansion: it would remove a "!" from the folder path and the
 rem arguments. The folder path is never used inside parentheses, where a ")" in it would
 rem end the block; the steps below jump with goto instead.
 set "TORCH_VARIANT=%~1"
@@ -20,7 +20,7 @@ if not "%TORCH_VARIANT%"=="" if /i not "%TORCH_VARIANT%"=="cpu" if /i not "%TORC
 rem lower case for install_torch.py
 if /i "%TORCH_VARIANT%"=="cpu" set "TORCH_VARIANT=cpu"
 if /i "%TORCH_VARIANT%"=="cuda" set "TORCH_VARIANT=cuda"
-rem I42: each version has one framescout-version-<version>.txt. A ZIP extracted over the
+rem Each version has one framescout-version-<version>.txt. A ZIP extracted over the
 rem folder of another version leaves both files, and files of two versions must not run
 rem together: stop before anything is downloaded or installed. Start-FrameScout.bat has the
 rem same lines (a test compares them).
@@ -37,8 +37,8 @@ pause
 exit /b 1
 :version_checked
 set "PIP_CACHE_DIR=%CD%\.cache\pip"
-rem Model downloads and library settings go to .cache, unless the user set a variable
-rem (A36): as for a manual engine run, that one wins. With the user's XDG_CACHE_HOME, torch and
+rem Model downloads and library settings go to .cache, unless the user set a variable:
+rem as for a manual engine run, that one wins. With the user's XDG_CACHE_HOME, torch and
 rem Hugging Face use its folders, so these two lines come first. Start-FrameScout.bat has the same lines.
 if not defined TORCH_HOME if not defined XDG_CACHE_HOME set "TORCH_HOME=%CD%\.cache\torch"
 if not defined HF_HOME if not defined XDG_CACHE_HOME set "HF_HOME=%CD%\.cache\huggingface"
@@ -47,7 +47,7 @@ if not defined XDG_CACHE_HOME set "XDG_CACHE_HOME=%CD%\.cache"
 set "TMP=%CD%\.tmp"
 set "TEMP=%CD%\.tmp"
 if not exist ".tmp" mkdir ".tmp"
-rem New installations get a private Python in .python (P5 part C): python.org's full
+rem New installations get a private Python in .python: python.org's full
 rem package for Windows, a ZIP, checked against its published SHA-256, so no Python has to
 rem be installed on the PC. framescout_core.portable_python pins the same values (a test).
 rem .venv refers to .python by its path: the folder cannot be moved afterwards.
@@ -63,12 +63,12 @@ rem An existing environment that starts and has pip is kept.
 if not errorlevel 1 goto packages
 set "VENV_BROKEN=1"
 rem Its Python is gone (.python deleted, the folder moved) or
-rem venv stopped before pip was installed (review). Below it is used again if it works with
+rem venv stopped before pip was installed. Below it is used again if it works with
 rem the private Python, otherwise it is created again.
 echo The Python environment in .venv does not work: its Python or pip is missing. The
 echo installer repairs it.
 :python
-rem A .python is reused only if it is complete and the pinned version (review, I24): a
+rem A .python is reused only if it is complete and the pinned version: a
 rem leftover of an uninstall or a delete that stopped halfway, or the Python of an older
 rem pin, is downloaded again.
 if not exist ".python\python.exe" goto python_download
@@ -84,7 +84,7 @@ curl.exe -fL --retry 3 -o "%PYTHON_ZIP%" "%PYTHON_URL%"
 if errorlevel 1 goto download_failed
 rem Windows PowerShell started from PowerShell 7 inherits its module path and then cannot
 rem find Get-FileHash; without the variable it uses its own default. The value is restored
-rem right after the check, so pip and install_torch.py get the user's value (review).
+rem right after the check, so pip and install_torch.py get the user's value.
 set "PSMODULEPATH_SAVED=%PSModulePath%"
 set "PSModulePath="
 powershell.exe -NoProfile -NonInteractive -Command "if ((Get-FileHash -Algorithm SHA256 -LiteralPath $env:PYTHON_ZIP).Hash -ne $env:PYTHON_SHA256) { exit 1 }"
@@ -99,7 +99,7 @@ if errorlevel 1 goto unpack_failed
 if not exist "%PYTHON_UNPACKED%\python.exe" goto unpack_failed
 rem Moved as a whole: an interrupted extraction never leaves a .python that looks complete.
 rem A virus scanner that still checks the new files makes the move fail with "Access is
-rem denied" for a moment, so it is tried up to five times (review); ping waits also when
+rem denied" for a moment, so it is tried up to five times; ping waits also when
 rem the console input is redirected, timeout does not.
 set "MOVE_TRIES=0"
 :move_python
@@ -124,16 +124,16 @@ rem --clear: a .venv that gets here does not work (no python.exe, or both checks
 if errorlevel 1 goto venv_failed
 :packages
 rem requirements\constraints.txt pins every package, including the dependencies of the
-rem dependencies, to the version of the verified runs (I12); requirements\requirements.txt
+rem dependencies, to the version of the verified runs; requirements\requirements.txt
 rem names the direct dependencies.
 rem PIP_CONSTRAINT applies the pins to the pip call of install_torch.py too, so torch's
-rem dependencies are not first installed in their newest versions (I18). It is set after
+rem dependencies are not first installed in their newest versions. It is set after
 rem the venv is created and relative: pip splits its value at spaces, and both pip calls
 rem run in this folder.
 set "PIP_CONSTRAINT=requirements\constraints.txt"
 rem PyTorch first (CPU or CUDA build); requirements.txt pins the same version. Without an
 rem argument install_torch.py keeps an installed CUDA build, otherwise it asks if it finds
-rem an NVIDIA driver. Exit code 3: the user stopped on low disk space (F3), not a failure.
+rem an NVIDIA driver. Exit code 3: the user stopped on low disk space, not a failure.
 ".venv\Scripts\python.exe" install_torch.py %TORCH_VARIANT%
 if errorlevel 3 (echo Installation stopped. Free some disk space, then run Install-FrameScout.bat again. & pause & exit /b 1)
 if errorlevel 1 (echo Installing PyTorch failed. See the error message above. & pause & exit /b 1)
@@ -167,7 +167,7 @@ echo Moving the extracted Python to .python failed (see the message above), usua
 echo a virus scanner still checks the new files. Run the installer again in a minute.
 goto failed
 :venv_failed
-rem a half-created .venv could pass the check at the top on the next run (review)
+rem a half-created .venv could pass the check at the top on the next run
 if exist ".venv" rmdir /s /q ".venv"
 echo Creating the virtual environment failed. See the error message above. If it fails
 echo again, delete the folder .python (the installer downloads it again) and run the

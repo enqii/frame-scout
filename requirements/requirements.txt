@@ -1,4 +1,4 @@
-# PyTorch is pinned (I3): Install-FrameScout.bat installs this version first from the
+# PyTorch is pinned: Install-FrameScout.bat installs this version first from the
 # PyTorch index, as the CPU build or a CUDA build (install_torch.py), and the same pins here
 # keep pip from replacing it. Change it together with TORCH_VERSION and TORCHVISION_VERSION
 # in framescout_core/torch_build.py (a test checks that they match).
@@ -6,8 +6,8 @@ torch==2.14.1
 torchvision==0.29.1
 # Minimum versions only: the versions of the project venv of the verified runs (Python 3.14,
 # CPU). Install-FrameScout.bat installs with -c constraints.txt, which pins these and all
-# their dependencies to the versions of that venv (I12); a pip install without it takes the
-# newest releases. Streamlit follows the same rule since A10; app.py needs at least 1.48
+# their dependencies to the versions of that venv; a pip install without it takes the
+# newest releases. Streamlit follows the same rule; app.py needs at least 1.48
 # (width='stretch' on buttons).
 streamlit>=1.66.1
 numpy>=2.5.4
@@ -15,10 +15,10 @@ pillow>=12.3.0
 open_clip_torch>=3.3.0
 ultralytics>=8.4.183
 psutil>=7.2.2
-# HEIC/HEIF and camera RAW photos (E25), with the versions of the project venv's smoke runs
+# HEIC/HEIF and camera RAW photos, with the versions of the project venv's smoke runs
 # as minimum; without them the engine skips those photos with a note.
 pillow-heif>=1.8.1
 rawpy>=0.27.1
-# The tokenizer of the optional SigLIP search model (E22), with the version of the project
+# The tokenizer of the optional SigLIP search model, with the version of the project
 # venv's smoke run as minimum; without it only that model is refused, with a note.
 transformers>=5.21.0

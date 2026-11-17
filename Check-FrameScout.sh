@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Usage: ./Check-FrameScout.sh
-# The Linux counterpart of Check-FrameScout.bat (F47): checks the FrameScout installation
-# in this folder (F15) and names a fix per problem. Read-only: nothing is written (-B: no
+# The Linux counterpart of Check-FrameScout.bat: checks the FrameScout installation
+# in this folder and names a fix per problem. Read-only: nothing is written (-B: no
 # compiled files), downloaded or repaired.
 # It runs with the Python of .venv if that starts, otherwise with the private Python in
 # .python (the check needs only the standard library), so it can also say why .venv
