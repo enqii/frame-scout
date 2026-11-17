@@ -38,24 +38,24 @@ def test_context_features_and_custom_prompts_are_combined_in_order(tmp_path):
         'A photograph of Red car (Vehicles), with red bodywork, four wheels.',
         'An image showing red bodywork, four wheels, depicting Red car (Vehicles).',
         'a red sports car']
-    # the six generated prompts form the template ensemble, the custom one stays apart (E4)
+    # the six generated prompts form the template ensemble, the custom one stays apart
     assert profile['generated'] == 6
 
 
 def test_query_labels_name_the_queries_in_scoring_order(tmp_path):
-    # F17: the averaged generated texts first, named by the motif, then each custom text
+    # the averaged generated texts first, named by the motif, then each custom text
     path = write_profiles(tmp_path, {'profiles': [{
         'name': 'Red car', 'franchise': 'Vehicles', 'features': 'four wheels',
         'prompts': ['a red sports car', 'a car in the snow']}]})
     [profile] = load_profiles(path, [])
     assert query_labels(profile) == ['motif "Red car"', '"a red sports car"', '"a car in the snow"']
     assert query_labels(quick_profile('a dog')) == ['motif "a dog"']
-    # "Find similar" (F11) has no text
+    # "Find similar" has no text
     assert query_labels(like_profile('/photos/a.jpg', 'Full image')) == []
 
 
 def test_query_labels_follow_the_queries_of_the_scoring(tmp_path):
-    # review: Match.query indexes framescout_scoring.text_queries and the cards name it by
+    # Match.query indexes framescout_scoring.text_queries and the cards name it by
     # query_labels, two modules kept in step only by this test. A one-hot vector per prompt
     # shows which prompts each query is made of.
     path = write_profiles(tmp_path, {'profiles': [
@@ -75,7 +75,7 @@ def test_query_labels_follow_the_queries_of_the_scoring(tmp_path):
 
 
 def test_query_labels_show_custom_texts_without_stray_white_space(tmp_path):
-    # review: a custom text is used as written, but its name on a card has no line break
+    # a custom text is used as written, but its name on a card has no line break
     # or padding inside the quotes
     path = write_profiles(tmp_path, {'profiles': [{
         'name': 'Red car', 'prompts': ['  a red\n sports   car \n', 'a car in the snow']}]})
@@ -140,7 +140,7 @@ def test_missing_or_blank_name_is_rejected(tmp_path, profile):
 
 @pytest.mark.parametrize('second', ['RED CAR', ' Red car', 'red car  '])
 def test_duplicate_names_are_rejected_case_and_whitespace_insensitively(tmp_path, second):
-    # names are stored stripped; " Red car" would otherwise merge with "Red car" (E10)
+    # names are stored stripped; " Red car" would otherwise merge with "Red car"
     path = write_profiles(tmp_path, {'profiles': [{'name': 'Red car'}, {'name': second}]})
     with pytest.raises(ValueError):
         load_profiles(path, [])

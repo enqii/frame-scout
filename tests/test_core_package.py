@@ -1,4 +1,4 @@
-"""Imports from framescout_core go to the module that defines a name (I45): no re-export list."""
+"""Imports from framescout_core go to the module that defines a name: no re-export list."""
 import ast
 import importlib
 import pkgutil

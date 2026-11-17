@@ -1,4 +1,4 @@
-"""The photos of a search: supported extensions, RAW+JPEG pairs, skipped files and RAW previews (E25)."""
+"""The photos of a search: supported extensions, RAW+JPEG pairs, skipped files and RAW previews."""
 import collections
 import copy
 import os
@@ -58,7 +58,7 @@ class FakeFeatures:
 
 
 def importer(available, avif=True):
-    """An import_module that only knows the module names in available (review)."""
+    """An import_module that only knows the module names in available."""
     imported = []
 
     def import_module(name):
@@ -72,7 +72,7 @@ def importer(available, avif=True):
 
 def test_available_decoders_import_the_packages():
     # really imports them (not only find_spec), as the engine does: a package that is
-    # installed but cannot be loaded counts as missing in the app and the engine (review)
+    # installed but cannot be loaded counts as missing in the app and the engine
     load = importer({'PIL.features', 'pillow_heif', 'rawpy'})
     assert available_decoders(load) == ALL_DECODERS
     assert set(load.imported) == {'PIL.features', 'pillow_heif', 'rawpy'}
@@ -153,7 +153,7 @@ def test_scan_skips_a_raw_file_with_a_jpeg_or_heic_of_the_same_name(tmp_path, pa
     kept = touch(tmp_path / partner)
     scan = scan_photos(tmp_path)
     assert scan.paths == [kept]
-    # the skipped RAW files themselves, so the log can name them (review)
+    # the skipped RAW files themselves, so the log can name them
     assert scan.raw_pairs == [raw]
     assert scan.unsupported == collections.Counter()
 
@@ -183,7 +183,7 @@ def test_scan_of_an_empty_folder(tmp_path):
     assert scan_photos(tmp_path) == PhotoScan([], [], collections.Counter())
 
 
-# --- the RAW file of a broken partner (E30) ---
+# --- the RAW file of a broken partner ---
 
 def test_raw_fallbacks_map_each_partner_to_its_skipped_raw_file(tmp_path):
     raw = touch(tmp_path / 'IMG_0001.CR2')
@@ -215,7 +215,7 @@ def test_raw_fallbacks_without_pairs():
 
 
 def test_raw_fallbacks_match_the_pairs_of_scan_photos_across_folders(tmp_path):
-    # the pairing of raw_fallbacks is the one scan_photos skips the RAW files by (review):
+    # the pairing of raw_fallbacks is the one scan_photos skips the RAW files by:
     # mixed-case names, subfolders and several photo folders joined into one scan
     first, second = tmp_path / 'one', tmp_path / 'two'
     raws = [touch(first / 'Shot.NEF'), touch(first / 'sub' / 'x.dng'), touch(second / 'SHOT.cr2')]
@@ -241,7 +241,7 @@ def test_raw_fallback_defers_only_partners_with_a_raw_file(tmp_path):
 
 
 def test_raw_fallback_is_not_used_when_another_partner_of_the_shot_was_analyzed(tmp_path):
-    # IMG_0001.dng + a good JPEG + a broken HEIC: the shot is in the results once, as the JPEG (review)
+    # IMG_0001.dng + a good JPEG + a broken HEIC: the shot is in the results once, as the JPEG
     touch(tmp_path / 'IMG_0001.dng')
     jpeg = touch(tmp_path / 'IMG_0001.jpg')
     heic = touch(tmp_path / 'IMG_0001.heic')
@@ -278,7 +278,7 @@ def test_raw_fallback_photos_name_the_raw_file_in_place_of_its_partner(tmp_path)
     assert fallback.photos(scan.paths) == [a, b, c]
     fallback.defer(b)
     chosen, _ = fallback.choose(lambda path: False)
-    # a chosen RAW file that could not be analyzed either is not named (review)
+    # a chosen RAW file that could not be analyzed either is not named
     assert fallback.photos(scan.paths) == [a, b, c]
     fallback.use(b, chosen[b])
     # the shot keeps its place (and the number of photos stays the same)
@@ -287,7 +287,7 @@ def test_raw_fallback_photos_name_the_raw_file_in_place_of_its_partner(tmp_path)
 
 
 def test_partners_with_a_raw_file_must_decode_completely(tmp_path):
-    # E46: a merely truncated JPEG decodes (the missing part gray); next to a RAW file it
+    # a merely truncated JPEG decodes (the missing part gray); next to a RAW file it
     # fails instead, so the RAW file is analyzed
     touch(tmp_path / 'IMG_0001.dng')
     jpeg = touch(tmp_path / 'IMG_0001.jpg')
@@ -297,7 +297,7 @@ def test_partners_with_a_raw_file_must_decode_completely(tmp_path):
 
 
 def test_a_truncated_partner_is_analyzed_as_far_as_it_goes_if_its_raw_file_fails(tmp_path):
-    # E46: a RAW file LibRaw cannot read (e.g. a camera it does not know) must not cost the
+    # a RAW file LibRaw cannot read (e.g. a camera it does not know) must not cost the
     # shot whose truncated JPEG was readable in part
     raw = touch(tmp_path / 'IMG_0001.dng')
     jpeg = touch(tmp_path / 'IMG_0001.jpg')
@@ -324,7 +324,7 @@ def test_a_truncated_partner_is_not_retried_once_its_raw_file_was_analyzed(tmp_p
 
 
 def test_a_partner_that_fails_otherwise_is_not_retried_after_its_raw_file(tmp_path):
-    # a corrupt header cannot be read in part: its RAW file failing ends the shot as in E30
+    # a corrupt header cannot be read in part: its RAW file failing ends the shot
     raw = touch(tmp_path / 'IMG_0001.dng')
     heic = touch(tmp_path / 'IMG_0001.heic')
     fallback = RawFallback(scan_photos(tmp_path))
@@ -333,7 +333,7 @@ def test_a_partner_that_fails_otherwise_is_not_retried_after_its_raw_file(tmp_pa
     assert fallback.defer(raw) is False and fallback.retry() == ([], [])
 
 
-# --- several photo folders (A25) ---
+# --- several photo folders ---
 
 def test_distinct_folders_keep_the_order_of_the_list(tmp_path):
     a, b = tmp_path / 'b-event', tmp_path / 'a-event'
@@ -385,7 +385,7 @@ def test_the_output_folder_must_be_outside_every_photo_folder_list_entry(tmp_pat
     # the output folder inside a photo folder is left out of the scan, as before
     assert output_folder_problem([tmp_path], results) is None
     assert 'must not be a photo folder' in output_folder_problem([photos, results], results)
-    # review: a photo folder inside the output folder would be searched without any photo
+    # a photo folder inside the output folder would be searched without any photo
     inside = results / 'import'
     problem = output_folder_problem([photos, inside], results)
     assert str(inside) in problem and 'inside the output folder' in problem
@@ -401,7 +401,7 @@ def test_missing_folders_message():
 
 
 def test_one_folder_has_no_label(tmp_path):
-    # the gallery of a single folder shows the paths as before (user decision on A25)
+    # the gallery of a single folder shows the paths without a folder label
     assert folder_labels([tmp_path / 'event']) == ['']
     assert folder_labels([]) == []
 
@@ -418,7 +418,7 @@ def test_folders_of_the_same_name_get_more_of_their_path(tmp_path):
 
 
 def test_a_label_never_starts_another_label(tmp_path):
-    # review: labels "Event" and "Event/sub" would show D:/Event/sub/x.jpg and
+    # labels "Event" and "Event/sub" would show D:/Event/sub/x.jpg and
     # E:/Event/sub/x.jpg both as "Event/sub/x.jpg"
     a, b, c = tmp_path / 'd' / 'Event', tmp_path / 'e' / 'Event' / 'sub', tmp_path / 'f' / 'sub'
     labels = folder_labels([a, b, c])
@@ -474,7 +474,7 @@ def test_join_scans_of_folders_counted_one_by_one(tmp_path):
 
 def test_scan_keeps_the_modification_time_and_size_of_each_photo(tmp_path):
     # the app compares them with the cache rows, like the engine, without asking the
-    # file system again for every photo (A44)
+    # file system again for every photo
     a = touch(tmp_path / 'one' / 'a.jpg')
     b = tmp_path / 'one' / 'sub' / 'b.png'
     b.parent.mkdir(parents=True)
@@ -483,14 +483,14 @@ def test_scan_keeps_the_modification_time_and_size_of_each_photo(tmp_path):
     touch(tmp_path / 'one' / 'clip.mov')
     scan = scan_photos(tmp_path / 'one')
     # and of each RAW file skipped for a partner: the app counts a quick search with the RAW
-    # files analyzed in place of a broken partner (E61) without a stat per RAW file (review)
+    # files analyzed in place of a broken partner without a stat per RAW file
     assert scan.stats == {p: (p.stat().st_mtime_ns, p.stat().st_size) for p in (a, b, raw)}
     # a hand-made scan has none: the photos are looked at when needed
     assert PhotoScan([a], [], collections.Counter()).stats == {}
 
 
 def test_a_scan_can_be_pickled_and_copied(tmp_path):
-    # e.g. as the value of st.cache_data, which pickles it (review)
+    # e.g. as the value of st.cache_data, which pickles it
     touch(tmp_path / 'a.jpg')
     for scan in (scan_photos(tmp_path), PhotoScan([tmp_path / 'b.jpg'], [], collections.Counter())):
         assert pickle.loads(pickle.dumps(scan)) == scan
@@ -504,7 +504,7 @@ def test_scan_keeps_the_times_of_each_folder_apart(tmp_path):
     assert set(one.stats) == {a} and set(two.stats) == {b}
 
 
-# --- the same folder or photo by another path (A28) and links inside a folder (A29) ---
+# --- the same folder or photo by another path and links inside a folder ---
 
 def link_folder(link, target):
     """Make link a folder link to target: a junction on Windows (no privileges needed), a symlink elsewhere."""
@@ -535,7 +535,7 @@ def fake_identity(same):
 
 
 def test_distinct_folders_drop_the_same_folder_by_another_path(tmp_path):
-    # e.g. a mapped drive letter and the UNC path of the same share (A28)
+    # e.g. a mapped drive letter and the UNC path of the same share
     drive, unc, other = Path('Z:/photos'), Path('//server/share/photos'), tmp_path / 'other'
     kept, dropped = distinct_folders([drive, other, unc], identity=fake_identity([{drive, unc}]))
     assert kept == [drive, other]
@@ -544,7 +544,7 @@ def test_distinct_folders_drop_the_same_folder_by_another_path(tmp_path):
 
 
 def test_distinct_folders_drop_a_folder_inside_another_listed_folder_by_another_path(tmp_path):
-    # Z:/photos/event is inside //server/share/photos, which is Z:/photos (A28)
+    # Z:/photos/event is inside //server/share/photos, which is Z:/photos
     drive, unc = Path('Z:/photos'), Path('//server/share/photos')
     child = drive / 'event'
     for listed in ([unc, child], [child, unc]):
@@ -571,7 +571,7 @@ def test_distinct_folders_recognize_a_junction_to_a_listed_folder(tmp_path):
 
 
 def test_scan_follows_a_folder_link_to_photos_outside_the_folder(tmp_path):
-    # event folders linked into one parent folder are searched through the links, as before (A29)
+    # event folders linked into one parent folder are searched through the links, as before
     touch(tmp_path / 'elsewhere' / 'event' / 'a.jpg')
     parent = tmp_path / 'all'
     parent.mkdir()
@@ -626,13 +626,13 @@ def test_scan_finds_a_hard_linked_photo_once(tmp_path):
         pytest.skip(f'no hard links here: {exc}')
     assert scan_folders([tmp_path / 'one', tmp_path / 'two']).paths == [a]
     assert scan_photos(tmp_path).paths == [a]
-    # A37: the photo found again is counted, for the folder it was found again in
+    # the photo found again is counted, for the folder it was found again in
     assert [s.found_again for s in scan_each_folder([tmp_path / 'one', tmp_path / 'two'])] == [0, 1]
     assert scan_photos(tmp_path).found_again == 1
 
 
 def test_scan_counts_the_folders_reached_again_through_a_link(tmp_path):
-    # A37: a link into a folder already searched adds nothing; the scan says how many there were
+    # a link into a folder already searched adds nothing; the scan says how many there were
     root = tmp_path / 'photos'
     touch(root / 'zz-event' / 'a.jpg'); touch(root / 'zz-event' / 'b.jpg')
     link_folder(root / 'aa-link', root / 'zz-event')
@@ -644,8 +644,8 @@ def test_scan_counts_the_folders_reached_again_through_a_link(tmp_path):
 
 
 def test_scan_counts_no_folder_again_for_listed_folders_given_twice_or_nested(tmp_path):
-    # review of A37: only a link is named "reached again through a link"; a folder listed
-    # twice or inside another listed one is distinct_folders' case (A25), not this count's
+    # only a link is named "reached again through a link"; a folder listed
+    # twice or inside another listed one is distinct_folders' case, not this count's
     (tmp_path / 'event' / 'day-1').mkdir(parents=True)
     (tmp_path / 'event' / 'day-1' / 'a.jpg').write_bytes(b'x')
     scans = scan_each_folder([tmp_path / 'event', tmp_path / 'event', tmp_path / 'event' / 'day-1'])
@@ -669,7 +669,7 @@ def test_scan_leaves_out_the_excluded_folder_through_a_link(tmp_path):
 
 
 def test_scan_leaves_out_a_listed_folder_that_is_or_is_inside_the_excluded_folder(tmp_path):
-    # as the old "exclude in path.parents" check did, and also through a link to it (review)
+    # as the old "exclude in path.parents" check did, and also through a link to it
     results = tmp_path / 'results'
     touch(results / 'thumbnails' / 'thumb.jpg')
     link = link_folder(tmp_path / 'link', results)
@@ -679,7 +679,7 @@ def test_scan_leaves_out_a_listed_folder_that_is_or_is_inside_the_excluded_folde
 
 
 def test_scan_keeps_different_photos_apart_on_a_file_system_with_repeated_file_ids(tmp_path, monkeypatch):
-    # some file systems give different files the same non-zero file id (review)
+    # some file systems give different files the same non-zero file id
     import framescout_core.photos as photos
     a = touch(tmp_path / 'a.jpg')
     b = tmp_path / 'b.jpg'
@@ -697,7 +697,7 @@ def test_scan_keeps_different_photos_apart_on_a_file_system_with_repeated_file_i
 
 
 def test_scan_ends_a_link_loop_on_a_file_system_without_file_ids(tmp_path, monkeypatch):
-    # without identities the folders are compared by their real paths, so a loop still ends (review)
+    # without identities the folders are compared by their real paths, so a loop still ends
     import framescout_core.photos as photos
     monkeypatch.setattr(photos, '_identity', lambda path: None)
     monkeypatch.setattr(photos, '_file_identity', lambda path: None)
@@ -709,7 +709,7 @@ def test_scan_ends_a_link_loop_on_a_file_system_without_file_ids(tmp_path, monke
 
 
 def test_scan_tries_a_folder_again_through_another_path(tmp_path, monkeypatch):
-    # a folder that cannot be read once is not marked as walked (review)
+    # a folder that cannot be read once is not marked as walked
     import framescout_core.photos as photos
     root = tmp_path / 'photos'
     touch(root / 'zz-event' / 'a.jpg')
@@ -727,7 +727,7 @@ def test_scan_tries_a_folder_again_through_another_path(tmp_path, monkeypatch):
 
 
 def test_distinct_folders_do_not_ask_the_parents_of_a_folder_without_identity(tmp_path):
-    # e.g. an unreachable network folder: each parent could block for a timeout (review)
+    # e.g. an unreachable network folder: each parent could block for a timeout
     gone, here = Path('//server/share/event'), tmp_path / 'here'
     calls = []
 
@@ -783,7 +783,7 @@ def test_skipped_lines_both_kinds():
 
 
 def test_skipped_lines_name_photos_and_folders_found_again():
-    # A37: photos and folders reached through a second path are searched once; the log says so
+    # photos and folders reached through a second path are searched once; the log says so
     lines = skipped_lines(PhotoScan([], [], collections.Counter(), found_again=12, folders_again=2))
     assert lines == ['12 photos found again through another path (a link or hard link), analyzed once.',
                      '2 folders reached again through a link, searched once.']
@@ -794,7 +794,7 @@ def test_skipped_lines_name_photos_and_folders_found_again():
 
 def test_skipped_lines_explain_files_of_a_missing_decoder_once():
     # files whose package is missing are named with the reason, not again as an
-    # "unsupported extension"; nothing is said when the folder has none of them (review)
+    # "unsupported extension"; nothing is said when the folder has none of them
     scan = scan_of(heic=1, heif=1, nef=1, cr3=2, avif=1, mov=4)
     lines = skipped_lines(scan, NONE)
     assert len(lines) == 4
@@ -838,7 +838,7 @@ def test_raw_preview_transpose(orientation, flip, expected):
     assert raw_preview_transpose(orientation, flip) == expected
 
 
-# --- remembered_scans (A27) ---
+# --- remembered_scans ---
 
 class CountingScan:
     """A scan_each_folder stand-in that counts its calls and returns one empty PhotoScan per folder."""
@@ -915,7 +915,7 @@ def test_remembered_scans_finds_new_photos_only_on_recount(tmp_path):
 
 def test_remembered_scans_counts_again_after_a_folder_was_gone(tmp_path):
     # [A], [], [A]: the only folder disconnected and reconnected (e.g. a USB drive) is counted
-    # again, though the key of the count is the same as before (review)
+    # again, though the key of the count is the same as before
     memory, scan = {}, CountingScan()
     remembered_scans(memory, [tmp_path], EXT, None, scan=scan, clock=lambda: 1.0)
     assert remembered_scans(memory, [], EXT, None, scan=scan) == ([], None)
@@ -925,7 +925,7 @@ def test_remembered_scans_counts_again_after_a_folder_was_gone(tmp_path):
 
 
 def test_a_truncated_partner_that_did_not_get_the_raw_file_is_retried_if_it_fails(tmp_path):
-    # E53: a broken HEIC failed first and got the RAW file; the truncated JPEG of the shot
+    # a broken HEIC failed first and got the RAW file; the truncated JPEG of the shot
     # waits instead of being lost, and is analyzed as far as its data goes if the RAW file
     # fails too
     raw = touch(tmp_path / 'IMG_0001.dng')
@@ -941,7 +941,7 @@ def test_a_truncated_partner_that_did_not_get_the_raw_file_is_retried_if_it_fail
 
 
 def test_a_waiting_truncated_partner_stays_a_failure_once_the_raw_file_was_analyzed(tmp_path):
-    # E53: the shot is analyzed as its RAW file; the truncated JPEG that waited is counted
+    # the shot is analyzed as its RAW file; the truncated JPEG that waited is counted
     # as a failure now, as it was before
     raw = touch(tmp_path / 'IMG_0001.dng')
     heic = touch(tmp_path / 'IMG_0001.heic')
@@ -958,7 +958,7 @@ def test_a_waiting_truncated_partner_stays_a_failure_once_the_raw_file_was_analy
 
 @pytest.mark.parametrize('first', ['heic', 'jpg'])
 def test_every_truncated_partner_of_the_shot_waits_for_the_raw_file(tmp_path, first):
-    # E53 review: a second truncated partner is not lost either, whether the partner that got
+    # a second truncated partner is not lost either, whether the partner that got
     # the RAW file failed otherwise (heic) or is truncated itself (jpg)
     raw = touch(tmp_path / 'IMG_0001.dng')
     photos = {ext: touch(tmp_path / f'IMG_0001.{ext}') for ext in ('heic', 'jpg', 'jpeg')}
@@ -967,7 +967,7 @@ def test_every_truncated_partner_of_the_shot_waits_for_the_raw_file(tmp_path, fi
     order = [first] + [ext for ext in photos if ext != first]
     for ext in order:
         assert fallback.defer(photos[ext], truncated=ext != 'heic')
-    # a HEIC that failed otherwise and did not get the RAW file stays a failure (E30)
+    # a HEIC that failed otherwise and did not get the RAW file stays a failure
     lost = [photos['heic']] if first != 'heic' else []
     assert fallback.choose(lambda path: False) == ({photos[first]: raw}, lost)
     # the RAW file fails: every truncated partner is analyzed as far as its data goes, and
@@ -992,7 +992,7 @@ def test_every_waiting_truncated_partner_stays_a_failure_once_the_raw_file_was_a
     assert fallback.retry() == ([], [jpeg])
 
 
-# E57: the marker segments of a JPEG that ends before its end marker; built by hand, so
+# the marker segments of a JPEG that ends before its end marker; built by hand, so
 # that the tests need no Pillow
 def segment(marker, payload=b''):
     return bytes((0xFF, marker)) + (len(payload) + 2).to_bytes(2, 'big') + payload

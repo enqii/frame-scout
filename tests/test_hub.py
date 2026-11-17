@@ -1,4 +1,4 @@
-"""Hugging Face Hub access of the search models: offline once cached, no symlink warning (E16, E33)."""
+"""Hugging Face Hub access of the search models: offline once cached, no symlink warning."""
 import subprocess
 import sys
 import textwrap
@@ -84,7 +84,7 @@ def test_an_unreadable_ref_or_a_path_outside_the_snapshots_is_not_cached(tmp_pat
 
 @pytest.mark.parametrize('ref', ['..', '.'])
 def test_a_dot_ref_is_not_cached(tmp_path, ref):
-    # review: Path('..').name == '..', so the name check alone lets it through
+    # Path('..').name == '..', so the name check alone lets it through
     folder = tmp_path / 'models--org--model'
     (folder / 'refs').mkdir(parents=True)
     (folder / 'snapshots').mkdir()
@@ -165,7 +165,7 @@ def test_the_cache_folder_defaults_to_the_one_of_the_environment(tmp_path):
 
 
 def test_a_hub_library_imported_before_gets_the_values_as_well(tmp_path):
-    # review: huggingface_hub reads the variables on import, so an earlier import would ignore them
+    # huggingface_hub reads the variables on import, so an earlier import would ignore them
     cache_file(tmp_path, DEFAULT.weights_repo, 'open_clip_model.safetensors')
     hub = types.SimpleNamespace(HF_HUB_OFFLINE=False, HF_HUB_DISABLE_SYMLINKS_WARNING=False,
                                 HF_HUB_DISABLE_TELEMETRY=False)
@@ -187,7 +187,7 @@ def test_an_online_import_leaves_the_offline_flag_of_an_imported_hub_alone(tmp_p
 
 
 def test_the_real_huggingface_hub_follows_the_offline_switch(tmp_path):
-    # review: checks that the installed huggingface_hub reads the flags that are switched
+    # checks that the installed huggingface_hub reads the flags that are switched
     # (skipped without huggingface_hub, e.g. in CI); a fresh process keeps os.environ clean
     pytest.importorskip('huggingface_hub')
     cache_file(tmp_path, DEFAULT.weights_repo, 'open_clip_model.safetensors')
@@ -239,7 +239,7 @@ def open_clip_weights_error():
 
 
 def test_a_missing_cache_file_is_told_apart_from_other_load_errors():
-    # review: only a missing file goes online again; OOM, a bad device or a broken file do not
+    # only a missing file goes online again; OOM, a bad device or a broken file do not
     assert hub_file_error(open_clip_weights_error())
     assert hub_file_error(ConnectionError('offline mode is enabled'))
     assert hub_file_error(OSError("can't load tokenizer"))

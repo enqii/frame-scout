@@ -1,4 +1,4 @@
-"""Marks of gallery photos in results/marks.json (framescout_core, A17)."""
+"""Marks of gallery photos in results/marks.json (framescout_core)."""
 import importlib.util
 import json
 import os
@@ -157,7 +157,7 @@ def test_renaming_a_profile_without_marks_changes_nothing(tmp_path):
     assert path.read_bytes() == before
 
 
-# --- deleting a profile (A22) ------------------------------------------------------------
+# --- deleting a profile ------------------------------------------------------------
 
 def test_deleting_a_profile_deletes_only_its_marks(tmp_path):
     path = tmp_path / MARKS_FILE
@@ -168,7 +168,7 @@ def test_deleting_a_profile_deletes_only_its_marks(tmp_path):
 
 
 def test_a_new_profile_of_a_deleted_name_starts_without_marks(tmp_path):
-    # the bug of A22: marks are keyed by the name, so they must go with the deleted profile
+    # marks are keyed by the name, so they must go with the deleted profile
     path = tmp_path / MARKS_FILE
     save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
     delete_marks(path, 'Red car')
@@ -214,7 +214,7 @@ def test_deleting_waits_for_the_lock_and_gives_up(tmp_path):
     assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH}}
 
 
-# --- removing single marks (unbound photos, E8/A21) ---------------------------------------
+# --- removing single marks (unbound photos) ----------------------------------------------
 
 def test_removing_marks_removes_only_the_named_entries(tmp_path):
     path = tmp_path / MARKS_FILE
@@ -230,7 +230,7 @@ def test_removing_marks_removes_only_the_named_entries(tmp_path):
 
 
 def test_removing_marks_of_deleted_profiles_keeps_those_of_a_current_profile(tmp_path):
-    # the cleanup of marks of names that are no profile (A34): checked under the lock
+    # the cleanup of marks of names that are no profile: checked under the lock
     path, profiles = tmp_path / MARKS_FILE, tmp_path / 'profiles.json'
     save_marks(path, 'Dog', {'a.jpg': MARK_MATCH})
     save_marks(path, 'Cat', {'a.jpg': MARK_MATCH})
@@ -276,7 +276,7 @@ def test_removing_marks_never_replaces_an_unreadable_file_and_waits_for_the_lock
     assert read_marks(path) == {'Red car': {'a.jpg': MARK_MATCH}}
 
 
-# --- review of A22: no marks for a name that is no profile any more ------------------------
+# --- no marks for a name that is no profile any more ---------------------------------------
 
 def profiles_file(path, *names):
     path.write_text(json.dumps({'profiles': [{'name': n} for n in names]}), encoding='utf-8')
@@ -329,7 +329,7 @@ def test_the_profile_is_checked_under_the_marks_lock(tmp_path, monkeypatch):
     assert seen == [True]
 
 
-# --- hiding the photos marked as no match within a gallery page (A24) ---
+# --- hiding the photos marked as no match within a gallery page ---
 
 def cards_of(count):
     return [{'rank': rank, 'path': f'photo{rank}.jpg'} for rank in range(1, count + 1)]
@@ -345,7 +345,7 @@ def test_hide_no_match_drops_only_the_photos_marked_as_no_match():
 
 
 def test_hiding_the_rejects_of_a_page_keeps_the_pages_stable():
-    # user report: hiding the rejects of page 1 pulled the undecided photos of page 2 up
+    # hiding the rejects of page 1 pulled the undecided photos of page 2 up
     cards = cards_of(100)
     marks = {f'photo{rank}.jpg': MARK_NO_MATCH for rank in range(1, 49)}  # all of page 1
     kept, hidden = hide_no_match(page_cards(cards, 1, 48), marks)
@@ -358,7 +358,7 @@ def test_hiding_the_rejects_of_a_page_keeps_the_pages_stable():
     (0, 48, True, ''),
     (1, 47, False, '1 photo of this page marked as no match is hidden.'),
     (1200, 3, False, '1,200 photos of this page marked as no match are hidden.'),
-    # review: no "All 1 photos" for a page of a single photo
+    # no "All 1 photos" for a page of a single photo
     (1, 0, False, 'The only photo of this page is marked as no match and hidden.'),
     (48, 0, False, 'All 48 photos of this page are marked as no match and hidden.'),
     (48, 0, True, 'All 48 photos of this page are marked as no match and hidden. '
@@ -368,7 +368,7 @@ def test_hidden_text_counts_the_hidden_photos_of_a_page(hidden, kept, more_pages
     assert hidden_text(hidden, kept, more_pages) == text
 
 
-# --- review progress per profile and the first open photo (F20) ---
+# --- review progress per profile and the first open photo ---
 
 def test_review_progress_counts_the_marks_of_the_ranked_photos():
     cards = cards_of(10)
@@ -385,7 +385,7 @@ def test_review_progress_finds_the_page_the_gallery_shows_the_first_open_photo_o
     progress = review_progress(cards, marks, 48)
     assert (progress.first_open_rank, progress.first_open_page) == (74, 2)
     assert progress.open == 77 and progress.matches + progress.no_matches == 73
-    # the page of the gallery's pagination holds that photo, also with the rejects hidden (A24)
+    # the page of the gallery's pagination holds that photo, also with the rejects hidden
     kept, _ = hide_no_match(page_cards(cards, progress.first_open_page, 48), marks)
     assert 74 in [card['rank'] for card in kept]
 
@@ -406,7 +406,7 @@ def test_review_progress_follows_the_list_order_not_the_rank_numbers():
 
 
 def test_review_progress_counts_every_card_of_a_photo_listed_twice():
-    # review: the gallery shows a card per entry, each with the photo's one mark, so the
+    # the gallery shows a card per entry, each with the photo's one mark, so the
     # caption counts per card like the pages do
     cards = [{'rank': 1, 'path': 'a.jpg'}, {'rank': 2, 'path': 'b.jpg'}, {'rank': 3, 'path': 'a.jpg'},
              {'rank': 4, 'path': 'c.jpg'}]
@@ -442,12 +442,12 @@ def test_progress_text_summarizes_the_review_of_a_profile(progress, paged, text)
     (ReviewProgress(1200, 3, 0, None, None), '1,200 match · 3 no match · 0 undecided'),
 ])
 def test_mark_counts_text_is_the_short_count_of_the_toolbar(progress, text):
-    # F29: the toolbar above the photos names the three counts only; the first undecided
+    # the toolbar above the photos names the three counts only; the first undecided
     # photo is named below the grid, next to the button that shows it
     assert mark_counts_text(progress) == text
 
 
-# --- the colors of the selected option of a mark (A24) ---
+# --- the colors of the selected option of a mark ---
 
 def test_mark_style_colors_the_selected_option_of_each_marked_card():
     style = mark_style({'fscard-a1': MARK_MATCH, 'fscard-b2': MARK_NO_MATCH, 'fscard-c3': MARK_OPEN,
@@ -458,7 +458,7 @@ def test_mark_style_colors_the_selected_option_of_each_marked_card():
     # one rule per state listing the selected button of the mark control of each card in that
     # state, named as Streamlit 1.66.1 does: the key class of the card's container, the
     # variant of its buttons and the data-selected attribute of the selected one (no kind
-    # attribute any more, A49)
+    # attribute any more)
     assert ('.st-key-fscard-a1 button[data-variant="segmented_control"][data-selected], '
             '.st-key-fscard-d4 button[data-variant="segmented_control"][data-selected]'
             f'{{background-color:{match_background}!important;border-color:{match_border}!important;'
@@ -467,13 +467,13 @@ def test_mark_style_colors_the_selected_option_of_each_marked_card():
             f'{{background-color:{reject_background}!important;border-color:{reject_border}!important;'
             'color:inherit!important}') in style
     assert 'fscard-c3' not in style  # undecided keeps Streamlit's look
-    assert 'kind=' not in style  # the 1.66.1 buttons carry no kind attribute (A49)
+    assert 'kind=' not in style  # the 1.66.1 buttons carry no kind attribute
 
 
 def test_mark_style_shows_the_state_on_the_card_itself():
-    # F30: a marked card must not look like an unmarked one; a frame in the state's color
+    # a marked card must not look like an unmarked one; a frame in the state's color
     # (a box-shadow: it follows the rounded corners and changes no size; inset, so a parent
-    # that clips its overflow cannot cut it, review), and the photo of a
+    # that clips its overflow cannot cut it), and the photo of a
     # card marked as no match is dimmed, so the states differ by more than their color
     style = mark_style({'fscard-a1': MARK_MATCH, 'fscard-b2': MARK_NO_MATCH})
     assert f'.st-key-fscard-a1{{box-shadow:inset 0 0 0 3px {MARK_COLORS[MARK_MATCH][1]}!important}}' in style
@@ -487,7 +487,7 @@ def rgb(color):
 
 
 def test_the_mark_colors_are_blue_and_orange():
-    # told apart without red and green (decided 2026-11-13, F30)
+    # told apart without red and green
     for state in (MARK_MATCH, MARK_NO_MATCH):
         assert rgb(MARK_COLORS[state][0]) == rgb(MARK_COLORS[state][1])  # one hue per state
     red, green, blue = rgb(MARK_COLORS[MARK_MATCH][1])
@@ -497,7 +497,7 @@ def test_the_mark_colors_are_blue_and_orange():
 
 
 def test_the_card_style_fits_every_photo_into_a_square():
-    # equal cells (F30): the photo of every card container is shown in a square box, whole
+    # equal cells: the photo of every card container is shown in a square box, whole
     assert CARD_KEY_PREFIX == 'fscard-'
     assert CARD_STYLE.startswith('<style>') and CARD_STYLE.endswith('</style>')
     rule = re.search(r'\[class\*="st-key-fscard-"\] img\{([^}]*)\}', CARD_STYLE)
@@ -530,7 +530,7 @@ def test_mark_style_was_checked_with_the_pinned_streamlit():
 def test_mark_style_selectors_exist_in_the_installed_streamlit_frontend():
     # the string tests above cannot see the page: the installed frontend bundle shows whether
     # the names mark_style relies on still exist, so a pin raise that renames them fails here
-    # (review of A49). find_spec does not import Streamlit; CI has none, the test is skipped there
+    # find_spec does not import Streamlit; CI has none, the test is skipped there
     spec = importlib.util.find_spec('streamlit')
     if spec is None or not spec.submodule_search_locations:
         pytest.skip('Streamlit is not installed')
@@ -545,19 +545,19 @@ def test_mark_style_selectors_exist_in_the_installed_streamlit_frontend():
     assert any('"data-variant":' in text and '`segmented_control`' in text for text in bundle)
     # the selected button is styled by its data-selected attribute
     assert any('&[data-selected]' in text for text in bundle)
-    # the elements around an image that CARD_STYLE stretches (F30), named as their data-testid
-    # (review: as the attribute, not only as a word somewhere in the bundle)
+    # the elements around an image that CARD_STYLE stretches, named as their data-testid
+    # (as the attribute, not only as a word somewhere in the bundle)
     assert any('"data-testid":`stImage`' in text for text in bundle)
     assert any('"data-testid":`stImageContainer`' in text for text in bundle)
-    # the frame around an image, whose content REVIEW_STYLE centers in the review dialog (F19)
+    # the frame around an image, whose content REVIEW_STYLE centers in the review dialog
     assert any('"data-testid":`stFullScreenFrame`' in text for text in bundle)
-    # the tab panels PAGE_STYLE limits (F30 review): all drawn, after the tab list, so the
+    # the tab panels PAGE_STYLE limits: all drawn, after the tab list, so the
     # last child is the panel of the last tab
     assert any(re.search(r'"data-testid":`stTabPanel`,id:String\(\w+\),\$isActive:\w+===\w+,shouldForceMount:!0', text)
                for text in bundle)
 
 
-# --- backup and restore (F1) ----------------------------------------------------------------
+# --- backup and restore ----------------------------------------------------------------
 
 # 2026-11-02 12:30:45 local time
 NOW = time.mktime((2026, 11, 2, 12, 30, 45, 0, 0, -1))
@@ -583,7 +583,7 @@ def test_a_save_keeps_the_previous_file_as_backup(tmp_path):
 
 
 def test_only_the_marks_file_is_flushed_to_disk_not_its_backup(tmp_path, monkeypatch):
-    # review: the backup is written on every mark click; one fsync per change, for the file
+    # the backup is written on every mark click; one fsync per change, for the file
     path = tmp_path / MARKS_FILE
     save_marks(path, 'Red car', {'a.jpg': MARK_MATCH})
     events = []
@@ -706,7 +706,7 @@ def test_the_restore_is_offered_for_a_damaged_file_with_a_readable_backup(tmp_pa
 
 
 def test_the_restore_is_offered_for_a_missing_file_whose_backup_holds_marks(tmp_path):
-    # e.g. removed by hand as an older warning advised (A40)
+    # e.g. removed by hand as an older warning advised
     path = damaged(tmp_path)
     assert marks_restore_offer(path, None) is None  # the file exists (read without an error)
     path.unlink()
@@ -718,7 +718,7 @@ def test_the_restore_is_offered_for_a_missing_file_whose_backup_holds_marks(tmp_
 
 
 def test_the_restore_offer_reads_the_backup_with_the_given_reader(tmp_path):
-    # the app passes a cached read_marks: the offer runs on every gallery rerun (review)
+    # the app passes a cached read_marks: the offer runs on every gallery rerun
     path = damaged(tmp_path)
     path.unlink()
     read = []
@@ -755,5 +755,5 @@ def test_a_failed_restore_leaves_the_damaged_file(tmp_path, monkeypatch):
         with pytest.raises(OSError):
             restore_marks(path, now=NOW, attempts=1)
     assert path.read_bytes() == DAMAGED
-    # review: no copy of the damaged file per failed try
+    # no copy of the damaged file per failed try
     assert sorted(p.name for p in tmp_path.iterdir()) == [MARKS_FILE, MARKS_BACKUP, MARKS_FILE + '.lock']

@@ -1,4 +1,4 @@
-"""The remaining-time estimate of a search and the summary before its start (F12, F16)."""
+"""The remaining-time estimate of a search and the summary before its start."""
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -102,13 +102,13 @@ def test_remaining_text_from_the_rate_and_the_photos_left():
     assert remaining_text(analyzing(), NOW) == 'about 25 min left for the analysis'
 
 
-# an earlier search scored 1,000 photos and rendered 20 thumbnails per minute (F16)
+# an earlier search scored 1,000 photos and rendered 20 thumbnails per minute
 FINISHING = {'scoring': 1000.0, 'thumbnails': 20.0}
 
 
 def test_remaining_text_of_the_analysis_adds_scoring_and_thumbnails():
     # 1,000 photos left at 40 per minute, then 1,100 photos to score (1.1 min) and 300
-    # thumbnails to render (15 min): the estimate no longer ends with the analysis (F16)
+    # thumbnails to render (15 min): the estimate no longer ends with the analysis
     status = analyzing(finishing=FINISHING, thumbnails=300)
     assert remaining_text(status, NOW) == 'about 40 min left'
 
@@ -136,7 +136,7 @@ def test_remaining_text_while_scoring_and_writing_the_galleries():
 
 def test_remaining_text_once_every_photo_is_analyzed_or_scored():
     # the analysis is over (or all photos came from the cache, without a rate), but scoring
-    # and the thumbnails still take their time (review)
+    # and the thumbnails still take their time
     for status in (analyzing(done=1100, finishing=FINISHING, thumbnails=300),
                    analyzing(done=1100, rate=None, finishing=FINISHING, thumbnails=300)):
         assert remaining_text(status, NOW) == 'about 15 min left'  # 1 min of scoring, 15 of thumbnails
@@ -156,7 +156,7 @@ def test_no_remaining_text_after_the_analysis_without_earlier_speeds(status):
 
 def test_no_remaining_text_while_the_analysis_stalls():
     # the rate changes only when the engine stores photos: a status that has not changed
-    # for a while keeps a rate that no longer says anything (review)
+    # for a while keeps a rate that no longer says anything
     stalled = (NOW - timedelta(seconds=RATE_STALE + 1)).isoformat(timespec='seconds')
     assert remaining_text(analyzing(updated=stalled), NOW) is None
     recent = (NOW - timedelta(seconds=RATE_STALE - 1)).isoformat(timespec='seconds')
@@ -222,7 +222,7 @@ def test_run_throughput_stores_the_first_speed_of_its_settings_at_once():
 
 def test_a_short_run_does_not_replace_the_speed_of_a_longer_one():
     # a search stopped after its first minute measured too little to replace the record
-    # of a whole earlier analysis (review)
+    # of a whole earlier analysis
     earlier = [{'signature': 's', 'device': 'cpu', 'per_minute': 30.0}]
     assert run_throughput(earlier, 's', 'cpu', measured(THROUGHPUT_MIN_SECONDS - 1)) is None
     records = run_throughput(earlier, 's', 'cpu', measured(THROUGHPUT_MIN_SECONDS))
@@ -255,7 +255,7 @@ def test_known_throughput_matches_signature_and_device():
     assert known_throughput({'throughput': 'broken'}, 'a', 'cpu') is None
 
 
-# --- the speed of scoring and of the gallery thumbnails, kept in the status file (F16) ---
+# --- the speed of scoring and of the gallery thumbnails, kept in the status file ---
 
 def test_remember_finishing_needs_enough_items():
     assert remember_finishing({}, 'scoring', FINISHING_MIN_ITEMS - 1, 10.0) is None
@@ -264,7 +264,7 @@ def test_remember_finishing_needs_enough_items():
 
 
 def test_a_short_measurement_does_not_replace_a_stored_speed():
-    # a small search measured too little to replace the speed of an earlier one (review);
+    # a small search measured too little to replace the speed of an earlier one;
     # the first speed of a step is stored at once
     before = {'scoring': 500.0, 'thumbnails': 10.0}
     assert remember_finishing(before, 'thumbnails', 100, FINISHING_MIN_SECONDS - 1) is None
@@ -346,7 +346,7 @@ def test_start_summary_with_everything_analyzed():
 
 
 def test_start_summary_adds_scoring_and_galleries_at_the_speed_of_earlier_searches():
-    # F16: the duration also covers what follows the analysis, as an upper bound
+    # the duration also covers what follows the analysis, as an upper bound
     text = start_summary(5000, 3200, 20.0, 15.0)
     assert 'about 1 h 30 min' in text
     assert 'up to about 15 min more' in text
@@ -361,13 +361,13 @@ def test_start_summary_of_one_photo():
 
 
 def test_start_summary_without_photos_does_not_call_them_analyzed():
-    # folders that hold no supported photo (review)
+    # folders that hold no supported photo
     text = start_summary(0, 0, 20.0)
     assert 'No supported photos found' in text
     assert 'analyzed' not in text and 'about' not in text
 
 
-# --- an analysis without a search (F18) ---
+# --- an analysis without a search ---
 
 def test_remaining_text_of_an_analysis_is_the_analysis_alone():
     # nothing is scored or rendered after it: no "for the analysis", no time for galleries
@@ -380,7 +380,7 @@ def test_remaining_text_of_an_analysis_is_the_analysis_alone():
 
 
 def analysis_summary(photos, analyzed, per_minute, finishing=None):
-    """The summary next to "Analyze photos now": start_summary of an analysis without a search (review)."""
+    """The summary next to "Analyze photos now": start_summary of an analysis without a search."""
     return start_summary(photos, analyzed, per_minute, finishing, analysis_only=True)
 
 
@@ -391,7 +391,7 @@ def test_analysis_summary_with_a_known_speed():
     # nothing about rankings or galleries: the analysis writes none, even with their speeds known
     assert 'galler' not in text and 'scor' not in text
     assert analysis_summary(5000, 3200, 20.0, finishing=12.0) == text
-    # the sentence of the counts is the one of a search (one source, review)
+    # the sentence of the counts is the one of a search (one source)
     assert text.split('.')[0] == start_summary(5000, 3200, 20.0, 12.0).split('.')[0]
 
 
@@ -405,7 +405,7 @@ def test_analysis_summary_with_everything_analyzed_or_no_photos():
     text = analysis_summary(5000, 5000, 20.0)
     assert 'All 5,000 photos are analyzed with these settings already' in text
     assert 'to analyze' not in text and 'about' not in text
-    # review: the count is the one remembered for the browser session; photos added since are
+    # the count is the one remembered for the browser session; photos added since are
     # counted after "Recount", and the analysis finds them anyway
     assert '"Recount"' in text and 'finds them' in text
     assert analysis_summary(1, 1, None).startswith('The photo is analyzed with these settings already')

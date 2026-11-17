@@ -1,4 +1,4 @@
-"""The uninstall script (P5): deletes the environment, caches and temporary files, never user data.
+"""The uninstall script: deletes the environment, caches and temporary files, never user data.
 
 Every test works in pytest's tmp_path; nothing touches the real project folder.
 """
@@ -100,7 +100,7 @@ def test_the_plan_never_lists_user_data(project):
 
 def test_every_program_folder_has_its_compiled_files_listed():
     # the list stays fixed (the uninstall deletes only known paths), so a new package of the
-    # repository must add its __pycache__ by hand; this catches a forgotten one (review)
+    # repository must add its __pycache__ by hand; this catches a forgotten one
     listed = {path for path, _ in uninstall_module.UNINSTALL_ITEMS}
     folders = [entry.name for entry in os.scandir(ROOT)
                if entry.is_dir() and not entry.name.startswith('.') and any(Path(entry.path).glob('*.py'))]
@@ -168,14 +168,14 @@ def test_the_default_photo_folder_is_protected_without_settings(project):
     {'copy_folders': ['.tmp/copies']},
 ])
 def test_invalid_photo_or_copy_folders_block_the_plan(project, document):
-    # the app would fall back to the default folder, so the real folders are unknown (review)
+    # the app would fall back to the default folder, so the real folders are unknown
     (project / 'settings.json').write_text(json.dumps(document), encoding='utf-8')
     with pytest.raises(ValueError):
         protected_folders(project)
 
 
 def test_the_settings_file_is_read_once(project, monkeypatch):
-    # photo folders and copy folders come from the same version of the file (review)
+    # photo folders and copy folders come from the same version of the file
     (project / 'settings.json').write_text(json.dumps({'photo_folders': ['a'], 'copy_folders': {'hero': 'b'}}),
                                            encoding='utf-8')
     reads = []
@@ -187,7 +187,7 @@ def test_the_settings_file_is_read_once(project, monkeypatch):
 
 @pytest.mark.parametrize('folder', ['.', 'ROOT', 'PARENT'])
 def test_nothing_inside_a_photo_folder_is_deleted(project, folder):
-    # a photo folder that is the project folder or holds it holds every item (review)
+    # a photo folder that is the project folder or holds it holds every item
     folder = {'ROOT': str(project), 'PARENT': str(project.parent)}.get(folder, folder)
     (project / 'settings.json').write_text(json.dumps({'photo_folders': [folder]}), encoding='utf-8')
     items, skipped = plan(project)
@@ -204,7 +204,7 @@ case_insensitive = pytest.mark.skipif(os.path.normcase('A') == 'A' or not Path(_
 
 @case_insensitive
 def test_a_kept_entry_in_another_case_is_kept(project):
-    # settings name .tmp\eval\shots, the folder on disk is .tmp\Eval (review)
+    # settings name .tmp\eval\shots, the folder on disk is .tmp\Eval
     (project / '.tmp' / 'eval').rename(project / '.tmp' / 'Eval')
     shot = write(project / '.tmp' / 'Eval' / 'shots' / 'IMG_0003.jpg', b'shot')
     (project / 'settings.json').write_text(json.dumps({'photo_folders': ['.tmp/eval/shots']}), encoding='utf-8')
@@ -271,7 +271,7 @@ def test_an_emptied_tmp_folder_is_removed(project):
 
 @windows_only
 def test_a_read_only_file_is_reported_and_the_rest_is_removed(project):
-    # I44: no retry after clearing the attribute; the failure list names it
+    # no retry after clearing the attribute; the failure list names it
     path = project / '.cache' / 'huggingface' / 'model.bin'
     os.chmod(path, stat.S_IREAD)
     try:
@@ -306,7 +306,7 @@ def test_the_private_python_goes_first(project, monkeypatch):
 
 
 def test_the_linux_pythons_go_first(project, monkeypatch):
-    # F47: the installer's checks on Linux look for .venv/bin/python and .python/bin/python3
+    # the installer's checks on Linux look for .venv/bin/python and .python/bin/python3
     write(project / '.venv' / 'bin' / 'python')
     write(project / '.python' / 'bin' / 'python3')
     monkeypatch.setattr(uninstall_module, '_remove_tree', lambda path, failures: None)
@@ -330,7 +330,7 @@ def test_failures_are_reported_and_the_rest_is_removed(project, monkeypatch):
 
 
 def test_a_locked_file_is_reported_once_without_its_folders(project, monkeypatch):
-    # its folders cannot be removed because it is still there: only the file is the culprit (review)
+    # its folders cannot be removed because it is still there: only the file is the culprit
     original = os.unlink
     calls = []
 
@@ -418,7 +418,7 @@ def test_a_running_search_is_detected(project):
 # --- user_data: listed only ---
 
 def test_user_data_lists_what_exists_without_walking_it(project, monkeypatch):
-    # photos/ and results/ may hold many thousands of files, never deleted: no sizes (review)
+    # photos/ and results/ may hold many thousands of files, never deleted: no sizes
     monkeypatch.setattr(uninstall_module, '_tree_size', lambda *args: pytest.fail('walked the user data'))
     rows = [path.relative_to(project).as_posix() for path, _ in user_data(project)]
     assert rows == ['photos', 'references', 'results', 'profiles.json', 'settings.json', 'run.log', '.tmp/eval']
@@ -480,7 +480,7 @@ def test_a_running_search_stops_the_uninstall(project, tmp_path):
 
 
 def test_a_running_app_stops_the_uninstall(project, tmp_path):
-    # F47: on Linux the environment's Python cannot tell that FrameScout runs, its start lock can
+    # on Linux the environment's Python cannot tell that FrameScout runs, its start lock can
     lock = RunLock(project / '.tmp' / 'app-instance.lock')
     assert lock.acquire(timeout=1)
     try:
@@ -489,7 +489,7 @@ def test_a_running_app_stops_the_uninstall(project, tmp_path):
         lock.release()
     assert code == 1 and 'FrameScout is still running' in text and questions == []
     assert (project / '.venv').exists()
-    # review: a lock that only looks held (a file a virus scanner keeps open, or of another
+    # a lock that only looks held (a file a virus scanner keeps open, or of another
     # user) has the same way out as in the start script
     lock_name = str(Path('.tmp') / 'app-instance.lock')
     assert f'If no FrameScout window of this folder is open, delete the file {lock_name}' in text
@@ -597,7 +597,7 @@ def test_the_uninstaller_runs_the_script_with_the_private_python_only():
     runs = [line for line in commands if 'framescout_uninstall.py' in line]
     assert runs == [f'"{PRIVATE_PYTHON}\\python.exe" -B -E -s framescout_uninstall.py %*']
     assert commands.index(f'if exist "{PRIVATE_PYTHON}\\python.exe" goto private') < commands.index(runs[0])
-    # .venv's Python cannot delete itself; no other Python is looked for (I50)
+    # .venv's Python cannot delete itself; no other Python is looked for
     assert [line for line in commands if '.venv' in line or line.startswith(('py ', 'for '))] == []
 
 
@@ -605,7 +605,7 @@ def private_python_copy(folder):
     """A .python in folder that stands in for the private Python: copies of the test run's python.exe and DLLs.
 
     Never a link to the test run's Python: after exit code 3 the .bat deletes .python\\python.exe,
-    and through a junction that would be the python.exe running the tests (review).
+    and through a junction that would be the python.exe running the tests.
     """
     import shutil
     base = Path(getattr(sys, '_base_executable', sys.executable)).parent
@@ -655,7 +655,7 @@ def test_the_uninstaller_names_the_manual_steps_without_the_private_python(tmp_p
     assert 'STAND-IN' not in result.stdout and result.returncode == 1
     assert 'There is no private Python in .python' in result.stdout
     assert 'delete the folders .venv' in result.stdout
-    # the whole folder path, and its "& co" is not run as a command (review)
+    # the whole folder path, and its "& co" is not run as a command
     assert f'{PRIVATE_PYTHON}, .cache and .tmp in "{folder}"' in result.stdout and result.stderr == ''
 
 
@@ -694,7 +694,7 @@ def test_the_folder_path_is_never_used_inside_a_block():
 
 
 def test_the_uninstaller_keeps_exclamation_marks_in_paths_and_arguments():
-    # with delayed expansion, cmd removes the "!" of a folder like C:\Photos!2026 from %~dp0 and %* (review)
+    # with delayed expansion, cmd removes the "!" of a folder like C:\Photos!2026 from %~dp0 and %*
     text = uninstaller()
     assert 'EnableDelayedExpansion' not in text
     assert not any('!' in line for line in batch_commands(text))

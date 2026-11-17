@@ -1,4 +1,4 @@
-"""Quick search over the analyzed photos without a profile (F10, framescout_core.quick)."""
+"""Quick search over the analyzed photos without a profile (framescout_core.quick)."""
 import ast
 import collections
 import os
@@ -20,7 +20,7 @@ from app_source import app_tree, page_tree
 
 
 def test_quick_results_go_to_their_own_folder_and_gallery():
-    # the profile galleries, results.json and marks.json of results/ stay untouched (F10)
+    # the profile galleries, results.json and marks.json of results/ stay untouched
     assert QUICK_DIR == 'quick'
     assert QUICK_GALLERY == 'quick.html'
 
@@ -58,19 +58,19 @@ def test_quick_photos_takes_only_the_analyzed_photos_in_their_order():
 
 
 def test_quick_photos_takes_the_analyzed_raw_file_of_a_partner_without_a_row():
-    # E30: a full search analyzed the RAW file in place of its broken JPEG
+    # a full search analyzed the RAW file in place of its broken JPEG
     jpeg, heic, raw = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3')
     rows = {raw}
     chosen, missing = quick_photos([jpeg, heic], {jpeg: raw, heic: raw}, rows.__contains__)
     # one shot, one photo: the second partner does not take the RAW file again, and it is
-    # not counted as not analyzed either (E61)
+    # not counted as not analyzed either
     assert chosen == [raw]
     assert missing == []
 
 
 def test_quick_photos_shows_a_shot_once_if_one_partner_and_its_raw_file_have_rows():
-    # review: the RAW file stands in for a partner only if no other partner of the shot is
-    # analyzed, as in a full search (E30); in either order of the partners. E61: the partner
+    # the RAW file stands in for a partner only if no other partner of the shot is
+    # analyzed, as in a full search; in either order of the partners. The partner
     # without a row is not counted as not analyzed, since a full search would not analyze
     # the shot again through it either
     jpeg, heic, raw = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3')
@@ -82,7 +82,7 @@ def test_quick_photos_shows_a_shot_once_if_one_partner_and_its_raw_file_have_row
 
 
 def test_quick_photos_does_not_count_a_partner_whose_shot_is_searched_through_its_raw_file():
-    # E61: the RAW file analyzed in place of one broken partner stands for the whole shot
+    # the RAW file analyzed in place of one broken partner stands for the whole shot
     jpeg, heic, raw, other = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3'), Path('other.jpg')
     chosen, missing = quick_photos([jpeg, heic, other], {jpeg: raw, heic: raw}, {raw}.__contains__)
     assert chosen == [raw]
@@ -104,7 +104,7 @@ def test_quick_photos_asks_about_each_photo_once():
 
 
 def test_quick_photos_leaves_out_the_photo_of_find_similar():
-    # F11: the chosen photo is neither compared with itself nor counted as not analyzed
+    # the chosen photo is neither compared with itself nor counted as not analyzed
     paths = [Path('a.jpg'), Path('b.jpg'), Path('c.jpg')]
     chosen, missing = quick_photos(paths, {}, lambda path: path.name != 'c.jpg', exclude=Path('a.jpg'))
     assert chosen == [Path('b.jpg')]
@@ -113,7 +113,7 @@ def test_quick_photos_leaves_out_the_photo_of_find_similar():
 
 def test_quick_photos_leaves_out_the_whole_shot_of_find_similar():
     # the RAW file of the chosen JPEG is not shown as its best match, nor the partner whose
-    # RAW file was chosen (E30)
+    # RAW file was chosen
     jpeg, raw, other = Path('shot.jpg'), Path('shot.cr3'), Path('other.jpg')
     chosen, missing = quick_photos([jpeg, other], {jpeg: raw}, {jpeg, raw, other}.__contains__, exclude=jpeg)
     assert (chosen, missing) == ([other], [])
@@ -122,7 +122,7 @@ def test_quick_photos_leaves_out_the_whole_shot_of_find_similar():
 
 
 def test_quick_photos_leaves_out_every_partner_of_the_shot_of_find_similar():
-    # review: a partner with a row of its own is left out too, whether the chosen photo is
+    # a partner with a row of its own is left out too, whether the chosen photo is
     # the RAW file (e.g. analyzed while the JPEG was broken) or another partner
     jpeg, heic, raw, other = Path('shot.jpg'), Path('shot.heic'), Path('shot.cr3'), Path('other.jpg')
     fallbacks = {jpeg: raw, heic: raw}
@@ -136,7 +136,7 @@ def test_quick_photos_leaves_out_every_partner_of_the_shot_of_find_similar():
 
 
 def test_quick_folders_differ_tells_a_search_of_other_folders(tmp_path):
-    # review: the app notes quick results of folders no longer chosen; the order does not matter
+    # the app notes quick results of folders no longer chosen; the order does not matter
     a, b = tmp_path / 'a', tmp_path / 'b'
     assert not quick_folders_differ([str(a), str(b)], [b, a])
     assert quick_folders_differ([str(a)], [a, b])
@@ -161,7 +161,7 @@ def test_quick_scope_text_names_the_photos_that_are_not_searched():
 
 
 def test_quick_scope_text_names_the_partners_whose_shot_is_searched():
-    # E61: a JPEG/HEIC partner without a row whose shot is searched through another file
+    # a JPEG/HEIC partner without a row whose shot is searched through another file
     assert quick_scope_text(10, 8, 0, 2) == ('8 of 10 photos are analyzed with these AI settings and searched; the '
                                              'other 2 are not analyzed, but another file of their shots (the same '
                                              'picture in another format) is searched.')
@@ -169,7 +169,7 @@ def test_quick_scope_text_names_the_partners_whose_shot_is_searched():
                                              'not searched until a search with your profiles analyzes them; 1 other '
                                              'is not analyzed, but another file of its shot (the same picture in '
                                              'another format) is searched.')
-    # review: only partners whose shot is searched through its RAW file, with or without
+    # only partners whose shot is searched through its RAW file, with or without
     # photos that are not analyzed; the count is given, not inferred from the others
     assert quick_scope_text(2, 0, 0, 2) == ('The 2 photos are not analyzed with these AI settings themselves, but '
                                             'another file of their shots (the same picture in another format) is '
@@ -187,8 +187,8 @@ def test_quick_scope_text_names_the_partners_whose_shot_is_searched():
 
 
 def test_quick_scope_counts_as_the_engine_does(tmp_path):
-    # E61: the app counts a quick search with the RAW files of the scan, as the engine does;
-    # a folder whose analyzed photos are all RAW files in place of their broken partner (E30)
+    # the app counts a quick search with the RAW files of the scan, as the engine does;
+    # a folder whose analyzed photos are all RAW files in place of their broken partner
     # has photos to search. Review: (searched, not analyzed, partners) count the scan's
     # photos, so they add up to them; searched are the photos with a row of their own
     jpeg, heic, raw, other = (tmp_path / name for name in ('a.jpg', 'a.heic', 'a.cr3', 'b.jpg'))
@@ -211,7 +211,7 @@ def test_quick_note_says_how_many_photos_were_searched_and_that_scores_differ():
 
 
 def test_quick_note_of_find_similar_names_the_photos_compared():
-    # F11: the photo itself is not among them
+    # the photo itself is not among them
     note = quick_note(799, 200, like=True)
     assert note.startswith('Photos similar to the chosen one among the other 799 photos analyzed with these AI '
                            'settings; 200 photos were not analyzed and not searched.')
@@ -220,7 +220,7 @@ def test_quick_note_of_find_similar_names_the_photos_compared():
 
 
 def test_like_profile_has_no_text_and_names_the_photo_and_its_part():
-    # F11: ranked by the photo's cached vector alone, no search text
+    # ranked by the photo's cached vector alone, no search text
     photo = Path('D:/photos/IMG_0001.jpg')
     assert like_profile(photo, FULL_IMAGE_LABEL) == {'name': 'Similar to IMG_0001.jpg', 'prompts': [],
                                                      'generated': 0, 'refs': []}
@@ -230,7 +230,7 @@ def test_like_profile_has_no_text_and_names_the_photo_and_its_part():
 def test_like_crop_finds_the_part_shown_on_the_card():
     assert like_crop(['Full image', 'Person 1', 'Person 3'], 'Person 3') == 2
     assert like_crop(['Full image', 'Person 1'], FULL_IMAGE_LABEL) == 0
-    # rows written before I7 carry the German label of the whole photo
+    # rows of older versions carry the German label of the whole photo
     assert like_crop(['Gesamtbild', 'Person 1'], FULL_IMAGE_LABEL) == 0
 
 
@@ -241,7 +241,7 @@ def test_like_crop_refuses_a_part_the_photo_has_not():
 
 
 def test_like_scan_path_names_the_photo_as_the_scan_does():
-    # review: the cache row and the shot are found by the scan's path, also for a photo given
+    # the cache row and the shot are found by the scan's path, also for a photo given
     # by another path to the same file (letter case, a link or junction, a mapped drive)
     scanned = [Path('C:/photos/a.jpg'), Path('C:/photos/Sub/IMG_1.JPG'), Path('C:/photos/Sub/IMG_1.CR3')]
     asked = []
@@ -278,7 +278,7 @@ def test_like_scan_path_skips_files_it_cannot_compare(tmp_path):
 
 
 def test_like_labels_fit_only_one_text_per_vector():
-    # review: a broken row of the chosen photo counts as not analyzed instead of crashing
+    # a broken row of the chosen photo counts as not analyzed instead of crashing
     # with an IndexError (more labels than vectors) or a TypeError (labels that are no texts)
     assert like_labels_fit(['Full image', 'Person 1'], 2)
     assert not like_labels_fit(['Full image', 'Person 1'], 1)
@@ -336,7 +336,7 @@ def test_engine_command_of_a_quick_search_passes_the_text_in_one_argument():
 
 
 def test_engine_command_of_find_similar_passes_the_photo_and_its_part_in_one_argument_each():
-    # F11: "--like=<path>" and "--like-part=<part>", so a name starting with "-" is no option
+    # "--like=<path>" and "--like-part=<part>", so a name starting with "-" is no option
     photo = Path('D:/a/-shot.jpg')
     cmd = command(like=photo, like_part='Person 2')
     assert '--profiles' not in cmd and not any(arg.startswith('--quick-query') for arg in cmd)
@@ -358,7 +358,7 @@ def test_engine_command_needs_profiles_or_a_quick_query():
 
 
 def test_engine_command_of_an_analysis_without_a_search():
-    # F18: "Analyze photos now" analyzes with the current settings, without profiles
+    # "Analyze photos now" analyzes with the current settings, without profiles
     cmd = command(analyze_only=True)
     assert cmd[5] == '--analyze-only'
     assert '--profiles' not in cmd
@@ -388,7 +388,7 @@ def quick_export(folder, thumbnail, query='dog'):
 
 def test_the_cleanup_of_the_results_folder_leaves_the_quick_folder_alone(tmp_path):
     # the quick folder has its own thumbnails; a full search's auto_cleanup and the
-    # "Clean up storage" scan of results/ neither delete nor offer them (F10)
+    # "Clean up storage" scan of results/ neither delete nor offer them
     results = tmp_path / 'results'
     quick = results / QUICK_DIR
     name = 'a' * 24 + '.jpg'
@@ -416,13 +416,13 @@ def test_auto_cleanup_of_the_quick_folder_keeps_only_what_its_gallery_links(tmp_
 
 
 def test_the_app_starts_both_searches_through_engine_command():
-    # F10: the search with profiles and the quick search get the same settings
+    # the search with profiles and the quick search get the same settings
     tree = app_tree()
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
              and getattr(node.func, 'id', None) == 'start_engine']
-    # and "Analyze photos now" (F18), whose note goes next to its button, as the note of
-    # "Find similar" goes to the results tab (F28)
-    # (review: per call, so that no two notice keys can be swapped unnoticed)
+    # and "Analyze photos now", whose note goes next to its button, as the note of
+    # "Find similar" goes to the results tab
+    # (per call, so that no two notice keys can be swapped unnoticed)
     [start_engine] = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
                       and node.name == 'start_engine']
     assert [ast.unparse(arg) for arg in start_engine.args.defaults] == ["'run_notice'"]
@@ -442,8 +442,8 @@ def test_the_app_starts_both_searches_through_engine_command():
 
 
 def test_the_app_counts_partners_as_analyzed_for_a_search_and_an_analysis():
-    # F18 review: a partner searched through another file of its shot never gets a row of its
-    # own, so "Analyze photos now" must not keep calling it "to analyze"; A48: nor the
+    # a partner searched through another file of its shot never gets a row of its
+    # own, so "Analyze photos now" must not keep calling it "to analyze"; nor the
     # summary of a search, and its disk space estimate follows
     tree = app_tree()
     summaries = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
@@ -459,28 +459,28 @@ def test_the_app_counts_partners_as_analyzed_for_a_search_and_an_analysis():
 
 
 def test_the_app_warns_of_low_disk_space_next_to_analyze_photos_now():
-    # F18 review: the analysis writes the cache rows, but the search's warning is in another tab
+    # the analysis writes the cache rows, but the search's warning is in another tab
     tree = app_tree()
     [call] = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
               and getattr(node.func, 'id', None) == 'low_space_warning'
               and any(k.arg == 'analysis' for k in node.keywords)]
     assert ast.unparse(call.args[2]) == '0'  # no profile: no gallery thumbnails
     assert ast.unparse(call.args[5]) == 'analyzed'
-    # since F28 next to its button in the search tab, as the search's own warning
+    # next to its button in the search tab, as the search's own warning
     [area] = [node for node in page_tree().body if isinstance(node, ast.With)
               and ast.unparse(node.items[0].context_expr) == 'search_tab']
     assert 'st.warning(analysis_space)' in ast.unparse(area) and 'st.warning(space_warning)' in ast.unparse(area)
 
 
 def test_every_result_card_of_the_app_offers_find_similar():
-    # F11: on the cards of the profile results and of the quick search; the click passes the
+    # on the cards of the profile results and of the quick search; the click passes the
     # card's photo and the part it names, and the page run (not the fragment) starts it
     tree = app_tree()
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
 
     def calls(name):
         return [getattr(call.func, 'id', None) for call in ast.walk(functions[name]) if isinstance(call, ast.Call)]
-    # both views draw their cards with the one card function (F30), which offers it
+    # both views draw their cards with the one card function, which offers it
     for name in ('show_profile_results', 'show_quick_results'):
         assert 'draw_cards' in calls(name)
     assert 'find_similar_button' in calls('draw_cards')
@@ -491,9 +491,9 @@ def test_every_result_card_of_the_app_offers_find_similar():
                and getattr(node.func, 'id', None) == 'start_engine' and 'like' in [k.arg for k in node.keywords]]
     assert ast.unparse(start) == ("start_engine(notice='like_notice', like=find_similar_request[0], "
                                   'like_part=find_similar_request[1])')
-    # review: the request is taken from the session state first thing in the page run (before
+    # the request is taken from the session state first thing in the page run (before
     # any st.stop), and one that cannot start while a search runs gets a notice
-    # (in app.py, whose page run it is: compared by its line numbers, A46)
+    # (in app.py, whose page run it is: compared by its line numbers)
     page = page_tree()
     pops = [node for node in tree.body if isinstance(node, ast.Assign) and 'find_similar' in ast.unparse(node)]
     assert [ast.unparse(node) for node in pops] == ["find_similar_request = st.session_state.pop('find_similar', None)"]
@@ -505,7 +505,7 @@ def test_every_result_card_of_the_app_offers_find_similar():
                  and ast.unparse(node.test) == 'find_similar_request']
     [branch] = handled.body
     assert ast.unparse(branch.test) == 'active' and 'like_notice' in ast.unparse(branch.body)
-    # F28: the notice is shown in the tab "Results", where the card was clicked
+    # the notice is shown in the tab "Results", where the card was clicked
     [results_tab] = [node for node in page.body if isinstance(node, ast.With)
                      and ast.unparse(node.items[0].context_expr) == 'results_tab']
     assert "st.session_state.pop('like_notice')" in ast.unparse(results_tab)
@@ -536,7 +536,7 @@ def quick_results(name='red car', quick=None, finished='2026-11-14T10:00:00'):
 
 
 def test_quick_entry_label_names_the_text_or_the_photo_of_find_similar():
-    # F34: the last quick search is an entry of the results selector next to the profiles
+    # the last quick search is an entry of the results selector next to the profiles
     assert quick_entry_label(quick_results()) == 'Quick search: "red car"'
     like = {'like': str(Path('photos') / 'a.jpg'), 'part': 'Person 1'}
     assert quick_entry_label(quick_results('Similar to a.jpg (Person 1)', like)) == 'Find similar: a.jpg (Person 1)'
@@ -555,7 +555,7 @@ def test_quick_entry_label_differs_from_every_profile_name():
 
 
 def test_quick_result_id_depends_on_the_result_file_only():
-    # review: a profile name that clashes with the entry changes its label, but must not make
+    # a profile name that clashes with the entry changes its label, but must not make
     # the selector take the result for a new one and jump to it
     results = quick_results()
     assert quick_result_id(results) == ('2026-11-14T10:00:00', 'Quick search: "red car"')
@@ -579,7 +579,7 @@ def test_results_choice_keeps_the_entry_shown_and_opens_a_new_quick_result():
 
 
 def test_the_results_selector_holds_the_profiles_and_the_last_quick_result():
-    # F34: one selector instead of the quick result's gallery above the profile results
+    # one selector instead of the quick result's gallery above the profile results
     tree = app_tree()
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
     selector = ast.unparse(functions['show_results'])
@@ -601,7 +601,7 @@ def test_the_results_selector_holds_the_profiles_and_the_last_quick_result():
 
 
 def test_the_quick_search_text_stays_in_its_field():
-    # F34: the field is disabled while the search runs, which emptied it; the text submitted
+    # the field is disabled while the search runs, which emptied it; the text submitted
     # is kept and put back before the field is drawn
     page = page_tree()
     [area] = [node for node in page.body if isinstance(node, ast.With)
@@ -609,7 +609,7 @@ def test_the_quick_search_text_stays_in_its_field():
     source = ast.unparse(area)
     assert "on_click=keep_value, args=('quick_query',)" in source
     # only while the field is disabled: putting a value into a widget's key resets the field in
-    # the browser, which would drop a text typed but not yet searched for (review)
+    # the browser, which would drop a text typed but not yet searched for
     [guard] = [node for node in ast.walk(area) if isinstance(node, ast.If)
                and "restore_value('quick_query')" in ast.unparse(node)]
     assert ast.unparse(guard) == "if active:\n    restore_value('quick_query')"
@@ -621,9 +621,9 @@ def test_the_quick_search_text_stays_in_its_field():
 
 
 def test_the_views_of_the_results_selector_keep_their_boxes():
-    # F34 review: Streamlit drops the value of a widget a run does not draw; the box "Hide photos
+    # Streamlit drops the value of a widget a run does not draw; the box "Hide photos
     # marked as no match" and the page boxes are not drawn while another entry is shown, so they
-    # keep their values with persist_state (also F38: the page of a profile gallery)
+    # keep their values with persist_state (also the page of a profile gallery)
     functions = {node.name: node for node in app_tree().body if isinstance(node, ast.FunctionDef)}
     widgets = {}
     for name in ('show_profile_results', 'show_quick_results'):

@@ -1,4 +1,4 @@
-"""The app's settings.json: defaults, validation and saving without losing data (framescout_core, A8)."""
+"""The app's settings.json: defaults, validation and saving without losing data (framescout_core)."""
 import json
 import os
 import threading
@@ -35,7 +35,7 @@ def test_the_defaults_are_the_previous_session_defaults(tmp_path):
 
 
 def test_keep_the_pc_responsive_is_an_ai_setting_off_by_default(tmp_path, defaults):
-    # F4: an older settings.json without it runs at normal priority, as before
+    # an older settings.json without it runs at normal priority, as before
     assert defaults['low_priority'] is False and 'low_priority' in AI_SETTINGS
     path = tmp_path / 'settings.json'
     assert save_settings(path, {'low_priority': True}, defaults) == {'low_priority': True}
@@ -46,7 +46,7 @@ def test_keep_the_pc_responsive_is_an_ai_setting_off_by_default(tmp_path, defaul
 
 
 def test_the_search_model_is_a_registry_key(tmp_path, defaults):
-    # E22: a key of framescout_core.models.MODELS, like the engine's --model; an older settings.json
+    # a key of framescout_core.models.MODELS, like the engine's --model; an older settings.json
     # without it uses the default model
     assert defaults['model'] == DEFAULT_MODEL
     path = write(tmp_path / 'settings.json', {'model': 'vit-l-14-datacomp'})
@@ -60,8 +60,8 @@ def test_the_search_model_is_a_registry_key(tmp_path, defaults):
 
 
 def test_the_default_reference_weight_is_the_evaluated_one():
-    # 0.35 before E4/E5; 0.3 did best with the normalized scores on the local evaluation
-    # set (user decision in PR #11); a saved 0.35 in settings.json stays as it is
+    # 0.35 before the scores were normalized; 0.3 did best with the normalized scores on the
+    # local evaluation set; a saved 0.35 in settings.json stays as it is
     assert DEFAULT_REFERENCE_WEIGHT == 0.3
 
 
@@ -96,7 +96,7 @@ def test_a_byte_order_mark_is_accepted(tmp_path, defaults):
     ('low_priority', 1), ('low_priority', 'true'), ('low_priority', None),
     ('person_confidence', 0.05), ('person_confidence', 0.95), ('person_confidence', True),
     ('reference_weight', -0.1), ('reference_weight', 1.5), ('reference_weight', float('nan')),
-    # a free-text OpenCLIP name or a model no longer offered (E22)
+    # a free-text OpenCLIP name or a model no longer offered
     ('model', 'ViT-B-32'), ('model', 'removed-model'), ('model', None), ('model', ['vit-b-16-datacomp']),
 ])
 def test_an_invalid_value_falls_back_to_its_default_and_is_reported(tmp_path, defaults, key, value):
@@ -205,7 +205,7 @@ def test_a_replace_that_keeps_failing_raises_os_error(tmp_path, defaults, monkey
 
 
 def test_a_transient_read_error_is_retried(tmp_path, defaults, monkeypatch):
-    # on Windows, reading fails for a moment while another session replaces the file (review)
+    # on Windows, reading fails for a moment while another session replaces the file
     path = write(tmp_path / 'settings.json', {'top': 300})
     real_read = Path.read_text
     calls = []
@@ -233,7 +233,7 @@ def test_a_read_error_that_persists_raises_os_error(tmp_path, defaults, monkeypa
 
 
 def test_float_noise_of_a_slider_is_rounded(tmp_path, defaults):
-    # a slider computes min + n * step, e.g. 0.1 + 4 * 0.05 = 0.30000000000000004 (review)
+    # a slider computes min + n * step, e.g. 0.1 + 4 * 0.05 = 0.30000000000000004
     noisy = 0.1 + 4 * 0.05
     assert noisy != 0.30
     path = tmp_path / 'settings.json'
@@ -246,7 +246,7 @@ def test_float_noise_of_a_slider_is_rounded(tmp_path, defaults):
 
 
 def test_saving_removes_invalid_values_that_were_replaced_by_their_defaults(tmp_path, defaults):
-    # otherwise the warning about them would come back on every page run (review)
+    # otherwise the warning about them would come back on every page run
     path = write(tmp_path / 'settings.json', {'batch_size': 0, 'device': 'gpu', 'theme': 'dark'})
     save_settings(path, {'top': 300}, defaults)
     assert stored(path) == {'theme': 'dark', 'top': 300}
@@ -263,7 +263,7 @@ def test_an_invalid_change_raises_value_error_and_changes_nothing(tmp_path, defa
 
 
 def test_saving_returns_the_values_as_written(tmp_path, defaults):
-    # the app remembers these, not the raw widget values (review: rounded floats)
+    # the app remembers these, not the raw widget values (rounded floats)
     path = tmp_path / 'settings.json'
     written = save_settings(path, {'person_confidence': 0.1 + 4 * 0.05, 'reference_weight': 0, 'top': 300}, defaults)
     assert written == {'person_confidence': 0.3, 'reference_weight': 0.0, 'top': 300}
@@ -272,7 +272,7 @@ def test_saving_returns_the_values_as_written(tmp_path, defaults):
 
 def test_concurrent_saves_of_different_settings_keep_every_change(tmp_path, defaults):
     # app sessions are threads of one process; without a lock around read-merge-write,
-    # two saves at the same moment lose one change (review)
+    # two saves at the same moment lose one change
     path = tmp_path / 'settings.json'
     names = ['batch_size', 'top', 'max_persons']
     values = {'batch_size': range(9, 30), 'top': range(200, 221), 'max_persons': range(13, 34)}
@@ -296,7 +296,7 @@ def test_concurrent_saves_of_different_settings_keep_every_change(tmp_path, defa
     assert stored(path) == {name: values[name][-1] for name in names}
 
 
-# --- several photo folders (A25) ---
+# --- several photo folders ---
 
 def test_folder_lines_are_the_non_empty_lines_without_spaces():
     # the app's field has one folder per line
@@ -321,7 +321,7 @@ def test_an_empty_folder_list_is_saved(tmp_path, defaults):
 
 @pytest.mark.parametrize('legacy, expected', [('D:\\Fotos', ['D:\\Fotos']), ('', [])])
 def test_the_old_single_photo_folder_is_read_as_a_list_of_one(tmp_path, defaults, legacy, expected):
-    # settings.json of FrameScout before A25
+    # settings.json of an older FrameScout version
     path = write(tmp_path / 'settings.json', {'photo_folder': legacy, 'top': 300})
     assert read_settings(path, defaults) == ({**defaults, 'photo_folders': expected, 'top': 300}, [])
 
@@ -359,13 +359,13 @@ def test_an_invalid_old_photo_folder_is_dropped_on_the_next_save(tmp_path, defau
 
 
 def test_the_ranges_are_the_ones_of_the_widgets():
-    # the app builds its widgets from SETTING_RANGES, so both always agree (review)
+    # the app builds its widgets from SETTING_RANGES, so both always agree
     assert SETTING_RANGES == {'batch_size': (1, 64), 'top': (1, 5000), 'max_persons': (1, 50),
                               'person_confidence': (0.1, 0.9), 'reference_weight': (0.0, 1.0)}
     assert DEVICES == ('auto', 'cpu', 'cuda')
 
 
-# --- reconcile_settings: widget state, the session's view and settings.json (A8 review) ---
+# --- reconcile_settings: widget state, the session's view and settings.json ---
 
 def test_a_new_page_shows_the_saved_values(defaults):
     seen, shown = {}, {}
@@ -408,7 +408,7 @@ def test_a_widget_showing_a_substitute_is_not_a_change(defaults):
 
 
 def test_slider_noise_after_a_save_does_not_look_like_another_session(defaults):
-    # the caller stores the raw widget value as shown and the written value as seen (review)
+    # the caller stores the raw widget value as shown and the written value as seen
     noisy = 0.1 + 4 * 0.05
     seen, shown = {**defaults, 'person_confidence': 0.3}, {**defaults, 'person_confidence': noisy}
     updates, changed, taken_over = reconcile_settings({**defaults, 'person_confidence': noisy}, seen, shown,
@@ -427,7 +427,7 @@ def test_an_unreadable_file_keeps_what_the_widgets_show(defaults):
     assert updates == defaults and changed == {} and taken_over == []
 
 
-# --- resetting the AI settings to their defaults (A26) ---
+# --- resetting the AI settings to their defaults ---
 
 def test_the_ai_settings_are_every_setting_but_the_photo_folders(defaults):
     assert set(AI_SETTINGS) == set(defaults) - {'photo_folders'}
@@ -436,7 +436,7 @@ def test_the_ai_settings_are_every_setting_but_the_photo_folders(defaults):
 
 def test_a_reset_setting_is_saved_even_if_its_widget_shows_no_change(defaults):
     # the widget already showed the default, but another session saved another value since:
-    # the reset is this session's latest action and wins (A26)
+    # the reset is this session's latest action and wins
     seen, shown = dict(defaults), dict(defaults)
     saved = {**defaults, 'top': 300, 'batch_size': 16}
     updates, changed, taken_over = reconcile_settings(dict(defaults), seen, shown, saved, defaults, reset=['top'])
@@ -445,7 +445,7 @@ def test_a_reset_setting_is_saved_even_if_its_widget_shows_no_change(defaults):
 
 
 def test_a_reset_of_a_substituted_device_saves_auto(defaults):
-    # a saved "cuda" PyTorch cannot use is shown as "auto"; the reset saves "auto" (A26)
+    # a saved "cuda" PyTorch cannot use is shown as "auto"; the reset saves "auto"
     seen, shown = {**defaults, 'device': 'cuda'}, dict(defaults)
     saved = {**defaults, 'device': 'cuda'}
     updates, changed, taken_over = reconcile_settings(dict(defaults), seen, shown, saved, defaults, reset=['device'])

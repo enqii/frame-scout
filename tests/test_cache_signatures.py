@@ -1,4 +1,4 @@
-"""The signatures side table of the feature cache and the classification of cached rows (E11)."""
+"""The signatures side table of the feature cache and the classification of cached rows."""
 import json
 import math
 import sqlite3
@@ -60,7 +60,7 @@ def test_known_signatures_cover_every_value_of_the_app_widgets():
             assert feature_signature(True, max_persons, confidence, DEFAULT_YOLO_MODEL) in known
     # a slider returns e.g. 0.1 + 4 * 0.05 = 0.30000000000000004, which the app passes on as it is
     assert feature_signature(True, 12, 0.1 + 4 * 0.05, DEFAULT_YOLO_MODEL) in known
-    # noise from other arithmetic paths, e.g. accumulated steps or n * step + low (review)
+    # noise from other arithmetic paths, e.g. accumulated steps or n * step + low
     accumulated = 0.1
     for n in range(1, 17):
         accumulated += 0.05
@@ -93,7 +93,7 @@ def test_a_recorded_older_engine_wins_over_a_known_signature():
     assert classify_signatures([sig], {sig: 'v4'}, 'x') == {sig: 'old'}
 
 
-# --- search models (E22) ---
+# --- search models ---
 
 def test_prepare_cache_records_the_engine_of_the_model(tmp_path):
     con = sqlite3.connect(tmp_path / 'cache.sqlite3')

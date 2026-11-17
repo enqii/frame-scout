@@ -1,4 +1,4 @@
-"""The start of the app (F22): one app per project folder, a free port of 127.0.0.1."""
+"""The start of the app: one app per project folder, a free port of 127.0.0.1."""
 import json
 import socket
 from pathlib import Path
@@ -223,7 +223,7 @@ def test_start_bat_starts_through_the_launcher():
 
 
 def test_a_claim_removes_the_instance_file_of_a_killed_app(tmp_path):
-    # between claim() and publish() another start must not read the dead app's port (review)
+    # between claim() and publish() another start must not read the dead app's port
     (tmp_path / INSTANCE_DIR).mkdir()
     (tmp_path / INSTANCE_DIR / INSTANCE_FILE).write_text('{"port": 8507}', encoding='utf-8')
     mine = AppInstance(tmp_path)
@@ -236,7 +236,7 @@ def test_a_claim_removes_the_instance_file_of_a_killed_app(tmp_path):
 
 def test_a_claim_waits_briefly_for_a_lock_that_is_only_probed(tmp_path):
     # running() of a waiting start takes the lock for a moment; a claim at that moment
-    # must not fail (review)
+    # must not fail
     (tmp_path / INSTANCE_DIR).mkdir()
     probe = RunLock(tmp_path / INSTANCE_DIR / INSTANCE_LOCK)
     assert probe.acquire()
@@ -254,7 +254,7 @@ def test_a_claim_waits_briefly_for_a_lock_that_is_only_probed(tmp_path):
 
 
 def test_a_lock_file_that_cannot_be_opened_stops_with_its_name(tmp_path, monkeypatch):
-    # e.g. a virus scanner keeps it open: a message with a way out, no traceback (review)
+    # e.g. a virus scanner keeps it open: a message with a way out, no traceback
     def refuse(self, *args, **kwargs):
         raise PermissionError(13, 'Permission denied')
     monkeypatch.setattr(RunLock, 'acquire', refuse)

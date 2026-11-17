@@ -1,6 +1,6 @@
-"""Progress lines the engine writes to run.log for people reading the log (A11).
+"""Progress lines the engine writes to run.log for people reading the log.
 
-The app reads the progress from the status file instead (test_run_status.py, A5).
+The app reads the progress from the status file instead (test_run_status.py).
 """
 from framescout_core.pipeline import progress_line
 

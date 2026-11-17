@@ -1,4 +1,4 @@
-"""The "Keep the PC responsive" option: lower process priority and fewer PyTorch threads (framescout_core, F4)."""
+"""The "Keep the PC responsive" option: lower process priority and fewer PyTorch threads (framescout_core)."""
 import os
 import subprocess
 import sys
@@ -14,7 +14,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 @pytest.mark.parametrize('available, expected', [(1, 1), (4, 4), (8, 8), (12, 12), (16, 12), (64, 12), (0, 1)])
 def test_a_normal_search_uses_at_most_twelve_threads(available, expected):
-    # the engine's thread count before F4: min(12, max(1, torch.get_num_threads()))
+    # the engine's thread count of a normal search: min(12, max(1, torch.get_num_threads()))
     assert MAX_TORCH_THREADS == 12
     assert torch_threads(available) == expected
     assert torch_threads(available, low_priority=False) == expected
@@ -48,7 +48,7 @@ def test_windows_gets_the_below_normal_priority_class(current):
 
 @pytest.mark.parametrize('current', [IDLE_PRIORITY_CLASS, BELOW_NORMAL_PRIORITY_CLASS])
 def test_windows_never_raises_an_inherited_lower_priority(current):
-    # Windows passes IDLE and BELOW_NORMAL on to child processes, e.g. from "start /low" (review)
+    # Windows passes IDLE and BELOW_NORMAL on to child processes, e.g. from "start /low"
     assert IDLE_PRIORITY_CLASS == 0x40
     assert lower_priority('nt', set_priority_class=lambda _: pytest.fail('priority changed'),
                           get_priority_class=lambda: current) is None
@@ -94,7 +94,7 @@ def test_the_priority_of_the_own_process_is_really_lowered():
 
 @pytest.mark.skipif(os.name != 'nt', reason='Windows priority classes')
 def test_an_idle_priority_process_stays_idle():
-    # started at IDLE_PRIORITY_CLASS, as by "start /low": --low-priority must not raise it (review)
+    # started at IDLE_PRIORITY_CLASS, as by "start /low": --low-priority must not raise it
     check = ('import ctypes; k = ctypes.WinDLL("kernel32"); k.GetCurrentProcess.restype = ctypes.c_void_p; '
              'k.GetPriorityClass.argtypes = (ctypes.c_void_p,); print(k.GetPriorityClass(k.GetCurrentProcess()))')
     code = f'from framescout_core.priority import lower_priority; assert lower_priority() is None; {check}'

@@ -1,4 +1,4 @@
-"""The review dialog of a result list: one photo at a time with a large preview (F19)."""
+"""The review dialog of a result list: one photo at a time with a large preview."""
 import ast
 import re
 
@@ -49,7 +49,7 @@ def test_the_dialog_is_shown_only_for_the_list_its_state_names():
     assert review_shown({'profile': 'Cars', 'path': 'a.jpg'}, 'Cars', LIST)
     assert review_shown({'profile': None, 'path': None}, None, LIST)
     # another list is shown (the selector switched, e.g. to a new quick search), or the
-    # list is empty: the state is dropped, so the dialog cannot pop up later (review)
+    # list is empty: the state is dropped, so the dialog cannot pop up later
     assert not review_shown({'profile': 'Cars', 'path': 'a.jpg'}, None, LIST)
     assert not review_shown({'profile': None, 'path': 'a.jpg'}, 'Cars', LIST)
     assert not review_shown({'profile': 'Cars', 'path': 'a.jpg'}, 'Cars', [])
@@ -131,7 +131,7 @@ def calls_in(node):
 
 
 def test_only_decoding_the_preview_falls_back_to_the_thumbnail():
-    # review: an error of st.image after its container was drawn would draw a second
+    # an error of st.image after its container was drawn would draw a second
     # container with the same key in the fallback (a duplicate-key error), so the try covers
     # the decoding only and the preview is drawn after it
     show_preview = app_functions()['show_preview']
@@ -143,7 +143,7 @@ def test_only_decoding_the_preview_falls_back_to_the_thumbnail():
 
 
 def test_a_press_acts_only_on_the_photo_still_shown():
-    # review: a second press of M before the dialog was drawn again must neither save the
+    # a second press of M before the dialog was drawn again must neither save the
     # photo twice nor mark the next one, which the user has not seen: the buttons name the
     # photo they were drawn for, the callbacks do nothing once another photo is shown, and
     # the dialog keeps the photo it shows in its state
@@ -159,7 +159,7 @@ def test_a_press_acts_only_on_the_photo_still_shown():
 
 
 def test_unreadable_marks_are_neither_named_nor_written_against():
-    # review: without readable marks (or for a profile that is gone) every photo would look
+    # without readable marks (or for a profile that is gone) every photo would look
     # undecided, so the dialog names no saved mark there, and a choice does not save one
     functions = app_functions()
     choice = functions['review_choice']
@@ -175,7 +175,7 @@ def test_unreadable_marks_are_neither_named_nor_written_against():
 
 def test_the_dialog_shows_the_card_text_as_the_gallery_does():
     # the row of the closest search text as in the gallery: for all cards of the list, so the
-    # text keeps its height from photo to photo (review)
+    # text keeps its height from photo to photo
     texts = [ast.unparse(n) for n in ast.walk(app_functions()['review_dialog'])
              if isinstance(n, ast.Call) and ast.unparse(n.func) == 'card_text']
     assert texts == ['card_text(card, has_closest_line(cards))']

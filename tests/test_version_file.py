@@ -1,4 +1,4 @@
-"""One version file per FrameScout version (I42).
+"""One version file per FrameScout version.
 
 The folder holds one framescout-version-<version>.txt. A ZIP extracted over the folder of
 another version leaves the other version's file too, so Install-FrameScout.bat and
@@ -47,7 +47,7 @@ def test_the_version_check_comes_before_anything_runs(name):
     lines, first, check = version_check(name)
     assert lines.index('cd /d "%~dp0"') < first
     assert first < min(i for i, line in enumerate(lines) if 'python' in line.lower() or 'curl' in line.lower())
-    # no delayed expansion: it would remove a "!" of the folder path (I21)
+    # no delayed expansion: it would remove a "!" of the folder path
     assert not any('!' in line for line in check)
 
 
@@ -80,7 +80,7 @@ def test_start_stops_with_the_version_files_of_two_versions(tmp_path):
         (folder / f'framescout-version-{version}.txt').write_text('', encoding='utf-8')
     result = run_start(folder)
     assert 'two FrameScout versions' in result.stdout and 'new, empty folder' in result.stdout
-    # the user's data stays in this folder: the message names what to copy (review)
+    # the user's data stays in this folder: the message names what to copy
     assert 'profiles.json, settings.json' in result.stdout
     assert 'run Install-FrameScout.bat first' not in result.stdout and result.returncode == 1
 

@@ -1,4 +1,4 @@
-"""Free disk space checks before installing PyTorch and before a search (F3); no real drive is filled."""
+"""Free disk space checks before installing PyTorch and before a search; no real drive is filled."""
 import sqlite3
 from collections import namedtuple
 from pathlib import Path
@@ -13,7 +13,7 @@ from framescout_core.disk_space import (CACHE_BYTES_PER_PHOTO, DETECTOR_DOWNLOAD
                                         search_space_needs, torch_install_needs)
 from framescout_core.models import MODELS
 
-MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text (review)
+MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text
 Usage = namedtuple('Usage', 'total used free')
 
 
@@ -51,14 +51,14 @@ def test_search_space_counts_cache_rows_and_thumbnails():
 
 
 def test_photos_in_the_cache_need_no_cache_rows(tmp_path):
-    # review: a repeat search of a large, analyzed collection writes almost nothing
+    # a repeat search of a large, analyzed collection writes almost nothing
     assert search_space_bytes(1000, 150, 2, analyzed=1000) == 150 * 2 * THUMBNAIL_BYTES
     assert search_space_bytes(1000, 150, 2, analyzed=400) == 600 * CACHE_BYTES_PER_PHOTO + 150 * 2 * THUMBNAIL_BYTES
     results = tmp_path / 'results'
     model = MODELS['vit-b-32-openai']
     assert search_space_needs(results, 1000, 150, 2, model, tmp_path, analyzed=1000)[0] == (
         results, 150 * 2 * THUMBNAIL_BYTES)
-    # an analysis without a search (F18 review) has no profile: cache rows only, no thumbnails
+    # an analysis without a search has no profile: cache rows only, no thumbnails
     assert search_space_needs(results, 1000, 150, 0, model, tmp_path, analyzed=400)[0] == (
         results, 600 * CACHE_BYTES_PER_PHOTO)
 
@@ -93,7 +93,7 @@ def test_analyzed_photos_counts_the_photos_with_rows_of_the_signature(tmp_path):
 
 def test_analyzed_photos_leaves_out_photos_changed_since_their_analysis(tmp_path):
     # the engine analyzes a photo again when its modification time or size differs from its
-    # row, so the count before the start does too (A44)
+    # row, so the count before the start does too
     photos = [tmp_path / f'{n}.jpg' for n in range(4)]
     cache = tmp_path / 'cache.sqlite'
     make_cache(cache, [(str(p), 'abc', 100, 5) for p in photos])
@@ -117,7 +117,7 @@ def test_analyzed_photos_looks_at_photos_without_times(tmp_path):
 
 def test_analyzed_photos_counts_a_photo_analyzed_again_after_the_scan(tmp_path):
     # the scan saw the photo before an edit, a search analyzed it since: its row is the
-    # photo's again, so only the photos whose row differs from the scan are looked at (A44)
+    # photo's again, so only the photos whose row differs from the scan are looked at
     photo = tmp_path / 'a.jpg'
     photo.write_bytes(b'edited')
     stat = photo.stat()
@@ -127,7 +127,7 @@ def test_analyzed_photos_counts_a_photo_analyzed_again_after_the_scan(tmp_path):
 
 
 def test_analyzed_paths_names_the_photos_and_raw_files_with_current_rows(tmp_path):
-    # E61: the app counts a quick search with them as the engine does (quick_scope); a RAW
+    # the app counts a quick search with them as the engine does (quick_scope); a RAW
     # file is not in the scan's times, so it is looked at
     jpeg, raw, other = tmp_path / 'a.jpg', tmp_path / 'a.cr3', tmp_path / 'b.jpg'
     raw.write_bytes(b'raw')
@@ -159,7 +159,7 @@ def test_search_needs_name_downloads_only_when_missing(tmp_path):
 
 
 def test_a_hub_cache_that_does_not_answer_is_not_read(tmp_path, monkeypatch):
-    # review: a disconnected network share in HF_HUB_CACHE must not freeze the page
+    # a disconnected network share in HF_HUB_CACHE must not freeze the page
     def never_read(*args):
         raise AssertionError('must not read the hub cache')
     monkeypatch.setattr(disk_space, 'model_cached', never_read)
@@ -171,7 +171,7 @@ def test_a_hub_cache_that_does_not_answer_is_not_read(tmp_path, monkeypatch):
 
 
 def test_evaluation_runs_need_room_for_every_model(tmp_path):
-    # E51: framescout_eval.py run gives each model an output folder (and feature cache) of its own
+    # framescout_eval.py run gives each model an output folder (and feature cache) of its own
     first, second = MODELS['vit-b-32-openai'], MODELS['vit-b-16-datacomp']
     hub, weights = tmp_path / 'hub', tmp_path / 'ultralytics' / 'yolo11n.pt'
     a, b = tmp_path / 'engine' / 'a', tmp_path / 'engine' / 'b'
@@ -196,7 +196,7 @@ def test_app_search_needs_use_the_folders_the_app_gives_the_engine(tmp_path):
     base.mkdir()
     results, model = base / 'results', MODELS['vit-b-32-openai']
     cache = base / '.cache'
-    # the variables cache_env sets: the project's cache folders, unless the user set one (A36)
+    # the variables cache_env sets: the project's cache folders, unless the user set one
     assert app_search_needs(base, results, {}, 100, 150, 2, model, True, analyzed=40) == [
         (results, search_space_bytes(100, 150, 2, 40)), (cache / 'huggingface' / 'hub', download_bytes(model.download)),
         (cache / 'ultralytics', DETECTOR_DOWNLOAD)]
@@ -225,7 +225,7 @@ def cache_weights(hub, repo):
 
 
 def test_downloaded_models_look_in_the_cache_the_app_gives_the_engine(tmp_path):
-    # A39: the model list says "downloaded" for the models whose files are in that cache
+    # the model list says "downloaded" for the models whose files are in that cache
     base = tmp_path / 'project'
     base.mkdir()
     assert downloaded_models(base, {}) == set()
@@ -233,7 +233,7 @@ def test_downloaded_models_look_in_the_cache_the_app_gives_the_engine(tmp_path):
     # SigLIP needs its tokenizer files too
     cache_weights(base / '.cache' / 'huggingface' / 'hub', MODELS['vit-b-16-siglip'].weights_repo)
     assert downloaded_models(base, {}) == {'vit-b-32-openai'}
-    # a HF_HOME the user set is kept, as for the engine (A36)
+    # a HF_HOME the user set is kept, as for the engine
     cache_weights(tmp_path / 'own' / 'hub', MODELS['vit-l-14-datacomp'].weights_repo)
     assert downloaded_models(base, {'HF_HOME': str(tmp_path / 'own')}) == {'vit-l-14-datacomp'}
     # a HF_HUB_CACHE of the user is kept, as for the engine
@@ -260,7 +260,7 @@ def test_torch_install_needs_per_build(tmp_path):
         assert torch_install_needs(build, venv, temp) == [(temp, download), (venv, installed)]
     # the CUDA build is the large one (about 2.5 GB download)
     assert TORCH_INSTALL_SPACE['cuda'][0] >= 2 * GB > TORCH_INSTALL_SPACE['cpu'][0]
-    # PyTorch installed already: only the other packages of requirements.txt (review), which
+    # PyTorch installed already: only the other packages of requirements.txt, which
     # the sizes of a PyTorch install include
     download, installed = OTHER_PACKAGES_SPACE
     assert torch_install_needs('cu130', venv, temp, torch=False) == [(temp, download), (venv, installed)]
@@ -294,7 +294,7 @@ def test_needs_on_the_same_drive_add_up(tmp_path):
 
 def test_one_volume_reached_through_two_paths_is_one_drive(monkeypatch):
     # e.g. a subst or mapped drive letter and C:\ for the same volume: the same disk usage,
-    # other anchors; the needs add up (I44: drives are told apart by their usage tuple)
+    # other anchors; the needs add up (drives are told apart by their usage tuple)
     monkeypatch.setattr(disk_space, '_existing_folder', lambda path: Path(path).parent)
     drives = Drives(s=(Path('S:/'), 3 * GB), c=(Path('C:/'), 3 * GB))
     results, hub = Path('S:/FrameScout/results'), Path('C:/hub/models')
@@ -333,6 +333,6 @@ def test_the_real_drive_can_be_asked(tmp_path):
 def test_low_space_lines_name_folder_need_and_free_space(tmp_path):
     lines = low_space_lines([LowSpace(tmp_path, int(1.5 * GB), 2 * GB)])
     assert lines == [f'{tmp_path}: about 1.5 GB needed, 2.0 GB free']
-    # the sizes of the constants read the same in a warning (review: not 5.6 GB for 6 GB)
+    # the sizes of the constants read the same in a warning (not 5.6 GB for 6 GB)
     _, installed = TORCH_INSTALL_SPACE['cuda']
     assert low_space_lines([LowSpace(tmp_path, installed, SPACE_RESERVE)]) == [f'{tmp_path}: about 6.0 GB needed, 1.0 GB free']

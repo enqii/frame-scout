@@ -11,7 +11,7 @@ def test_full_image_label_is_english():
 @pytest.mark.parametrize('stored, shown', [
     ('Full image', 'Full image'),
     ('Person 3', 'Person 3'),
-    # cache rows written before the translation (I7) keep the German label
+    # cache rows written before the translation keep the German label
     ('Gesamtbild', 'Full image'),
 ])
 def test_stored_labels_are_shown_in_english(stored, shown):

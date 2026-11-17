@@ -1,4 +1,4 @@
-"""Helpers of the engine's analysis pipeline (E2): batching, prefetching, draft size, progress."""
+"""Helpers of the engine's analysis pipeline: batching, prefetching, draft size, progress."""
 from concurrent.futures import Future, ThreadPoolExecutor
 
 import pytest
@@ -19,7 +19,7 @@ def test_photos_are_grouped_until_the_batch_is_full():
 
 
 def test_a_group_never_exceeds_the_batch_size():
-    # each group is one CLIP forward pass of at most batch_size crops (review: a group of
+    # each group is one CLIP forward pass of at most batch_size crops (a group of
     # 9 crops at batch size 8 needed a second pass for a single crop); a photo whose crops
     # do not fit any more starts the next group, a photo with more crops than batch_size
     # is a group on its own (embedded in several passes)
@@ -111,7 +111,7 @@ def test_a_single_photo_is_not_retried():
 
 @pytest.mark.parametrize('group', [['a', 'b', 'c'], ['a']])
 def test_a_fatal_error_stops_store_group_without_storing_one_by_one(group):
-    # review of E50: a damaged cache fails every write; storing the photos one by one would
+    # a damaged cache fails every write; storing the photos one by one would
     # embed the first one again before the error stops the search
     calls, failures = [], []
 
@@ -256,7 +256,7 @@ def test_progress_due_interval():
     assert progress_due(10, 11, 100, every=10) is False
 
 
-# --- Lazy: the person detector is loaded only when a photo needs analysis (F2) ---
+# --- Lazy: the person detector is loaded only when a photo needs analysis ---
 
 def test_lazy_does_not_create_the_value_until_it_is_needed():
     calls = []

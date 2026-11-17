@@ -1,4 +1,4 @@
-"""The "Check installation" self-test (F15): read-only checks with fake folders, metadata and processes."""
+"""The "Check installation" self-test: read-only checks with fake folders, metadata and processes."""
 import json
 import os
 import subprocess
@@ -83,7 +83,7 @@ def test_environment_using_the_private_python_of_another_folder_is_a_problem(tmp
 
 
 def make_linux_python(folder):
-    """A private Python as on Linux: pyvenv.cfg's home is its bin folder with python3 (F47)."""
+    """A private Python as on Linux: pyvenv.cfg's home is its bin folder with python3."""
     (folder / 'bin').mkdir(parents=True)
     (folder / 'bin' / 'python3').write_bytes(b'')
     return folder / 'bin'
@@ -96,7 +96,7 @@ def test_environment_with_the_linux_private_python_of_this_folder_is_fine(tmp_pa
 
 
 def test_environment_using_the_linux_private_python_of_another_folder_is_a_problem(tmp_path):
-    # F47: on Linux, home is .python/bin, not .python
+    # on Linux, home is .python/bin, not .python
     base = tmp_path / 'copy'
     make_linux_python(base / '.python')
     make_venv(base, make_linux_python(tmp_path / 'original' / '.python'))
@@ -135,7 +135,7 @@ def test_packages_matching_the_constraints_are_fine(tmp_path):
     # a pin of a package that is not needed here ("not-needed") is no problem
     [result] = check_packages(tmp_path, CONSTRAINTS, REQUIREMENTS)
     assert result.ok is True
-    # the file in its folder, as the user finds it (I31, review)
+    # the file in its folder, as the user finds it
     assert result.text.endswith(f'in the versions of {CONSTRAINTS_FILE}.')
 
 
@@ -160,7 +160,7 @@ def test_other_versions_and_missing_packages_are_named(tmp_path):
 
 def test_missing_requirement_with_an_environment_marker_is_no_problem(tmp_path):
     # the standard library cannot evaluate a marker: a package that may not apply to this
-    # platform or Python is not reported missing, but its pin is checked once installed (review)
+    # platform or Python is not reported missing, but its pin is checked once installed
     requirements = REQUIREMENTS + 'pywin32>=300 ; sys_platform == "win32"\n'
     # two folders: importlib.metadata caches a folder's listing
     for site, extra in [(tmp_path / 'without', []), (tmp_path / 'with', [('pywin32', '300')])]:
@@ -177,7 +177,7 @@ def test_requirement_names_skip_comments_markers_and_extras():
 
 
 def test_messages_name_the_scripts_and_files_of_this_system():
-    # F47: the .bat files on Windows, the .sh scripts on Linux, and paths as the system shows them
+    # the .bat files on Windows, the .sh scripts on Linux, and paths as the system shows them
     windows = os.name == 'nt'
     assert script('Install') == ('Install-FrameScout.bat' if windows else 'Install-FrameScout.sh')
     assert script('Check', '.bat') == 'Check-FrameScout.bat' and script('Check', '.sh') == 'Check-FrameScout.sh'
@@ -187,7 +187,7 @@ def test_messages_name_the_scripts_and_files_of_this_system():
 
 
 def test_the_real_constraints_and_requirements_can_be_read(tmp_path):
-    # in the folder requirements/ since I31
+    # in the folder requirements/
     assert CONSTRAINTS_FILE.as_posix() == 'requirements/constraints.txt'
     assert REQUIREMENTS_FILE.as_posix() == 'requirements/requirements.txt'
     constraints = (ROOT / CONSTRAINTS_FILE).read_text(encoding='utf-8')
@@ -247,7 +247,7 @@ def test_cuda_build_without_a_usable_gpu_is_a_problem(tmp_path):
 def test_torch_that_does_not_import_is_a_problem(tmp_path, run):
     [result] = check_torch(tmp_path / 'python.exe', {}, '2.14.1+cpu', run=run)
     assert result.ok is False
-    # one text for every way the import fails (I44)
+    # one text for every way the import fails
     assert result.text.startswith('PyTorch 2.14.1+cpu does not import: ')
     assert script('Install') in result.fix
 
@@ -342,9 +342,9 @@ def test_check_installation_runs_every_check_and_writes_nothing(tmp_path, monkey
     env = calls[0][1]['env']
     assert env['PATH'] == 'x' and env['HF_HOME'] == str(tmp_path / '.cache' / 'huggingface')
     # PyTorch is imported with the sys.path the engine gets: its first entry is the FrameScout
-    # folder, not the caller's working folder (review)
+    # folder, not the caller's working folder
     assert calls[0][1]['cwd'] == str(tmp_path)
-    # a cache variable the user set is kept, as the app and the engine do (A36)
+    # a cache variable the user set is kept, as the app and the engine do
     calls.clear()
     own = str(tmp_path / 'own-hf')
     check_installation(tmp_path, {'PATH': 'x', 'HF_HOME': own},
@@ -383,7 +383,7 @@ def test_check_lines_give_status_text_and_fix():
 
 def test_check_script_prints_the_results_and_exits_2_on_a_problem(monkeypatch, capsys):
     # exit code 1 is Python's own for an uncaught exception: Check-FrameScout.bat tells the
-    # two apart (review)
+    # two apart
     import framescout_check
     monkeypatch.setattr(framescout_check, 'check_installation',
                         lambda base, environ: [CheckResult('A', True, 'fine', ''),
@@ -399,7 +399,7 @@ def test_check_script_prints_the_results_and_exits_2_on_a_problem(monkeypatch, c
 
 def test_check_script_prints_characters_the_output_encoding_lacks(monkeypatch):
     # redirected output on Windows uses the ANSI code page: a folder name outside it must
-    # not end the check with a UnicodeEncodeError (review)
+    # not end the check with a UnicodeEncodeError
     import io
     import framescout_check
     buffer = io.BytesIO()
@@ -417,5 +417,5 @@ def test_check_bat_runs_the_check_script_without_writing_compiled_files():
     assert 'setlocal enabledelayedexpansion' not in text.lower()
     assert all(ord(c) < 128 for c in text)
     # a check that could not run (any exit code but 0 and PROBLEMS_FOUND) falls back to the
-    # private Python and then names the installer (review)
+    # private Python and then names the installer
     assert text.count('"%errorlevel%"=="2"') == 2 and 'goto failed' in text and ':failed' in text

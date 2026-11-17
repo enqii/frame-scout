@@ -1,4 +1,4 @@
-"""Run lock and status file: one search per output folder, progress the app can read back (A4, A5)."""
+"""Run lock and status file: one search per output folder, progress the app can read back."""
 import json
 import os
 import subprocess
@@ -116,7 +116,7 @@ time.sleep(60)
 def test_the_lock_of_a_killed_process_is_released(tmp_path):
     # the app's Stop button ends the engine with terminate()/kill(), which skips every
     # finally block: the operating system must release the lock, so a stopped or crashed
-    # run never blocks the next start (A4)
+    # run never blocks the next start
     path = tmp_path / RUN_LOCK
     proc = subprocess.Popen([sys.executable, '-c', HOLD_LOCK, str(path)], cwd=str(REPO),
                             stdout=subprocess.PIPE, text=True)
@@ -239,7 +239,7 @@ def test_the_status_file_is_json_with_a_format_version(tmp_path):
 
 def test_a_new_run_keeps_the_throughput_of_earlier_runs_but_not_their_rate(tmp_path):
     # the run tab's duration before the start needs the speed of an earlier search, also
-    # after a search that analyzed nothing new (F12)
+    # after a search that analyzed nothing new
     path = tmp_path / RUN_STATUS
     record = {'signature': 's', 'device': 'cpu', 'per_minute': 30.0}
     write_status(path, {'pid': 1, 'phase': 'finished', 'rate': 31.0, 'throughput': [record, 'broken'], 'done': 9})
@@ -262,7 +262,7 @@ def test_a_first_run_or_an_unreadable_status_has_no_throughput(tmp_path):
 
 
 def test_a_new_run_keeps_the_speed_of_scoring_and_thumbnails_but_not_their_plan(tmp_path):
-    # the estimate of what follows the analysis needs an earlier search's speeds (F16)
+    # the estimate of what follows the analysis needs an earlier search's speeds
     path = tmp_path / RUN_STATUS
     write_status(path, {'pid': 1, 'phase': 'finished', 'thumbnails': 300,
                         'finishing': {'scoring': 900.0, 'thumbnails': 0, 'x': 1.0}})
@@ -285,7 +285,7 @@ def test_a_held_lock_means_a_run_is_active():
 
 def test_a_starting_run_counts_while_its_process_lives():
     # between the app's start and the engine taking the lock, only the status written by
-    # the app ("starting", with the engine's process id) shows the run (A4)
+    # the app ("starting", with the engine's process id) shows the run
     status = {'phase': 'starting', 'pid': 42}
     assert run_active(status, False, lambda pid: pid == 42)
     assert not run_active(status, False, lambda pid: False)
@@ -304,7 +304,7 @@ def test_final_or_missing_status_without_the_lock_is_not_active():
     assert not run_active({'phase': 'analyzing', 'pid': 'x'}, False, never)
 
 
-# --- status_text / status_fraction: what the progress bar shows (A5) ---
+# --- status_text / status_fraction: what the progress bar shows ---
 
 def test_analysis_progress_names_new_cached_and_errors():
     status = {'phase': 'analyzing', 'done': 25, 'total': 4997, 'new': 20, 'cached': 4, 'errors': 1}
@@ -326,7 +326,7 @@ def test_phases_without_a_count_show_their_name_only():
 
 
 def test_a_running_phase_shows_the_message_of_the_run():
-    # a repeat search on an analyzed folder ranks only, without loading the detector (F2)
+    # a repeat search on an analyzed folder ranks only, without loading the detector
     assert NOTHING_NEW == 'Nothing new to analyze – ranking only'
     status = {'phase': 'scoring', 'done': 3, 'total': 10, 'message': NOTHING_NEW}
     assert status_text(status) == f'Scoring photos: 3/10 · {NOTHING_NEW}'
@@ -335,7 +335,7 @@ def test_a_running_phase_shows_the_message_of_the_run():
 
 def test_the_detector_load_keeps_the_analysis_progress(tmp_path):
     # the detector loads on the first photo the cache does not have: the analysis phase and
-    # its counts stay, the message names the load and is cleared afterwards (F2, review)
+    # its counts stay, the message names the load and is cleared afterwards
     assert LOADING_DETECTOR == 'Loading the person detector'
     path = tmp_path / RUN_STATUS
     status = StatusReporter(path, 1)
@@ -408,7 +408,7 @@ def test_a_stopped_run_is_marked_interrupted_and_keeps_its_progress():
     assert status['phase'] == 'analyzing'  # the input is not changed
 
 
-# --- started_in_time: is a process with the status's pid really that run's? (review) ---
+# --- started_in_time: is a process with the status's pid really that run's? ---
 
 STARTED = '2026-10-21T10:00:00+02:00'
 STARTED_EPOCH = datetime.fromisoformat(STARTED).timestamp()
@@ -424,7 +424,7 @@ def test_the_run_process_was_created_before_its_status_was_written():
 
 def test_a_process_that_reused_the_pid_later_is_not_the_run():
     # a killed engine leaves a status that is not final; another process (even another
-    # engine with another --output) that gets the same pid later must not count (review)
+    # engine with another --output) that gets the same pid later must not count
     status = {'pid': 5, 'started': STARTED}
     assert not started_in_time(status, STARTED_EPOCH + 10)
     assert not started_in_time(status, STARTED_EPOCH + 3600)
@@ -436,7 +436,7 @@ def test_a_status_without_a_readable_start_time_matches_no_process():
     assert not started_in_time({'pid': 5, 'started': 17}, STARTED_EPOCH)
 
 
-# --- final_status: the engine's final phase from its exit code (review) ---
+# --- final_status: the engine's final phase from its exit code ---
 
 def test_exit_codes_map_to_final_phases():
     assert final_status(0) == ('finished', None)
@@ -447,20 +447,20 @@ def test_exit_codes_map_to_final_phases():
 
 
 def test_a_finished_run_carries_its_warnings():
-    # review of E50: a search that finished despite unreadable cache rows says so in the app
+    # a search that finished despite unreadable cache rows says so in the app
     assert final_status(0, ['Rows left out.', 'Check cache.']) == ('finished', 'Rows left out. Check cache.')
     assert final_status(0, []) == ('finished', None)
     assert final_status(130, ['x']) == ('interrupted', 'Interrupted (Ctrl+C).')
 
 
 def test_a_failed_analysis_is_not_called_a_search():
-    # review of F18: the app shows the engine's message after "The last analysis failed"
+    # the app shows the engine's message after "The last analysis failed"
     assert final_status(1, run='analysis') == ('failed', 'The analysis ended with exit code 1.')
     assert final_status(1) == ('failed', 'The search ended with exit code 1.')
     assert final_status(0, ['Rows left out.'], run='analysis') == ('finished', 'Rows left out.')
 
 
-# --- lock_held when the lock file cannot be opened (review) ---
+# --- lock_held when the lock file cannot be opened ---
 
 def test_a_lock_file_that_cannot_be_opened_counts_as_held(tmp_path, monkeypatch):
     # e.g. a PermissionError on Windows while the file is pending delete or blocked by an
@@ -475,7 +475,7 @@ def test_a_lock_file_that_cannot_be_opened_counts_as_held(tmp_path, monkeypatch)
     assert lock_held(path)
 
 
-# --- an analysis without a search (F18) ---
+# --- an analysis without a search ---
 
 def test_an_analysis_run_is_named_as_such():
     assert analysis_only({'phase': 'finished', 'analyze_only': True})
@@ -488,7 +488,7 @@ def test_an_analysis_run_is_named_as_such():
 
 
 def test_the_reporter_of_an_analysis_marks_every_write(tmp_path):
-    # review: the run kind is given once, not by every update (the app's "starting", the
+    # the run kind is given once, not by every update (the app's "starting", the
     # engine's phases and its final status)
     path = tmp_path / RUN_STATUS
     reporter = StatusReporter(path, 1, analyze_only=True)
@@ -497,7 +497,7 @@ def test_the_reporter_of_an_analysis_marks_every_write(tmp_path):
     reporter.update('analyzing', done=1)
     reporter.finish('failed', 2, 'Bad option.')
     assert analysis_only(read_status(path))
-    # a search's status has no such field, as before F18
+    # a search's status has no such field
     StatusReporter(path, 1).update('scanning')
     assert 'analyze_only' not in read_status(path)
 
@@ -513,7 +513,7 @@ def test_the_status_of_an_analysis_starts_as_an_analysis():
 
 
 def test_an_analysis_with_errors_does_not_claim_all_photos_are_analyzed():
-    # review: no new analysis can also mean photos whose cache row or file could not be read
+    # no new analysis can also mean photos whose cache row or file could not be read
     assert nothing_new_message(analyze_only=True, errors=0) == ALL_ANALYZED
     message = nothing_new_message(analyze_only=True, errors=2)
     assert message != ALL_ANALYZED and 'All photos' not in message and 'log' in message
@@ -525,7 +525,7 @@ def test_an_analysis_with_errors_does_not_claim_all_photos_are_analyzed():
 def test_a_finished_analysis_names_its_counts_and_leaves_the_results():
     text = analysis_result_text({'phase': 'finished', 'analyze_only': True, 'new': 1200, 'cached': 3, 'errors': 0})
     assert text.startswith('1,200 photos newly analyzed, 3 already in the cache.')
-    # the risk of F18: a run without results.json must not look like a failed search
+    # a run without results.json must not look like a failed search
     assert 'results of the last search stay as they are' in text
     # the analyses help only a search with the same settings
     assert 'search model' in text and 'person detection' in text
