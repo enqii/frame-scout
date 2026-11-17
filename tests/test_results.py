@@ -9,7 +9,7 @@ import pytest
 
 from framescout_core.profiles import load_profiles
 from framescout_core.results import (QUERY_NOTE, RESULTS_FILE, RESULTS_FORMAT, card_text, closest_query,
-                                     has_closest_line, open_command, openable_photo, page_cards, page_count,
+                                     has_closest_line, histogram_bars, open_command, openable_photo, page_cards, page_count,
                                      profile_fingerprints, profile_state, publish_export, query_caption, query_summary,
                                      read_results, result_card, results_document, reveal_command, search_fingerprint)
 
@@ -589,3 +589,23 @@ def test_only_existing_image_files_can_be_opened(tmp_path):
     assert openable_photo(str(tmp_path / 'missing.jpg')) is None
     assert openable_photo(str(tmp_path)) is None
     assert openable_photo('a.JPG') is None  # relative: depends on the app's working directory
+
+
+def read_entry(folder, **profile):
+    path = folder / RESULTS_FILE
+    path.write_text(json.dumps(document(**profile)), encoding='utf-8')
+    return read_results(path)['profiles'][0]
+
+
+def test_histogram_bars_split_the_score_range_of_the_results_file(tmp_path):
+    entry = read_entry(tmp_path, histogram={'low': -1.0, 'high': 3.0, 'counts': [1, 2, 0, 2]})
+    assert histogram_bars(entry) == [{'from': -1.0, 'to': 0.0, 'photos': 1}, {'from': 0.0, 'to': 1.0, 'photos': 2},
+                                     {'from': 1.0, 'to': 2.0, 'photos': 0}, {'from': 2.0, 'to': 3.0, 'photos': 2}]
+
+
+@pytest.mark.parametrize('histogram', ['x', {'low': 1.0, 'high': 1.0, 'counts': [1]},
+                                       {'low': 0, 'high': 1, 'counts': []}, {'low': 0, 'high': 1, 'counts': [-1]},
+                                       {'low': 0, 'high': 1, 'counts': [True]}])
+def test_an_invalid_histogram_gives_no_chart_and_keeps_the_results_readable(tmp_path, histogram):
+    assert histogram_bars(read_entry(tmp_path, histogram=histogram)) is None
+    assert histogram_bars(read_entry(tmp_path)) is None  # results of older versions have none

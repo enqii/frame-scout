@@ -10,7 +10,8 @@ from framescout_core.models import MODELS, results_model
 from framescout_core.quick import (QUICK_DIR, QUICK_GALLERY, quick_entry_label, quick_folders_differ, quick_note,
                                    quick_result_id, results_choice)
 from framescout_core.results import (GALLERY_PAGE_SIZE, card_text, has_closest_line, page_cards, page_count,
-                                     profile_fingerprints, profile_state, query_summary, read_results)
+                                     histogram_bars, profile_fingerprints, profile_state, query_summary,
+                                     read_results)
 
 from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, close_popover, file_key, open_gallery,
                      open_photo, open_quick_folder, open_quick_gallery, open_results_folder, plain, show_photo,
@@ -341,6 +342,7 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
         if offer:
             st.caption(plain(offer))
             st.button('Restore marks from backup', on_click=restore_marks_backup, key='restore_marks')
+        show_score_distribution(entry)
     with notices:
         show_notice('gallery_notice')
         show_notice('marks_notice')
@@ -353,6 +355,35 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
     draw_cards(shown, THUMBS, f'gallery_{names.index(name)}_{page}_{len(shown)}', find_disabled,
                has_closest_line(entry['cards']), profile=name, can_mark=can_mark)
     bottom_pager(key, page, pages, 'results_' + widget_id(name) + '_', progress)
+
+
+def show_score_distribution(entry):
+    """The collapsed chart of how the scores of every photo of the search spread for a profile.
+
+    With a line at the score of the last card shown, where the gallery ends (Maximum
+    matches); nothing for results without a histogram (histogram_bars).
+    """
+    bars = histogram_bars(entry)
+    if not bars:
+        return
+    photos = sum(bar['photos'] for bar in bars)
+    score = 'Score' if entry.get('normalized') else 'Similarity'
+    layers = [{'mark': {'type': 'bar', 'tooltip': True},
+               'encoding': {'x': {'field': 'from', 'type': 'quantitative', 'bin': {'binned': True}, 'title': score},
+                            'x2': {'field': 'to'},
+                            'y': {'field': 'photos', 'type': 'quantitative', 'title': 'Photos'}}}]
+    cards = entry['cards']
+    if cards:
+        layers.append({'data': {'values': [{'cut': cards[-1]['score']}]},
+                       'mark': {'type': 'rule', 'color': '#ff4b4b', 'strokeWidth': 2},
+                       'encoding': {'x': {'field': 'cut', 'type': 'quantitative'}}})
+    with st.expander('Score distribution'):
+        st.vega_lite_chart({'data': {'values': bars}, 'layer': layers, 'height': 160}, width='stretch')
+        st.caption(f'The {score.lower()} of all {photos:,} photos of this search for this profile'
+                   + (f'; the red line marks place {len(cards):,}, the last photo shown (Maximum matches)'
+                      if cards else '')
+                   + '. Scores are relative to this search, not probabilities: a gap or bend in the curve is '
+                     'no threshold of certainty.')
 
 
 def show_gallery_actions(entry, popover):

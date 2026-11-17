@@ -166,6 +166,24 @@ def query_summary(entry):
             'small margin: the other texts can be nearly as close.')
 
 
+def histogram_bars(entry):
+    """Return the bars of a profile's score distribution: [{'from', 'to', 'photos'}], or None.
+
+    entry: a profile of read_results; its optional "histogram" (the engine's
+    score_histogram) has equal bins from "low" to "high". None if it has none (results of
+    older versions) or an invalid one: the chart is left out, the gallery still shown.
+    """
+    histogram = entry.get('histogram')
+    if not isinstance(histogram, dict):
+        return None
+    low, high, counts = histogram.get('low'), histogram.get('high'), histogram.get('counts')
+    if (not _is_number(low) or not _is_number(high) or not low < high or not isinstance(counts, list) or not counts
+            or not all(isinstance(c, int) and not isinstance(c, bool) and c >= 0 for c in counts)):
+        return None
+    width = (high - low) / len(counts)
+    return [{'from': low + i * width, 'to': low + (i + 1) * width, 'photos': c} for i, c in enumerate(counts)]
+
+
 def results_document(started, finished, folders, settings, photos, profiles):
     """Return the content of the result file.
 
@@ -173,7 +191,7 @@ def results_document(started, finished, folders, settings, photos, profiles):
     settings: the search options; photos: how many photos were found; profiles: per profile
     a dict with name, fingerprint (search_fingerprint), gallery (HTML file name),
     normalized, cards (result_card, in gallery order) and, for a search with texts, queries
-    (query_labels).
+    (query_labels); histogram (score_histogram of framescout_scoring) when photos were scored.
     """
     return {'format': RESULTS_FORMAT, 'started': started, 'finished': finished,
             'photo_folders': [str(f) for f in folders], 'settings': settings, 'photos': photos,
