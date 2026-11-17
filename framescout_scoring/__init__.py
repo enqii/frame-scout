@@ -1,24 +1,24 @@
-"""Scoring of image features against a search profile (E4, E5); needs numpy, not torch.
+"""Scoring of image features against a search profile; needs numpy, not torch.
 
 A profile's text queries are the average of its generated prompt templates (one
 normalized vector, the usual CLIP prompt ensemble) followed by its custom prompts, and a
-crop's text score is its best cosine similarity with one of these queries (E4). Text
+crop's text score is its best cosine similarity with one of these queries. Text
 scores (about 0.2-0.35 with CLIP) and image-to-image scores (about 0.5-0.9) have different
 scales, so per profile and run both are z-scored over all crops of the searched photos
-before the reference weight combines them (E5). A text-only score is then "standard
+before the reference weight combines them. A text-only score is then "standard
 deviations above the average crop of this search"; with reference images it is the
 weighted sum of both z-scores. A relative ranking value, not a probability.
 
-The package (I30) is this one file since I45; it stays a package rather than a module
-framescout_scoring.py, because a package folder left by an older version extracted into
-the same folder would win over a module of the same name.
+The package is this one file; it stays a package rather than a module framescout_scoring.py,
+because a package folder left by an older version extracted into the same folder would win
+over a module of the same name.
 """
 from typing import NamedTuple, Optional
 
 import numpy as np
 
 # Fewer crops than this in a run (or a spread of about 0): the raw cosine similarities are
-# combined as before, since the mean and spread of a handful of scores are noise.
+# used instead, since the mean and spread of a handful of scores are noise.
 MIN_SCORES = 10
 MIN_SPREAD = 1e-6
 
@@ -26,9 +26,9 @@ MIN_SPREAD = 1e-6
 class Match(NamedTuple):
     """Best crop of one photo: combined score, crop index, raw text and visual similarity.
 
-    text is None for "Find similar" (F11), which compares images only. query is the index
+    text is None for "Find similar", which compares images only. query is the index
     (in text_queries order) of the query the crop's text score comes from, or None if
-    rank_photos was not given the best queries (F17).
+    rank_photos was not given the best queries.
     """
     score: float
     crop: int
@@ -56,7 +56,7 @@ def text_queries(prompt_vectors, generated):
 
 
 def best_matches(features, queries):
-    """Best cosine similarity of each crop (row of features) with one of the queries, and that query's index (F17).
+    """Best cosine similarity of each crop (row of features) with one of the queries, and that query's index.
 
     Returns (scores, indices), both from one similarity matrix; an exact tie names the
     first of the tied queries.
@@ -76,7 +76,7 @@ def photo_scores(features, labels, profile_vectors):
     features: the photo's normalized crop vectors; labels: its crop labels;
     profile_vectors: {name: (queries, reference vectors or None)}. Returns (text, visual,
     best): {name: scores per crop}, visual only for profiles with reference images, best
-    the index of each crop's best query (best_matches, F17). Raises
+    the index of each crop's best query (best_matches). Raises
     ValueError for a broken cache row (labels and vectors do not match, no crop, scores
     that are not finite); the engine skips such a photo, so it cannot break a search.
     """
@@ -107,7 +107,7 @@ def rank_photos(text, visual, weight, best=None):
     text: one array per photo with the text score of each crop; visual: the same for the
     reference images, or None for a profile without them; weight: the reference weight;
     best: None or one array per photo with the index of each crop's best query
-    (photo_scores), named by each Match (F17); it does not change the ranking.
+    (photo_scores), named by each Match; it does not change the ranking.
     Returns (normalized, matches): matches holds one Match per photo in input order;
     normalized is False if the raw scores had to be used (too few crops, no spread). Only
     a channel that counts (weight above 0) needs a spread: with weight 0 the reference
@@ -131,7 +131,7 @@ def rank_photos(text, visual, weight, best=None):
 
 
 def rank_similar(similarity):
-    """Score every photo of "Find similar" (F11) by its image similarity with one photo.
+    """Score every photo of "Find similar" by its image similarity with one photo.
 
     similarity: one array per photo with the cosine similarity of each crop with the chosen
     photo's vector. Scaled over all crops like a profile without reference images, but each

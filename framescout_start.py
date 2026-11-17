@@ -1,4 +1,4 @@
-"""Start the FrameScout app of this folder (F22): Start-FrameScout.bat runs it.
+"""Start the FrameScout app of this folder: Start-FrameScout.bat runs it.
 
     python framescout_start.py
 
@@ -34,7 +34,7 @@ def main():
     try:
         return launch(ROOT, run_app, open_browser=webbrowser.open)
     except KeyboardInterrupt:
-        # Ctrl+C in the start window is a normal stop: no traceback, and no pause of the .bat (review);
+        # Ctrl+C in the start window is a normal stop: no traceback, and no pause of the .bat;
         # launch has given the lock back on the way out
         return 0
 

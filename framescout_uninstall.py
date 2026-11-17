@@ -1,9 +1,9 @@
-"""FrameScout uninstall (P5): deletes what the installer and FrameScout create again.
+"""FrameScout uninstall: deletes what the installer and FrameScout create again.
 
 Uninstall-FrameScout.bat runs it with the installer's private Python (.python), never with
 the environment's own Python (.venv), which could not delete itself while it runs. The
 private Python cannot delete itself either: when it runs the script, the script deletes
-everything else and ends with PRIVATE_PYTHON_EXIT_CODE, and the .bat deletes .python (I20).
+everything else and ends with PRIVATE_PYTHON_EXIT_CODE, and the .bat deletes .python.
 
 Deleted after a confirmation: the Python environment (.venv), the private Python (.python),
 downloaded model weights and
@@ -57,7 +57,7 @@ def _blocked(root, out):
     """Print why nothing may be deleted now and return True, or return False.
 
     A program that holds a file open without these locks shows up in the failure list of
-    remove_items instead (I44).
+    remove_items instead.
     """
     if search_running(root):
         out('A search is running. Stop it (or wait for its end), close FrameScout and run the uninstall again.')

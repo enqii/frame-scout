@@ -1,4 +1,4 @@
-"""FrameScout search-model evaluation (E32, E20): which offered search model ranks best?
+"""FrameScout search-model evaluation: which offered search model ranks best?
 
 A development tool, not part of the app. It works on named collections (a photo folder
 plus a profiles file each, e.g. one of cosplay photos and one of outdoor photos), kept in
@@ -17,7 +17,7 @@ a folder of their own (default: .tmp/eval/ in the project folder, which git igno
   python framescout_eval.py metrics cosplay outdoor
 
 Steps 2-4 need numpy only (no torch); pool renders thumbnails with the engine's decoders
-(framescout_images, E49) when Pillow is installed (E35). The labels stay in the collection's folder.
+(framescout_images) when Pillow is installed. The labels stay in the collection's folder.
 Everything runs locally; the labelling page is served on 127.0.0.1 only.
 """
 import argparse
@@ -61,7 +61,7 @@ POOL_FORMAT = 1
 # photos per model and profile that go into the pool: the union of all models is labelled
 DEFAULT_DEPTH = 100
 # gallery length of the engine runs: the labelling page shows their thumbnails, pool renders
-# the missing ones (E35)
+# the missing ones
 DEFAULT_TOP = 150
 # threads that render missing thumbnails, like the engine's decoding threads
 THUMBNAIL_THREADS = min(4, os.cpu_count() or 1)
@@ -142,7 +142,7 @@ def ranking(document, profile, weight):
     The same rank_photos as the engine, over the same per-crop scores, sorted by score with
     ties in scan order like the galleries. The scores file keeps SCORE_DIGITS decimals of
     each raw similarity, so photos whose scores differ by less than that rounding can come
-    in another order than in the galleries (review); AP over the top 40 hardly notices.
+    in another order than in the galleries; AP over the top 40 hardly notices.
     """
     text = [np.asarray(row, dtype=np.float64) for row in profile['text']]
     visual = None if profile['visual'] is None else [np.asarray(row, dtype=np.float64) for row in profile['visual']]
@@ -170,7 +170,7 @@ def run_warnings(scores):
     """Warnings about model runs that do not compare the same: changed profiles, other photos."""
     warnings = [f'The profile {name} has changed between the model runs; run the models again.'
                 for name in changed_profiles(profile_entries(scores))]
-    # a photo changed since another model's run has a new mtime_ns (review)
+    # a photo changed since another model's run has a new mtime_ns
     photo_sets = {model: {(photo['path'], photo['mtime_ns']) for photo in document['photos']}
                   for model, document in scores.items()}
     if len({frozenset(photos) for photos in photo_sets.values()}) > 1:
@@ -200,15 +200,15 @@ def label_warnings(scores, labels):
 def current_motifs(collection, scores):
     """{profile name: motif} of the scored profiles as pool_document records them: context and
     features from the collection's profiles file, the reference images of the latest model
-    run (E36). A profile the file does not have (renamed or removed since the run), or every
-    profile if the file cannot be read, is left out: its motif is not known (review)."""
+    run. A profile the file does not have (renamed or removed since the run), or every
+    profile if the file cannot be read, is left out: its motif is not known."""
     details = profile_details(collection)
     return {name: motif(*details[name], next(reversed(models.values()))['references'])
             for name, models in profile_entries(scores).items() if name in details}
 
 
 def motif_warnings(collection, scores, motifs):
-    """Warnings about labels made for another motif than the profile of that name describes now (E36).
+    """Warnings about labels made for another motif than the profile of that name describes now.
 
     motifs are those of the labels file (read_label_file; None: not readable). Prompts may
     be reworded under the same name (the labels are kept for comparing the wordings);
@@ -224,7 +224,7 @@ def motif_warnings(collection, scores, motifs):
 
 
 def pool_motif_warnings(collection, pool, scores):
-    """Warnings about pool profiles shown with another motif than their profile describes now (review of E36).
+    """Warnings about pool profiles shown with another motif than their profile describes now.
 
     A label records the motif the labelling page shows (that of the pool file), so a
     profile changed after pool would get labels of its old motif.
@@ -239,11 +239,11 @@ def pool_motif_warnings(collection, pool, scores):
 # --- run ---
 
 def default_cache_dir(prefix=None, base_prefix=None, root=ROOT):
-    """The .cache of the FrameScout checkout whose venv runs the tool, else the one next to the script (E48).
+    """The .cache of the FrameScout checkout whose venv runs the tool, else the one next to the script.
 
     The tool run from a git worktree with the main checkout's venv then uses the models the
     main checkout already downloaded. Only a checkout that holds the tool (the tool itself or
-    a worktree inside it) counts, so another clone's venv never receives the downloads (review).
+    a worktree inside it) counts, so another clone's venv never receives the downloads.
     """
     prefix = Path(sys.prefix if prefix is None else prefix)
     base_prefix = Path(sys.base_prefix if base_prefix is None else base_prefix)
@@ -271,15 +271,15 @@ def engine_command(collection, model, folders, profiles, args):
 
 
 def space_warning(collection, models, folders, profiles, args, env, log):
-    """Return the lines of a warning if the runs of models may leave little free disk space (E51), else [].
+    """Return the lines of a warning if the runs of models may leave little free disk space, else [].
 
-    The F3 check of the app for every model that is run: its output folder (feature cache
+    The app's free-space check for every model that is run: its output folder (feature cache
     and gallery thumbnails for the photos of folders, all counted as new), the downloads
     of the models not in the Hugging Face cache of env yet, and the person detector's
     weights as the engine looks them up. log says first that the photos are counted, which
-    takes as long as the engine's own scan of them (review). An estimate: a warning, never
+    takes as long as the engine's own scan of them. An estimate: a warning, never
     a block; a check that fails (OSError, ValueError) gives none, any other error a note
-    instead of stopping the runs (review).
+    instead of stopping the runs.
     """
     runnable = [model for model in models if model_problem(model) is None]
     if not runnable:
@@ -339,7 +339,7 @@ def command_run(args):
     failed = []
     for model in models:
         # a model's scores are those of its latest run: a skipped or failed run leaves none,
-        # so pool and metrics never compare an older run with the fresh ones (review)
+        # so pool and metrics never compare an older run with the fresh ones
         collection.scores_file(model).unlink(missing_ok=True)
         problem = model_problem(model)
         if problem:
@@ -440,7 +440,7 @@ def load_renderer(import_module=importlib.import_module):
     or (None, reason) if they cannot be loaded here, e.g. without Pillow.
 
     They come from framescout_images, which the engine decodes with too, without torch
-    and the engine's cache variables (E49); pool loads them only when thumbnails are missing.
+    and the engine's cache variables; pool loads them only when thumbnails are missing.
     """
     try:
         return import_module('framescout_images').render_thumbnail, None
@@ -453,7 +453,7 @@ def render_thumbnails(collection, missing, render, log, threads=THUMBNAIL_THREAD
     folder with render(path, target); return how many failed (logged, the first SKIP_LOG_LIMIT).
 
     A photo whose modification time is no longer mtime_ns gets none: its thumbnail is named
-    by that time (of scoring), so it must not show the photo's later pixels (review).
+    by that time (of scoring), so it must not show the photo's later pixels.
     """
     collection.thumbnails.mkdir(parents=True, exist_ok=True)
     problems = []  # list.append is safe across threads
@@ -473,7 +473,7 @@ def render_thumbnails(collection, missing, render, log, threads=THUMBNAIL_THREAD
 
 
 def pool_thumbnails(collection, document, log):
-    """Make sure the labelling page can show every pool photo and reference image (E35).
+    """Make sure the labelling page can show every pool photo and reference image.
 
     The galleries hold thumbnails of each model's top photos at the run's reference weight
     only; a pool photo from another weight, and every reference image, would otherwise be
@@ -611,7 +611,7 @@ def report(name, result, k, weight, models):
         weights = list(next(iter(result['sweep'].values())))
         best = {model: max((v['ap'] for v in row.values() if v['ap'] is not None), default=None)
                 for model, row in sweep.items()}
-        # a tie at 0 (no weight finds a match) has no best weight (E47)
+        # a tie at 0 (no weight finds a match) has no best weight
         best = {model: ap if ap is not None and ap > 0 else None for model, ap in best.items()}
         rows = []
         for w in weights:
@@ -740,7 +740,7 @@ class LabelSession:
         profile, photo = found
         with self.lock:
             labels = set_label(self.labels, profile['name'], photo['path'], value)
-            # the motif of the pool the label is set in (E36): pool and metrics warn when it changes;
+            # the motif of the pool the label is set in: pool and metrics warn when it changes;
             # not recorded for a profile the profiles file does not have (its context is not known)
             shown = motif(profile['context'], profile['features'], profile['references'])
             motifs = record_motif(self.motifs, labels, profile['name'],
@@ -752,7 +752,7 @@ class LabelSession:
     def handle(self, method, target, body):
         """Answer one request: (status, content type, body)."""
         parts = unquote(urlsplit(target).path).split('/')
-        # compared in constant time, as bytes: compare_digest refuses str that is not ASCII (review)
+        # compared in constant time, as bytes: compare_digest refuses str that is not ASCII
         if len(parts) < 2 or not secrets.compare_digest(parts[1].encode('utf-8'), self.token.encode()):
             return 404, 'text/plain', b'not found'
         route = parts[2:]
@@ -788,7 +788,7 @@ def body_length(header, limit=MAX_BODY):
 
 class LabelServer(http.server.ThreadingHTTPServer):
     # with SO_REUSEADDR, Windows lets a second server bind a port another one listens on, so
-    # a second labelling page would share the port silently instead of failing (review)
+    # a second labelling page would share the port silently instead of failing
     allow_reuse_address = os.name != 'nt'
     allow_reuse_port = False
 
