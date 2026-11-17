@@ -328,6 +328,58 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       Triage 2026-11-15: stays open; list per module what would go, then decide.
       Triage 2026-11-17: step 1 (the list, docs only) is roadmap P49; the removal itself stays
       `decision` until the user has seen the list.
+      **Step 1 result (2026-11-17; sampled reading of the four modules, line counts of
+      `cleanup.py` about 1,300 / `uninstall.py` 430 / `install_check.py` 330 / `disk_space.py`
+      260, tests 1,540 / 790 / 450 / 365). Per module what would go and the case it gives up;
+      the deletion rules for user data and `NEVER_DELETED` stay in every option.**
+      - `cleanup.py` – the unbound-photo check (`_PathCheck`, `_pass`, `_FolderWorker`, the
+        probes, `_unchecked_notes`; about 500 lines in `cleanup.py` plus about two thirds of
+        its tests). Simple rule instead: probe each root once (one `os.path.isdir` in a thread
+        with a timeout, or none) and offer "unbound" rows only for photos whose root answers
+        and whose parent folder exists and is not empty; otherwise offer nothing of that
+        category and say so in one line. Goes: (a) the per-folder timeout worker with the
+        "still hanging" bookkeeping (E37): a share that stops answering mid-pass stalls the scan
+        until the OS gives up; (b) the second pass and the second probe after the first
+        (a share that drops during the pass could make its photos look deleted: wrongly offered
+        rows, deleted only after the user's confirmation and only cache rows or marks); (c)
+        `_dead_link`/`_link_above` (junction or link to a disconnected drive inside a
+        reachable root); (d) the fstab and mount-root logic of `_unmounted` (E54; the simple
+        rule "parent folder empty or missing -> not checked" covers most of it); (e) the
+        five different "not checked" notes become one; (f) the per-folder listing
+        optimization (`_STAT_UP_TO`, listing instead of stats; slower on large network
+        folders, correct). Keep: `_missing` (only a certain "not found" counts) and the
+        root probe. The other categories (thumbnails, galleries, temp files, signatures,
+        references, broken files) are not defensive handling of rare cases and stay.
+      - `uninstall.py` – candidates: (a) `outside_leftovers` (lists, never deletes, caches
+        of FrameScout run without its scripts, I10): drop, the user guide says where the
+        caches are; (b) `_retry_writable` and the read-only handling (`programs_in_use`
+        `clear_read_only`): a read-only file then ends in the failure list instead of being
+        deleted; (c) `_held_open` on Windows via `_winapi`: replace by the existing locks
+        (`search_running`, `app_running`) plus the failure list of `remove_items` (a running
+        program then shows up as a failed delete, not before the confirmation). Keep: the
+        protected-folder and `USER_DATA` logic, the links handling (it protects data outside
+        the folder), `PRIVATE_PYTHON_EXIT_CODE` (needed for the clean uninstall).
+      - `install_check.py` – the check is diagnostic only. Candidates: (a) `check_models`
+        with the reachability probe of the model cache (information only: drop the probe or
+        the whole check); (b) the `check_torch` subprocess variants (timeout, OSError,
+        parse error each have their own text: one generic "PyTorch does not import: <last
+        stderr line>"); (c) `check_program_files` (two-version-files case after extracting a
+        ZIP over another version, I34/I42; a real case seen once, keep unless the user
+        decides otherwise); (d) `_same_folder` through 8.3 short names and links. Keep:
+        `check_environment`, `check_packages`, `check_writable`, `check_disk_space`.
+      - `disk_space.py` – the estimates (`search_space_*`, `torch_install_needs`) are the
+        feature; the defensive part is `low_space`: the root probe in threads (a hanging
+        share), the volume identity by device number and size, `_existing_folder`. Simple
+        rule: `shutil.disk_usage` of the nearest existing folder per need, add up needs by
+        the same `usage` tuple, no probe. Gives up: a warning check that hangs the app for
+        a dead share's timeout (only if the destination is on such a share; results and
+        cache usually are not) and the exact merging of one drive reached by two paths.
+        `analyzed_paths` stays (A44).
+      Rough effect if all options are taken: about 700 lines of code and 1,100 lines of
+      tests less; `cleanup.py` shrinks to about 700 lines. **Question for the user:** per
+      module and lettered option, remove or keep (the cleanup root and folder guards are the
+      only options that give up protection near user data: a wrongly "unbound" row is only
+      a cache row or mark, and deletion needs the user's confirmation).
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and
