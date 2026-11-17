@@ -1,16 +1,15 @@
-"""Check the FrameScout installation in this folder (F15): Check-FrameScout.bat runs it.
+"""Check the FrameScout installation in this folder: Check-FrameScout.bat runs it.
 
     python framescout_check.py
 
 Read-only: it writes, downloads and repairs nothing (a temporary file shows whether .cache
 and results can be written and is deleted right away). It checks that the program files are
-of one FrameScout version (I34), the Python
-environment (.venv) belongs to this folder, the package versions equal requirements/constraints.txt,
-PyTorch imports (in a subprocess) and finds the GPU for a CUDA build, .cache and results can
-be written, which model files are downloaded and the free disk space, and names one fix per
-problem. Standard library only, so it also runs with the private Python (.python) when .venv
-does not work. Exit code 0 no problem found, 2 a problem found (1 and any other: the check
-itself failed).
+of one FrameScout version, the Python environment (.venv) belongs to this folder, the package
+versions equal requirements/constraints.txt, PyTorch imports (in a subprocess) and finds the
+GPU for a CUDA build, .cache and results can be written, which model files are downloaded
+and the free disk space, and names one fix per problem. Standard library only, so it also
+runs with the private Python (.python) when .venv does not work. Exit code 0 no problem
+found, 2 a problem found (1 and any other: the check itself failed).
 """
 import argparse
 import os
@@ -21,14 +20,14 @@ from framescout_core.install_check import check_installation, check_lines
 
 ROOT = Path(__file__).resolve().parent
 # not 1: Python exits with 1 on an uncaught exception, and Check-FrameScout.bat must tell a
-# check that found problems from a check that could not run (review)
+# check that found problems from a check that could not run
 PROBLEMS_FOUND = 2
 
 
 def main(argv=None):
     argparse.ArgumentParser(description='Check the FrameScout installation in this folder (read-only).').parse_args(argv)
     # output redirected to a file or pipe uses the ANSI code page on Windows: a path with
-    # characters outside it is printed with "?" instead of ending the check (review)
+    # characters outside it is printed with "?" instead of ending the check
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(errors='replace')
     print(f'Checking the FrameScout installation in {ROOT} ...', flush=True)

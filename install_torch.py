@@ -1,4 +1,4 @@
-"""Install PyTorch for FrameScout: the CPU build or a CUDA build for an NVIDIA GPU (A7, I3).
+"""Install PyTorch for FrameScout: the CPU build or a CUDA build for an NVIDIA GPU.
 
 Install-FrameScout.bat runs it with the project venv before requirements/requirements.txt:
 
@@ -13,7 +13,7 @@ Install-FrameScout.bat runs it with the project venv before requirements/require
   asks whether to install GPU support, else it installs the CPU build.
 
 A build that is already installed is not downloaded again. Before a download it warns if
-the drive of the venv or of the temporary folder has little free space (F3) and asks
+the drive of the venv or of the temporary folder has little free space and asks
 whether to continue (without a console it continues); with the build installed it still
 checks for the other packages of requirements.txt the .bat installs next, unless they are
 all installed. --dry-run only prints the pip command. Standard library only. Exit codes:
@@ -36,8 +36,8 @@ from framescout_core.torch_build import (CUDA_BUILDS, cuda_build, driver_text, i
 
 KNOWN_CUDA_BUILDS = {build for build, *_ in CUDA_BUILDS}
 PYPI_INDEX = 'https://pypi.org/simple'
-# the user stopped on low disk space: Install-FrameScout.bat says so instead of "failed"
-# (review); not 1 (failure, also an uncaught exception) or 2 (argparse's usage error)
+# the user stopped on low disk space: Install-FrameScout.bat says so instead of "failed";
+# not 1 (failure, also an uncaught exception) or 2 (argparse's usage error)
 STOPPED_EXIT_CODE = 3
 REQUIREMENTS = Path(__file__).resolve().parent / REQUIREMENTS_FILE
 
@@ -104,11 +104,11 @@ def chosen_cuda_build():
 
 
 def enough_space(build, ask, torch=True):
-    """Warn if installing build leaves little free space on a drive (F3); return False if the user stops.
+    """Warn if installing build leaves little free space on a drive; return False if the user stops.
 
     Checks the venv (sys.prefix), where pip installs, and the temporary folder, where it
     downloads. ask: whether to ask to continue (not in a dry run); torch False: PyTorch is
-    installed, only the other packages of requirements.txt are installed next (review).
+    installed, only the other packages of requirements.txt are installed next.
     """
     low = low_space(torch_install_needs(build, sys.prefix, tempfile.gettempdir(), torch=torch))
     if not low:
@@ -177,7 +177,7 @@ def main(argv=None):
     if installed_build_matches(installed_version('torch'), installed_version('torchvision'), build):
         print(f'PyTorch {installed_version("torch")} ({build}) is already installed.', flush=True)
         # Install-FrameScout.bat installs requirements.txt next; a rerun after a full disk
-        # stopped that step must warn again (review)
+        # stopped that step must warn again
         if other_packages_missing() and not enough_space(build, ask=not args.dry_run, torch=False):
             return STOPPED_EXIT_CODE
         return 0
@@ -189,8 +189,8 @@ def main(argv=None):
         print(f'Installing PyTorch with CUDA support ({build}). This is a large download.', flush=True)
     # torch and torchvision with their local label (+cpu, +cu130) exist only on the PyTorch
     # index; their dependencies (numpy, pillow, ...) are taken from PyPI too, where the
-    # versions of constraints.txt exist (Install-FrameScout.bat sets PIP_CONSTRAINT, I18), so
-    # requirements.txt does not replace them right away (review)
+    # versions of constraints.txt exist (Install-FrameScout.bat sets PIP_CONSTRAINT), so
+    # requirements.txt does not replace them right away
     command = [sys.executable, '-m', 'pip', 'install', '--no-cache-dir', *torch_requirements(build),
                '--index-url', torch_index_url(build), '--extra-index-url', PYPI_INDEX]
     if args.dry_run:
