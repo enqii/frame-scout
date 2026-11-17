@@ -399,6 +399,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (hold point); check the offline behavior, the checksum of the `uv` download and the
       clean uninstall first. Found on 2026-11-12 in a simplification review.
       Triage 2026-11-15: parked until the distribution (P5) is due; new tool in the installer.
+- [ ] **I55 – REST fallback for the PR description when `gh pr edit` fails (workflow):**
+      the Projects-classic GraphQL error that I54 covers for labels also breaks `gh pr edit
+      --body-file`; in PR #146 both implementers updated the description through
+      `gh api -X PATCH repos/enqii/frame-scout/pulls/<n> -F body=@<file>`. Add this line to
+      "Tooling notes" in `.claude/skills/roadmap/SKILL.md` and to the implementer brief where
+      it edits the PR text. Found on 2026-11-17 in the retro of PR #146.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
