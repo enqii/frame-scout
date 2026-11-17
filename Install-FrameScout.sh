@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: ./Install-FrameScout.sh [cpu|cuda]
-# The Linux counterpart of Install-FrameScout.bat (F47): same steps, same exit codes.
+# The Linux counterpart of Install-FrameScout.bat: same steps, same exit codes.
 # Without an argument, an installed CUDA build of PyTorch is kept; otherwise GPU support
 # is offered if an NVIDIA graphics driver is found. "cpu" or "cuda" switches the build.
 set -u
@@ -14,7 +14,7 @@ if [ -n "$TORCH_VARIANT" ] && [ "$TORCH_VARIANT" != cpu ] && [ "$TORCH_VARIANT" 
   echo "if an NVIDIA graphics driver is found."
   exit 1
 fi
-# I42: each version has one framescout-version-<version>.txt. A ZIP extracted over the
+# Each version has one framescout-version-<version>.txt. A ZIP extracted over the
 # folder of another version leaves both files, and files of two versions must not run
 # together: stop before anything is downloaded or installed. Start-FrameScout.sh has the
 # same lines (a test compares them).
@@ -31,8 +31,8 @@ if [ "${#VERSION_FILES[@]}" -gt 1 ]; then
   exit 1
 fi
 export PIP_CACHE_DIR="$PWD/.cache/pip"
-# Model downloads and library settings go to .cache, unless the user set a variable
-# (A36): as for a manual engine run, that one wins. With the user's XDG_CACHE_HOME, torch and
+# Model downloads and library settings go to .cache, unless the user set a variable:
+# as for a manual engine run, that one wins. With the user's XDG_CACHE_HOME, torch and
 # Hugging Face use its folders, so these two lines come first. Start-FrameScout.sh has the same lines.
 if [ -z "${TORCH_HOME:-}" ] && [ -z "${XDG_CACHE_HOME:-}" ]; then export TORCH_HOME="$PWD/.cache/torch"; fi
 if [ -z "${HF_HOME:-}" ] && [ -z "${XDG_CACHE_HOME:-}" ]; then export HF_HOME="$PWD/.cache/huggingface"; fi
@@ -57,7 +57,7 @@ failed() {
   exit 1
 }
 
-# A .python is reused only if it is complete and the pinned version (I24): a leftover of an
+# A .python is reused only if it is complete and the pinned version: a leftover of an
 # uninstall that stopped halfway, or the Python of an older pin, is downloaded again.
 private_python_works() {
   [ -x .python/bin/python3 ] && .python/bin/python3 -I -c "import sys, platform, venv, ensurepip; sys.exit(platform.python_version() not in sys.argv[1:])" "$PYTHON_VERSION" >/dev/null 2>&1
@@ -141,12 +141,12 @@ if ! venv_works; then
 fi
 
 # requirements/constraints.txt pins every package, including the dependencies of the
-# dependencies, to the version of the verified runs (I12); requirements/requirements.txt
+# dependencies, to the version of the verified runs; requirements/requirements.txt
 # names the direct dependencies. PIP_CONSTRAINT applies the pins to the pip call of
-# install_torch.py too (I18). Relative: pip splits its value at spaces.
+# install_torch.py too. Relative: pip splits its value at spaces.
 export PIP_CONSTRAINT="requirements/constraints.txt"
 # PyTorch first (CPU or CUDA build); requirements.txt pins the same version. Exit code 3:
-# the user stopped on low disk space (F3), not a failure. Exactly 3, unlike the .bat's
+# the user stopped on low disk space, not a failure. Exactly 3, unlike the .bat's
 # "errorlevel 3": a process killed by a signal (OOM killer, Ctrl+C) exits with 128 + n.
 .venv/bin/python install_torch.py ${TORCH_VARIANT:+"$TORCH_VARIANT"}
 TORCH_RESULT=$?

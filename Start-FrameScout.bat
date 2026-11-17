@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-rem I42: each version has one framescout-version-<version>.txt. A ZIP extracted over the
+rem Each version has one framescout-version-<version>.txt. A ZIP extracted over the
 rem folder of another version leaves both files, and files of two versions must not run
 rem together: stop before any Python runs. Install-FrameScout.bat has the same lines (a test
 rem compares them). The folder path is not used here, so a "!" or ")" in it does no harm.
@@ -17,8 +17,8 @@ echo again). Then run Install-FrameScout.bat there.
 pause
 exit /b 1
 :version_checked
-rem Model downloads and library settings go to .cache, unless the user set a variable
-rem (A36): as for a manual engine run, that one wins. With the user's XDG_CACHE_HOME, torch and
+rem Model downloads and library settings go to .cache, unless the user set a variable:
+rem as for a manual engine run, that one wins. With the user's XDG_CACHE_HOME, torch and
 rem Hugging Face use its folders, so these two lines come first. Install-FrameScout.bat has the same lines.
 if not defined TORCH_HOME if not defined XDG_CACHE_HOME set "TORCH_HOME=%CD%\.cache\torch"
 if not defined HF_HOME if not defined XDG_CACHE_HOME set "HF_HOME=%CD%\.cache\huggingface"
@@ -32,7 +32,7 @@ if not exist ".venv\Scripts\python.exe" (
  pause
  exit /b 1
 )
-rem F22: framescout_start.py runs the app on 127.0.0.1, port 8501 or the next free one up to
+rem framescout_start.py runs the app on 127.0.0.1, port 8501 or the next free one up to
 rem 8510, or opens the browser on the app of this folder if it runs already.
 ".venv\Scripts\python.exe" framescout_start.py
 if errorlevel 1 pause

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: ./Uninstall-FrameScout.sh [--dry-run]
-# The Linux counterpart of Uninstall-FrameScout.bat (F47): deletes what the installer and
+# The Linux counterpart of Uninstall-FrameScout.bat: deletes what the installer and
 # FrameScout create again (.venv, the private Python in .python, .cache, .tmp, the person
 # detection model, compiled files) after showing the list and asking. Never deletes your
 # photos, references, results, profiles or settings. --dry-run only shows the list.
