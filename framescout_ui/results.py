@@ -17,7 +17,7 @@ from .common import (PROFILES, QUICK_THUMBS, RESULTS, RESULTS_JSON, THUMBS, clos
                      widget_id)
 
 from .marks import MARK_LABELS, load_marks, marks_backup_offer, restore_marks_backup, set_mark
-from .copy_export import show_copy, show_export
+from .copy_export import run_copy_request, show_copy, show_export
 from .review import close_review, find_similar_button, open_review, show_review
 
 
@@ -38,6 +38,8 @@ TOOLBAR_PAGE_WIDTH = 130
 # the width of the content of the popover "Export and copy" in pixels: fixed, so a long
 # caption or folder path wraps instead of widening it to about 700 px
 EXPORT_POPOVER_WIDTH = 440
+# the key of the popover "Export and copy", which its buttons close (close_popover)
+EXPORT_POPOVER = 'export_copy'
 
 
 def go_to_page(key, page):
@@ -247,7 +249,7 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
     # photo would count as undecided, and a renamed profile took its marks along
     progress = review_progress(entry['cards'], marks, GALLERY_PAGE_SIZE) if can_mark else None
     # below the toolbar, in this order: the caption of the search, the notes, the notices
-    # (drawn into later, after the toolbar's popover may have copied photos)
+    # (drawn into later)
     head = st.container(gap='small')
     notices = st.container(gap='small')
     with toolbar:
@@ -273,14 +275,20 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
                   help='Shows one photo at a time, large, starting with the first undecided one: mark it as Match or '
                        'No match, or skip it, and the next undecided photo follows. A click on a photo opens it there '
                        'too.' + ('' if can_mark else ' The photos of this list cannot be marked here.'))
+        # closed by each of its buttons, so it does not cover the notices below the toolbar;
+        # its content is drawn only while it is open
         with st.popover('Export and copy', help='Open or download the gallery, copy the photos marked as match '
-                                                'to a folder or export the result list.'), \
-                st.container(width=EXPORT_POPOVER_WIDTH):
-            show_gallery_actions(entry)
+                                                'to a folder or export the result list.',
+                        key=EXPORT_POPOVER, on_change='rerun'), st.container(width=EXPORT_POPOVER_WIDTH):
+            show_gallery_actions(entry, EXPORT_POPOVER)
             st.divider()
-            show_copy(name, entry, marks, photo_folders, states[name] != 'missing', notices)
+            show_copy(name, entry, marks, photo_folders, states[name] != 'missing', EXPORT_POPOVER)
             st.divider()
-            show_export(name, entry, marks, marks_error, notices)
+            show_export(name, entry, marks, marks_error, EXPORT_POPOVER)
+    with notices:
+        # the copy the popover's button asked for, with its progress bar, and the export's result
+        run_copy_request(name, photo_folders)
+        show_notice('export_notice')
     shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
     for card in shown:
         # the saved mark, set before the control is drawn (never as its default): the file
@@ -344,11 +352,11 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
     bottom_pager(key, page, pages, 'results_' + widget_id(name) + '_', progress)
 
 
-def show_gallery_actions(entry):
-    """The buttons of the HTML gallery of a profile in the popover "Export and copy"."""
+def show_gallery_actions(entry, popover):
+    """The buttons of the HTML gallery of a profile in the popover "Export and copy", which they close."""
     st.markdown('**Gallery**')
-    st.button('Open gallery in browser', on_click=open_gallery, args=(entry['gallery'],), width='stretch',
-              help=f"Opens {entry['gallery']} from the results folder in your web browser.")
+    st.button('Open gallery in browser', on_click=close_popover, args=(popover, open_gallery, entry['gallery']),
+              width='stretch', help=f"Opens {entry['gallery']} from the results folder in your web browser.")
     page_file = RESULTS / entry['gallery']
     try:
         # cached: a click on another button reruns this fragment
@@ -356,7 +364,7 @@ def show_gallery_actions(entry):
                            file_name=page_file.name, mime='text/html', width='stretch', key='dl_results_gallery')
     except OSError:
         pass  # deleted or in use: the other buttons still work
-    st.button('Open results folder', on_click=open_results_folder, width='stretch')
+    st.button('Open results folder', on_click=close_popover, args=(popover, open_results_folder), width='stretch')
 
 
 def show_quick_results(results, folders, model, find_disabled, toolbar):
