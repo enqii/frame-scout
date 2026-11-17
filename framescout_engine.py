@@ -54,7 +54,7 @@ import torch
 from PIL import Image
 
 from framescout_images import DECODERS, open_image, render_thumbnail
-from framescout_scoring import photo_scores, rank_photos, rank_similar, score_caption, text_queries
+from framescout_scoring import photo_scores, rank_photos, rank_similar, score_caption, score_histogram, text_queries
 
 # Photos are decoded in threads ahead of CLIP. Pillow releases the GIL while it
 # decodes; more threads would mostly compete with PyTorch for the same CPU cores.
@@ -853,8 +853,12 @@ def search(args, parser, roots, dropped, output, status, warnings):
                 f'Search model: {html.escape(search_model.label)}.</p><main>' + ''.join(cards) + '</main></html>')
         gallery = galleries[name]
         pages.append((gallery, page))
+        # the scores of every photo scored, not only of the cards: where the gallery's cut-off
+        # falls in the whole search
+        histogram = score_histogram([match.score for match, _, _ in ranked])
         results.append({'name': name, 'fingerprint': search_fingerprint(p, profiles_base), 'gallery': gallery,
                         'normalized': normalized[name], 'cards': entries,
+                        **({'histogram': histogram} if histogram else {}),
                         # the texts a card's best_query names, for the app's summary
                         **({'queries': query_names[name]} if query_names[name] else {})})
     if skipped.summary():
