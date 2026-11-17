@@ -195,14 +195,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       dependency (hold point). Found on 2026-11-12 in a simplification review.
       Triage 2026-11-13: decided separately and later; the UI rebuild P32–P37 stays within
       Streamlit. **Question:** Streamlit or a local server with an HTML frontend.
-- [ ] **A53 – The tooltips of the results toolbar stay open:** after "Review one by one" is
+- [ ] `ready` **A53 – The tooltips of the results toolbar stay open:** after "Review one by one" is
       closed with Esc, and after the popover "Export and copy" is closed with Esc, the
       tooltips of both buttons stay visible, overlapping each other, and more tooltips pile up
       while the user works (one for "Scan" in the Settings tab). They also float over other
       tabs (top left of the Settings tab) until the page is reloaded. Reproduced in the light
       and the dark theme, Streamlit 1.66.1, Chrome. Cause not examined (focus returns to the
       button after the dialog or popover closes). Found in the pass of A52.
-- [ ] **A54 – The header is squeezed at window widths of about 680–1100 px:** the F27 state
+- [ ] `ready` **A54 – The header is squeezed at window widths of about 680–1100 px:** the F27 state
       line sits next to the title, so the title column gets only about 200–300 px: at 680–800
       px the title breaks inside the word ("FrameSco" / "ut"), up to about 1100 px the icon
       wraps onto its own line above the title, and the header is 50–100 px taller than at
@@ -210,20 +210,20 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       A half-screen window is typical for this. Whether the header jumps when the 2 s update
       changes the length of the state text was not measured (no search was running at those
       widths). Found in the pass of A52 (the open question of PR #108).
-- [ ] **A55 – Notices of "Export and copy" appear behind the open popover:** "N copied …"
+- [ ] `ready` **A55 – Notices of "Export and copy" appear behind the open popover:** "N copied …"
       and "Exported to …" are written above the result grid, the popover stays open and covers
       them, and the grid moves down by one notice per click. The user sees the outcome only
       after closing the popover (the popover also scrolls inside itself at 726 px window
       height). Options: write the notice inside the popover, or close it after the action as
       the popover "More" does (F41). Found in the pass of A52.
-- [ ] **A56 – The title of a profile without context ends with a dangling " · ":** the saved
+- [ ] `minor` **A56 – The title of a profile without context ends with a dangling " · ":** the saved
       profile "purple picture" is listed as "purple picture ·" (Search profiles tab); the
       separator belongs only between motif and context. Found in the pass of A52.
-- [ ] **A57 – Result cards use only half of the width in a narrow window:** at 420 px the
+- [ ] `minor` **A57 – Result cards use only half of the width in a narrow window:** at 420 px the
       grid shows one card of about 200 px per row and the right half stays empty; the toolbar
       wraps into three rows (usable). The popover "Export and copy" fits. Found in the pass
       of A52.
-- [ ] **A58 – Parts of A52 that the second pass could not check:** open are the page change
+- [ ] `minor` **A58 – Parts of A52 that the second pass could not check:** open are the page change
       of the results (12 generated photos fit on one page), the contents of "Clean up
       storage" with entries (the scan listed eleven times "nothing to clean up"), person
       crops, a long run, and the state line while a search runs at the widths of A54.
@@ -233,7 +233,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       (cards, marks, dialog, popover), the popover "Export and copy" at 420 px, copy and
       export notices. Photo set: 12 generated images, not real photos; the narrow widths
       were an iframe of that width in Chrome. Kind `docs`.
-- [ ] **A59 – The popover button "More" of a result card is taller than "Match" and "No
+- [ ] `minor` **A59 – The popover button "More" of a result card is taller than "Match" and "No
       match":** the three buttons of a card's action row differ in height; the same height
       would look tidier. Reported by the user in chat, not measured in the browser. Found
       after the pass of A52.
@@ -326,6 +326,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       data and `NEVER_DELETED` stay). Found on 2026-11-12 in a simplification review, by
       sampling, not by reading every module.
       Triage 2026-11-15: stays open; list per module what would go, then decide.
+      Triage 2026-11-17: step 1 (the list, docs only) is roadmap P49; the removal itself stays
+      `decision` until the user has seen the list.
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and
@@ -343,7 +345,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       findings` comment and CI of the head commit, the orchestrator switches the label to
       `fs:ready` itself and reports. Found on 2026-11-16 in the retro of PR #131 (done by hand
       there). Size S, kind `docs`.
-- [ ] **I53 – A cleanup test fails when the temporary folder is a mount point:**
+- [ ] `ready` **I53 – A cleanup test fails when the temporary folder is a mount point:**
       `tests/test_cleanup.py::test_a_root_that_stops_answering_during_the_pass_is_given_up`
       expects the note to name the root `/` (`root_of` in the test), but on Linux the cleanup
       names the mount point of the photos, and in WSL2 `/tmp` (pytest's `tmp_path`) is a
@@ -384,7 +386,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       every photo slows the scan (only when a date filter is set); copies inside excluded
       folders vs. the A17 check. **Question:** mtime vs. EXIF as the date; additive CLI options
       and `settings.json` keys. Size M.
-- [ ] `decision` **F9 – A CSV export that Excel opens in columns in every locale:** the result
+- [ ] `ready` **F9 – A CSV export that Excel opens in columns in every locale:** the result
       list export (F5) writes a comma-separated CSV (RFC 4180). Excel splits a double-clicked
       CSV at the list separator of the system locale, which is `;` in German and other
       comma-decimal locales, so there every row lands in one column; the user guide points to
@@ -393,7 +395,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       only, breaks other CSV readers and RFC 4180). With `;` the decimal point stays `.`, so
       Excel may still read the scores as text there. Affected: `framescout_core/exporting.py`
       (`export_csv`), `app.py` (`show_export`), user guide, `tests/test_export.py`.
-      **Question:** whether a second format is wanted at all, and which. Found in the review of
+      Decided 2026-11-17: a "comma / semicolon" choice (roadmap P51). Found in the review of
       F5 (PR #67). Size S.
 - [ ] `decision` **F13 – Keep the previous search results:** every search replaces `results.json`
       and the galleries, so a worse result cannot be compared with the earlier ranking. Sketch:
@@ -423,13 +425,14 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `framescout_engine.py`, user guide. F24 review §5. Size S–M.
       Triage 2026-11-13: not decided; assess again after F30, because in the browser pass the
       gallery (seven equal columns over the full width) was easier to scan than the app.
-- [ ] `decision` **F36 – A folder dialog for the photo source:** the photo folders are a text
+- [ ] `parked` **F36 – A folder dialog for the photo source:** the photo folders are a text
       area; the path has to be typed or pasted. Streamlit has no folder dialog. Sketch: a
       "Choose folder" button that opens the system dialog on the PC the app runs on.
       **Question:** how, without a new dependency (e.g. `tkinter`, if the private Python of
       the installer ships it; check first) and whether a dialog opened by the server process
       is acceptable. Affected: `app.py`, user guide. Found in the browser pass of 2026-11-13.
-      Size S.
+      Size S. Triage 2026-11-17: parked, because `tkinter` in the private Python is unchecked and
+      a dialog from the server process is unreliable on Linux/WSL.
 - [ ] `decision` **F45 – The best crop outlined in the large preview:** this part of F19 is not
       done, because neither the results nor the feature cache store a crop's box (the engine
       computes it in `crops_for` and keeps only label and embedding). Sketch: store the person
@@ -487,11 +490,12 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       match silently gives a photo another photo's embedding; needs mtime-keeping copies; an index
       on size for 100,000 rows. **Question:** the match rule (a content hash would change the
       cache format). Size M. Idea of 2026-11-16.
-- [ ] `decision` **F53 – Score distribution per profile:** users cannot tell whether good matches
+- [ ] `ready` **F53 – Score distribution per profile:** users cannot tell whether good matches
       end at place 20 or continue past 150. Sketch: a collapsed small chart above a profile's
       results with a compact histogram (about 40 bins, written into `results.json` by the engine)
       and a marker at "Maximum matches"; the caption says scores are relative heuristics, never
       probabilities; Streamlit's built-in chart. Affected: `framescout_scoring`,
       `framescout_engine.py`, `framescout_ui/results.py`, user guide, ARCHITECTURE. Risks: a gap
       in the curve read as a certainty threshold; the results page is dense (A50/A51).
-      **Question:** result format addition and the UX. Size S–M. Idea of 2026-11-16.
+      Decided 2026-11-17: yes, roadmap P52 (additive `results.json` field, caption that scores
+      are relative heuristics). Size S–M. Idea of 2026-11-16.
