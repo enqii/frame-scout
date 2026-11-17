@@ -1,5 +1,4 @@
 """Free disk space checks before installing PyTorch and before a search (F3); no real drive is filled."""
-import os
 import sqlite3
 from collections import namedtuple
 from pathlib import Path
@@ -16,33 +15,22 @@ from framescout_core.models import MODELS
 
 MB, GB = 1024 ** 2, 1024 ** 3  # the units of disk_space and size_text (review)
 Usage = namedtuple('Usage', 'total used free')
-Stat = namedtuple('Stat', 'st_dev')
 
 
 class Drives:
-    """Stands in for shutil.disk_usage and os.stat: folders under a known root are on its drive."""
+    """Stands in for shutil.disk_usage: folders under a known root are on its drive."""
 
     def __init__(self, **roots):
-        # roots: name -> (root folder, free bytes[, device number[, total bytes]]); by default
-        # the device number is the name and the total 1000 GB
-        defaults = {name: (name, 1000 * GB) for name in roots}
-        self.roots = {name: (*root, *defaults[name][len(root) - 2:]) for name, root in roots.items()}
+        # roots: name -> (root folder, free bytes[, total bytes]); by default the total is 1000 GB
+        self.roots = {name: (*root, 1000 * GB)[:3] for name, root in roots.items()}
         self.asked = []
-
-    def _root(self, path):
-        for root, free, device, total in self.roots.values():
-            if Path(path) == root or root in Path(path).parents:
-                return free, device, total
-        raise OSError(f'no drive for {path}')
 
     def disk_usage(self, path):
         self.asked.append(Path(path))
-        free, _, total = self._root(path)
-        return Usage(total, total - free, free)
-
-    def stat(self, path):
-        _, device, _ = self._root(path)
-        return Stat(device)
+        for root, free, total in self.roots.values():
+            if Path(path) == root or root in Path(path).parents:
+                return Usage(total, total - free, free)
+        raise OSError(f'no drive for {path}')
 
 
 def test_download_sizes_of_the_model_labels():
@@ -281,74 +269,59 @@ def test_torch_install_needs_per_build(tmp_path):
 
 def test_enough_space_gives_no_warning(tmp_path):
     drives = Drives(c=(tmp_path, 100 * GB))
-    assert low_space([(tmp_path / 'results', 5 * GB)], disk_usage=drives.disk_usage, stat=drives.stat) == []
+    assert low_space([(tmp_path / 'results', 5 * GB)], disk_usage=drives.disk_usage) == []
 
 
 def test_low_space_on_one_drive_is_reported(tmp_path):
     drives = Drives(c=(tmp_path, 2 * GB))
     folder = tmp_path / 'results'
-    low = low_space([(folder, int(1.5 * GB))], disk_usage=drives.disk_usage, stat=drives.stat)
+    low = low_space([(folder, int(1.5 * GB))], disk_usage=drives.disk_usage)
     # 0.5 GB would be left, less than the reserve
     assert low == [LowSpace(folder, int(1.5 * GB), 2 * GB)]
     assert SPACE_RESERVE > GB // 2
 
 
 def test_needs_on_the_same_drive_add_up(tmp_path):
-    drives = Drives(c=(tmp_path / 'c', 3 * GB), d=(tmp_path / 'd', 3 * GB))
+    drives = Drives(c=(tmp_path / 'c', 3 * GB), d=(tmp_path / 'd', 3 * GB, 500 * GB))
     (tmp_path / 'c').mkdir()
     (tmp_path / 'd').mkdir()
     results, cache, other = tmp_path / 'c' / 'results', tmp_path / 'c' / '.cache', tmp_path / 'd' / 'cache'
     # each need alone fits on its drive, the two on drive c together leave less than the reserve
     needs = [(results, GB), (cache, int(1.5 * GB)), (other, GB)]
-    low = low_space(needs, disk_usage=drives.disk_usage, stat=drives.stat)
+    low = low_space(needs, disk_usage=drives.disk_usage)
     assert low == [LowSpace(results, int(2.5 * GB), 3 * GB)]
 
 
 def test_one_volume_reached_through_two_paths_is_one_drive(monkeypatch):
-    # e.g. a subst or mapped drive letter and C:\ for the same volume: the same device
-    # number and size, other anchors; the needs add up (review)
+    # e.g. a subst or mapped drive letter and C:\ for the same volume: the same disk usage,
+    # other anchors; the needs add up (I44: drives are told apart by their usage tuple)
     monkeypatch.setattr(disk_space, '_existing_folder', lambda path: Path(path).parent)
-    drives = Drives(s=(Path('S:/'), 3 * GB, 7), c=(Path('C:/'), 3 * GB, 7))
+    drives = Drives(s=(Path('S:/'), 3 * GB), c=(Path('C:/'), 3 * GB))
     results, hub = Path('S:/FrameScout/results'), Path('C:/hub/models')
-    low = low_space([(results, GB), (hub, int(1.5 * GB))], disk_usage=drives.disk_usage, stat=drives.stat,
-                    reachable=lambda roots, timeout: dict.fromkeys(roots, True))
+    low = low_space([(results, GB), (hub, int(1.5 * GB))], disk_usage=drives.disk_usage)
     assert low == [LowSpace(results, int(2.5 * GB), 3 * GB)]
 
 
-def test_volumes_with_the_same_serial_number_but_other_sizes_stay_apart(tmp_path):
-    # a cloned disk keeps the volume serial number Windows reports as st_dev
-    drives = Drives(c=(tmp_path / 'c', 3 * GB, 7, 500 * GB), d=(tmp_path / 'd', 3 * GB, 7, 2000 * GB))
+def test_drives_with_another_disk_usage_stay_apart(tmp_path):
+    drives = Drives(c=(tmp_path / 'c', 3 * GB, 500 * GB), d=(tmp_path / 'd', 3 * GB, 2000 * GB))
     (tmp_path / 'c').mkdir()
     (tmp_path / 'd').mkdir()
     needs = [(tmp_path / 'c' / 'results', GB), (tmp_path / 'd' / 'hub', int(1.5 * GB))]
-    assert low_space(needs, disk_usage=drives.disk_usage, stat=drives.stat) == []
+    assert low_space(needs, disk_usage=drives.disk_usage) == []
 
 
 def test_a_missing_folder_is_checked_on_the_drive_of_its_nearest_existing_parent(tmp_path):
     drives = Drives(c=(tmp_path, GB))
     folder = tmp_path / 'not' / 'there' / 'yet'
-    assert low_space([(folder, 1)], disk_usage=drives.disk_usage, stat=drives.stat) == [LowSpace(folder, 1, GB)]
+    assert low_space([(folder, 1)], disk_usage=drives.disk_usage) == [LowSpace(folder, 1, GB)]
     assert drives.asked == [tmp_path]  # the folder itself is never created
 
 
 def test_nothing_needed_or_an_unknown_drive_gives_no_warning(tmp_path):
     drives = Drives(c=(tmp_path / 'c', 0))
-    assert low_space([(tmp_path / 'c', 0)], disk_usage=drives.disk_usage, stat=drives.stat) == []
+    assert low_space([(tmp_path / 'c', 0)], disk_usage=drives.disk_usage) == []
     # a drive that cannot be asked (e.g. a disconnected network share): no warning, no error
-    assert low_space([(tmp_path / 'x', GB)], disk_usage=drives.disk_usage, stat=drives.stat) == []
-
-
-def test_a_drive_that_does_not_answer_in_time_gives_no_warning(tmp_path):
-    # review: a stat on a disconnected network share can hang; its root is probed with a timeout first
-    drives = Drives(c=(tmp_path, 0))
-    probed = []
-
-    def unreachable(roots, timeout):
-        probed.append((roots, timeout))
-        return dict.fromkeys(roots, False)
-    assert low_space([(tmp_path, GB)], disk_usage=drives.disk_usage, stat=drives.stat, timeout=0.5,
-                     reachable=unreachable) == []
-    assert drives.asked == [] and probed == [([os.path.splitdrive(str(tmp_path))[0] + os.sep], 0.5)]
+    assert low_space([(tmp_path / 'x', GB)], disk_usage=drives.disk_usage) == []
 
 
 def test_the_real_drive_can_be_asked(tmp_path):

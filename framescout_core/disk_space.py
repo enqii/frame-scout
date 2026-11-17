@@ -224,38 +224,27 @@ def _reachable(folders, timeout, reachable):
     return {folder: answers[root] for folder, root in roots.items()}
 
 
-def low_space(needs, reserve=SPACE_RESERVE, disk_usage=shutil.disk_usage, stat=os.stat, timeout=SPACE_CHECK_TIMEOUT,
-              reachable=_reachable_roots):
+def low_space(needs, reserve=SPACE_RESERVE, disk_usage=shutil.disk_usage):
     """Return a LowSpace for every drive that would keep less than reserve bytes free.
 
     needs are (folder, bytes) pairs; a folder that does not exist yet counts on the drive of
-    its nearest existing parent (nothing is created), and the needs of folders on the same
-    drive (volume, by device number and size) add up. A need of 0 bytes, and a drive that
-    cannot be asked or does not answer within timeout seconds (e.g. a disconnected network
-    share; reachable probes the roots in threads, see cleanup), give no warning.
+    its nearest existing parent (nothing is created). The needs of folders with the same disk
+    usage (total, used, free) add up: one drive, however it is reached (I44). A need of 0
+    bytes and a drive that cannot be asked give no warning; a drive that does not answer (a
+    disconnected network share) holds the check up until the system gives up on it.
     """
-    needs = [(folder, size) for folder, size in needs if size > 0]
-    answers = _reachable([folder for folder, _ in needs], timeout, reachable)
     drives = {}
     for folder, size in needs:
-        if not answers[folder]:
+        if size <= 0:
             continue
         try:
             existing = _existing_folder(folder)
             if existing is None:
                 continue
-            usage = disk_usage(existing)
-            # one volume is one drive, however it is reached (a subst or mapped drive letter, a
-            # UNC path): its device number (the volume serial number on Windows) with its size,
-            # since a cloned disk keeps the serial number; the anchor if a file system reports 0
-            # (review)
-            device = stat(existing).st_dev
-            key = (device or existing.anchor.lower(), usage.total)
-            if key not in drives:
-                drives[key] = [Path(folder), 0, usage.free]
+            usage = tuple(disk_usage(existing))
         except OSError:
             continue
-        drives[key][1] += size
+        drives.setdefault(usage, [Path(folder), 0, usage[2]])[1] += size
     return [LowSpace(*drive) for drive in drives.values() if drive[2] - drive[1] < reserve]
 
 
