@@ -182,8 +182,11 @@ def low_space_warning(photos, top, profile_count, model, person_detection, analy
     Counts cache rows for the photos not analyzed yet (analyzed: those with cache rows of
     these settings) and thumbnails in results/, and the downloads of a model or detector
     weights not in the cache folders the engine uses yet (engine_cache_env: .cache/ or a
-    folder of the user's cache variables, A36), on the drives they are on (app_search_needs). A download folder whose drive does not answer within SPACE_CHECK_TIMEOUT is left out. An
-    estimate: a warning, never a block; a check that fails (OSError, ValueError) gives none.
+    folder of the user's cache variables, A36), on the drives they are on (app_search_needs).
+    A download folder whose drive does not answer within SPACE_CHECK_TIMEOUT is left out; a
+    results drive that does not answer holds the check up until the system gives up on it
+    (low_space, I44). An estimate: a warning, never a block; a check that fails (OSError,
+    ValueError) gives none.
     analysis: the warning of "Analyze photos now" (F18 review), which writes no gallery
     thumbnails (profile_count 0).
     """
