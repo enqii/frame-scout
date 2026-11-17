@@ -1,4 +1,4 @@
-"""The app's folders and files, Markdown escaping, widget keys and opening files on this computer (A46)."""
+"""The app's folders and files, Markdown escaping, widget keys and opening files on this computer."""
 import functools
 import hashlib
 import os
@@ -24,25 +24,25 @@ from framescout_core.settings import SETTINGS_FILE
 # the project folder: app.py's folder, one above this package
 BASE = Path(__file__).resolve().parent.parent
 PROFILES = BASE / 'profiles.json'  # the user's working file, not in the repository
-SETTINGS = BASE / SETTINGS_FILE  # the user's settings (A8), not in the repository
+SETTINGS = BASE / SETTINGS_FILE  # the user's settings, not in the repository
 EXAMPLE_PROFILES = BASE / EXAMPLE_PROFILES_FILE
 REFS = BASE / 'references'
 RESULTS = BASE / 'results'
 LOG = BASE / 'run.log'
-# held by the engine while it runs, and its phase and progress (A4, A5)
+# held by the engine while it runs, and its phase and progress
 LOCK = RESULTS / RUN_LOCK
 STATUS = RESULTS / RUN_STATUS
-# what the galleries of the last search show (A12) and their thumbnails
+# what the galleries of the last search show and their thumbnails
 RESULTS_JSON = RESULTS / RESULTS_FILE
 THUMBS = RESULTS / 'thumbnails'
-# the last quick search (F10): its own gallery, result file and thumbnails, apart from the
+# the last quick search: its own gallery, result file and thumbnails, apart from the
 # profiles' galleries and marks
 QUICK = RESULTS / QUICK_DIR
 QUICK_JSON = QUICK / RESULTS_FILE
 QUICK_THUMBS = QUICK / 'thumbnails'
-# the user's marks of gallery photos (A17): user data, never deleted by FrameScout
+# the user's marks of gallery photos: user data, never deleted by FrameScout
 MARKS = RESULTS / MARKS_FILE
-# exported result lists (F5): user data, never deleted by FrameScout
+# exported result lists: user data, never deleted by FrameScout
 EXPORTS = RESULTS / EXPORTS_DIR
 
 
@@ -52,12 +52,12 @@ MARKDOWN_CHARS = re.compile(r'([\\`*_{}\[\]()#+\-.!|<>~$])')
 
 @st.cache_resource
 def decoders():
-    """The engine's Decoders (E25): it runs in the same Python environment and checks the same way (review)."""
+    """The engine's Decoders: it runs in the same Python environment and checks the same way."""
     return available_decoders()
 
 
 # called in every page run, not once at import: clearing the cache of decoders() then
-# refreshes the readable formats, as before A46 (review)
+# refreshes the readable formats
 def supported():
     """The file extensions the app reads and counts, from the cached Decoders."""
     return supported_extensions(decoders())
@@ -77,7 +77,7 @@ def open_path(path):
 
 
 def start_launcher(cmd):
-    """Start cmd (open, xdg-open) without waiting; a thread reaps it, so no zombie stays (review)."""
+    """Start cmd (open, xdg-open) without waiting; a thread reaps it, so no zombie stays."""
     process = subprocess.Popen(cmd)
     threading.Thread(target=process.wait, daemon=True).start()
 
@@ -97,7 +97,7 @@ def reveal_path(path):
     shell32.ILFree.argtypes = [ctypes.c_void_p]
     shell32.SHOpenFolderAndSelectItems.argtypes = [ctypes.c_void_p, wintypes.UINT, ctypes.c_void_p, wintypes.DWORD]
     # S_OK or S_FALSE: this call holds a reference to undo; a thread whose COM was
-    # initialized in another mode (RPC_E_CHANGED_MODE, negative) must keep it (review)
+    # initialized in another mode (RPC_E_CHANGED_MODE, negative) must keep it
     initialized = ole32.CoInitialize(None) >= 0
     try:
         item = shell32.ILCreateFromPathW(str(path))
@@ -110,7 +110,7 @@ def reveal_path(path):
     finally:
         if initialized:
             ole32.CoUninitialize()
-    if result < 0:  # FAILED(); a success code such as S_FALSE is no error (review)
+    if result < 0:  # FAILED(); a success code such as S_FALSE is no error
         raise OSError(f'Explorer reported error {result & 0xFFFFFFFF:#010x}')
 
 
@@ -126,7 +126,7 @@ def gallery_action(action, path, what):
 
 
 def close_popover(key, action=None, *args):
-    """on_click of a button in the popover with key: close it, then run action(*args) if given (F41).
+    """on_click of a button in the popover with key: close it, then run action(*args) if given.
 
     Streamlit (1.66.1) keeps a popover open after a click in it reruns the page; one that
     tracks its state (on_change set) closes when its key is set to False before it is drawn.
@@ -201,7 +201,7 @@ def kept_key(key):
 
 
 def keep_value(key):
-    """on_click of a form's submit button whose field must keep its value while disabled (F34).
+    """on_click of a form's submit button whose field must keep its value while disabled.
 
     Streamlit empties a field that is disabled in the run after its form was submitted, so
     the value submitted is copied to a session key of its own, which restore_value puts back.
@@ -214,7 +214,7 @@ def restore_value(key):
     """Put the value keep_value kept back into the widget with key; called before the widget is drawn.
 
     Only in the runs in which the widget is disabled: a value put into its key also resets
-    the field in the browser, which would drop a text typed but not submitted yet (review).
+    the field in the browser, which would drop a text typed but not submitted yet.
     """
     if kept_key(key) in st.session_state:
         st.session_state[key] = st.session_state[kept_key(key)]
@@ -243,7 +243,7 @@ def plain(text):
 
 @st.cache_resource(show_spinner=False)
 def clean_project_folder():
-    """Once per app start: remove the temporary files a killed app left in the project folder (E44)."""
+    """Once per app start: remove the temporary files a killed app left in the project folder."""
     try:
         return project_temp_cleanup(BASE)
     except OSError:  # e.g. a read-only project folder: never stops the app
@@ -251,5 +251,5 @@ def clean_project_folder():
 
 
 # seconds the free disk space check of the run tab and the downloaded models of the AI settings are
-# reused: not asked again on every click (review)
+# reused: not asked again on every click
 LOW_SPACE_TTL = 30

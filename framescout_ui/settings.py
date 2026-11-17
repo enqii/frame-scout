@@ -1,4 +1,4 @@
-"""The settings: settings.json synchronized with the widgets, and the AI settings in the tab "Settings" (A8, A46)."""
+"""The settings: settings.json synchronized with the widgets, and the AI settings in the tab "Settings"."""
 import os
 import platform
 import time
@@ -20,7 +20,7 @@ from .common import BASE, LOW_SPACE_TTL, SETTINGS, plain
 
 @st.cache_data(show_spinner=False, max_entries=1, ttl=LOW_SPACE_TTL)
 def models_downloaded():
-    """The keys of the search models whose files are downloaded already (A39), asked again after LOW_SPACE_TTL."""
+    """The keys of the search models whose files are downloaded already, asked again after LOW_SPACE_TTL."""
     try:
         return downloaded_models(BASE, dict(os.environ))
     except (OSError, ValueError):
@@ -45,12 +45,12 @@ DEFAULT_SETTINGS = default_settings(BASE)
 
 
 def setting_key(name):
-    """Return the session-state key of the widget of setting name (A8)."""
+    """Return the session-state key of the widget of setting name."""
     return 'setting_' + name
 
 
 def number_range(name):
-    """Return the min_value/max_value arguments of the widget of setting name (review: one table)."""
+    """Return the min_value/max_value arguments of the widget of setting name (one table)."""
     low, high = SETTING_RANGES[name]
     return {'min_value': low, 'max_value': high}
 
@@ -59,7 +59,7 @@ def setting_of_widget(name, value):
     """Return the setting value of the widget value of setting name.
 
     The photo folder field is a text area with one folder per line, and the setting is the
-    list of its lines (A25): reconcile_settings and save_settings work on the lists.
+    list of its lines: reconcile_settings and save_settings work on the lists.
     """
     return folder_lines(value) if name == 'photo_folders' else value
 
@@ -69,7 +69,7 @@ def widget_of_setting(name, value):
     return '\n'.join(value) if name == 'photo_folders' else value
 
 
-# the labels of the AI settings' widgets, also used in the list of changed settings (A26)
+# the labels of the AI settings' widgets, also used in the list of changed settings
 AI_LABELS = {'model': 'Search model', 'device': 'Compute device', 'batch_size': 'Batch size',
              'low_priority': 'Keep the PC responsive during a search',
              'top': 'Maximum matches per search profile',
@@ -80,28 +80,28 @@ AI_LABELS = {'model': 'Search model', 'device': 'Compute device', 'batch_size': 
 
 
 def default_help(name, text=''):
-    """Return the help text of the widget of setting name: text and its default (A26)."""
+    """Return the help text of the widget of setting name: text and its default."""
     return (text + ' ' if text else '') + f'Default: {setting_text(name, DEFAULT_SETTINGS[name])}.'
 
 
 def reset_ai_settings():
-    """Put the defaults into the AI settings' widgets (on_click, so before they are drawn; A26).
+    """Put the defaults into the AI settings' widgets (on_click, so before they are drawn).
 
-    Never as value= (A8 review); the next run saves them as a change of this session.
+    Never as value=; the next run saves them as a change of this session.
     """
     for name in AI_SETTINGS:
         st.session_state[setting_key(name)] = widget_of_setting(name, DEFAULT_SETTINGS[name])
     st.session_state.settings_reset = list(AI_SETTINGS)
 
 
-# Settings (A8): settings.json is read on every rerun, so a reload, a restart, another tab
+# Settings: settings.json is read on every rerun, so a reload, a restart, another tab
 # or session shows the saved settings. The widgets have keys and get the saved values
 # through their session state; passing them as value= would give a widget a new identity
-# after every save and drop the next change (review). framescout_core.settings.reconcile_settings
+# after every save and drop the next change. framescout_core.settings.reconcile_settings
 # tells a change made in this session (saved; the latest action wins) from a value another
 # session saved (shown here).
 def sync_settings():
-    """Synchronize the settings widgets with settings.json in this page run (A8); warnings are shown here.
+    """Synchronize the settings widgets with settings.json in this page run; warnings are shown here.
 
     Returns (settings, seen, shown, settings_taken_over): the settings the widgets show now,
     the session's settings_seen and settings_shown (changed in place by the AI settings tab)
@@ -110,12 +110,12 @@ def sync_settings():
     try:
         saved_settings, settings_problems = read_settings(SETTINGS, DEFAULT_SETTINGS)
     except OSError as exc:
-        # e.g. a virus scanner or another program holding the file for longer (review)
+        # e.g. a virus scanner or another program holding the file for longer
         saved_settings, settings_problems = None, []
         st.warning(f'{SETTINGS.name} is in use by another program right now, so the settings shown are kept and '
                    f'saving a change is tried again the next time this page updates.\n\nDetails: {exc}')
     except ValueError as exc:
-        # never save over a file the app cannot read, like profiles.json (A2); the widgets keep
+        # never save over a file the app cannot read, like profiles.json; the widgets keep
         # what they show (the defaults in a new page)
         saved_settings, settings_problems = None, []
         st.warning(f'{SETTINGS.name} cannot be read, so FrameScout does not change it and keeps the settings shown '
@@ -129,7 +129,7 @@ def sync_settings():
     shown = st.session_state.setdefault('settings_shown', {})
     widget_values = {name: setting_of_widget(name, st.session_state[setting_key(name)]) for name in DEFAULT_SETTINGS
                      if setting_key(name) in st.session_state}
-    # the settings "Reset to defaults" reset (A26): saved as a change of this session even where
+    # the settings "Reset to defaults" reset: saved as a change of this session even where
     # the widget showed the default before, and kept until the save succeeded
     settings_reset = st.session_state.get('settings_reset', ())
     setting_updates, changed_settings, settings_taken_over = reconcile_settings(
@@ -150,7 +150,7 @@ def sync_settings():
                            'saving is tried again the next time this page updates.')
             else:
                 shown.update(changed_settings)
-                seen.update(written)  # as stored, e.g. rounded (review)
+                seen.update(written)  # as stored, e.g. rounded
                 st.session_state.pop('settings_reset', None)
     settings = {name: setting_of_widget(name, st.session_state[setting_key(name)]) for name in DEFAULT_SETTINGS}
     return settings, seen, shown, settings_taken_over
@@ -159,14 +159,14 @@ def sync_settings():
 def show_ai_settings(settings, seen, shown, active):
     """The AI settings of the tab "Settings"; returns (system_info() or None, model_problem of the chosen model or None)."""
     st.subheader('AI processing')
-    # imports torch: here rather than at the top, so the profile tab is drawn first (review)
+    # imports torch: here rather than at the top, so the profile tab is drawn first
     try:
         info, info_error = system_info(), None
     except Exception as exc:
         info, info_error = None, exc
-    # E22: the registry keys, the default first; the labels name the CPU factor, the download
+    # the registry keys, the default first; the labels name the CPU factor, the download
     # and whether the model is evaluated
-    # A39: a model already in the cache shows "downloaded" instead of its download size
+    # a model already in the cache shows "downloaded" instead of its download size
     downloaded = models_downloaded()
     st.selectbox(AI_LABELS['model'], MODEL_KEYS, format_func=lambda key: model_label(key, key in downloaded),
                  key=setting_key('model'), disabled=active,
@@ -189,10 +189,10 @@ def show_ai_settings(settings, seen, shown, active):
     model_missing = model_problem(settings['model'])
     if model_missing:
         st.warning(model_missing)
-    # "cuda" only if PyTorch can use it (A7); if detection failed, the engine still checks
+    # "cuda" only if PyTorch can use it; if detection failed, the engine still checks
     devices = device_choices(info['cuda']) if info else list(DEVICES)
     if st.session_state[setting_key('device')] not in devices:
-        # the only substitute (review): a saved device this PyTorch cannot use (e.g. "cuda"
+        # the only substitute: a saved device this PyTorch cannot use (e.g. "cuda"
         # after switching to the CPU build) is shown and used as "auto" but stays saved
         st.session_state[setting_key('device')] = shown['device'] = 'auto'
     st.selectbox(AI_LABELS['device'], devices, key=setting_key('device'), disabled=active,
@@ -201,7 +201,7 @@ def show_ai_settings(settings, seen, shown, active):
     if seen.get('device', 'auto') not in devices:
         # a saved device this PyTorch cannot use (e.g. "cuda" after switching to the CPU
         # build) is shown and used as "auto", but stays saved, so it applies again once
-        # PyTorch can use it; choosing "auto" is no change, hence the button (review)
+        # PyTorch can use it; choosing "auto" is no change, hence the button
         st.caption(f"The saved device \"{seen['device']}\" is not available, so auto is used. "
                    'It is used again once PyTorch can use it.')
         if st.button('Use auto from now on', disabled=active):
@@ -214,7 +214,7 @@ def show_ai_settings(settings, seen, shown, active):
                 st.rerun()
     st.number_input(AI_LABELS['batch_size'], **number_range('batch_size'), step=1, key=setting_key('batch_size'),
                     disabled=active, help=default_help('batch_size'))
-    # F4: the engine's --low-priority; its effect on the search time is not measured yet
+    # the engine's --low-priority; its effect on the search time is not measured yet
     st.checkbox(AI_LABELS['low_priority'], key=setting_key('low_priority'), disabled=active,
                 help=default_help('low_priority', 'Runs the search at a lower priority, so other programs get the '
                                                   'CPU first, and with fewer CPU threads for the AI models. The '
@@ -222,10 +222,10 @@ def show_ai_settings(settings, seen, shown, active):
                                                   'the GPU does the work; how much it helps is not measured yet.'))
     st.number_input(AI_LABELS['top'], **number_range('top'), step=25, key=setting_key('top'), disabled=active,
                     help=default_help('top'))
-    # F32: the settings changed less often in an expander, open while one of them differs from
+    # the settings changed less often in an expander, open while one of them differs from
     # its default, so a changed value is never hidden. `expanded` only ever turns True in a
     # browser session: Streamlit closes an open expander when it turns False on a rerun, e.g.
-    # after a value is set back to its default (review)
+    # after a value is set back to its default
     if changed_from_defaults({name: st.session_state[setting_key(name)] for name in AI_DETAIL_SETTINGS},
                              DEFAULT_SETTINGS, AI_DETAIL_SETTINGS):
         st.session_state['ai_details_open'] = True
@@ -248,7 +248,7 @@ def show_ai_settings(settings, seen, shown, active):
                                     f'{1 - DEFAULT_REFERENCE_WEIGHT:.0%} text. Text and reference scores are scaled '
                                     'to the photos of the search before they are weighted.'))
     # what differs from the defaults, as the widgets show it now (a substituted device is
-    # shown as "auto"), and the way back to them (A26)
+    # shown as "auto"), and the way back to them
     not_default = changed_from_defaults({name: st.session_state[setting_key(name)] for name in AI_SETTINGS},
                                         DEFAULT_SETTINGS, AI_SETTINGS)
     c1, c2 = st.columns([3, 1], vertical_alignment='center')
@@ -267,7 +267,7 @@ def show_ai_settings(settings, seen, shown, active):
         st.info('Recommendation: choose auto. A batch size of 8 is a conservative starting point; reduce it if memory runs short. Model weights are downloaded on the first run.')
     else:
         st.caption(f'System details could not be determined ({info_error}). Automatic device selection remains available.')
-    # F15: the read-only self-test of Check-FrameScout.bat; importing PyTorch in a subprocess
+    # the read-only self-test of Check-FrameScout.bat; importing PyTorch in a subprocess
     # takes a few seconds, so it runs only on the button
     with st.expander('Check installation'):
         st.caption('Checks the Python environment, the package versions, PyTorch (and the GPU for a CUDA build), '
@@ -278,7 +278,7 @@ def show_ai_settings(settings, seen, shown, active):
                 st.session_state['install_check'] = check_installation(BASE, dict(os.environ))
                 st.session_state['install_check_at'] = time.time()
         if 'install_check' in st.session_state:
-            # the results are kept until the next click: say when they were found (review)
+            # the results are kept until the next click: say when they were found
             st.caption(f"Checked at {time.strftime('%H:%M:%S', time.localtime(st.session_state['install_check_at']))}"
                        '. After you fix something, click the button again.')
         for result in st.session_state.get('install_check', []):
