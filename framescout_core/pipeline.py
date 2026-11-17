@@ -6,7 +6,7 @@ def progress_line(done, total, new, cached, errors):
     """Return the progress line the engine prints to its log during the analysis.
 
     For people reading the log only: the app reads the progress from the status file
-    (StatusReporter, A5), not from the log text (A11).
+    (StatusReporter), not from the log text.
     """
     return f'Progress: {done}/{total} | New: {new} | Cached: {cached} | Errors: {errors}'
 
@@ -15,7 +15,7 @@ def progress_due(before, after, total, every=25):
     """Return True if the engine should print a progress line after going from before to after done photos.
 
     That is every `every` photos and once at the end. Photos can finish several at a time
-    (one embedded batch, E2), so a multiple of `every` that was jumped over counts too.
+    (one embedded batch), so a multiple of `every` that was jumped over counts too.
     """
     return after > before and (after == total or after // every > before // every)
 
@@ -25,8 +25,8 @@ def progress_due(before, after, total, every=25):
 # engine keeps the same quality margin for CLIP's input.
 DRAFT_REDUCING_GAP = 2
 # Names the drafted decoding in the cache signature of runs without person detection;
-# change it if the decoding of those runs changes (the user decided in the PR #7 review
-# that drafted and full-resolution embeddings are not mixed in the cache).
+# change it if the decoding of those runs changes, so that drafted and full-resolution
+# embeddings are never mixed in the cache.
 DRAFT_DECODING = f'jpeg-draft-{DRAFT_REDUCING_GAP}x-clip-size'
 
 
@@ -34,7 +34,7 @@ def draft_size(clip_size, person_detection):
     """Return the smallest edge length a photo may be decoded at for the analysis, or None.
 
     JPEG decoding can scale by 1/2, 1/4 or 1/8 on the fly (Image.draft), which makes it
-    several times faster (E2). Without person detection CLIP sees only the whole photo,
+    several times faster. Without person detection CLIP sees only the whole photo,
     resized to clip_size, so twice that is enough. With person detection the photo is
     decoded at full resolution: a person crop (e.g. in a group photo) covers only part of
     it and would lose detail.
@@ -47,8 +47,8 @@ def group_batches(items, batch_size, size):
 
     size(item) is the number of crops of an item (a photo). Items are added to a list as
     long as their crops fit, so CLIP embeds the crops of several photos in one forward
-    pass instead of one photo at a time (E2), and a list never needs a second, small pass
-    for a few leftover crops (review). An item with more than batch_size crops is a list
+    pass instead of one photo at a time, and a list never needs a second, small pass
+    for a few leftover crops. An item with more than batch_size crops is a list
     on its own. Items are read lazily: a full list is yielded before the next item is
     requested; otherwise a list is yielded when the next item does not fit any more.
     """
@@ -74,10 +74,10 @@ def store_group(group, store, failed, fatal=lambda exc: False):
 
     store must store all items or none (one transaction). If it raises and the group has
     several items, each item is stored on its own, so a single broken photo or a failure
-    that hits only one of them (review) does not fail the whole group, and failed(item,
+    that hits only one of them does not fail the whole group, and failed(item,
     exc) reports every item that still fails with its own error. An error for which
-    fatal(exc) is true (e.g. a damaged cache file, E50) is raised at once, without
-    storing the items one by one (review). KeyboardInterrupt and other BaseExceptions are
+    fatal(exc) is true (e.g. a damaged cache file) is raised at once, without
+    storing the items one by one. KeyboardInterrupt and other BaseExceptions are
     not caught.
     """
     try:
@@ -106,7 +106,7 @@ def prefetch(submit, items, depth):
 
     submit(item) starts the work (e.g. ThreadPoolExecutor.submit) and returns a Future.
     The work for later items runs while the consumer handles the current one (decoding
-    photos in parallel, E2), but never more than depth items ahead, which bounds memory.
+    photos in parallel), but never more than depth items ahead, which bounds memory.
     Errors stay in the futures: future.result() raises them for that item only. Closing
     the generator (e.g. on KeyboardInterrupt) cancels the work that has not started yet.
     """
@@ -126,7 +126,7 @@ def prefetch(submit, items, depth):
 
 
 class Lazy:
-    """A value created by factory() on the first get() only, e.g. the person detector (F2).
+    """A value created by factory() on the first get() only, e.g. the person detector.
 
     A repeat search on an analyzed folder needs no detector: every photo comes from the
     cache, so the detector (seconds to tens of seconds on a CPU, a download on first use)

@@ -4,12 +4,12 @@ import platform
 from .paths import WINDOWS
 
 
-# PyTorch version the installer installs (I3), the version of the verified end-to-end run.
+# PyTorch version the installer installs, the version of the verified end-to-end run.
 # requirements.txt pins the same versions; a test keeps them in sync.
 TORCH_VERSION = '2.14.1'
 TORCHVISION_VERSION = '0.29.1'
 TORCH_INDEX = 'https://download.pytorch.org/whl/'
-# CUDA builds of PyTorch the installer chooses from, newest first (A7):
+# CUDA builds of PyTorch the installer chooses from, newest first:
 # (build, oldest compute capability, first unsupported compute capability, oldest Windows
 # driver, oldest Linux driver). From the CUDA 12.6/13.0 release notes ("minor version
 # compatibility": CUDA 12.x from 528.33 on Windows, 525.60.13 on Linux; CUDA 13.x from 580)
@@ -23,7 +23,7 @@ CUDA_BUILDS = (('cu130', (7, 5), None, (580,), (580,)),
 def reports_windows_driver(windows=WINDOWS, release=platform.release()):
     """Return True if nvidia-smi reports the number of a Windows driver: on Windows, and in WSL
     (a kernel release with "microsoft"), whose nvidia-smi shows the Windows host's driver
-    (review; not verified on a GPU, F48). The driver minimums of Windows apply then (F47)."""
+    (not verified on a GPU). The driver minimums of Windows apply then."""
     return windows or 'microsoft' in release.lower()
 
 
@@ -76,7 +76,7 @@ def cuda_build(gpus, windows=WINDOWS_DRIVER):
     gpus as returned by parse_gpu_query. The newest build that supports every GPU is
     preferred, since CUDA can number the GPUs differently from nvidia-smi. Otherwise the
     newest build for the most capable GPU (highest compute capability) is used, so an old
-    second card does not drop the PC to the CPU build (review); unsupported_gpus names the
+    second card does not drop the PC to the CPU build; unsupported_gpus names the
     GPUs that build cannot use. windows: the driver minimums of Windows, otherwise those of
     Linux (default: reports_windows_driver). Raises ValueError with the reason if no build supports the most capable GPU (GPU
     too old, or driver too old for it).

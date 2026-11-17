@@ -1,4 +1,4 @@
-"""The status file of a search run (A4, A5) and how the app reads it."""
+"""The status file of a search run and how the app reads it."""
 import json
 import time
 from datetime import datetime
@@ -8,8 +8,8 @@ from ._common import _replace_with_retry
 from .estimate import stored_finishing, stored_throughput
 
 
-# One search at a time per output folder (A4): the engine holds RUN_LOCK in the output
-# folder while it runs and reports its phase and progress in RUN_STATUS (A5), which the
+# One search at a time per output folder: the engine holds RUN_LOCK in the output
+# folder while it runs and reports its phase and progress in RUN_STATUS, which the
 # app reads to show a run again after a browser reload, in another tab or session.
 RUN_LOCK = 'run.lock'
 RUN_STATUS = 'run-status.json'
@@ -28,17 +28,17 @@ PHASE_LABELS = {
 }
 FINAL_PHASES = frozenset({'finished', 'failed', 'interrupted'})
 # the message of a run whose photos all come from the cache: no person detector is
-# loaded, the search only ranks (F2)
+# loaded, the search only ranks
 NOTHING_NEW = 'Nothing new to analyze – ranking only'
 # the message while the person detector loads on the first photo the cache does not have:
-# the phase stays "analyzing" with its progress (F2, review)
+# the phase stays "analyzing" with its progress
 LOADING_DETECTOR = 'Loading the person detector'
-# An analysis without a search (F18, the engine's --analyze-only, the app's "Analyze photos
+# An analysis without a search (the engine's --analyze-only, the app's "Analyze photos
 # now"): its status carries "analyze_only": true; it runs the phases up to "analyzing" and
 # then finishes without scoring or export, so results.json and the galleries stay as they are.
 # The message of one whose photos all come from the cache:
 ALL_ANALYZED = 'All photos are analyzed already – nothing new to analyze'
-# and of one that analyzed no photo although some could not be read (review)
+# and of one that analyzed no photo although some could not be read
 NONE_ANALYZED = 'No photo newly analyzed – some could not be analyzed, see the log'
 
 
@@ -47,7 +47,7 @@ def _timestamp():
 
 
 class StatusReporter:
-    """Writes the status file of a search run: process id, phase and progress (A4, A5).
+    """Writes the status file of a search run: process id, phase and progress.
 
     update() merges the given fields; it writes the file when the phase changes, when force
     is set, and otherwise at most every interval seconds, so a progress update per photo
@@ -55,7 +55,7 @@ class StatusReporter:
     effort: on Windows replacing a file fails while another process has it open (the app
     reads it every two seconds); a failed update is retried with the next one and never
     stops the search. finish() writes the final phase, trying harder. analyze_only: the run
-    is an analysis without a search (F18); every write carries "analyze_only": true, a
+    is an analysis without a search; every write carries "analyze_only": true, a
     search's status has no such field.
     """
 
@@ -65,9 +65,9 @@ class StatusReporter:
         self.interval, self.clock, self.retries, self.retry_delay = interval, clock, retries, retry_delay
         started = _timestamp()
         # rate: photos per minute of this run's analysis (None until measured); throughput:
-        # the speed of earlier runs per settings, kept from the file this run replaces (F12);
+        # the speed of earlier runs per settings, kept from the file this run replaces;
         # thumbnails: the gallery thumbnails this run plans at most (None until known);
-        # finishing: the speeds of scoring and thumbnails, also kept (F16)
+        # finishing: the speeds of scoring and thumbnails, also kept
         previous = read_status(self.path) or {}
         self.state = {'format': STATUS_FORMAT, 'pid': pid, 'phase': None, 'started': started, 'updated': started,
                       'done': 0, 'total': 0, 'new': 0, 'cached': 0, 'errors': 0,
@@ -130,7 +130,7 @@ def started_in_time(status, create_time, tolerance=2.0):
 
     The process of a run exists before its status is written (the app writes "starting"
     after Popen, the engine its status after it started), so a process with the status's
-    pid that was created later got the pid after the run's process ended (review). The
+    pid that was created later got the pid after the run's process ended. The
     tolerance covers the whole seconds of "started" and clock rounding.
     """
     try:
@@ -143,9 +143,9 @@ def started_in_time(status, create_time, tolerance=2.0):
 def final_status(code, warnings=(), run='search'):
     """Return (phase, message) of the engine's final status for its exit code.
 
-    A finished search carries its warnings (e.g. photos the cache could not be read for,
-    E50) as its message, which the app shows with the success note. run: what the failure
-    message calls the run, "search" or "analysis" (without a search, F18 review).
+    A finished search carries its warnings (e.g. photos the cache could not be read for)
+    as its message, which the app shows with the success note. run: what the failure
+    message calls the run, "search" or "analysis" (without a search).
     """
     if code == 0:
         return 'finished', ' '.join(warnings) or None
@@ -196,7 +196,7 @@ def status_fraction(status):
 def status_text(status):
     """Return the line the app shows for a status: the phase, its progress if it counts.
 
-    A running phase also shows the message of the run (e.g. NOTHING_NEW, F2); the message
+    A running phase also shows the message of the run (e.g. NOTHING_NEW); the message
     of a final phase is shown by the app in its own line.
     """
     phase = status.get('phase')
@@ -208,17 +208,16 @@ def status_text(status):
 
 
 def analysis_only(status):
-    """Return True if status is the one of an analysis without a search (F18)."""
+    """Return True if status is the one of an analysis without a search."""
     return isinstance(status, dict) and status.get('analyze_only') is True
 
 
 def nothing_new_message(analyze_only, errors):
-    """Return the engine's message when no photo needed a new analysis (F2), e.g. all came from the cache.
+    """Return the engine's message when no photo needed a new analysis, e.g. all came from the cache.
 
-    A search still ranks the photos (NOTHING_NEW). An analysis without a search (F18) says
+    A search still ranks the photos (NOTHING_NEW). An analysis without a search says
     that all photos are analyzed (ALL_ANALYZED) only if none failed: errors counts the photos
-    whose cache row or file could not be read, which are neither in the cache nor analyzed
-    (review).
+    whose cache row or file could not be read, which are neither in the cache nor analyzed.
     """
     if not analyze_only:
         return NOTHING_NEW
@@ -226,12 +225,12 @@ def nothing_new_message(analyze_only, errors):
 
 
 def run_name(status):
-    """Return what the app calls the run of status: "analysis" (F18) or "search run"."""
+    """Return what the app calls the run of status: "analysis" or "search run"."""
     return 'analysis' if analysis_only(status) else 'search run'
 
 
 def analysis_result_text(status):
-    """Return what the app says about a finished analysis without a search (F18): its counts and what it changed."""
+    """Return what the app says about a finished analysis without a search: its counts and what it changed."""
     new, cached, errors = (_count(status, k) or 0 for k in ('new', 'cached', 'errors'))
     text = (f"{new:,} photo{'' if new == 1 else 's'} newly analyzed, {cached:,} already in the cache"
             + (f', {errors:,} could not be analyzed (see the log).' if errors else '.'))

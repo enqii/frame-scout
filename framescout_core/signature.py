@@ -1,4 +1,4 @@
-"""The CLIP model, the feature cache signature and the cache tables (E11)."""
+"""The CLIP model, the feature cache signature and the cache tables."""
 import hashlib
 import json
 import math
@@ -9,7 +9,7 @@ from .settings import SETTING_RANGES, SETTING_STEPS
 
 
 # The OpenCLIP model and weights of every search model, the default too, are only in
-# framescout_core.models.MODELS (E22): no second copy that code could load instead of --model.
+# framescout_core.models.MODELS: no second copy that code could load instead of --model.
 # The engine version of a search model, part of the feature cache signature: change the
 # template whenever cached embeddings become incompatible (preprocessing or crops; other
 # weights are another registry entry). v4 was ViT-B-32 with GELU.
@@ -17,16 +17,16 @@ ENGINE_TEMPLATE = 'v5-clip-{model}-{pretrained}-crop-features-1'
 
 
 def engine_id(model=DEFAULT_MODEL):
-    """Return the engine version of the search model key (E22); ValueError for an unknown key.
+    """Return the engine version of the search model key; ValueError for an unknown key.
 
-    For the default model it is ENGINE, unchanged since E1, so its cached rows stay valid.
+    For the default model it is ENGINE, kept unchanged, so its cached rows stay valid.
     """
     entry = _model(model)
     return ENGINE_TEMPLATE.format(model=entry.name, pretrained=entry.pretrained)
 
 
 ENGINE = engine_id(DEFAULT_MODEL)
-# the engine versions of all registered models: rows of another one are kept by default (E22)
+# the engine versions of all registered models: rows of another one are kept by default
 MODEL_ENGINES = frozenset(engine_id(key) for key in MODEL_KEYS)
 
 
@@ -36,10 +36,10 @@ def feature_signature(person_detection, max_persons, person_confidence, yolo_mod
     Cached rows are reused only under the same signature, so any setting that changes
     the stored embeddings or crops belongs here, and nothing else: without person
     detection only the full image is embedded, so the detector settings are left out.
-    Without person detection JPEGs are decoded at reduced scale (draft_size, E2), so that
+    Without person detection JPEGs are decoded at reduced scale (draft_size), so that
     signature also names the decoding; with detection photos keep full resolution and the
-    signature is the same as before E2, so those cached rows stay valid. model is the
-    search model key (E22): each model has its own engine version and so its own rows.
+    signature names no decoding, so the rows cached before that change stay valid. model is the
+    search model key: each model has its own engine version and so its own rows.
     """
     config = [engine_id(model), bool(person_detection)]
     if person_detection:
@@ -71,7 +71,7 @@ def prepare_cache(con, person_detection, max_persons, person_confidence, yolo_mo
 
     The features table holds the embeddings per photo path and signature. The signatures
     table records which engine version (engine_id of the search model) and settings each
-    signature stands for (E11, E22): the signature is a hash, so without it the cleanup
+    signature stands for: the signature is a hash, so without it the cleanup
     could not tell rows of an older engine version or another model from rows of other
     settings. The features table is unchanged, so older versions keep reading the same file
     and ignore the side table.
@@ -92,7 +92,7 @@ def prepare_cache(con, person_detection, max_persons, person_confidence, yolo_mo
 
 # float neighbors (units in the last place) of each slider step known_signatures also counts:
 # a slider value can carry rounding noise from any arithmetic path (e.g. 0.1 + 4 * 0.05 =
-# 0.30000000000000004, one ULP above 0.3); several ULPs cover every such path (review)
+# 0.30000000000000004, one ULP above 0.3); several ULPs cover every such path
 SLIDER_NOISE_ULPS = 8
 
 
@@ -113,12 +113,12 @@ def _slider_values(name):
 
 
 def known_signatures(yolo_model=DEFAULT_YOLO_MODEL):
-    """Return the signatures of the current ENGINE for every value of the app's widgets (E11).
+    """Return the signatures of the current ENGINE for every value of the app's widgets.
 
     For cached rows written before the signatures table existed: a row whose signature is
     neither recorded there nor one of these is of an older engine version or of settings
     only the CLI offers (e.g. another --yolo-model). Only the default model: versions
-    without the side table had no other one, and every other model records its rows (E22).
+    without the side table had no other one, and every other model records its rows.
     """
     known = {feature_signature(False, 0, 0, yolo_model)}
     low, high = SETTING_RANGES['max_persons']
@@ -130,7 +130,7 @@ def known_signatures(yolo_model=DEFAULT_YOLO_MODEL):
 
 
 def classify_signatures(signatures, recorded, current, known=None, current_engine=ENGINE):
-    """Return {signature: 'current' | 'other' | 'model' | 'old'} for the signatures of cached rows (E11, E22).
+    """Return {signature: 'current' | 'other' | 'model' | 'old'} for the signatures of cached rows.
 
     recorded: {signature: engine} of the signatures table; current: the signature of the
     current settings; known: known_signatures() (computed if None); current_engine: the

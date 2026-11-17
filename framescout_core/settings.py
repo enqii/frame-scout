@@ -1,36 +1,36 @@
-"""The app's settings.json (A8): defaults, validation, saving and the widget sync."""
+"""The app's settings.json: defaults, validation, saving and the widget sync."""
 from pathlib import Path
 
 from ._common import _json_object, _read_json_object, _update_locked
 from .models import DEFAULT_MODEL, MODELS
 
 
-# The app's settings (A8): kept in settings.json in the project folder, so they survive a
+# The app's settings: kept in settings.json in the project folder, so they survive a
 # browser reload and a restart. Only values that differ from the defaults are written, so
 # the default photo folder follows the project folder when it is moved.
 SETTINGS_FILE = 'settings.json'
 # the engine's --device choices
 DEVICES = ('auto', 'cpu', 'cuda')
 # (minimum, maximum) of each number setting; the app builds its widgets from them (Streamlit
-# raises for a value outside a widget's range), so both always agree (review). Float
+# raises for a value outside a widget's range), so both always agree. Float
 # bounds mark a float setting.
 SETTING_RANGES = {'batch_size': (1, 64), 'top': (1, 5000), 'max_persons': (1, 50),
                   'person_confidence': (0.1, 0.9), 'reference_weight': (0.0, 1.0)}
-# step of the app's sliders; known_signatures computes the cache signatures they lead to (E11)
+# step of the app's sliders; known_signatures computes the cache signatures they lead to
 SETTING_STEPS = {'person_confidence': 0.05, 'reference_weight': 0.05}
-# default weight of the reference images: 0.35 before the scores were normalized (E5);
-# 0.3 did best on the local evaluation set (user decision in PR #11). A value saved in
+# default weight of the reference images: 0.35 before the scores were normalized;
+# 0.3 did best on the local evaluation set. A value saved in
 # settings.json is kept as it is, also the old default.
 DEFAULT_REFERENCE_WEIGHT = 0.3
 # the settings of the app's AI settings tab, in the order it shows them: what its "Reset to
-# defaults" button resets (A26). Not the photo folders, the user's data location, which sit
+# defaults" button resets. Not the photo folders, the user's data location, which sit
 # in the Photo source tab.
 AI_SETTINGS = ('model', 'device', 'batch_size', 'low_priority', 'top', 'person_detection', 'max_persons',
                'person_confidence', 'reference_weight')
-# the AI settings the tab shows in an expander after the everyday ones (F32): the last ones
+# the AI settings the tab shows in an expander after the everyday ones: the last ones
 # of AI_SETTINGS
 AI_DETAIL_SETTINGS = ('person_detection', 'max_persons', 'person_confidence', 'reference_weight')
-# the settings of the person detection, disabled in the tab while the detection is off (F32)
+# the settings of the person detection, disabled in the tab while the detection is off
 PERSON_DETECTION_SETTINGS = ('max_persons', 'person_confidence')
 # the on/off settings (checkboxes)
 _BOOL_SETTINGS = ('person_detection', 'low_priority')
@@ -38,7 +38,7 @@ _BOOL_SETTINGS = ('person_detection', 'low_priority')
 SETTINGS_LOCK_TIMEOUT = 5.0
 
 
-# the single photo folder of settings.json before A25: read as a list of one, replaced by
+# the single photo folder of settings.json of older versions: read as a list of one, replaced by
 # "photo_folders" on the next save
 LEGACY_PHOTO_FOLDER = 'photo_folder'
 
@@ -48,12 +48,12 @@ def default_settings(base):
     return {'photo_folders': [str(Path(base) / 'photos')], 'device': 'auto', 'batch_size': 8, 'top': 150,
             'person_detection': True, 'max_persons': 12, 'person_confidence': 0.30,
             'reference_weight': DEFAULT_REFERENCE_WEIGHT, 'model': DEFAULT_MODEL,
-            # "Keep the PC responsive" (F4): the engine's --low-priority
+            # "Keep the PC responsive": the engine's --low-priority
             'low_priority': False}
 
 
 def folder_lines(text):
-    """Return the folders of the app's photo folder field (one per line): the non-empty lines, stripped (A25)."""
+    """Return the folders of the app's photo folder field (one per line): the non-empty lines, stripped."""
     return [line.strip() for line in text.splitlines() if line.strip()]
 
 
@@ -65,7 +65,7 @@ def _setting_value(key, value):
         return [x.strip() for x in value if x.strip()]
     if key == 'device':
         return value if isinstance(value, str) and value in DEVICES else None
-    if key == 'model':  # a registry key, never a free-text OpenCLIP name (E22)
+    if key == 'model':  # a registry key, never a free-text OpenCLIP name
         return value if isinstance(value, str) and value in MODELS else None
     if key in _BOOL_SETTINGS:
         return value if isinstance(value, bool) else None
@@ -74,7 +74,7 @@ def _setting_value(key, value):
     low, high = SETTING_RANGES[key]
     number = isinstance(value, (int, float)) and not isinstance(value, bool)
     if isinstance(low, float):
-        # rounded: a slider computes min + n * step, e.g. 0.30000000000000004 (review)
+        # rounded: a slider computes min + n * step, e.g. 0.30000000000000004
         return round(float(value), 4) if number and low <= value <= high else None  # NaN is never in range
     return value if number and isinstance(value, int) and low <= value <= high else None
 
@@ -83,7 +83,7 @@ def _read_settings_file(filename, attempts=5, retry_delay=0.05):
     """Return the JSON object of a settings file ({} if it is missing); ValueError if unreadable.
 
     On Windows, reading fails for a moment while another session replaces the file, so an
-    OSError is retried up to attempts times, retry_delay seconds apart (review).
+    OSError is retried up to attempts times, retry_delay seconds apart.
     """
     return _read_json_object(filename, 'settings file', attempts, retry_delay)
 
@@ -94,7 +94,7 @@ def _parse_settings(content):
 
 
 def _with_folder_list(data):
-    """Return the saved settings data with the old single photo folder as "photo_folders" (A25).
+    """Return the saved settings data with the old single photo folder as "photo_folders".
 
     The old key is removed; it becomes a list of one (none for an empty folder) unless
     "photo_folders" is saved too, which wins. An old value that is not a string stays
@@ -118,7 +118,7 @@ def read_settings(filename, defaults, attempts=5, retry_delay=0.05):
     (the same range as the app's widget); a missing file gives the defaults. problems lists
     the saved values that are not allowed and were replaced by their defaults. Unknown keys
     are ignored (save_settings keeps them). The single "photo_folder" of older versions is
-    read as "photo_folders", a list of one (A25). Raises ValueError (including JSON and
+    read as "photo_folders", a list of one. Raises ValueError (including JSON and
     Unicode decoding errors) for a file that is not a JSON object, and OSError if it still
     cannot be read after attempts tries.
     """
@@ -144,7 +144,7 @@ def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05, loc
     changes are merged into the file as it is now (another tab or session may have saved
     other settings in between). The read-merge-write holds a RunLock on <filename>.lock
     (app sessions are threads of one process, and two RunLocks conflict there too), so two
-    sessions saving at the same moment cannot lose a change (review); the lock file stays
+    sessions saving at the same moment cannot lose a change; the lock file stays
     (empty). Saved values that are not allowed (read_settings replaced them by their
     defaults and reported them) and values equal to their default are removed; unknown
     keys are kept. No file is created if there is nothing to write. The file is replaced
@@ -164,7 +164,7 @@ def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05, loc
 
     def update(current):
         document = {}
-        # the old single photo folder is replaced by photo_folders, never written again (A25);
+        # the old single photo folder is replaced by photo_folders, never written again;
         # an invalid one is dropped like an invalid value of a known setting
         current = _with_folder_list(current)
         current.pop(LEGACY_PHOTO_FOLDER, None)
@@ -182,7 +182,7 @@ def save_settings(filename, changes, defaults, attempts=5, retry_delay=0.05, loc
 
 
 def reconcile_settings(widgets, seen, shown, saved, defaults, reset=()):
-    """Bring the app's settings widgets and the saved settings together (A8 review).
+    """Bring the app's settings widgets and the saved settings together.
 
     Called at the start of every page run, before the widgets are drawn. widgets maps a
     setting to its widget's current value (missing: a new page, or the widget was not drawn
@@ -200,7 +200,7 @@ def reconcile_settings(widgets, seen, shown, saved, defaults, reset=()):
     session wins over another session's save, since it is the later action. seen and shown
     are updated for the updates.
 
-    reset names the settings this session reset to their defaults (A26): their widgets count
+    reset names the settings this session reset to their defaults: their widgets count
     as changed even if they show what they showed before, e.g. the default while another
     session saved another value, or "auto" shown for a saved device PyTorch cannot use.
     """
@@ -218,7 +218,7 @@ def reconcile_settings(widgets, seen, shown, saved, defaults, reset=()):
 
 
 def changed_from_defaults(values, defaults, names):
-    """Return the settings of names (in that order) whose value in values differs from its default (A26).
+    """Return the settings of names (in that order) whose value in values differs from its default.
 
     Compared as save_settings stores them, so slider noise such as 0.30000000000000004 is
     no change.
@@ -227,7 +227,7 @@ def changed_from_defaults(values, defaults, names):
 
 
 def setting_text(name, value):
-    """Return the value of setting name as the app shows it, e.g. in "Default: …" (A26)."""
+    """Return the value of setting name as the app shows it, e.g. in "Default: …"."""
     if name == 'model':
         return MODELS[value].label if value in MODELS else str(value)
     if isinstance(value, bool):
@@ -248,10 +248,10 @@ def engine_command(python, engine, folders, output, settings, device, *, profile
     output: the results folder; settings: the app's settings (batch_size, top, max_persons,
     person_confidence, reference_weight, model, person_detection, low_priority); device: the
     --device choice. Exactly one of profiles (the profiles file), quick_query (the search
-    text of a quick search, F10, passed as "--quick-query=<text>", so a text that starts with
-    "-" is no option) and like (the photo of "Find similar", F11, passed as "--like=<path>";
+    text of a quick search, passed as "--quick-query=<text>", so a text that starts with
+    "-" is no option) and like (the photo of "Find similar", passed as "--like=<path>";
     like_part, the part shown on its card, as "--like-part=<part>") and analyze_only (True:
-    "Analyze photos now", F18, "--analyze-only") is given, else ValueError; like_part only
+    "Analyze photos now", "--analyze-only") is given, else ValueError; like_part only
     with like. A quick search, "Find similar" and the analysis get the same settings, so they
     use (or fill) the cache rows of the current settings.
     """
@@ -273,5 +273,5 @@ def engine_command(python, engine, folders, output, settings, device, *, profile
     if not settings['person_detection']:
         cmd.append('--no-person-detection')
     if settings['low_priority']:
-        cmd.append('--low-priority')  # the engine lowers its own priority (F4)
+        cmd.append('--low-priority')  # the engine lowers its own priority
     return cmd

@@ -1,4 +1,4 @@
-"""Reference image files: a folder per profile, saving uploads, moving them after a rename (A1)."""
+"""Reference image files: a folder per profile, saving uploads, moving them after a rename."""
 import json
 import os
 import shutil
@@ -14,7 +14,7 @@ def reference_folder(refs_root, name, others, base):
 
     That is refs_root/<slug>, or <slug>-2, <slug>-3, ... if the folder holds a reference
     image of one of the other profiles (dicts with "reference_images", paths relative to
-    base), so two profiles never share a folder (A1). Leftover files that no other
+    base), so two profiles never share a folder. Leftover files that no other
     profile references do not block a folder: write_new_file never overwrites them.
     """
     used = {_path_key((base / ref).parent) for profile in others for ref in profile.get('reference_images', [])}
@@ -26,7 +26,7 @@ def reference_folder(refs_root, name, others, base):
 
 
 def stage_reference_move(refs, folder, refs_root, base, others):
-    """First step of moving a renamed profile's reference images into folder (A1).
+    """First step of moving a renamed profile's reference images into folder.
 
     refs: the profile's reference paths (relative to base, as in profiles.json); others:
     the other profiles. Every existing file inside refs_root that is not in folder yet and
@@ -56,7 +56,7 @@ def stage_reference_move(refs, folder, refs_root, base, others):
                     new = _link_new(old.resolve(), folder)
                     staged.append((old.resolve(), new))
                     # lexically, like the paths the app writes: resolving would leave base
-                    # if references/ is a junction or symlink to another place (review)
+                    # if references/ is a junction or symlink to another place
                     moved[k] = Path(os.path.relpath(new, base)).as_posix()
             new_refs.append(moved[k] or ref)
     except BaseException:
@@ -137,13 +137,13 @@ def update_backup_references(filename, staged, base, lock_timeout=PROFILES_LOCK_
 
     Call it between save_profiles (which wrote the backup with the old paths) and
     finish_reference_move (which removes the old names), so restoring the backup keeps
-    working after a rename (review). Only the paths of the moved files (staged, from
+    working after a rename. Only the paths of the moved files (staged, from
     stage_reference_move; relative to base) change; everything else, including other
     top-level keys and their order, stays. The backup is replaced via a flushed temporary
     file, so a crash leaves the old or the new backup, and while the old names still
     exist both point to existing files. The backup is read and replaced under the lock of
     save_profiles (<filename>.lock), so a save of another session, which replaces the
-    backup too, cannot come in between (A32); OSError if that lock is not free within
+    backup too, cannot come in between; OSError if that lock is not free within
     lock_timeout seconds.
 
     Returns True if the backup now fits the moved files (also if nothing had to change,
@@ -188,7 +188,7 @@ def write_new_file(folder, stem, suffix, data):
     """Write data to folder/<stem>-<n><suffix> with the smallest free n >= 1; return the path.
 
     Never overwrites an existing file (exclusive create), so leftover reference images
-    (e.g. of a deleted profile, or in a folder shared by profiles before A1) are kept.
+    (e.g. of a deleted profile, or in a folder shared by profiles of older versions) are kept.
     Creates the folder if needed.
     """
     folder.mkdir(parents=True, exist_ok=True)

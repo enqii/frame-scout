@@ -1,4 +1,4 @@
-"""Crop labels and gallery thumbnails of the HTML export (E6)."""
+"""Crop labels and gallery thumbnails of the HTML export."""
 import hashlib
 import os
 import shutil
@@ -9,7 +9,7 @@ from ._common import _publish_via_temp
 # Label of the uncropped photo among the crops; person crops are labelled "Person <n>".
 FULL_IMAGE_LABEL = 'Full image'
 # Labels are stored in the feature cache; rows written before the English translation
-# (I7) carry the German label. Mapping them on display keeps those rows valid.
+# carry the German label. Mapping them on display keeps those rows valid.
 _LEGACY_LABELS = {'Gesamtbild': FULL_IMAGE_LABEL}
 
 
@@ -29,10 +29,10 @@ def ensure_thumbnail(path, thumbs, legacy_thumbs, render, log, mtime_ns=None):
     An existing thumbnail is reused; one of an older version in legacy_thumbs (same name =
     same photo and modification time; None: no such folder) is copied and left in place;
     otherwise render(path, target) writes a new one. Any failure, including a photo that
-    was deleted or moved after scoring (E6), is reported with log(message) and the photo
+    was deleted or moved after scoring, is reported with log(message) and the photo
     is skipped, so one missing file cannot abort the whole HTML export. render must
     write to the target it is given (a temporary .jpg name, not the final one). The name
-    is made of mtime_ns if given (the evaluation tool's time of scoring, E35), otherwise
+    is made of mtime_ns if given (the evaluation tool's time of scoring), otherwise
     of the photo's current modification time.
     """
     try:
@@ -61,7 +61,7 @@ def gallery_cards(ranked, top, thumbnail):
     ranked is the full ranking of a gallery, best first; thumbnail(item) returns the
     thumbnail's file name or None for a photo that is skipped (see ensure_thumbnail).
     Ranks count only the photos shown, so a skipped photo leaves no gap, and lower-ranked
-    photos fill the gallery up to top cards (E12). Stops trying as soon as it is full.
+    photos fill the gallery up to top cards. Stops trying as soon as it is full.
     """
     rank = 0
     for item in ranked:
@@ -78,7 +78,7 @@ SKIP_LOG_LIMIT = 50
 
 
 class SkippedPhotos:
-    """The photos of one export that got no thumbnail (review of E12).
+    """The photos of one export that got no thumbnail.
 
     thumbnail() is ensure_thumbnail for a whole export: a photo that failed once is not
     tried again in later galleries, and only the first limit failures are logged, so a

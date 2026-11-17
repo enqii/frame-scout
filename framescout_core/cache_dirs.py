@@ -1,8 +1,8 @@
-"""Model downloads and library config files under the project's .cache folder (E9, I10).
+"""Model downloads and library config files under the project's .cache folder.
 
 The .bat files, the app (engine_cache_env) and a manual engine run (default_cache_env in
 its main()) set the cache variables a user did not set, so nothing lands in the user
-profile and the uninstall stays clean; a variable the user set wins (A36, E42). The
+profile and the uninstall stays clean; a variable the user set wins. The
 evaluation tool sets all of them to its --cache-dir.
 """
 import os
@@ -19,7 +19,7 @@ def cache_paths(base):
 
 
 def cache_folder_paths(cache):
-    """The cache variables and their folders under the cache folder cache itself (I25).
+    """The cache variables and their folders under the cache folder cache itself.
 
     The evaluation tool's --cache-dir names the cache folder, not the project folder.
     """
@@ -33,11 +33,11 @@ XDG_DERIVED = ('TORCH_HOME', 'HF_HOME')
 
 
 def default_cache_env(environ, base):
-    """Set the cache variables that are unset or empty in environ to base/.cache (I10).
+    """Set the cache variables that are unset or empty in environ to base/.cache.
 
     A value the user set is kept. With an XDG_CACHE_HOME of the user, TORCH_HOME and HF_HOME
     stay unset, so torch and huggingface_hub use its torch and huggingface folders as they do
-    without FrameScout (review; an empty one is removed, as cmd.exe has no empty variables).
+    without FrameScout (an empty one is removed, as cmd.exe has no empty variables).
     Must run before torch, huggingface_hub and Ultralytics are imported (they read some of
     the variables on import). Creates no folder; returns the names it set, each to its
     folder in cache_paths(base).
@@ -56,7 +56,7 @@ def default_cache_env(environ, base):
 
 
 def engine_cache_env(environ, base):
-    """A copy of environ with the cache variables default_cache_env sets for base (A36).
+    """A copy of environ with the cache variables default_cache_env sets for base.
 
     The environment the app gives the engine it starts: a variable the user set is kept,
     as for a manual engine run. environ itself is not changed.
@@ -67,7 +67,7 @@ def engine_cache_env(environ, base):
 
 
 def open_clip_cache_dir(model, environ, base):
-    """The cache_dir the engine passes open_clip for the SearchModel model, or None (E39).
+    """The cache_dir the engine passes open_clip for the SearchModel model, or None.
 
     open_clip fetches weights that have no Hugging Face Hub repository from their URL into
     ~/.cache/clip unless it gets a cache_dir, whatever TORCH_HOME or XDG_CACHE_HOME say. Such
@@ -82,13 +82,13 @@ def open_clip_cache_dir(model, environ, base):
 
 
 def yolo_weights(name, base, cwd, environ, log=None, replace=os.replace):
-    """The path the detector loads its weights from, and downloads them to on first use (E9).
+    """The path the detector loads its weights from, and downloads them to on first use.
 
     Ultralytics downloads an official weights file given by its bare name into the working
     folder, which put yolo11n.pt into the project folder. A file of that name in the working
-    folder cwd wins, as a copy the user put there deliberately (E41); otherwise the bare name
+    folder cwd wins, as a copy the user put there deliberately; otherwise the bare name
     is looked up in the folder of YOLO_CONFIG_DIR in environ (base/.cache/ultralytics if
-    unset; a value the user set is kept, review). The default file an older version
+    unset; a value the user set is kept). The default file an older version
     downloaded into base is no such copy, also when cwd is base: it is moved into that folder
     once, unless a copy is there already (kept and used where it is if it cannot be moved;
     log, if given, gets a line about it). Any other path or URL is used as given.
@@ -114,15 +114,15 @@ def yolo_weights(name, base, cwd, environ, log=None, replace=os.replace):
 
 
 def detector_weights_line(weights, cwd):
-    """The run log line that names the weights file the detector loads (E60).
+    """The run log line that names the weights file the detector loads.
 
     weights is what yolo_weights returned: the cache signature records --yolo-model only as
-    given, so a copy of the same name in the working folder (E41) or a relative path from
+    given, so a copy of the same name in the working folder or a relative path from
     another working folder is told apart only by this line. It is printed before the load, so
     a load that fails still names the file tried. A relative path is shown as the absolute one
-    in cwd (the path Ultralytics opens; it expands no "~", review); a URL as given. A file
+    in cwd (the path Ultralytics opens; it expands no "~"); a URL as given. A file
     that is not there gets a note without promising a download: Ultralytics downloads only
-    the names of its own releases, any other missing file fails to load (review).
+    the names of its own releases, any other missing file fails to load.
     """
     if '://' in weights:
         return f'Loading person detector weights: {weights}'
@@ -136,11 +136,11 @@ def find_yolo_weights(name, base, cwd, environ):
     """Return (found, cached) for the bare weights file name, without moving or downloading anything.
 
     found is the file the detector loads, looked up as yolo_weights does: a file in the
-    working folder cwd (E41; not the default file of an older version's download in base,
+    working folder cwd (not the default file of an older version's download in base,
     also when cwd is base), the one in the folder of YOLO_CONFIG_DIR in environ
     (base/.cache/ultralytics if unset), that older download (yolo_weights moves it); None if
     there is none, so it is downloaded on first use. cached is the path in that cache
-    folder, where a download goes. The free disk space check uses it too (F3 review).
+    folder, where a download goes. The free disk space check uses it too.
     """
     folder = environ.get('YOLO_CONFIG_DIR') or cache_paths(base)['YOLO_CONFIG_DIR']
     cached = Path(folder) / name
@@ -148,7 +148,7 @@ def find_yolo_weights(name, base, cwd, environ):
     own = Path(cwd) / name
     # the project folder is told by its path, not by the file's identity (samefile): that
     # stats a file another search may be moving into the cache, and some Windows volumes
-    # (exFAT, network shares) report no unique file index (review)
+    # (exFAT, network shares) report no unique file index
     if own.is_file() and not (legacy is not None and _same_folder(cwd, base)):
         return own, cached
     if cached.is_file():

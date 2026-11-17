@@ -1,4 +1,4 @@
-"""The operating-system file lock (RunLock, A4) used for search runs and for saving JSON files."""
+"""The operating-system file lock (RunLock) used for search runs and for saving JSON files."""
 import os
 import time
 from pathlib import Path
@@ -27,7 +27,7 @@ def _unlock(fd):
 
 
 class RunLock:
-    """An exclusive lock on a file, held while a search runs in an output folder (A4).
+    """An exclusive lock on a file, held while a search runs in an output folder.
 
     It is a lock of the operating system (Windows byte-range lock, flock elsewhere) on an
     open file, not the existence of the file: when the process ends in any way, including
@@ -81,7 +81,7 @@ def lock_held(path):
     Checks by taking the lock for a moment, so a RunLock.acquire at that very moment fails
     once: the engine and the app therefore acquire with a timeout. A file that exists but
     cannot be opened (e.g. PermissionError while it is pending delete or held by an antivirus
-    scanner on Windows) counts as held, the safe side: no start (review).
+    scanner on Windows) counts as held, the safe side: no start.
     """
     try:
         fd = os.open(path, os.O_RDWR)

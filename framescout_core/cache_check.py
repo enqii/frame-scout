@@ -1,4 +1,4 @@
-"""The cache health check of "Clean up storage": SQLite's quick_check of cache.sqlite3, and setting a damaged cache aside (F1)."""
+"""The cache health check of "Clean up storage": SQLite's quick_check of cache.sqlite3, and setting a damaged cache aside."""
 import os
 import sqlite3
 from pathlib import Path
@@ -33,7 +33,7 @@ def _quick_check(cache):
     first, as the next search would do. An error SQLite reports as damage (sqlite3's
     DatabaseError: "file is not a database", "database disk image is malformed") makes the
     file damaged. A disk I/O error (SQLITE_IOERR) makes it unreadable: a bad sector, which
-    setting the file aside helps against, or a drive that is not reachable now (review). Any
+    setting the file aside helps against, or a drive that is not reachable now. Any
     other error (OperationalError: e.g. the file cannot be opened or is locked) leaves it
     unchecked, since setting the file aside would not help.
     """
@@ -59,7 +59,7 @@ def _io_error(exc):
 
 
 def cache_error(exc):
-    """Whether the exception exc of a search is an error of the cache file itself (E50).
+    """Whether the exception exc of a search is an error of the cache file itself.
 
     'damaged' for an error SQLite reports as damage (exactly sqlite3.DatabaseError: "file is
     not a database", "database disk image is malformed"), 'unreadable' for a disk I/O error,
@@ -74,7 +74,7 @@ def cache_error(exc):
 
 
 def cache_error_message(cache, exc):
-    """The message of a search that stopped on the error exc of the cache file cache, or None (E50).
+    """The message of a search that stopped on the error exc of the cache file cache, or None.
 
     Points to "Check cache" in the app instead of leaving SQLite's raw error alone; None if
     exc is no error of the cache file itself (cache_error).
@@ -91,12 +91,12 @@ def cache_error_message(cache, exc):
 
 
 def cache_read_warning(cache, exc, count, run='search'):
-    """The warning of a search that finished although count photos could not be read from the cache (E50, review).
+    """The warning of a search that finished although count photos could not be read from the cache.
 
     exc: the first such error, an error of the cache file itself (cache_error). A damaged
     page can hit only a few rows: the search leaves out those photos instead of stopping,
     and its end points to "Check cache" (cache_error_message). run: what the warning calls
-    the run, "search" or "analysis" (without a search, F18, E63).
+    the run, "search" or "analysis" (without a search).
     """
     left_out = f'{count} photo was' if count == 1 else f'{count} photos were'
     return (f'{left_out} left out of this {run} because the feature cache could not be read for them. '
@@ -104,7 +104,7 @@ def cache_read_warning(cache, exc, count, run='search'):
 
 
 def check_cache(results, alive, lock_timeout=CLEANUP_LOCK_TIMEOUT):
-    """Check the cache file of the folder results with SQLite's quick_check; return the result (F1).
+    """Check the cache file of the folder results with SQLite's quick_check; return the result.
 
     The result has refused (why nothing was checked, else None), state ('missing': no cache
     file; 'ok'; 'damaged'; 'unreadable': a disk I/O error; 'unchecked': the check itself
@@ -130,7 +130,7 @@ def check_cache(results, alive, lock_timeout=CLEANUP_LOCK_TIMEOUT):
 
 
 def cache_check_current(results, result):
-    """Whether the cache file of results is still as the check_cache result result saw it (F1 review).
+    """Whether the cache file of results is still as the check_cache result result saw it.
 
     False once the file was changed, created or removed since the check, e.g. by a cleanup
     (deleted rows, compacting), a search started in any tab or a rename, so the app drops
@@ -144,7 +144,7 @@ def cache_check_current(results, result):
 
 
 def set_cache_aside(results, alive, expected, lock_timeout=CLEANUP_LOCK_TIMEOUT, now=None):
-    """Rename the damaged cache file of results to <name>.broken-<YYYYMMDD-HHMMSS>; return the result (F1).
+    """Rename the damaged cache file of results to <name>.broken-<YYYYMMDD-HHMMSS>; return the result.
 
     Never deletes it. expected is the file of the check_cache result the user saw: a file
     changed or removed since is not renamed. The side files (CACHE_SIDE_FILES) get the same

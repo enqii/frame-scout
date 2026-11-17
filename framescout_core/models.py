@@ -1,4 +1,4 @@
-"""The search models FrameScout can use (E22): the registry the engine's --model and the app read."""
+"""The search models FrameScout can use: the registry the engine's --model and the app read."""
 import importlib.util
 from dataclasses import dataclass
 
@@ -12,15 +12,15 @@ class SearchModel:
     key: the stable name of --model and settings.json; name and pretrained: the OpenCLIP
     model and weights; label: the name shown in the app, the log and the galleries;
     download: the size of the first-use download; cpu_factor: the CPU time per photo part
-    relative to the default (measured in PR #13, the investigation of E22); image_size: the input
+    relative to the default (as measured); image_size: the input
     edge in pixels (tested against the OpenCLIP config; the engine's fallback for the draft
     size); requires: Python packages (import names) the model needs beyond
     requirements.txt of v1.1; multilingual: understands search terms in other languages
-    than English (none yet, E21); evaluated: its search quality was measured (E20);
+    than English (none yet); evaluated: its search quality was measured;
     weights_repo and tokenizer_repo: the Hugging Face Hub repositories open_clip loads the
     weights and a Hugging Face tokenizer from ('' = open_clip's built-in tokenizer; tested
     against the OpenCLIP config), which the engine checks in the cache to load the model
-    offline (E16).
+    offline.
     """
     key: str
     name: str
@@ -36,10 +36,9 @@ class SearchModel:
     tokenizer_repo: str = ''
 
 
-# The default comes first. User decisions: the default stays OpenAI CLIP ViT-B/32 (PR #13);
-# offered besides it are ViT-B/16 and ViT-L/14 (DataComp-XL) and SigLIP B/16, not evaluated
-# yet: a follow-up item evaluates them and trims the list (E22). The OpenAI weights were
-# trained with QuickGELU, so the "-quickgelu" config (E1).
+# The default comes first: OpenAI CLIP ViT-B/32; offered besides it are ViT-B/16 and
+# ViT-L/14 (DataComp-XL) and SigLIP B/16, not evaluated yet. The OpenAI weights were
+# trained with QuickGELU, so the "-quickgelu" config.
 MODELS = {model.key: model for model in (
     SearchModel('vit-b-32-openai', 'ViT-B-32-quickgelu', 'openai', 'ViT-B/32 · OpenAI CLIP', '605 MB', '1×',
                 224, evaluated=True, weights_repo='timm/vit_base_patch32_clip_224.openai'),
@@ -67,7 +66,7 @@ def model_label(key, downloaded=False):
     """Return the label of the app's model choice, e.g. "ViT-B/16 · DataComp-XL (~4× slower on a CPU; ...)".
 
     downloaded: the model's files are in the cache already (hub.model_cached), so the label
-    says "downloaded" instead of the size of the first-use download (A39).
+    says "downloaded" instead of the size of the first-use download.
     """
     model = _model(key)
     download = 'downloaded' if downloaded else f'{model.download} download'
@@ -80,7 +79,7 @@ def model_label(key, downloaded=False):
 def results_model(settings):
     """Return the search model key of a search from its results.json settings (a dict).
 
-    A search before E22 used the default model and does not name it. Anything other than a
+    A search of an older version that names no model used the default model. Anything other than a
     string (a damaged file) is returned as None.
     """
     key = settings.get('model', DEFAULT_MODEL) if isinstance(settings, dict) else DEFAULT_MODEL

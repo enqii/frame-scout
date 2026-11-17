@@ -1,6 +1,6 @@
-"""The app's state line next to its title and what a search needs at the Start button (F27).
+"""The app's state line next to its title and what a search needs at the Start button.
 
-And why the other run buttons are not available (F37).
+And why the other run buttons are not available.
 """
 from .run_status import FINAL_PHASES, PHASE_LABELS, _count, analysis_only, status_fraction
 
@@ -10,9 +10,9 @@ START_NEEDS_TAB = {'profiles': 'Search profiles', 'photos': 'Photo source', 'mod
 RUN_TAB = 'Search'
 # the tab with the results of the last search and of the last quick search
 RESULTS_TAB = 'Results'
-# the app's tabs in their order (F28)
+# the app's tabs in their order
 APP_TABS = (START_NEEDS_TAB['profiles'], START_NEEDS_TAB['photos'], START_NEEDS_TAB['model'], RUN_TAB, RESULTS_TAB)
-# the widest the tabs with forms and text areas get, in pixels (F30 review, F39): the page uses
+# the widest the tabs with forms and text areas get, in pixels: the page uses
 # the whole window for the result cards, the other tabs keep the width they had before
 FORM_TAB_MAX_WIDTH = 1300
 # the app's page style. The limit holds for every tab panel but the last ("Results", the last
@@ -33,7 +33,7 @@ def _short_phase(status):
         text = 'Starting the analysis'
     else:
         text = PHASE_LABELS.get(phase, str(phase))
-    # the counts as status_fraction reads them (the same _count), so a fraction implies both (review)
+    # the counts as status_fraction reads them (the same _count), so a fraction implies both
     done, total, fraction = _count(status, 'done'), _count(status, 'total'), status_fraction(status)
     if fraction is not None and done is not None and total is not None:
         text += f" {done:,}/{total:,} ({fraction:.0%})"
@@ -44,7 +44,7 @@ def _status_time(status):
     """The time the status was written as "YYYY-MM-DD HH:MM", or None.
 
     The local time of the engine that wrote it on this computer, shown as written (without
-    its UTC offset), as show_status shows it in the search tab (review).
+    its UTC offset), as show_status shows it in the search tab.
     """
     updated = status.get('updated')
     if not isinstance(updated, str) or len(updated) < 16:
@@ -53,7 +53,7 @@ def _status_time(status):
 
 
 def state_line(active, status, photos, cleanup=False):
-    """Return the one-line state the app shows next to its title on every tab (F27).
+    """Return the one-line state the app shows next to its title on every tab.
 
     active: whether a run holds the output folder (run_state); status: its status dict or
     None; photos: the supported photos counted in the listed folders, or None without an
@@ -85,7 +85,7 @@ def state_line(active, status, photos, cleanup=False):
 
 
 def results_running_text(active, status, cleanup=False):
-    """Return the note of the tab "Results" while a search or an analysis runs, or None (F28 review).
+    """Return the note of the tab "Results" while a search or an analysis runs, or None.
 
     "Find similar" starts from that tab, and its result (as a search's) appears only when the
     run is done; the note says so and where to follow it. A cleanup holding the run lock
@@ -100,11 +100,11 @@ def results_running_text(active, status, cleanup=False):
 
 
 def start_needs(profiles, photos, folders_listed, model_label, model_missing):
-    """Return what a search needs as (need, met, text) for profiles, photos and the search model (F27).
+    """Return what a search needs as (need, met, text) for profiles, photos and the search model.
 
     profiles: the number of search profiles; photos: the supported photos counted in the
     listed folders that exist, or None if none exists (an existing folder is enough: a
-    search reads the folders again, A27); folders_listed: whether any folder is entered;
+    search reads the folders again); folders_listed: whether any folder is entered;
     model_label: the search model's name; model_missing: why it cannot be used
     (model_problem), or None. A missing need names the tab to fix it in.
     """
@@ -153,7 +153,7 @@ def start_blocked_text(needs, active=False, cleanup=False):
 
 
 def button_blocked_text(button, needs, active=False, cleanup=False):
-    """Return why a run button that needs no search profile is not available, or None (F37).
+    """Return why a run button that needs no search profile is not available, or None.
 
     For "Analyze photos now" and "Quick search": as start_blocked_text, without the profile
     need of start_needs. That a quick search has nothing analyzed to search is said by its

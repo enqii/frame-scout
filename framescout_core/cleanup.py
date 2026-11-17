@@ -1,4 +1,4 @@
-"""The app's "Clean up storage": what FrameScout no longer needs, listed and deleted (E7, E11)."""
+"""The app's "Clean up storage": what FrameScout no longer needs, listed and deleted."""
 import os
 import re
 import sqlite3
@@ -19,20 +19,20 @@ from .settings import SETTINGS_FILE
 from .signature import CACHE_FILE, CACHE_SIDE_FILES, classify_signatures, engine_id
 
 
-# Cleanup (E7, E11, E13, E23, A14; user decisions at the PR #18 hold point): the app's
+# Cleanup: the app's
 # "Clean up storage" lists what FrameScout no longer needs per category and deletes the
 # selected categories permanently after a confirmation, holding the run lock of the
 # results folder; at the end of every search the engine itself removes the harmless part
 # (temporary and unreferenced thumbnails, and the stale temporary files of the status,
-# result and marks file and of the galleries, E26: auto_cleanup). Never deleted: the marks file
+# result and marks file and of the galleries: auto_cleanup). Never deleted: the marks file
 # (only single marks of photos that no longer exist, if the user selects them), the run,
 # status and result files, the cache file itself, settings and profiles.
-# Unbound entries (E8/A21, user decision 2026-10-28): cache rows and marks stay keyed by the
+# Unbound entries: cache rows and marks stay keyed by the
 # absolute photo path, so a renamed or moved photo counts as a new one; the old rows and
 # marks stay until the cleanup offers them as "unbound" (photo gone, its drive reachable and
-# its folder there and not empty, I44).
+# its folder there and not empty).
 THUMBNAILS_DIR = 'thumbnails'
-# the thumbnail folder of versions before I7: no longer written, still linked by their galleries
+# the thumbnail folder of older versions: no longer written, still linked by their galleries
 LEGACY_THUMBNAILS_DIR = 'vorschaubilder'
 # every gallery the engine has written (also v1.1) has this title
 GALLERY_MARKER = '<title>FrameScout – '
@@ -41,9 +41,9 @@ CLEANUP_CATEGORIES = ('temp_thumbnails', 'galleries', 'thumbnails', 'cache_missi
 # the categories of cache rows (deleted by signature, except cache_missing: by path and signature)
 CACHE_CATEGORIES = ('cache_missing', 'cache_old', 'cache_other', 'cache_models')
 # selected when a scan is shown; cache rows and marks of unbound photos (any folder searched so
-# far; a drive letter another disk got makes photos look unbound, A35), reference images, rows
-# of other current settings, rows of other search models (E22), marks of names that are no
-# profile (A34: a profile of that name may come back) and the damaged files set aside (A40: the
+# far; a drive letter another disk got makes photos look unbound), reference images, rows
+# of other current settings, rows of other search models, marks of names that are no
+# profile (a profile of that name may come back) and the damaged files set aside (the
 # user may want to repair one) are not
 CLEANUP_DEFAULTS = {'temp_thumbnails': True, 'galleries': True, 'thumbnails': True, 'cache_missing': False,
                     'marks_unbound': False, 'marks_profiles': False, 'cache_old': True, 'cache_other': False,
@@ -57,14 +57,14 @@ NEVER_DELETED = frozenset({MARKS_FILE, MARKS_BACKUP, MARKS_FILE + '.lock', RUN_L
 # seconds clean_up waits for the run lock of the results folder
 CLEANUP_LOCK_TIMEOUT = 1.0
 # the temporary file of ensure_thumbnail (tempfile.mkstemp: <name>.<random>.jpg); a stop
-# during the export can leave it (E13)
+# during the export can leave it
 _TEMP_THUMBNAIL = re.compile(r'[0-9a-f]{24}\.jpg\.[a-z0-9_]+\.jpg')
 # the temporary files (<name>.<random>.tmp, _temp_path) of the atomic writes into the results
-# folder: status and result file, marks and their backup (F1; one file each), the copy of a
-# damaged marks file restore_marks keeps (marks.json.broken-<YYYYMMDD-HHMMSS>[-n], F1 review),
-# the galleries of publish_export (E24; only names profile_slugs gives, [a-z0-9-], so that no
+# folder: status and result file, marks and their backup (one file each), the copy of a
+# damaged marks file restore_marks keeps (marks.json.broken-<YYYYMMDD-HHMMSS>[-n]),
+# the galleries of publish_export (only names profile_slugs gives, [a-z0-9-], so that no
 # other tool's file in a chosen output folder matches); terminate()/kill() during a write
-# leaves one (E26)
+# leaves one
 _TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name)
                                          for name in (RUN_STATUS, RESULTS_FILE, MARKS_FILE, MARKS_BACKUP))
                         + '|' + re.escape(MARKS_FILE) + r'\.broken-\d{8}-\d{6}(?:-\d+)?'
@@ -72,15 +72,15 @@ _TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name)
 # seconds after which such a temporary file counts as left over: the write of an app
 # session (marks.json, a stopped status) takes a fraction of a second
 STALE_TEMP_AGE = 60
-# the temporary files of the app's atomic writes into the project folder (E44): of
+# the temporary files of the app's atomic writes into the project folder: of
 # profiles.json, its backup and settings.json (also the probe file _file_system_now creates
 # there); a kill of the app during a save leaves one
 _PROJECT_TEMP_FILE = re.compile('(?:' + '|'.join(re.escape(name) for name in ('profiles.json', 'profiles.json.bak',
                                                                              SETTINGS_FILE))
                                 + r')\.[a-z0-9_]{8}\.tmp')
-# the damaged files FrameScout set aside (F1): the copy of a damaged marks file restore_marks
+# the damaged files FrameScout set aside: the copy of a damaged marks file restore_marks
 # keeps and a damaged cache set_cache_aside renamed, with its side files (_broken_names:
-# <name>.broken-<YYYYMMDD-HHMMSS>[-n]); never read again, offered by the cleanup (A40)
+# <name>.broken-<YYYYMMDD-HHMMSS>[-n]); never read again, offered by the cleanup
 _BROKEN_STAMP = r'\.broken-\d{8}-\d{6}(?:-\d+)?'
 _BROKEN_FILE = re.compile(re.escape(MARKS_FILE) + _BROKEN_STAMP + '|' + re.escape(CACHE_FILE) + _BROKEN_STAMP
                           + '(?:' + '|'.join(re.escape(suffix) for suffix in CACHE_SIDE_FILES) + ')?')
@@ -124,7 +124,7 @@ def _result_names(results):
         data = read_results(results / RESULTS_FILE)
     except (OSError, ValueError) as exc:
         raise ValueError(f'{RESULTS_FILE} cannot be read ({exc})') from None
-    if data is None:  # a results folder of a version before A12
+    if data is None:  # a results folder of an older version
         return set(), set()
     return ({card['thumbnail'] for entry in data['profiles'] for card in entry['cards']},
             {entry['gallery'].lower() for entry in data['profiles']})
@@ -166,7 +166,7 @@ def _gallery_state(results, profiles):
 
     profiles: the current profile list. Orphaned: a FrameScout gallery (GALLERY_MARKER) that
     results.json does not list and that is not the gallery of a current profile, e.g. of a
-    renamed or deleted profile or under an old slug (A3). Every other HTML file is kept.
+    renamed or deleted profile or under an old slug. Every other HTML file is kept.
     """
     listed, listed_galleries = _result_names(results)
     current = {slug + '.html' for slug in profile_slugs([p['name'].strip() for p in profiles])}
@@ -222,7 +222,7 @@ class _Probe:
 
 
 # the latest probe per root: a probe that still hangs is waited for again instead of starting
-# another thread, so the threads of a dead share do not pile up over the scans (review)
+# another thread, so the threads of a dead share do not pile up over the scans
 _PROBES = {}
 _PROBES_LOCK = threading.Lock()
 
@@ -265,10 +265,10 @@ def _by_folder(paths):
 
 
 class _PathCheck:
-    """Tells which photo paths certainly no longer exist ("unbound", E8/A21); one per scan or deletion step.
+    """Tells which photo paths certainly no longer exist ("unbound"); one per scan or deletion step.
 
     Each path is checked once (the answer is kept, so the cache rows and the marks of a scan
-    share one pass). Simple rule (I44): a path is checked only if it is absolute, its drive
+    share one pass). Simple rule: a path is checked only if it is absolute, its drive
     or share root answers the probe (_reachable_roots, once per root) and its folder exists
     and is not empty (_filled); then one stat tells whether it is gone (_missing). Every
     other path is not checked, as its photo may only be offline: a disconnected drive or an
@@ -328,7 +328,7 @@ def _sqlite_uri(path, mode):
 
     Path.as_uri() gives a UNC path (\\\\server\\share\\...) a host authority, which SQLite
     rejects; the URI form with an empty authority and the server in the path works for both
-    (checked on Windows with \\\\localhost\\C$, review).
+    (checked on Windows with \\\\localhost\\C$).
     """
     posix = Path(path).resolve().as_posix()
     if not posix.startswith('/'):
@@ -356,15 +356,15 @@ def _read_cache(cache):
 
 
 def _unbound_rows(rows, check, among=None):
-    """The cache_missing category: the rows [(path, signature, size)] whose photo no longer exists (E7, E8).
+    """The cache_missing category: the rows [(path, signature, size)] whose photo no longer exists.
 
-    Wherever the photo was, also outside the current photo folders (user decision on E8/A21:
+    Wherever the photo was, also outside the current photo folders (
     a renamed or moved photo counts as a new one, its old rows are unbound); check: the
     _PathCheck of this scan or deletion step; among: only these (path, signature) pairs (None: all).
     """
     if among is not None:
         rows = [row for row in rows if (row[0], row[1]) in among]
-    # each photo is looked at once, however many signatures it has (review)
+    # each photo is looked at once, however many signatures it has
     gone, unchecked = check.result({path for path, _, _ in rows})
     dead = [(path, signature, size or 0) for path, signature, size in rows if path in gone]
     category = _category('cache_missing', sorted((p, s) for p, s, _ in dead), sum(size for *_, size in dead),
@@ -377,7 +377,7 @@ def _gone_folders(photos):
     """The folders of photos, fullest first, e.g. "D:\\Photos\\2020 (1,234 photos)".
 
     Shown before the deletion, so that e.g. the folders of an earlier disk whose drive
-    letter another disk got are seen before their rows are deleted (review, A35).
+    letter another disk got are seen before their rows are deleted.
     """
     counts = {}
     for photo in photos:
@@ -431,9 +431,9 @@ def _read_marks_entries(results):
 
 
 def _unbound_marks(entries, check, among=None):
-    """The marks_unbound category: the marks of photos that no longer exist (E8/A21).
+    """The marks_unbound category: the marks of photos that no longer exist.
 
-    Kept by default (user decision): the photo may come back. entries:
+    Kept by default: the photo may come back. entries:
     _attempt(_read_marks_entries) of the results folder; check, among: as for _unbound_rows.
     """
     if isinstance(entries, ValueError):
@@ -448,9 +448,9 @@ def _unbound_marks(entries, check, among=None):
 
 
 def _profile_marks(entries, profiles):
-    """The marks_profiles category: the marks of names that are no profile of profiles (A34).
+    """The marks_profiles category: the marks of names that are no profile of profiles.
 
-    E.g. of a profile deleted before deleting a profile also deleted its marks (A22): a new
+    E.g. of a profile an older version deleted without its marks: a new
     profile of that name would get them. entries: _attempt(_read_marks_entries); profiles:
     the current profile list, or a ValueError if it cannot be read (nothing is offered then).
     Names are compared exactly, like require_profile.
@@ -487,7 +487,7 @@ def _referenced_files(profiles_file, profiles):
 
 
 def _unreferenced_references(refs_root, profiles_file, profiles=None):
-    """The image files in refs_root that neither profiles_file nor its .bak references (A14).
+    """The image files in refs_root that neither profiles_file nor its .bak references.
 
     profiles: the profile list of profiles_file if already read; None reads the file now.
     """
@@ -502,11 +502,11 @@ def _unreferenced_references(refs_root, profiles_file, profiles=None):
 
 
 def scan_cleanup(results, profiles_file, refs_root, current_signature, *, current_model, progress=None):
-    """Return {category: dict} of what the cleanup can delete; nothing is changed (E7).
+    """Return {category: dict} of what the cleanup can delete; nothing is changed.
 
     results: the results folder; profiles_file: the app's profiles.json; refs_root: the
     references folder; current_signature: the cache signature of the current settings
-    (never offered); current_model: the search model key of the current settings (E22;
+    (never offered); current_model: the search model key of the current settings (
     required, as the signature, a hash, does not tell it): rows of the other registered
     models are cache_models, not cache_old; progress(done, total): called while the photos
     of the cache rows and marks are checked (one pass, per folder; the slow part).
@@ -522,7 +522,7 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
     temps = _temp_thumbnails(results)
     found = {'temp_thumbnails': _category('temp_thumbnails', temps, sum(_file_size(p) for p in temps))}
     # read once for galleries, references and the marks of deleted profiles; a failure is
-    # the reason all three are not offered, never read again (review)
+    # the reason all three are not offered, never read again
     profiles = _attempt(lambda: _load_profile_file(profiles_file))
     try:
         if isinstance(profiles, ValueError):
@@ -534,7 +534,7 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
         found['thumbnails'] = _category('thumbnails', problem=problem)
     else:
         # one listing of the thumbnail folders: unlinked by the kept galleries, then split by
-        # whether an orphaned gallery links them (review)
+        # whether an orphaned gallery links them
         orphan_links = _union(orphaned.values())
         candidates = _unlinked_thumbnails(results, _union(kept.values()), listed)
         free = [p for p in candidates if (p.parent.name, p.name) not in orphan_links]
@@ -543,7 +543,7 @@ def scan_cleanup(results, profiles_file, refs_root, current_signature, *, curren
                                        thumbnails=extra, thumbnails_size=sum(_file_size(p) for p in extra))
         found['galleries']['names'] = [p.name for p in found['galleries']['items']]
         found['thumbnails'] = _category('thumbnails', free, sum(_file_size(p) for p in free))
-    # one existence pass over the photos of the cache rows and of the marks (E8/A21)
+    # one existence pass over the photos of the cache rows and of the marks
     cache = _attempt(lambda: _cache_rows(results))
     entries = _attempt(lambda: _read_marks_entries(results))
     check = _PathCheck()
@@ -662,10 +662,10 @@ def _delete_rows(results, shown, selected, current, current_model, vacuum, summa
 
 
 def _delete_marks(results, shown, summary):
-    """Remove the unbound marks the scan shown listed whose photo is still gone now (E8/A21).
+    """Remove the unbound marks the scan shown listed whose photo is still gone now.
 
     The photos are checked in this step, with a check of its own (an answer of the cache
-    step, which can include a VACUUM, may be out of date, review), and before the marks lock
+    step, which can include a VACUUM, may be out of date), and before the marks lock
     is taken (a slow check must not block a mark being saved); then only these entries are
     removed from marks.json, never the file.
     """
@@ -678,7 +678,7 @@ def _delete_marks(results, shown, summary):
 
 
 def _delete_profile_marks(results, shown, profiles_file, summary):
-    """Remove the marks of names that are no profile the scan shown listed and that still are none now (A34).
+    """Remove the marks of names that are no profile the scan shown listed and that still are none now.
 
     profiles_file is read again under the marks lock (remove_marks), so a profile of such a
     name created since the scan keeps its marks; only these entries leave marks.json.
@@ -691,7 +691,7 @@ def _delete_profile_marks(results, shown, profiles_file, summary):
 
 
 # results folders a clean_up of this process works on now: the app's sessions are threads of
-# one process, so another tab can tell a cleanup holding the run lock from a search (review)
+# one process, so another tab can tell a cleanup holding the run lock from a search
 _CLEANING = set()
 
 
@@ -743,7 +743,7 @@ def _galleries_and_thumbnails(results, shown, selected, profiles_file, summary):
         for path in sorted(orphaned):
             if path in allowed and _remove_file(path, summary):
                 deleted.add(path)
-        # the thumbnails only these galleries showed belong to them (review)
+        # the thumbnails only these galleries showed belong to them
         allowed_thumbnails += shown['galleries'].get('thumbnails', [])
     # every gallery left on disk keeps what it links; nothing writes galleries meanwhile (lock)
     links = _union([*kept.values(), *(v for p, v in orphaned.items() if p not in deleted)])
@@ -752,11 +752,11 @@ def _galleries_and_thumbnails(results, shown, selected, profiles_file, summary):
 
 def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, current_signature,
              lock_timeout=CLEANUP_LOCK_TIMEOUT, *, current_model):
-    """Delete the selected categories of the scan shown (scan_cleanup) permanently; return a summary (E7).
+    """Delete the selected categories of the scan shown (scan_cleanup) permanently; return a summary.
 
-    current_model: the search model key of the current settings, as for scan_cleanup (E22).
+    current_model: the search model key of the current settings, as for scan_cleanup.
     Unbound cache rows and marks are deleted only if their photo is still gone now and still
-    checked (_PathCheck, E8/A21); of marks.json only those entries are removed.
+    checked (_PathCheck); of marks.json only those entries are removed.
 
     Holds the run lock of results, so it is refused while a search runs (also one being
     started: alive(pid, status) tells whether the process of a "starting" status runs) and
@@ -768,7 +768,7 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
     The summary has refused (why nothing was done, else None), files, rows, freed (bytes),
     marks (marks removed), compacted (VACUUM done), failed [(name, error)] and skipped (steps that could not be
     done). An error in one step (e.g. a folder that cannot be listed) ends only that step and
-    is listed in skipped, so the summary always tells what was deleted (review).
+    is listed in skipped, so the summary always tells what was deleted.
     """
     results = Path(results)
     summary = _new_summary()
@@ -818,7 +818,7 @@ def clean_up(results, shown, selected, vacuum, alive, profiles_file, refs_root, 
                 step()
             except (OSError, ValueError, sqlite3.Error) as exc:
                 # e.g. a folder that cannot be listed: this step ends, the others still run,
-                # and the summary keeps what was already deleted (review)
+                # and the summary keeps what was already deleted
                 summary['skipped'].append(f'{name}: stopped ({exc}).')
     return summary
 
@@ -862,8 +862,8 @@ def auto_cleanup(results, now=None):
     """Remove left-over temporary files and the thumbnails nothing links; return a summary.
 
     For the engine at the end of a search, with the run lock held. Left over: the temporary
-    thumbnails (E13) and the temporary files of the status, result and marks file and of the
-    galleries that are at least STALE_TEMP_AGE seconds old (E24, E26; a younger one may be
+    thumbnails and the temporary files of the status, result and marks file and of the
+    galleries that are at least STALE_TEMP_AGE seconds old (a younger one may be
     written by an app session now, e.g. marks.json). Their age is measured against the clock
     of the results folder's file system (_file_system_now; now: a time for tests), so a
     network share whose clock runs behind this PC's does not make a file being written look
@@ -890,7 +890,7 @@ def auto_cleanup(results, now=None):
 
 
 def project_temp_cleanup(folder, now=None):
-    """Remove the temporary files the app's saves left in the project folder folder; return a summary (E44).
+    """Remove the temporary files the app's saves left in the project folder folder; return a summary.
 
     For the app at its start: a kill during a save of profiles.json, its backup or
     settings.json leaves <name>.<random>.tmp (_PROJECT_TEMP_FILE), which no other cleanup
@@ -898,7 +898,7 @@ def project_temp_cleanup(folder, now=None):
     STALE_TEMP_AGE seconds old by the folder's clock are removed (a younger one may be
     written by an app session now, as in auto_cleanup; now: a time for tests). The folder's
     clock is read (with a probe file) only if there is such a file, so a normal start writes
-    nothing into the project folder (review). The summary is auto_cleanup's.
+    nothing into the project folder. The summary is auto_cleanup's.
     """
     folder = Path(folder)
     summary = _new_summary()
@@ -933,7 +933,7 @@ def cleanup_summary_text(summary):
         parts.append(count_text(summary['marks'], 'mark', 'marks'))
     text = f"Deleted {', '.join(parts[:-1])} and {parts[-1]} · {size_text(summary['freed'])} freed"
     if summary['rows'] and not summary.get('compacted'):
-        # SQLite keeps the file size until VACUUM (review)
+        # SQLite keeps the file size until VACUUM
         text += f'; {CACHE_FILE} was not compacted, so it keeps its size and reuses the space for new analyses'
     if summary['failed']:
         text += f" · {len(summary['failed']):,} could not be deleted"

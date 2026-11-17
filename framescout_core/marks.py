@@ -1,4 +1,4 @@
-"""Marks of gallery photos in results/marks.json (A17), with a backup and its restore (F1)."""
+"""Marks of gallery photos in results/marks.json, with a backup and its restore."""
 import json
 import re
 from pathlib import Path
@@ -9,13 +9,13 @@ from ._common import (_backup_path, _broken_names, _file_lock, _previous_content
 from .profiles import read_profiles, require_profile
 
 
-# Marks (A17, P4 (B)): FrameScout ranks candidates, not certain hits; a mark records what the
+# Marks: FrameScout ranks candidates, not certain hits; a mark records what the
 # user decided about a photo of a profile's gallery: a match, no match, or still open. Kept
-# in MARKS_FILE in the results folder (user decision), per profile name and photo path,
+# in MARKS_FILE in the results folder, per profile name and photo path,
 # across later searches; "open" is the absence of a mark. The file is user data: the engine
-# never writes it, and a cleanup of the results folder (E7) must never delete it.
+# never writes it, and a cleanup of the results folder must never delete it.
 MARKS_FILE = 'marks.json'
-# the marks file before its latest change (F1): written by every change, restored only on the
+# the marks file before its latest change: written by every change, restored only on the
 # user's request (restore_marks) when marks.json cannot be read; user data like MARKS_FILE
 MARKS_BACKUP = MARKS_FILE + '.bak'
 MARKS_FORMAT = 1
@@ -23,27 +23,27 @@ MARK_OPEN, MARK_MATCH, MARK_NO_MATCH = 'open', 'match', 'no-match'
 MARK_STATES = (MARK_OPEN, MARK_MATCH, MARK_NO_MATCH)
 # seconds save_marks and rename_marks wait for the lock around their read-change-write
 MARKS_LOCK_TIMEOUT = 5.0
-# the color of a mark in the app's gallery (A24, F30): (background, border) per state, for
+# the color of a mark in the app's gallery: (background, border) per state, for
 # the selected button of a card's mark control and (the border color) the card's frame;
 # Undecided keeps Streamlit's look. Blue and orange of the Okabe-Ito palette, told apart
-# without red and green (decided 2026-11-13). Translucent backgrounds and the theme's text
+# without red and green. Translucent backgrounds and the theme's text
 # color keep the label readable in the light and the dark theme.
 MARK_COLORS = {MARK_MATCH: ('rgba(0, 114, 178, 0.25)', 'rgb(0, 114, 178)'),
                MARK_NO_MATCH: ('rgba(230, 159, 0, 0.25)', 'rgb(230, 159, 0)')}
-# how much of the photo of a card marked as no match shows (F30): dimmed, so the two states
+# how much of the photo of a card marked as no match shows: dimmed, so the two states
 # differ by more than their color
 MARK_NO_MATCH_OPACITY = 0.4
-# the key of a gallery card's container in the app starts with this (F30); CARD_STYLE and
+# the key of a gallery card's container in the app starts with this; CARD_STYLE and
 # mark_style find the cards by it
 CARD_KEY_PREFIX = 'fscard-'
 # the photo of a card sits in a container whose key starts with PHOTO_KEY_PREFIX, with the
-# button that opens the review dialog (F19) laid over it, whose key starts with
+# button that opens the review dialog laid over it, whose key starts with
 # PREVIEW_KEY_PREFIX: Streamlit has no clickable image, so a click on the photo reaches the
 # invisible button; it shows when it has the keyboard focus. Neither prefix contains
 # CARD_KEY_PREFIX, whose selector would match them too
 PHOTO_KEY_PREFIX = 'fsphoto-'
 PREVIEW_KEY_PREFIX = 'fspreview-'
-# equal cells (F30): the photo of every card is fitted whole into a square box (as in the
+# equal cells: the photo of every card is fitted whole into a square box (as in the
 # HTML gallery), so portrait and landscape photos give cards of one height; CSS, so the
 # thumbnails and the cache signature stay as they are. Streamlit sizes the elements around an
 # image to its natural width, also with width='stretch' (checked with 1.66.1), so they are
@@ -60,13 +60,13 @@ CARD_STYLE = (f'<style>{_CARD} :is(div:has(> [data-testid="stImage"]), [data-tes
               f'[class*="st-key-{PREVIEW_KEY_PREFIX}"] button:focus-visible{{opacity:0.85}}</style>')
 # the Streamlit version whose internals mark_style was checked against (its frontend bundle:
 # the key class st-key-<key>, data-variant="segmented_control" on the buttons and the
-# data-selected attribute of the selected one; the old kind attribute is gone, A49);
-# a test fails once constraints.txt pins another version (review)
+# data-selected attribute of the selected one);
+# a test fails once constraints.txt pins another version
 MARK_STYLE_STREAMLIT = '1.66.1'
 
 
 def marks_backup(path):
-    """Return the backup of the marks file path: <path>.bak, the file before its latest change (F1)."""
+    """Return the backup of the marks file path: <path>.bak, the file before its latest change."""
     return _backup_path(path)
 
 
@@ -102,7 +102,7 @@ def _update_marks(path, update, attempts, retry_delay, lock_timeout):
     """Read, change and replace the marks file path under its lock, keeping the previous file as backup.
 
     update(document) returns the new document, or None to leave the file as it is. The
-    previous content goes to marks_backup(path) first (F1; _update_locked with backup): only
+    previous content goes to marks_backup(path) first (_update_locked with backup): only
     content that was just read as a valid marks file, so an unreadable file (ValueError,
     never replaced) never replaces the backup. Raises like _update_locked.
     """
@@ -190,7 +190,7 @@ def rename_marks(path, old, new, attempts=5, retry_delay=0.05, lock_timeout=MARK
 def delete_marks(path, profile, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
     """Delete all marks of the profile profile; return how many there were.
 
-    For a profile the user deleted after a confirmation that names the marks (A22): marks
+    For a profile the user deleted after a confirmation that names the marks: marks
     are keyed by the profile name, so a later profile of that name would otherwise get them.
     Merged into the file as it is now, under the lock of save_marks; nothing happens without
     a marks file or marks of profile. Raises like save_marks.
@@ -216,8 +216,8 @@ def remove_marks(path, entries, attempts=5, retry_delay=0.05, lock_timeout=MARKS
                  unless_profile_of=None):
     """Remove the marks entries ((profile name, photo path) pairs) names; return how many were removed.
 
-    For the cleanup of marks of photos that no longer exist (unbound, E8/A21) and of names
-    that are no profile (A34): only these entries go, never the file or other marks; a
+    For the cleanup of marks of photos that no longer exist (unbound) and of names
+    that are no profile: only these entries go, never the file or other marks; a
     profile left without marks is removed from the file, as by save_marks. With
     unless_profile_of (the app's profiles JSON file), the entries of a name that is a profile
     of that file at the time of the write are kept (read under the lock, like
@@ -258,7 +258,7 @@ def remove_marks(path, entries, attempts=5, retry_delay=0.05, lock_timeout=MARKS
 
 
 def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MARKS_LOCK_TIMEOUT):
-    """Replace the unreadable marks file path by its backup; return (marks restored, damaged copy or None) (F1).
+    """Replace the unreadable marks file path by its backup; return (marks restored, damaged copy or None).
 
     Only on the user's request, never automatically. Under the lock of save_marks, the file
     is read again: if it can be read now (fixed by hand, or restored in another tab),
@@ -292,7 +292,7 @@ def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MAR
         try:
             _replace_with_retry(path, content, attempts, retry_delay)
         except OSError:
-            # the damaged file is still there: no copy of it per failed try (review)
+            # the damaged file is still there: no copy of it per failed try
             if kept is not None:
                 kept.unlink(missing_ok=True)
             raise
@@ -300,13 +300,13 @@ def restore_marks(path, now=None, attempts=5, retry_delay=0.05, lock_timeout=MAR
 
 
 def marks_restore_offer(path, error, read=read_marks):
-    """Return (marks in the backup, its mtime) if restoring marks_backup(path) can be offered, else None (F1, A40).
+    """Return (marks in the backup, its mtime) if restoring marks_backup(path) can be offered, else None.
 
     error: what read_marks(path) raised, or None if it read the file or found none. Offered
     for a damaged file (a ValueError; an OSError may pass, e.g. a file another program has
     open) and for a missing file whose backup holds at least one mark (e.g. removed by
     hand), in both cases only with a backup that can be read. read(backup) reads the
-    backup like read_marks (e.g. a cached read_marks of the app, review). Nothing is changed.
+    backup like read_marks (e.g. a cached read_marks of the app). Nothing is changed.
     """
     path = Path(path)
     if error is None:
@@ -336,7 +336,7 @@ def _keep_copy(path, content, now):
 
 
 def hide_no_match(cards, marks):
-    """Return (the cards not marked as no match, how many were left out) (A24).
+    """Return (the cards not marked as no match, how many were left out).
 
     cards are result cards with a "path", marks one profile's marks of read_marks. The app
     applies it to the cards of one gallery page, after paginating the whole ranked list, so
@@ -347,7 +347,7 @@ def hide_no_match(cards, marks):
 
 
 class ReviewProgress(NamedTuple):
-    """How far the user got marking one profile's result list (F20), of review_progress."""
+    """How far the user got marking one profile's result list, of review_progress."""
     matches: int
     no_matches: int
     open: int
@@ -356,7 +356,7 @@ class ReviewProgress(NamedTuple):
 
 
 def review_progress(cards, marks, size):
-    """Return the ReviewProgress of a profile's ranked cards under its marks (F20).
+    """Return the ReviewProgress of a profile's ranked cards under its marks.
 
     cards are the result cards in the order the gallery pages them, marks one profile's
     marks of read_marks, size the gallery's page size. Only the photos of cards count; a
@@ -377,7 +377,7 @@ def review_progress(cards, marks, size):
 
 
 def progress_text(progress, paged):
-    """Return the caption of a profile's ReviewProgress, or '' for an empty list (F20).
+    """Return the caption of a profile's ReviewProgress, or '' for an empty list.
 
     paged says whether the gallery has more than one page: only then the page is named.
     """
@@ -393,7 +393,7 @@ def progress_text(progress, paged):
 
 
 def mark_counts_text(progress):
-    """Return the short counts of a profile's ReviewProgress for the results toolbar, or '' (F29).
+    """Return the short counts of a profile's ReviewProgress for the results toolbar, or ''.
 
     Only the three counts: progress_text, below the grid, names the first undecided photo.
     """
@@ -403,7 +403,7 @@ def mark_counts_text(progress):
 
 
 def mark_style(states):
-    """Return a <style> block showing the saved mark of each gallery card, or '' (A24, F30).
+    """Return a <style> block showing the saved mark of each gallery card, or ''.
 
     states maps the key of a card's container (CARD_KEY_PREFIX) to its saved state. A
     marked card gets a frame in its state's color, the photo of one marked as no match is
@@ -421,7 +421,7 @@ def mark_style(states):
         if not cards:
             continue
         # a box-shadow, not a border: it follows the rounded corners and changes no size;
-        # inset, inside the card's padding, so no parent that clips its overflow (review)
+        # inset, inside the card's padding, so no parent that clips its overflow
         # can cut the frame of a card at the edge of a row
         rules.extend(f'{card}{{box-shadow:inset 0 0 0 3px {border}!important}}' for card in cards)
         if state == MARK_NO_MATCH:
@@ -435,7 +435,7 @@ def mark_style(states):
 
 
 def hidden_text(hidden, kept, more_pages):
-    """Return the caption of a gallery page's photos hidden by hide_no_match, or '' (A24).
+    """Return the caption of a gallery page's photos hidden by hide_no_match, or ''.
 
     hidden and kept are the counts hide_no_match left out and kept; more_pages says whether
     a page follows this one.
