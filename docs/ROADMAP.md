@@ -40,8 +40,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       behavior change) – 2026-11-17 ([#153](https://github.com/enqii/frame-scout/pull/153))
 - [x] Remove the project history from the engine, images, scoring, evaluation tool and the other
       root files, and their tests (F54; kind `code`, no behavior change) – 2026-11-17 ([#154](https://github.com/enqii/frame-scout/pull/154))
-- [ ] Remove the project history from `app.py` and `framescout_ui/`, and their tests (F54; kind
-      `code`, no behavior change)
+- [x] Remove the project history from `app.py` and `framescout_ui/`, and their tests (F54; kind
+      `code`, no behavior change) – 2026-11-17 ([#155](https://github.com/enqii/frame-scout/pull/155))
 
 ### P54 – Feature review (added 2026-11-17)
 - [ ] List per module the features that could go or shrink, for the user's decision; `/triage`

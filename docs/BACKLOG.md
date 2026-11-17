@@ -478,20 +478,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       in the curve read as a certainty threshold; the results page is dense (A50/A51).
       Decided 2026-11-17: yes, roadmap P52 (additive `results.json` field, caption that scores
       are relative heuristics). Size S–M. Idea of 2026-11-16.
-- [ ] `ready` **F54 – Project history in the code (rule and cleanup):** about 250 code comments
-      and docstrings record review history ("(review)", "user decision ...") and about 650 lines
-      name backlog IDs; the history is already in git, the PR descriptions and
-      `docs/BACKLOG-DONE.md`, and in the code it makes docstrings long. Sketch: a rule in
-      `CLAUDE.md` → "Engineering principles" ("Code comments and docstrings say what the code
-      does and why, never its history: no backlog IDs, no '(review)', no dates or 'user
-      decision' notes; a decision that constrains the code is stated as a rule, longer ones in
-      `docs/ARCHITECTURE.md`"), checked by the `/roadmap` briefs; then removal module by module
-      without behavior change (`framescout_core/`; engine, images, scoring, evaluation tool and
-      the other root files; `app.py` and `framescout_ui/`), tests the same. Affected:
-      `CLAUDE.md`, `.claude/skills/roadmap/` briefs, all Python modules and tests,
-      `docs/ARCHITECTURE.md` where it relies on IDs in the code. Risks: a "why" that only the
-      history note carried is rewritten as a reason, not deleted. Decided 2026-11-17: yes,
-      roadmap P53 (1)–(4); rule added in [PR #152](https://github.com/enqii/frame-scout/pull/152), `framescout_core/` (2) cleaned in [PR #153](https://github.com/enqii/frame-scout/pull/153), the root files (3) in [PR #154](https://github.com/enqii/frame-scout/pull/154) (except `.github/workflows/tests.yml`, I56), (4) `app.py`, `framescout_ui/` and their tests (`tests/app_source.py`, `test_app_source.py`, `test_settings_layout.py`) is open. Size S (rule) + M (cleanup). Idea of 2026-11-17.
 - [ ] `decision` **F56 – Feature review: what FrameScout really needs (recurring):** after I44 most
       of the size is features: search core about 3,400 lines, UI 2,700, user state 2,000,
       installation and housekeeping 3,200, extra features (time estimate, quick search,
