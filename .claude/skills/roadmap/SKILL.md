@@ -32,6 +32,8 @@ section 3):
 - Label fallback: `gh pr edit` can fail with a Projects-classic GraphQL error (`projectCards`). Switch labels
   through the REST API instead: `gh api -X DELETE repos/enqii/frame-scout/issues/<n>/labels/<old>` and
   `gh api -X POST repos/enqii/frame-scout/issues/<n>/labels -f 'labels[]=<new>'` (I54).
+- PR description fallback: `gh pr edit --body-file` fails with the same error. Update the text with
+  `gh api -X PATCH repos/enqii/frame-scout/pulls/<n> -F body=@<file>` (I55).
 - Branch, push and user-data rules: `CLAUDE.md` → "PR workflow".
 
 ## 1. Reconstruct state (every start – you are stateless)

@@ -102,7 +102,7 @@ comments via `gh api repos/enqii/frame-scout/pulls/{PR}/comments`).
   `.github/pull_request_template.md`, title in Conventional Commits form with the IDs:
   `gh pr create --draft --base main --head {BRANCH} --title "<type>(<scope>): <description> (<IDs>)" --body-file <file> --label fs:in-progress`.
   The PR body ends with the line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-- Keep the PR description current while you work (`gh pr edit {PR} --body-file <file>`).
+- Keep the PR description current while you work (`gh pr edit {PR} --body-file <file>`; if it fails with the Projects-classic GraphQL error, use the REST fallback in `SKILL.md` → "Tooling notes").
 - Documentation (`docs/ROADMAP.md`, `docs/BACKLOG.md`, `docs/BACKLOG-DONE.md`, `README.md`, `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`, and `CLAUDE.md` only
   for rule changes; keep it short; out-of-scope findings as new backlog items, no GitHub
   issues) belongs in the same PR and is written by you, after the code and tests: search the
