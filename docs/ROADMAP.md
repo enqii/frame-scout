@@ -24,8 +24,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] Fix the cleanup test that fails when the temporary folder is a mount point (I53; kind `code`) – 2026-11-17
 
 ### P49 – Simplify the rare-case handling (added 2026-11-17)
-- [ ] List per module (`cleanup.py`, `uninstall.py`, `install_check.py`, `disk_space.py`) what
-      defensive handling would go; the user decides the removal afterwards (I44 step 1; kind `docs`)
+- [x] List per module (`cleanup.py`, `uninstall.py`, `install_check.py`, `disk_space.py`) what
+      defensive handling would go; the user decides the removal afterwards (I44 step 1; kind `docs`) – 2026-11-17
 
 ### P50 – Interface follow-ups 2 (added 2026-11-17)
 - [ ] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a
