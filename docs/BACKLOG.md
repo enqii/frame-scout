@@ -315,6 +315,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `profiles.json` schema and the CLI (hold point): decide per name. Found on 2026-11-12 in
       a simplification review.
       Triage 2026-11-15: stays open; better together with the release v1.1.0. **Question:** per name, migrate or keep.
+      Triage 2026-11-17: stays open; reviewed together with the feature list of F56.
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and
@@ -471,3 +472,60 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       in the curve read as a certainty threshold; the results page is dense (A50/A51).
       Decided 2026-11-17: yes, roadmap P52 (additive `results.json` field, caption that scores
       are relative heuristics). Size S–M. Idea of 2026-11-16.
+- [ ] `ready` **F54 – Project history in the code (rule and cleanup):** about 250 code comments
+      and docstrings record review history ("(review)", "user decision ...") and about 650 lines
+      name backlog IDs; the history is already in git, the PR descriptions and
+      `docs/BACKLOG-DONE.md`, and in the code it makes docstrings long. Sketch: a rule in
+      `CLAUDE.md` → "Engineering principles" ("Code comments and docstrings say what the code
+      does and why, never its history: no backlog IDs, no '(review)', no dates or 'user
+      decision' notes; a decision that constrains the code is stated as a rule, longer ones in
+      `docs/ARCHITECTURE.md`"), checked by the `/roadmap` briefs; then removal module by module
+      without behavior change (`framescout_core/`; engine, images, scoring, evaluation tool and
+      the other root files; `app.py` and `framescout_ui/`), tests the same. Affected:
+      `CLAUDE.md`, `.claude/skills/roadmap/` briefs, all Python modules and tests,
+      `docs/ARCHITECTURE.md` where it relies on IDs in the code. Risks: a "why" that only the
+      history note carried is rewritten as a reason, not deleted. Decided 2026-11-17: yes,
+      roadmap P53 (1)–(4). Size S (rule) + M (cleanup). Idea of 2026-11-17.
+- [ ] `ready` **F55 – Test scope: only what is necessary (rule):** the tests (about 15,400 lines)
+      are larger than the code (about 13,100); many pin message wording or review edge cases, so
+      every feature costs twice. Sketch: a rule in `CLAUDE.md` (principle 5): tests cover what
+      would hurt if it broke (user data never overwritten or deleted, the cache signature,
+      scoring, file formats, the CLI contract); a fixed bug gets a test only if it can plausibly
+      come back; no tests for the exact wording of messages or for hypothetical cases; removing
+      a feature removes its tests. The simplification PRs apply it to the tests they touch; no
+      separate test-deletion sweep. Affected: `CLAUDE.md`, `/roadmap` briefs,
+      `docs/DEVELOPMENT.md`. Risks: a removed test lets a regression through; tests near user
+      data stay. Decided 2026-11-17: yes, roadmap P53 (1). Size S. Idea of 2026-11-17.
+- [ ] `decision` **F56 – Feature review: what FrameScout really needs (recurring):** after I44 most
+      of the size is features: search core about 3,400 lines, UI 2,700, user state 2,000,
+      installation and housekeeping 3,200, extra features (time estimate, quick search,
+      evaluation tool) 1,800. Sketch: a list per module of features that could go or shrink,
+      with size and who uses them (e.g. the evaluation tool, about 1,170 lines, needed for P4b;
+      the own uninstaller, about 470 lines, vs. "delete the folder" for a portable install; the
+      install check; the copy/export area; the cache check; I43's legacy names); the user
+      decides each line. In the same PR `/triage` gets a fixed step: name at least one removal
+      candidate per round (extends the I47 rule). Affected: `docs/BACKLOG.md`,
+      `.claude/skills/triage/SKILL.md`. Risks: removing features users rely on. Decided
+      2026-11-17: the list goes on the roadmap (P54); **Question** after the list: which
+      features go. Size S (list), then M–L. Idea of 2026-11-17.
+- [ ] `decision` **F57 – Second simplification round after I44:** functions that grew through chains
+      of review follow-ups (rough line counts, tests about twice as many): (A) RAW fallback for
+      truncated JPEG partners (E46 → E53 → E57, about 200 lines: `jpeg_scans_missing`, the
+      per-thread strict loading in `framescout_images.py`, the truncated/retry part of
+      `RawFallback`; E30 stays; gives up: a truncated JPEG with a RAW partner is analyzed with
+      its gray rest); (B) path identities in the photo scan (A28, A37, about 80–100 lines;
+      simple rule: follow folder links, visit each folder once by `realpath`, loop protection
+      stays; gives up: a hard-linked photo or one share listed by drive letter and UNC path is
+      searched twice); (C) `cleanup.py` leftovers (about 120 lines: `_file_system_now`,
+      `project_temp_cleanup`, the `_PROBES` reuse, the `marks_profiles` category, the legacy
+      `vorschaubilder/` galleries); (D) time estimate "finishing" speeds and throughput records
+      (F12/F16, about 80 lines; product decision); (E) quick search `quick_scope_text` and
+      `like_scan_path` (E61, about 60 lines); (F) `run_status.started_in_time` (about 15
+      lines). Kept on purpose: the marks backup (F1), the re-check under the run lock before a
+      deletion, `NEVER_DELETED`, the root probe (I44), RAW+JPEG pairing, `broken_files` (A40).
+      Affected: `framescout_core/photos.py`, `framescout_images.py`, `framescout_engine.py`,
+      `cleanup.py`, `marks.py`, `estimate.py`, `quick.py`, `run_status.py`, their tests, docs.
+      Risks: (A) and (B) change which photos are analyzed or counted. Triage 2026-11-17: after
+      F56, assessed together with its result. **Question:** per letter, remove or keep. Size
+      M (all letters: about 550 lines of code and 1,000–1,200 of tests less). Idea of
+      2026-11-17.
