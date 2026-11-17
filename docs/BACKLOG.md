@@ -243,13 +243,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       recognises the RTX 4070 with compute capability 8.9, `cpu` would replace it); all four
       search models and the evaluation tool ran on CUDA with real models. The speed numbers
       feed E18 and P10 (B).)
-- [ ] `decision` **I19 – The uninstall script never deletes user data:** `Uninstall-FrameScout.bat`
-      keeps photos, references, results (with `marks.json`), `profiles.json`,
-      `settings.json`, `run.log` and the evaluation labels in `.tmp/eval`, and tells the
-      user to delete the folder. Fix idea: opt-in deletion per category (results and
-      marks, references, profiles and settings, `run.log`, evaluation labels) with its own
-      confirmation; photos are never deleted. Needs a user decision (what is
-      offered, how it is confirmed). Found on 2026-10-27 in P5 part B.
 - [ ] `decision` **I23 – No prebuilt movable bundle:** a user still needs the internet and about
       3 GB (CPU) or 6 GB (CUDA) of downloads, and the FrameScout folder cannot be moved
       after the installation (`.venv` refers to `.python` by absolute path; running the
@@ -275,7 +268,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       unpacked size of the CUDA build of PyTorch and pip's peak space use are not measured;
       `TORCH_INSTALL_SPACE['cuda']` (3 GB download, 6 GB installed) is an estimate. Measure on
       the home PC and correct it; could go into the rest of I11. Found in F3 (PR #64).
-- [ ] `decision` **I43 – Drop legacy names with one migration (simplification, breaking):** the prototype
+- [ ] `ready` **I43 – Drop legacy names with one migration (simplification, breaking):** the prototype
       has no release yet but carries compatibility code for its own earlier states: the crop
       label `Gesamtbild` in old cache rows, the thumbnail folder `results/vorschaubilder/`,
       the profile field `franchise` (meaning "Context / origin"), the CLI option
@@ -286,6 +279,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       a simplification review.
       Triage 2026-11-15: stays open; better together with the release v1.1.0. **Question:** per name, migrate or keep.
       Triage 2026-11-17: stays open; reviewed together with the feature list of F56.
+      Decided 2026-11-17: all five names are migrated once and removed (roadmap P59); the
+      `!` commit and the `BREAKING CHANGE:` footer mark the break. The legacy `vorschaubilder/`
+      galleries inside `cleanup.py` are removed by P56 (F57 C) or P59, whichever runs first.
 - [ ] `parked` **I46 – One place for dependencies: `pyproject.toml` with a lock file (simplification):**
       versions live in `requirements/requirements.txt`, `requirements-dev.txt`,
       `constraints.txt`, as constants in `framescout_core/torch_build.py` and
@@ -302,6 +298,18 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       the four IDs by hand (the reasons stay: "on Linux", "which needs numpy", "change the
       SHA and its version comment together", "the private Python that Install-FrameScout.bat
       downloads"). Found on 2026-11-17 in PR #154. Size XS.
+
+- [ ] `ready` **I57 – Remove the own uninstaller (F56 (2)):** `framescout_uninstall.py`,
+      `framescout_core/uninstall.py`, `Uninstall-FrameScout.bat/.sh`, their tests and the
+      references in `framescout_core/paths.py`, the README, the user guide,
+      `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md` and `tests/test_linux_scripts.py`. An
+      install keeps everything in one folder (`.python`, `.venv`, `.cache`, `results`), so
+      uninstalling means deleting the folder; the user's photos are never inside it. The docs
+      say this plainly, name what the app writes outside the folder (if anything) and how a
+      user keeps `profiles.json`, `references/` and `results/marks.json` before deleting.
+      Gives up: the confirmation, the running-app check and the report. Closes I19 (an
+      opt-in deletion of user data has no uninstaller left to live in). Decided 2026-11-17.
+      Size M.
 
 ### Features (from [docs/IDEAS.md](IDEAS.md))
 
@@ -483,9 +491,10 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `/triage` got a fixed step in the same PR: name at least one removal candidate per
       round (extends the I47 rule; candidates come from this list). Affected: `docs/BACKLOG.md`,
       `.claude/skills/triage/SKILL.md`. Risks: removing features users rely on. Decided
-      2026-11-17: the list goes on the roadmap (P54). **Question:** which numbered lines
-      go or shrink. Size S (list, done in P54), then M–L per decision. Idea of 2026-11-17.
-- [ ] `decision` **F57 – Second simplification round after I44:** functions that grew through chains
+      2026-11-17: the list goes on the roadmap (P54). Decided 2026-11-17: line (2) (own
+      uninstaller) is removed (I57, roadmap P57); all other lines stay open. **Question:**
+      which of the other numbered lines go or shrink. Size S (list, done in P54), then M–L per decision. Idea of 2026-11-17.
+- [ ] `ready` **F57 – Second simplification round after I44:** functions that grew through chains
       of review follow-ups (rough line counts, tests about twice as many): (A) RAW fallback for
       truncated JPEG partners (E46 → E53 → E57, about 200 lines: `jpeg_scans_missing`, the
       per-thread strict loading in `framescout_images.py`, the truncated/retry part of
@@ -502,7 +511,8 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       deletion, `NEVER_DELETED`, the root probe (I44), RAW+JPEG pairing, `broken_files` (A40).
       Affected: `framescout_core/photos.py`, `framescout_images.py`, `framescout_engine.py`,
       `cleanup.py`, `marks.py`, `estimate.py`, `quick.py`, `run_status.py`, their tests, docs.
-      Risks: (A) and (B) change which photos are analyzed or counted. Triage 2026-11-17: after
-      F56, assessed together with its result. **Question:** per letter, remove or keep. Size
+      Risks: (A) and (B) change which photos are analyzed or counted. Decided 2026-11-17: (C), (E), (F) go in
+      roadmap P56, (A) and (B) in P58 (both remove); (D) stays open as `decision` (product
+      decision: keep or shrink the time estimate). Size
       M (all letters: about 550 lines of code and 1,000–1,200 of tests less). Idea of
       2026-11-17.
