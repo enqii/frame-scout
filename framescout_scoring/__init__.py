@@ -21,6 +21,10 @@ import numpy as np
 # used instead, since the mean and spread of a handful of scores are noise.
 MIN_SCORES = 10
 MIN_SPREAD = 1e-6
+# the bins of the score distribution the result file holds per profile (score_histogram),
+# and the decimals of its range
+HISTOGRAM_BINS = 40
+HISTOGRAM_DIGITS = 4
 
 
 class Match(NamedTuple):
@@ -140,6 +144,20 @@ def rank_similar(similarity):
     """
     normalized, matches = rank_photos(similarity, None, 0.0)
     return normalized, [Match(m.score, m.crop, None, m.text) for m in matches]
+
+
+def score_histogram(scores, bins=HISTOGRAM_BINS):
+    """Histogram of the scores of every photo of a search for one profile, or None for no photos.
+
+    Returns {'low', 'high', 'counts'}: bins equal bins from low to high (the lowest and
+    highest score; numpy widens a range of one value by 0.5 on each side), rounded to
+    HISTOGRAM_DIGITS, for the app's score distribution in the result file.
+    """
+    if not len(scores):
+        return None
+    counts, edges = np.histogram(np.asarray(scores, dtype=np.float64), bins=bins)
+    return {'low': round(float(edges[0]), HISTOGRAM_DIGITS), 'high': round(float(edges[-1]), HISTOGRAM_DIGITS),
+            'counts': [int(c) for c in counts]}
 
 
 def score_caption(match, normalized):
