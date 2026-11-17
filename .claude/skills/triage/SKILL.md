@@ -62,7 +62,8 @@ in the proposal, fill the gap with `minor` bundles (no decision needed) and put 
 no candidate is left. Never leave the window short without telling the user why.
 
 Every round schedules at least one item that only removes code or docs (`CLAUDE.md` → "Triage", I47);
-propose one from the simplification items of the backlog.
+propose one from the simplification items of the backlog or from the removal candidates in
+`docs/BACKLOG.md` → F56 (name at least one removal candidate per round, with the question put to the user).
 
 Status tags (written in bold after the checkbox, `- [ ] \`tag\` **E15 – …**`):
 
