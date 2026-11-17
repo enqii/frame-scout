@@ -57,8 +57,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [x] "Separator: comma / semicolon" choice for the result export (F9; kind `code`) – 2026-11-17 ([#159](https://github.com/enqii/frame-scout/pull/159))
 
 ### P52 – Score distribution (added 2026-11-17)
-- [ ] Collapsed score histogram per profile with an additive `results.json` field (F53; kind
-      `code`; the caption says scores are relative heuristics)
+- [x] Collapsed score histogram per profile with an additive `results.json` field (F53; kind
+      `code`; the caption says scores are relative heuristics) – 2026-11-17 ([#160](https://github.com/enqii/frame-scout/pull/160))
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new

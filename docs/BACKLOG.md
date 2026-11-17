@@ -428,15 +428,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       match silently gives a photo another photo's embedding; needs mtime-keeping copies; an index
       on size for 100,000 rows. **Question:** the match rule (a content hash would change the
       cache format). Size M. Idea of 2026-11-16.
-- [ ] `ready` **F53 – Score distribution per profile:** users cannot tell whether good matches
-      end at place 20 or continue past 150. Sketch: a collapsed small chart above a profile's
-      results with a compact histogram (about 40 bins, written into `results.json` by the engine)
-      and a marker at "Maximum matches"; the caption says scores are relative heuristics, never
-      probabilities; Streamlit's built-in chart. Affected: `framescout_scoring`,
-      `framescout_engine.py`, `framescout_ui/results.py`, user guide, ARCHITECTURE. Risks: a gap
-      in the curve read as a certainty threshold; the results page is dense (A50/A51).
-      Decided 2026-11-17: yes, roadmap P52 (additive `results.json` field, caption that scores
-      are relative heuristics). Size S–M. Idea of 2026-11-16.
 - [ ] `decision` **F56 – Feature review: what FrameScout really needs (recurring):** after I44 most
       of the size is features (about 11,500 lines of code, 15,400 of tests). Sizes below are
       code plus tests, rounded. **List of 2026-11-17** – per feature: lines, who uses it, what

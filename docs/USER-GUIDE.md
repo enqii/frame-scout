@@ -364,7 +364,12 @@ thumbnails)" and "Open results folder", then "Copy N marked photos" and "Export 
 of its buttons closes it, so you see the message of a copy or an export below the row. The quick search result has the same row with the menu **Gallery and folder**.
 Below the row come one caption about the search and only the notes that apply (another search
 model, a profile changed, renamed or deleted since the search, the state of the other profiles,
-an unreadable `marks.json`), then the messages of copying and exporting. Below the photos
+an unreadable `marks.json`) and the collapsed **Score distribution**, then the messages of copying
+and exporting. The score distribution is a small bar chart of the scores of all photos of the search
+for this profile, not only those shown, with a red line at the last photo shown (Maximum matches):
+it shows whether good matches end well before that line or go on past it. Scores are relative to the
+search (see "What the numbers mean"), so a gap or bend in the bars is no threshold of certainty.
+Results of an earlier version have no chart. Below the photos
 the buttons **Previous page** and **Next page** and the page number repeat the page box (the
 page stays where the browser is scrolled, so scroll up to the first photo of the new page).
 Switching to another entry of "Results of" and back keeps the page you were on and "Hide no

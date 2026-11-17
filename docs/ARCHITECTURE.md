@@ -217,7 +217,10 @@ a quick search and is not touched by the cleanup of `results/`.
 Run start and end, `photo_folders` (list), settings (including `model`; absent means the default),
 the photo count, and per profile: name, `search_fingerprint` (hash of the search texts and
 reference paths, relative to the profiles file's folder when inside it), gallery file name,
-`normalized`, optional `queries` (F17), and the cards in gallery order (rank, absolute `path`,
+`normalized`, optional `queries` (F17), optional `histogram` (F53: `low`, `high` and 40 `counts`
+of equal bins over the scores of every photo scored, `framescout_scoring.score_histogram`; the app
+shows it collapsed above a profile's results, not the quick search's, with a line at the last
+card, and leaves it out if it is invalid), and the cards in gallery order (rank, absolute `path`,
 `relative` name, crop label, score, raw text and visual similarity, caption lines, thumbnail name,
 optional `best_query`). Optional keys are additive: the format stays 2 and older apps ignore them
 (A25 rule). `read_results` also reads format 1 (single `photo_folder`); app versions before A25

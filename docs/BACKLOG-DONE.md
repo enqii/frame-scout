@@ -211,3 +211,4 @@ have their own IDs in `docs/BACKLOG.md`. The roadmap lines of finished work are 
 - [x] **A53 – The tooltips of the results toolbar stay open** – done 2026-11-17, [PR #158](https://github.com/enqii/frame-scout/pull/158)
 - [x] **A54 – The header is squeezed at window widths of about 680–1100 px** – done 2026-11-17, [PR #158](https://github.com/enqii/frame-scout/pull/158)
 - [x] **F9 – A CSV export that Excel opens in columns in every locale** – done 2026-11-17, [PR #159](https://github.com/enqii/frame-scout/pull/159)
+- [x] **F53 – Score distribution per profile** – done 2026-11-17, [PR #160](https://github.com/enqii/frame-scout/pull/160)
