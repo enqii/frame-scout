@@ -1,7 +1,4 @@
-"""The app's state line next to its title and what a search needs at the Start button.
-
-And why the other run buttons are not available.
-"""
+"""The app's state line, what a search needs at the Start button and why other run buttons are unavailable."""
 from .run_status import FINAL_PHASES, PHASE_LABELS, _count, analysis_only, status_fraction
 
 # the tab in which a missing need is fixed, as the app names its tabs

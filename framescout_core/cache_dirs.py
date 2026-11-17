@@ -85,11 +85,11 @@ def yolo_weights(name, base, cwd, environ, log=None, replace=os.replace):
     """The path the detector loads its weights from, and downloads them to on first use.
 
     Ultralytics downloads an official weights file given by its bare name into the working
-    folder, which put yolo11n.pt into the project folder. A file of that name in the working
-    folder cwd wins, as a copy the user put there deliberately; otherwise the bare name
-    is looked up in the folder of YOLO_CONFIG_DIR in environ (base/.cache/ultralytics if
-    unset; a value the user set is kept). The default file an older version
-    downloaded into base is no such copy, also when cwd is base: it is moved into that folder
+    folder, so a default weights file can lie in the project folder base. A file of that name
+    in the working folder cwd wins, as a copy the user put there deliberately; otherwise the
+    bare name is looked up in the folder of YOLO_CONFIG_DIR in environ
+    (base/.cache/ultralytics if unset; a value the user set is kept). A default weights file
+    in base is a download, not such a copy, also when cwd is base: it is moved into that folder
     once, unless a copy is there already (kept and used where it is if it cannot be moved;
     log, if given, gets a line about it). Any other path or URL is used as given.
     """
@@ -136,9 +136,9 @@ def find_yolo_weights(name, base, cwd, environ):
     """Return (found, cached) for the bare weights file name, without moving or downloading anything.
 
     found is the file the detector loads, looked up as yolo_weights does: a file in the
-    working folder cwd (not the default file of an older version's download in base,
-    also when cwd is base), the one in the folder of YOLO_CONFIG_DIR in environ
-    (base/.cache/ultralytics if unset), that older download (yolo_weights moves it); None if
+    working folder cwd (not a default weights file downloaded into base, also when cwd is
+    base), the one in the folder of YOLO_CONFIG_DIR in environ (base/.cache/ultralytics if
+    unset), that download in base (yolo_weights moves it); None if
     there is none, so it is downloaded on first use. cached is the path in that cache
     folder, where a download goes. The free disk space check uses it too.
     """
