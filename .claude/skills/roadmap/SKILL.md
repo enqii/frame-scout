@@ -29,6 +29,9 @@ section 3):
 - GitHub CLI: use plain `gh …` (matches the permission rules in `.claude/settings.json`);
   the fallback path is in `CLAUDE.md` → "Git and commits" (it prompts).
 - Repository: `enqii/frame-scout`, base branch `main`.
+- Label fallback: `gh pr edit` can fail with a Projects-classic GraphQL error (`projectCards`). Switch labels
+  through the REST API instead: `gh api -X DELETE repos/enqii/frame-scout/issues/<n>/labels/<old>` and
+  `gh api -X POST repos/enqii/frame-scout/issues/<n>/labels -f 'labels[]=<new>'` (I54).
 - Branch, push and user-data rules: `CLAUDE.md` → "PR workflow".
 
 ## 1. Reconstruct state (every start – you are stateless)
@@ -70,7 +73,7 @@ Check the rows top to bottom; the first match decides.
 | No open roadmap PR | Take the next unchecked roadmap item → spawn an **implementer** (mode `new`). If no item is left, report that the roadmap is done. |
 | PR labeled `fs:in-progress`, draft | Spawn a new **implementer** (mode `continue`) on the existing branch; it reads PR text, commits, diff and comments itself. |
 | PR labeled `fs:in-progress`, not draft, not reviewed (step 6) | Spawn a fresh **reviewer**. If its report says "not posted" / "nothing posted", or no `Review complete` comment exists after it ended, apply "Review posting check" below; never spawn a second reviewer. |
-| PR labeled `fs:in-progress`, not draft, reviewed, and the `Review complete` comment says `0 findings` | No `address-review` implementer (it would have nothing to answer). Check that the PR has no review comments (`gh api repos/enqii/frame-scout/pulls/<n>/comments --jq length` is 0, "Review posting check" below) and that every CI check of the head commit `headRefOid` is green (`gh pr checks <n>`). Then switch the label yourself (`gh pr edit <n> --remove-label fs:in-progress --add-label fs:ready`) and continue with the next row's report. |
+| PR labeled `fs:in-progress`, not draft, reviewed, and the `Review complete` comment says `0 findings` | No `address-review` implementer (it would have nothing to answer). Check that the PR has no review comments (`gh api repos/enqii/frame-scout/pulls/<n>/comments --jq length` is 0, "Review posting check" below) and that every CI check of the head commit `headRefOid` is green (`gh pr checks <n>`). Then switch the label yourself (`gh pr edit <n> --remove-label fs:in-progress --add-label fs:ready`; if that fails with the Projects-classic GraphQL error, use the REST fallback in "Tooling notes") and continue with the next row's report. |
 | PR labeled `fs:in-progress`, not draft, reviewed (1 or more findings) | First check that the findings are on the PR ("Review posting check" below). Then spawn a **fresh** implementer (mode `address-review`) for all unanswered review comments; never continue the previous implementer with `SendMessage`. Afterwards the PR goes to `fs:ready`: there is **no second review round**. |
 | PR labeled `fs:ready` | Report to the user (PR link, summary, addressed/declined findings, tests executed vs. not executed, CI status from `gh pr checks <n>` for the head commit `headRefOid`, open risks) and **wait for explicit merge approval**. Base the report on the implementer's final report and `gh pr view <n> --json title,body,headRefOid`; do not read the diff or comment threads yourself. Before reporting, run the worktree cleanup (section 4) so that no agent worktree holds the PR branch, and end the report with the commands for the user's manual test in the main checkout: `git fetch origin`, `git switch <branch>`, and `git switch main` again before the merge (I38). |
 

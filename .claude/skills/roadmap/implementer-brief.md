@@ -143,7 +143,7 @@ second review follows your fixes):
    finding with its outcome, and post the same summary as a PR comment.
 4. Re-run the tests locally, wait quietly for CI on the latest push as above (every
    check must pass), then
-   `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:ready`.
+   `gh pr edit {PR} --remove-label fs:in-progress --add-label fs:ready`. If it fails with the Projects-classic GraphQL error, use the REST fallback in `SKILL.md` → "Tooling notes".
 
 ## Hold points
 
