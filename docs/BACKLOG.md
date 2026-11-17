@@ -195,21 +195,6 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       dependency (hold point). Found on 2026-11-12 in a simplification review.
       Triage 2026-11-13: decided separately and later; the UI rebuild P32–P37 stays within
       Streamlit. **Question:** Streamlit or a local server with an HTML frontend.
-- [ ] `ready` **A53 – The tooltips of the results toolbar stay open:** after "Review one by one" is
-      closed with Esc, and after the popover "Export and copy" is closed with Esc, the
-      tooltips of both buttons stay visible, overlapping each other, and more tooltips pile up
-      while the user works (one for "Scan" in the Settings tab). They also float over other
-      tabs (top left of the Settings tab) until the page is reloaded. Reproduced in the light
-      and the dark theme, Streamlit 1.66.1, Chrome. Cause not examined (focus returns to the
-      button after the dialog or popover closes). Found in the pass of A52.
-- [ ] `ready` **A54 – The header is squeezed at window widths of about 680–1100 px:** the F27 state
-      line sits next to the title, so the title column gets only about 200–300 px: at 680–800
-      px the title breaks inside the word ("FrameSco" / "ut"), up to about 1100 px the icon
-      wraps onto its own line above the title, and the header is 50–100 px taller than at
-      1200 px and wider (one line) and at 640 px and narrower (state line below the title).
-      A half-screen window is typical for this. Whether the header jumps when the 2 s update
-      changes the length of the state text was not measured (no search was running at those
-      widths). Found in the pass of A52 (the open question of PR #108).
 - [ ] `minor` **A58 – Parts of A52 that the second pass could not check:** open are the page change
       of the results (12 generated photos fit on one page), the contents of "Clean up
       storage" with entries (the scan listed eleven times "nothing to clean up"), person
@@ -219,7 +204,9 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       a profile with a reference image (the reference photo scores 1.000), the dark theme
       (cards, marks, dialog, popover), the popover "Export and copy" at 420 px, copy and
       export notices. Photo set: 12 generated images, not real photos; the narrow widths
-      were an iframe of that width in Chrome. Kind `docs`.
+      were an iframe of that width in Chrome. Also open: the fixes of A53 and A54 in a
+      browser ([PR #158](https://github.com/enqii/frame-scout/pull/158) was not
+      browser-tested). Kind `docs`.
 
 ### Installation / project
 
