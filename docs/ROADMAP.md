@@ -34,7 +34,7 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       texts, drop `_same_folder`; simple rule for `low_space` (I44 step 2; kind `code`) – 2026-11-17 ([#149](https://github.com/enqii/frame-scout/pull/149))
 
 ### P53 – Rules and project history (added 2026-11-17)
-- [ ] Rules in `CLAUDE.md` and the `/roadmap` briefs: no project history in code comments and
+- [x] Rules in `CLAUDE.md` and the `/roadmap` briefs: no project history in code comments and
       docstrings, tests only for what is necessary (F54, F55; kind `docs`)
 - [ ] Remove the project history from `framescout_core/` and its tests (F54; kind `code`, no
       behavior change)
