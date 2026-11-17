@@ -19,35 +19,26 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
 - [~] (B) Measure thread counts and YOLO batches on a real CPU and GPU (E17, E18; changing
       detection results is a hold point) – deferred 2026-11-02 by user: needs home PC hardware
 
-### P44 – Simplify (added 2026-11-16)
-- [x] Support Python 3.14 only: one CI job, no version fallbacks, shorter docs (I50; kind `code`)
-      (done 2026-11-16 in PR #129)
-- [x] Delete or shorten outdated documents: `docs/UI-REVIEW.md`, the closed ideas in
-      `docs/IDEAS.md` (I51; kind `docs`; adapts the rule in `CLAUDE.md` → "Triage")
-      (done 2026-11-16 in PR #130)
+### P48 – Workflow and tests (added 2026-11-17)
+- [ ] State machine row for a review with 0 findings in the `/roadmap` skill (I52; kind `docs`)
+- [ ] Fix the cleanup test that fails when the temporary folder is a mount point (I53; kind `code`)
 
-### P45 – Workflow (added 2026-11-16)
-- [x] Subagents read their brief themselves instead of the orchestrator copying it (I49; kind `docs`)
-      (done 2026-11-16 in PR #131)
+### P49 – Simplify the rare-case handling (added 2026-11-17)
+- [ ] List per module (`cleanup.py`, `uninstall.py`, `install_check.py`, `disk_space.py`) what
+      defensive handling would go; the user decides the removal afterwards (I44 step 1; kind `docs`)
 
-### P46 – Interface follow-ups (added 2026-11-16)
-- [x] Reasons for the other disabled run buttons (F37; kind `code`)
-      (done 2026-11-16 in PR #133)
-- [x] Hygiene bundle: pre-search count of partner photos, long captions, popover "More" closes,
-      narrower popover "Export and copy" (A48, A51, F41, F43; kind `code`)
-      (done 2026-11-16 in PR #134)
-- [x] Second browser pass over the parts not looked at; findings become backlog items (A52; kind `docs`)
-      (done 2026-11-16 in PR #135)
+### P50 – Interface follow-ups 2 (added 2026-11-17)
+- [ ] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a
+      profile title, result cards in a narrow window, height of the "More" button
+      (A55, A56, A57, A59; kind `code`)
+- [ ] Tooltips that stay open and the squeezed header at 680–1100 px (A53, A54; kind `code`)
 
-### P47 – Linux (WSL) (added 2026-11-16; private Python 3.14 like Windows, user decision)
-- [x] `ubuntu-latest` in the CI matrix and fix what fails (F47 part 1; kind `code`)
-      (done 2026-11-16 in PR #136)
-- [x] `.sh` scripts for install, start, check and uninstall with a private Python 3.14 and its
-      checksum (F47 part 2; kind `code-risky`; new download approved 2026-11-16)
-      (done 2026-11-16 in PR #137)
-- [x] Linux driver minimums, uninstaller paths, platform-specific messages (F47 part 3; kind
-      `code`; the run in WSL2 is F48, not scheduled)
-      (done 2026-11-16 in PR #139)
+### P51 – Excel-friendly CSV (added 2026-11-17)
+- [ ] "Separator: comma / semicolon" choice for the result export (F9; kind `code`)
+
+### P52 – Score distribution (added 2026-11-17)
+- [ ] Collapsed score histogram per profile with an additive `results.json` field (F53; kind
+      `code`; the caption says scores are relative heuristics)
 
 ### P4b – Search models (evaluate at home first; paused by user decision 2026-10-27)
 - [ ] Evaluate the offered search models and trim the list (E32; the user labels a new

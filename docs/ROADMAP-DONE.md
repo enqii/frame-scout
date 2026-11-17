@@ -265,3 +265,33 @@ decision in PR #14):
 ### P43 – Package structure (added 2026-11-15)
 - [x] Flatten `framescout_core/__init__.py` and the `framescout_scoring` package (I45; after P42)
       (done 2026-11-16 in PR #126)
+
+### P44 – Simplify (added 2026-11-16)
+- [x] Support Python 3.14 only: one CI job, no version fallbacks, shorter docs (I50; kind `code`)
+      (done 2026-11-16 in PR #129)
+- [x] Delete or shorten outdated documents: `docs/UI-REVIEW.md`, the closed ideas in
+      `docs/IDEAS.md` (I51; kind `docs`; adapts the rule in `CLAUDE.md` → "Triage")
+      (done 2026-11-16 in PR #130)
+
+### P45 – Workflow (added 2026-11-16)
+- [x] Subagents read their brief themselves instead of the orchestrator copying it (I49; kind `docs`)
+      (done 2026-11-16 in PR #131)
+
+### P46 – Interface follow-ups (added 2026-11-16)
+- [x] Reasons for the other disabled run buttons (F37; kind `code`)
+      (done 2026-11-16 in PR #133)
+- [x] Hygiene bundle: pre-search count of partner photos, long captions, popover "More" closes,
+      narrower popover "Export and copy" (A48, A51, F41, F43; kind `code`)
+      (done 2026-11-16 in PR #134)
+- [x] Second browser pass over the parts not looked at; findings become backlog items (A52; kind `docs`)
+      (done 2026-11-16 in PR #135)
+
+### P47 – Linux (WSL) (added 2026-11-16; private Python 3.14 like Windows, user decision)
+- [x] `ubuntu-latest` in the CI matrix and fix what fails (F47 part 1; kind `code`)
+      (done 2026-11-16 in PR #136)
+- [x] `.sh` scripts for install, start, check and uninstall with a private Python 3.14 and its
+      checksum (F47 part 2; kind `code-risky`; new download approved 2026-11-16)
+      (done 2026-11-16 in PR #137)
+- [x] Linux driver minimums, uninstaller paths, platform-specific messages (F47 part 3; kind
+      `code`; the run in WSL2 is F48, not scheduled)
+      (done 2026-11-16 in PR #139)
