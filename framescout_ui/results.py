@@ -178,6 +178,9 @@ def show_results(results, quick, photo_folders, folders, model, find_disabled):
     (show_quick_results); model: the search model the AI settings choose now;
     find_disabled: whether "Find similar" is disabled (find_similar_button).
     """
+    # taken in every run of this part, also one that shows no profile gallery: a copy
+    # request is never kept to copy photos in a later, unrelated run
+    copy_request = st.session_state.pop('copy_request', None)
     entries = results['profiles'] if results else []
     if not entries and not quick:
         close_review()  # no list to review
@@ -207,17 +210,18 @@ def show_results(results, quick, photo_folders, folders, model, find_disabled):
     if name == quick_option:
         show_quick_results(quick, folders, model, find_disabled, toolbar)
     else:
-        show_profile_results(results, name, photo_folders, model, find_disabled, toolbar)
+        show_profile_results(results, name, photo_folders, model, find_disabled, toolbar, copy_request)
 
 
-def show_profile_results(results, name, photo_folders, model, find_disabled, toolbar):
+def show_profile_results(results, name, photo_folders, model, find_disabled, toolbar, copy_request):
     """The gallery of the profile name of the last search as a grid of thumbnails.
 
     With a mark per photo and copying of the matches; photo_folders: the folders a
     copy target must not be in; model and find_disabled as in show_results. toolbar: the
     row above the photos, which gets the counts of the marks, "Hide no match", the page
     box and the popover "Export and copy"; the notes for exceptional states follow below it
-    only when they apply, a second pager below the grid.
+    only when they apply, a second pager below the grid. copy_request: the copy the
+    button "Copy marked photos" asked for (request_copy), or None.
     """
     entries = results['profiles']
     try:
@@ -284,7 +288,7 @@ def show_profile_results(results, name, photo_folders, model, find_disabled, too
             show_export(name, entry, marks, marks_error, EXPORT_POPOVER)
     with notices:
         # the copy the popover's button asked for, with its progress bar, and the export's result
-        run_copy_request(name, photo_folders)
+        run_copy_request(copy_request, name, photo_folders)
         show_notice('export_notice')
     shown, hidden = hide_no_match(page_cards(entry['cards'], page, GALLERY_PAGE_SIZE), marks if hide else {})
     for card in shown:
