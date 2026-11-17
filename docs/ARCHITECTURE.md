@@ -407,7 +407,8 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   deletes `.venv/bin/python` and `.python/bin/python3` first and tells a running app only by
   its start lock (`app_running`, on Windows too; a lock that only looks held gets the start
   script's way out, `stale_lock_hint`): Linux deletes files in use, so a Python of the
-  environment running without that lock is not reported at all; the check takes a `home` of `.python/bin` for the private Python `.python`.
+  environment running without that lock is not reported at all; the check takes a `home` of
+  `.python/bin` for the private Python `.python`.
 
 ## Environment variables, caches and offline loading
 
