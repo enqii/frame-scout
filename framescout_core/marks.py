@@ -43,6 +43,9 @@ CARD_KEY_PREFIX = 'fscard-'
 # CARD_KEY_PREFIX, whose selector would match them too
 PHOTO_KEY_PREFIX = 'fsphoto-'
 PREVIEW_KEY_PREFIX = 'fspreview-'
+# the width of a gallery card in pixels: fixed, so a wider window shows more cards in a
+# row
+CARD_WIDTH = 250
 # equal cells: the photo of every card is fitted whole into a square box (as in the
 # HTML gallery), so portrait and landscape photos give cards of one height; CSS, so the
 # thumbnails and the cache signature stay as they are. Streamlit sizes the elements around an
@@ -57,7 +60,17 @@ CARD_STYLE = (f'<style>{_CARD} :is(div:has(> [data-testid="stImage"]), [data-tes
               f'[class*="st-key-{PREVIEW_KEY_PREFIX}"]{{position:absolute;inset:0;width:auto!important;z-index:1}}'
               f'[class*="st-key-{PREVIEW_KEY_PREFIX}"] :is(div, button){{width:100%!important;height:100%!important}}'
               f'[class*="st-key-{PREVIEW_KEY_PREFIX}"] button{{opacity:0;cursor:zoom-in}}'
-              f'[class*="st-key-{PREVIEW_KEY_PREFIX}"] button:focus-visible{{opacity:0.85}}</style>')
+              f'[class*="st-key-{PREVIEW_KEY_PREFIX}"] button:focus-visible{{opacity:0.85}}'
+              # a row too narrow for two cards (the gap between them is 1rem, Streamlit's
+              # "small") shows one card across the whole row, not one of CARD_WIDTH and
+              # an empty rest; the row is the element whose children wrap the cards, and
+              # the wrapper of a card gets its width from flex-basis
+              f'div:has(> [data-testid="stLayoutWrapper"] > {_CARD}){{container-type:inline-size}}'
+              f'@container (width < calc(2 * {CARD_WIDTH}px + 1rem)){{'
+              f'[data-testid="stLayoutWrapper"]:has(> {_CARD}){{flex-basis:100%!important}}'
+              f'{_CARD}{{width:100%!important}}}}'
+              # the button "More" as high as the buttons "Match" / "No" next to it
+              f'{_CARD} [data-testid="stPopoverButton"]{{min-height:2rem}}</style>')
 # the Streamlit version whose internals mark_style was checked against (its frontend bundle:
 # the key class st-key-<key>, data-variant="segmented_control" on the buttons and the
 # data-selected attribute of the selected one);

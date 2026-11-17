@@ -3,7 +3,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from framescout_core.marks import (CARD_KEY_PREFIX, CARD_STYLE, MARKS_FILE, MARK_OPEN, PHOTO_KEY_PREFIX,
+from framescout_core.marks import (CARD_KEY_PREFIX, CARD_STYLE, CARD_WIDTH, MARKS_FILE, MARK_OPEN, PHOTO_KEY_PREFIX,
                                    PREVIEW_KEY_PREFIX, hidden_text, hide_no_match, mark_counts_text, mark_style,
                                    progress_text, review_progress)
 from framescout_core.models import MODELS, results_model
@@ -21,9 +21,6 @@ from .copy_export import run_copy_request, show_copy, show_export
 from .review import close_review, find_similar_button, open_review, show_review
 
 
-# the width of a gallery card in pixels: fixed, so a wider window shows more cards in a
-# row
-CARD_WIDTH = 250
 # the cell of a card without a thumbnail, as tall as one with a photo (CARD_STYLE); the
 # margin is the one a Markdown paragraph has: Streamlit (1.66.1) gives every Markdown
 # container margin-bottom -1rem (its spacing "lg") to cancel its last paragraph's 1rem, which
