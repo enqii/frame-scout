@@ -30,8 +30,8 @@ done are in [docs/ROADMAP-DONE.md](ROADMAP-DONE.md).
       (a)-(f) (I44 step 2; kind `code-risky`; deletion rules and `NEVER_DELETED` stay) – 2026-11-17 ([#146](https://github.com/enqii/frame-scout/pull/146))
 - [x] `uninstall.py`: drop `outside_leftovers`, the read-only retry and `_held_open` (I44 step 2;
       kind `code`) – 2026-11-17 ([#148](https://github.com/enqii/frame-scout/pull/148))
-- [ ] `install_check.py` and `disk_space.py`: drop the model-cache probe, merge the PyTorch
-      texts, drop `_same_folder`; simple rule for `low_space` (I44 step 2; kind `code`)
+- [x] `install_check.py` and `disk_space.py`: drop the model-cache probe, merge the PyTorch
+      texts, drop `_same_folder`; simple rule for `low_space` (I44 step 2; kind `code`) – 2026-11-17 ([#149](https://github.com/enqii/frame-scout/pull/149))
 
 ### P50 – Interface follow-ups 2 (added 2026-11-17)
 - [ ] Hygiene bundle: notices of "Export and copy" behind the popover, dangling " · " in a

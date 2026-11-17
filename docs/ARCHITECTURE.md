@@ -374,7 +374,18 @@ cache rows, marks, references and galleries. All deletes are permanent. Rules to
   Port 8501, else the next free up to 8510 (`port_free` makes the same bind Streamlit makes). Gap:
   an app started by hand holds no lock (F26).
 - **Check** (`Check-FrameScout.bat`, F15): read-only; exit 0 no problem, 2 problems found, anything
-  else means it could not run.
+  else means it could not run. Simplified in I44: every failed PyTorch import gives one text
+  ("does not import: <last stderr line or error>"); the private Python of `pyvenv.cfg` is compared
+  with the folder's `.python` by path (`normcase`), so a folder installed through a link or an 8.3
+  short name is reported as "another folder"; the model files are listed without a probe of their
+  own (`downloaded_models` still leaves out a hub cache whose drive does not answer, which then reads
+  "not downloaded yet").
+- **Free-space warning** (`disk_space.low_space`, F3; installer, app, evaluation tool): one
+  `shutil.disk_usage` of the nearest existing folder per need, needs with the same usage tuple
+  (total, used, free) add up as one drive (I44). No probe: a results folder on a drive that does
+  not answer holds the check up until the OS gives up; only the download folders are probed
+  (`_download_needs`, `downloaded_models`). A write between two `disk_usage` calls can split one
+  drive in two (a missed warning, never a wrong one).
 - **Uninstall** (`Uninstall-FrameScout.bat [--dry-run]`, on Linux `.sh`, P5 part B): runs with the private
   `.python` (not with `.venv`'s Python, which cannot delete itself; without `.python` it only
   names the folders to delete by hand), refuses while a search runs, the app holds its start lock
