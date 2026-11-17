@@ -491,7 +491,7 @@ analysis from 2026-10-20 (state v1.1), extended by every pull request since. IDs
       `CLAUDE.md`, `.claude/skills/roadmap/` briefs, all Python modules and tests,
       `docs/ARCHITECTURE.md` where it relies on IDs in the code. Risks: a "why" that only the
       history note carried is rewritten as a reason, not deleted. Decided 2026-11-17: yes,
-      roadmap P53 (1)–(4); rule added in [PR #152](https://github.com/enqii/frame-scout/pull/152), `framescout_core/` (2) cleaned in [PR #153](https://github.com/enqii/frame-scout/pull/153), the root files (3) in [PR #154](https://github.com/enqii/frame-scout/pull/154) (except `.github/workflows/tests.yml`, I56), (4) is open. Size S (rule) + M (cleanup). Idea of 2026-11-17.
+      roadmap P53 (1)–(4); rule added in [PR #152](https://github.com/enqii/frame-scout/pull/152), `framescout_core/` (2) cleaned in [PR #153](https://github.com/enqii/frame-scout/pull/153), the root files (3) in [PR #154](https://github.com/enqii/frame-scout/pull/154) (except `.github/workflows/tests.yml`, I56), (4) `app.py`, `framescout_ui/` and their tests (`tests/app_source.py`, `test_app_source.py`, `test_settings_layout.py`) is open. Size S (rule) + M (cleanup). Idea of 2026-11-17.
 - [ ] `decision` **F56 – Feature review: what FrameScout really needs (recurring):** after I44 most
       of the size is features: search core about 3,400 lines, UI 2,700, user state 2,000,
       installation and housekeeping 3,200, extra features (time estimate, quick search,
