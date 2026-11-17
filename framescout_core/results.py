@@ -2,6 +2,7 @@
 import hashlib
 import html
 import json
+import math
 import os
 import re
 from collections import Counter
@@ -177,7 +178,8 @@ def histogram_bars(entry):
     if not isinstance(histogram, dict):
         return None
     low, high, counts = histogram.get('low'), histogram.get('high'), histogram.get('counts')
-    if (not _is_number(low) or not _is_number(high) or not low < high or not isinstance(counts, list) or not counts
+    if (not _is_number(low) or not _is_number(high) or not math.isfinite(low) or not math.isfinite(high)
+            or not low < high or not isinstance(counts, list) or not counts
             or not all(isinstance(c, int) and not isinstance(c, bool) and c >= 0 for c in counts)):
         return None
     width = (high - low) / len(counts)

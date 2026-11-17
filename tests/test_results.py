@@ -605,7 +605,8 @@ def test_histogram_bars_split_the_score_range_of_the_results_file(tmp_path):
 
 @pytest.mark.parametrize('histogram', ['x', {'low': 1.0, 'high': 1.0, 'counts': [1]},
                                        {'low': 0, 'high': 1, 'counts': []}, {'low': 0, 'high': 1, 'counts': [-1]},
-                                       {'low': 0, 'high': 1, 'counts': [True]}])
+                                       {'low': 0, 'high': 1, 'counts': [True]},
+                                       {'low': 0, 'high': float('inf'), 'counts': [1]}])
 def test_an_invalid_histogram_gives_no_chart_and_keeps_the_results_readable(tmp_path, histogram):
     assert histogram_bars(read_entry(tmp_path, histogram=histogram)) is None
     assert histogram_bars(read_entry(tmp_path)) is None  # results of older versions have none
